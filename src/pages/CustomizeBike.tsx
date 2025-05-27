@@ -1,9 +1,9 @@
-
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronLeft, RotateCcw, Share, Heart, Palette, Wrench, Settings } from "lucide-react";
+import { ChevronLeft, Share, Heart, Palette, Wrench, Settings } from "lucide-react";
+import BikeViewer3D from "@/components/BikeViewer3D";
 
 const bikeStyles = [
   { 
@@ -101,7 +101,7 @@ const CustomizeBike = () => {
   const bike = location.state?.bike;
   const [selectedStyle, setSelectedStyle] = useState("");
   const [selectedParts, setSelectedParts] = useState<Record<string, string>>({});
-  const [rotation, setRotation] = useState(0);
+  const [activeTab, setActiveTab] = useState("styles");
 
   if (!bike) {
     navigate("/my-bikes");
@@ -120,6 +120,21 @@ const CustomizeBike = () => {
     return total;
   };
 
+  const handlePartClick = (partId: string) => {
+    setActiveTab("parts");
+    // Scroll to the specific part section
+    setTimeout(() => {
+      const partElement = document.getElementById(`part-${partId}`);
+      if (partElement) {
+        partElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        partElement.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+        setTimeout(() => {
+          partElement.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+        }, 2000);
+      }
+    }, 100);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20">
       {/* Header */}
@@ -131,13 +146,10 @@ const CustomizeBike = () => {
             </Button>
             <div>
               <h1 className="text-xl font-bold">{bike.brand} {bike.model}</h1>
-              <p className="text-white/80 text-sm">Virtual Mod Shop</p>
+              <p className="text-white/80 text-sm">Interactive 3D Mod Shop</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
-              <RotateCcw className="w-4 h-4" />
-            </Button>
             <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
               <Share className="w-4 h-4" />
             </Button>
@@ -150,55 +162,11 @@ const CustomizeBike = () => {
           {/* 3D Bike View Area */}
           <div className="lg:sticky lg:top-24 h-fit">
             <div className="bike-card p-6">
-              <div className="relative h-96 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl overflow-hidden">
-                {/* 3D Bike Representation */}
-                <div 
-                  className="absolute inset-0 flex items-center justify-center cursor-grab active:cursor-grabbing"
-                  style={{ transform: `rotateY(${rotation}deg)` }}
-                  onMouseDown={(e) => {
-                    const startX = e.clientX;
-                    const startRotation = rotation;
-                    
-                    const handleMouseMove = (e: MouseEvent) => {
-                      const deltaX = e.clientX - startX;
-                      setRotation(startRotation + deltaX * 0.5);
-                    };
-                    
-                    const handleMouseUp = () => {
-                      document.removeEventListener('mousemove', handleMouseMove);
-                      document.removeEventListener('mouseup', handleMouseUp);
-                    };
-                    
-                    document.addEventListener('mousemove', handleMouseMove);
-                    document.addEventListener('mouseup', handleMouseUp);
-                  }}
-                >
-                  <div className="relative">
-                    <img 
-                      src={bike.image} 
-                      alt="3D Bike"
-                      className="w-80 h-60 object-contain filter drop-shadow-2xl"
-                    />
-                    
-                    {/* Interactive hotspots */}
-                    <div className="absolute top-8 left-16 w-3 h-3 bg-blue-500 rounded-full animate-pulse cursor-pointer" title="Headlight" />
-                    <div className="absolute top-12 left-32 w-3 h-3 bg-red-500 rounded-full animate-pulse cursor-pointer" title="Fuel Tank" />
-                    <div className="absolute top-20 left-40 w-3 h-3 bg-green-500 rounded-full animate-pulse cursor-pointer" title="Seat" />
-                    <div className="absolute bottom-16 right-20 w-3 h-3 bg-purple-500 rounded-full animate-pulse cursor-pointer" title="Exhaust" />
-                  </div>
-                </div>
-
-                {/* Controls overlay */}
-                <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
-                  <div className="glass-effect rounded-lg px-3 py-2">
-                    <p className="text-white text-sm font-medium">Drag to rotate • Click hotspots</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="bg-white/20 border-white/30 text-white hover:bg-white/30">
-                      <Settings className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+              <div className="h-96 w-full">
+                <BikeViewer3D 
+                  selectedParts={selectedParts} 
+                  onPartClick={handlePartClick}
+                />
               </div>
 
               {/* Current Build Summary */}
@@ -218,7 +186,7 @@ const CustomizeBike = () => {
 
           {/* Customization Panel */}
           <div className="space-y-4">
-            <Tabs defaultValue="styles" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3 bg-white shadow-sm">
                 <TabsTrigger value="styles" className="flex items-center gap-2">
                   <Palette className="w-4 h-4" />
@@ -271,7 +239,11 @@ const CustomizeBike = () => {
               <TabsContent value="parts" className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {bikeParts.map((part) => (
-                    <div key={part.id} className="bike-card p-4">
+                    <div 
+                      key={part.id} 
+                      id={`part-${part.id}`}
+                      className="bike-card p-4 transition-all duration-300"
+                    >
                       <div className="flex items-center gap-3 mb-3">
                         <span className="text-2xl">{part.icon}</span>
                         <h4 className="font-semibold text-gray-900">{part.name}</h4>
