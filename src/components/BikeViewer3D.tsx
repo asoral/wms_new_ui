@@ -1,6 +1,6 @@
 
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, PerspectiveCamera, useGLTF, Html } from '@react-three/drei';
+import { OrbitControls, Environment, Html } from '@react-three/drei';
 import { Suspense, useRef, useState } from 'react';
 import { Mesh } from 'three';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,6 @@ interface BikeViewer3DProps {
 function BikeModel({ selectedParts, onPartClick }: BikeViewer3DProps) {
   const meshRef = useRef<Mesh>(null);
   
-  // In a real app, you'd load actual 3D models here
-  // For now, we'll create a simplified bike using basic shapes
   return (
     <group ref={meshRef} position={[0, -1, 0]}>
       {/* Main Frame */}
