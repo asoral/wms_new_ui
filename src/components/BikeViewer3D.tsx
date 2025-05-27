@@ -2,7 +2,7 @@
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, Html } from '@react-three/drei';
 import { Suspense, useRef, useState } from 'react';
-import { Mesh } from 'three';
+import { Group } from 'three';
 import { Button } from '@/components/ui/button';
 import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -13,10 +13,10 @@ interface BikeViewer3DProps {
 
 // 3D Bike Model Component
 function BikeModel({ selectedParts, onPartClick }: BikeViewer3DProps) {
-  const meshRef = useRef<Mesh>(null);
+  const groupRef = useRef<Group>(null);
   
   return (
-    <group ref={meshRef} position={[0, -1, 0]}>
+    <group ref={groupRef} position={[0, -1, 0]}>
       {/* Main Frame */}
       <mesh position={[0, 0.5, 0]} onClick={() => onPartClick?.('frame')}>
         <boxGeometry args={[2, 0.1, 0.1]} />
@@ -121,6 +121,29 @@ function BikeModel({ selectedParts, onPartClick }: BikeViewer3DProps) {
             Suspension
           </div>
         </Html>
+      </mesh>
+
+      {/* Additional bike parts for more realism */}
+      {/* Handlebars */}
+      <mesh position={[1.3, 0.9, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.6, 8]} />
+        <meshStandardMaterial color="#2c3e50" metalness={0.8} roughness={0.3} />
+      </mesh>
+      
+      {/* Fork */}
+      <mesh position={[1.2, 0.1, 0.15]} rotation={[0.3, 0, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.8, 8]} />
+        <meshStandardMaterial color="#34495e" metalness={0.9} roughness={0.2} />
+      </mesh>
+      <mesh position={[1.2, 0.1, -0.15]} rotation={[0.3, 0, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.8, 8]} />
+        <meshStandardMaterial color="#34495e" metalness={0.9} roughness={0.2} />
+      </mesh>
+
+      {/* Engine block */}
+      <mesh position={[0, 0.2, 0]}>
+        <boxGeometry args={[0.6, 0.4, 0.4]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.7} roughness={0.4} />
       </mesh>
     </group>
   );
