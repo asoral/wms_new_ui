@@ -10,6 +10,7 @@ import Profile from "./pages/Profile";
 import Favorites from "./pages/Favorites";
 import BikeSelector from "./pages/BikeSelector";
 import CustomizeBike from "./pages/CustomizeBike";
+import PickList from "./pages/PickList";
 import BottomNav from "./components/BottomNav";
 import WMSNavigation from "./components/WMSNavigation";
 import NotFound from "./pages/NotFound";
@@ -36,7 +37,7 @@ const App = () => (
               <Route path="/bike-selector" element={<BikeSelector />} />
               <Route path="/customize/:bikeId" element={<CustomizeBike />} />
               
-              {/* WMS Routes - placeholder pages */}
+              {/* WMS Routes */}
               <Route path="/item-enquiry" element={<div className="p-8"><h1 className="text-2xl font-bold">Item Enquiry</h1><p>Item enquiry functionality coming soon...</p></div>} />
               <Route path="/bin-enquiry" element={<div className="p-8"><h1 className="text-2xl font-bold">Bin Enquiry</h1><p>Bin enquiry functionality coming soon...</p></div>} />
               <Route path="/stock-count" element={<div className="p-8"><h1 className="text-2xl font-bold">Stock Count</h1><p>Stock count functionality coming soon...</p></div>} />
@@ -44,7 +45,7 @@ const App = () => (
               <Route path="/deliver" element={<div className="p-8"><h1 className="text-2xl font-bold">Deliver</h1><p>Deliver functionality coming soon...</p></div>} />
               <Route path="/mat-request" element={<div className="p-8"><h1 className="text-2xl font-bold">Material Request</h1><p>Material request functionality coming soon...</p></div>} />
               <Route path="/stock-entry" element={<div className="p-8"><h1 className="text-2xl font-bold">Stock Entry</h1><p>Stock entry functionality coming soon...</p></div>} />
-              <Route path="/pick-list" element={<div className="p-8"><h1 className="text-2xl font-bold">Pick List</h1><p>Pick list functionality coming soon...</p></div>} />
+              <Route path="/pick-list" element={<PickList />} />
               <Route path="/packing" element={<div className="p-8"><h1 className="text-2xl font-bold">Packing</h1><p>Packing functionality coming soon...</p></div>} />
               <Route path="/print-label" element={<div className="p-8"><h1 className="text-2xl font-bold">Print Label</h1><p>Print label functionality coming soon...</p></div>} />
               <Route path="/quality-check" element={<div className="p-8"><h1 className="text-2xl font-bold">Quality Check</h1><p>Quality check functionality coming soon...</p></div>} />
