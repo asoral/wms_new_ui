@@ -5,13 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
-import MyBikes from "./pages/MyBikes";
-import Profile from "./pages/Profile";
-import Favorites from "./pages/Favorites";
-import BikeSelector from "./pages/BikeSelector";
-import CustomizeBike from "./pages/CustomizeBike";
 import PickList from "./pages/PickList";
-import BottomNav from "./components/BottomNav";
 import WMSNavigation from "./components/WMSNavigation";
 import NotFound from "./pages/NotFound";
 
@@ -28,14 +22,9 @@ const App = () => (
           <WMSNavigation />
           
           {/* Main Content Area */}
-          <div className="flex-1 md:ml-0">
+          <div className="flex-1">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/my-bikes" element={<MyBikes />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/bike-selector" element={<BikeSelector />} />
-              <Route path="/customize/:bikeId" element={<CustomizeBike />} />
               
               {/* WMS Routes */}
               <Route path="/item-enquiry" element={<div className="p-8"><h1 className="text-2xl font-bold">Item Enquiry</h1><p>Item enquiry functionality coming soon...</p></div>} />
