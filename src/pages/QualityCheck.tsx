@@ -2,24 +2,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardCheck, RefreshCcw, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TestTube, RefreshCcw, CheckCircle, XCircle, Clock, BarChart3 } from "lucide-react";
 import QualityDashboard from "../components/quality-check/QualityDashboard";
 import QualityInspectionList from "../components/quality-check/QualityInspectionList";
 import QualityInspectionForm from "../components/quality-check/QualityInspectionForm";
-
-export interface QualityInspection {
-  id: string;
-  inspectionType: string;
-  referenceType: "Item" | "Job Card" | "Batch" | "Serial No";
-  referenceName: string;
-  itemCode: string;
-  itemName: string;
-  status: "Draft" | "Submitted" | "Cancelled";
-  inspectionDate: string;
-  inspector: string;
-  parameters: QualityParameter[];
-}
 
 export interface QualityParameter {
   specification: string;
@@ -29,28 +16,31 @@ export interface QualityParameter {
   remarks?: string;
 }
 
-const QualityCheck = () => {
+export interface QualityInspection {
+  id: string;
+  itemCode: string;
+  itemName: string;
+  warehouse: string;
+  inspectionType: "Incoming" | "In-Process" | "Final" | "Customer Return";
+  status: "Draft" | "Submitted" | "Cancelled";
+  createdDate: string;
+  parameters: QualityParameter[];
+}
+
+export type InspectionType = "Incoming" | "In-Process" | "Final" | "Customer Return";
+
+const QualityCheckPage = () => {
   const [currentView, setCurrentView] = useState<"dashboard" | "list" | "create">("dashboard");
   const [selectedInspection, setSelectedInspection] = useState<QualityInspection | null>(null);
 
   const dashboardData = {
     qcWaiting: 8,
     qcFailed: 3,
-    qcCompleted: 156,
-    qcTesting: 5,
-    successRate: 94.2,
-    mostTestedItem: "Laptop Dell Inspiron",
-    mostRejectedItem: "USB Cable Type-C"
-  };
-
-  const handleSelectInspection = (inspection: QualityInspection) => {
-    setSelectedInspection(inspection);
-    setCurrentView("create");
-  };
-
-  const handleCreateNew = () => {
-    setSelectedInspection(null);
-    setCurrentView("create");
+    qcCompleted: 45,
+    qcTesting: 12,
+    successRate: 92.5,
+    mostTestedItem: "Raw Material A",
+    mostRejectedItem: "Component B"
   };
 
   const handleBackToDashboard = () => {
@@ -60,15 +50,30 @@ const QualityCheck = () => {
 
   const handleBackToList = () => {
     setCurrentView("list");
+    setSelectedInspection(null);
+  };
+
+  const handleViewInspections = () => {
+    setCurrentView("list");
+  };
+
+  const handleCreateInspection = () => {
+    setCurrentView("create");
+    setSelectedInspection(null);
+  };
+
+  const handleEditInspection = (inspection: QualityInspection) => {
+    setSelectedInspection(inspection);
+    setCurrentView("create");
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div className="flex items-center space-x-3">
-            <ClipboardCheck className="w-6 h-6 text-green-600" />
+            <TestTube className="w-6 h-6 text-purple-600" />
             <h1 className="text-2xl font-bold text-gray-900">Quality Check</h1>
           </div>
           <div className="flex items-center space-x-2">
@@ -82,34 +87,39 @@ const QualityCheck = () => {
         {currentView === "dashboard" && (
           <div className="space-y-6">
             <QualityDashboard 
-              data={dashboardData}
-              onViewInspections={() => setCurrentView("list")}
-              onCreateInspection={handleCreateNew}
+              qcWaiting={dashboardData.qcWaiting}
+              qcFailed={dashboardData.qcFailed}
+              qcCompleted={dashboardData.qcCompleted}
+              qcTesting={dashboardData.qcTesting}
+              successRate={dashboardData.successRate}
+              mostTestedItem={dashboardData.mostTestedItem}
+              mostRejectedItem={dashboardData.mostRejectedItem}
+              onViewInspections={handleViewInspections}
+              onCreateInspection={handleCreateInspection}
             />
           </div>
         )}
 
         {currentView === "list" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <h2 className="text-xl font-semibold">Quality Inspections</h2>
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex space-x-2">
+                <Button onClick={handleCreateInspection}>
+                  New Inspection
+                </Button>
                 <Button variant="outline" onClick={handleBackToDashboard}>
                   Back to Dashboard
                 </Button>
-                <Button onClick={handleCreateNew} className="flex items-center space-x-2">
-                  <Plus className="w-4 h-4" />
-                  <span>Create New</span>
-                </Button>
               </div>
             </div>
-            <QualityInspectionList onSelectInspection={handleSelectInspection} />
+            <QualityInspectionList onEditInspection={handleEditInspection} />
           </div>
         )}
 
         {currentView === "create" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <h2 className="text-xl font-semibold">
                 {selectedInspection ? "Edit Inspection" : "Create Quality Inspection"}
               </h2>
@@ -119,7 +129,8 @@ const QualityCheck = () => {
             </div>
             <QualityInspectionForm 
               inspection={selectedInspection}
-              onBack={handleBackToList}
+              onSave={() => handleBackToList()}
+              onCancel={() => handleBackToList()}
             />
           </div>
         )}
@@ -128,4 +139,4 @@ const QualityCheck = () => {
   );
 };
 
-export default QualityCheck;
+export default QualityCheckPage;

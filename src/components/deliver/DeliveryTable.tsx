@@ -27,11 +27,11 @@ const DeliveryTable = ({ entries }: DeliveryTableProps) => {
   const getVarianceBadge = (toDeliver: number, actual: number) => {
     const difference = actual - toDeliver;
     if (difference === 0) {
-      return <Badge className="bg-green-100 text-green-800">Exact</Badge>;
+      return <Badge className="bg-green-100 text-green-800 border-green-300">Exact</Badge>;
     } else if (difference > 0) {
-      return <Badge className="bg-blue-100 text-blue-800">+{difference}</Badge>;
+      return <Badge className="bg-blue-100 text-blue-800 border-blue-300">+{difference}</Badge>;
     } else {
-      return <Badge className="bg-red-100 text-red-800">{difference}</Badge>;
+      return <Badge className="bg-red-100 text-red-800 border-red-300">{difference}</Badge>;
     }
   };
 
@@ -43,42 +43,46 @@ const DeliveryTable = ({ entries }: DeliveryTableProps) => {
             <CardContent className="p-4">
               <div className="space-y-3">
                 <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-lg">{entry.itemCode}</h3>
-                    <p className="text-gray-600 text-sm">{entry.itemName}</p>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg text-gray-900">{entry.itemCode}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{entry.itemName}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg">{formatCurrency(entry.actualQty * entry.rate)}</p>
+                  <div className="text-right ml-3">
+                    <p className="font-bold text-lg text-green-600">{formatCurrency(entry.actualQty * entry.rate)}</p>
                     <p className="text-sm text-gray-600">{formatCurrency(entry.rate)}/unit</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">Warehouse:</span>
-                    <p className="font-medium">{entry.warehouse}</p>
+                    <span className="text-gray-600 font-medium">Warehouse:</span>
+                    <p className="font-semibold mt-1">{entry.warehouse}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">To Deliver:</span>
-                    <p className="font-medium">{entry.qtyToDeliver}</p>
+                    <span className="text-gray-600 font-medium">To Deliver:</span>
+                    <p className="font-semibold mt-1">{entry.qtyToDeliver} {entry.uom}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Actual Qty:</span>
-                    <p className="font-medium">{entry.actualQty}</p>
+                    <span className="text-gray-600 font-medium">Actual Qty:</span>
+                    <p className="font-semibold mt-1">{entry.actualQty} {entry.uom}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Variance:</span>
+                    <span className="text-gray-600 font-medium">Variance:</span>
                     <div className="mt-1">{getVarianceBadge(entry.qtyToDeliver, entry.actualQty)}</div>
                   </div>
                 </div>
 
                 {(entry.batch || entry.serial) && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
                     {entry.batch && (
-                      <Badge variant="outline">Batch: {entry.batch}</Badge>
+                      <Badge variant="outline" className="bg-gray-50">
+                        Batch: {entry.batch}
+                      </Badge>
                     )}
                     {entry.serial && (
-                      <Badge variant="outline">Serial: {entry.serial}</Badge>
+                      <Badge variant="outline" className="bg-gray-50">
+                        Serial: {entry.serial}
+                      </Badge>
                     )}
                   </div>
                 )}
@@ -96,11 +100,11 @@ const DeliveryTable = ({ entries }: DeliveryTableProps) => {
         )}
 
         {entries.length > 0 && (
-          <Card className="bg-gray-50">
+          <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
             <CardContent className="p-4">
               <div className="text-center space-y-2">
                 <p className="text-sm text-gray-600">Total Items: {entries.length}</p>
-                <p className="text-xl font-bold">Total Value: {formatCurrency(getTotalValue())}</p>
+                <p className="text-xl font-bold text-green-700">Total Value: {formatCurrency(getTotalValue())}</p>
               </div>
             </CardContent>
           </Card>
@@ -112,26 +116,26 @@ const DeliveryTable = ({ entries }: DeliveryTableProps) => {
   // Desktop table view
   return (
     <div className="space-y-4">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Item Code</TableHead>
-              <TableHead>Item Name</TableHead>
-              <TableHead>Warehouse</TableHead>
-              <TableHead>Batch/Serial</TableHead>
-              <TableHead className="text-right">To Deliver</TableHead>
-              <TableHead className="text-right">Actual Qty</TableHead>
-              <TableHead className="text-center">Variance</TableHead>
-              <TableHead className="text-right">Rate</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+            <TableRow className="bg-gray-50">
+              <TableHead className="font-semibold">Item Code</TableHead>
+              <TableHead className="font-semibold">Item Name</TableHead>
+              <TableHead className="font-semibold">Warehouse</TableHead>
+              <TableHead className="font-semibold">Batch/Serial</TableHead>
+              <TableHead className="text-right font-semibold">To Deliver</TableHead>
+              <TableHead className="text-right font-semibold">Actual Qty</TableHead>
+              <TableHead className="text-center font-semibold">Variance</TableHead>
+              <TableHead className="text-right font-semibold">Rate</TableHead>
+              <TableHead className="text-right font-semibold">Amount</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.map((entry, index) => (
-              <TableRow key={index}>
+              <TableRow key={index} className="hover:bg-gray-50">
                 <TableCell className="font-medium">{entry.itemCode}</TableCell>
-                <TableCell>{entry.itemName}</TableCell>
+                <TableCell className="max-w-48 truncate">{entry.itemName}</TableCell>
                 <TableCell>{entry.warehouse}</TableCell>
                 <TableCell>
                   {entry.batch && (
@@ -148,8 +152,8 @@ const DeliveryTable = ({ entries }: DeliveryTableProps) => {
                     <span className="text-gray-400">-</span>
                   )}
                 </TableCell>
-                <TableCell className="text-right font-medium">{entry.qtyToDeliver}</TableCell>
-                <TableCell className="text-right font-medium">{entry.actualQty}</TableCell>
+                <TableCell className="text-right font-medium">{entry.qtyToDeliver} {entry.uom}</TableCell>
+                <TableCell className="text-right font-medium">{entry.actualQty} {entry.uom}</TableCell>
                 <TableCell className="text-center">
                   {getVarianceBadge(entry.qtyToDeliver, entry.actualQty)}
                 </TableCell>
@@ -171,10 +175,10 @@ const DeliveryTable = ({ entries }: DeliveryTableProps) => {
 
       {entries.length > 0 && (
         <div className="flex justify-end">
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
             <div className="text-right">
               <p className="text-sm text-gray-600">Total Items: {entries.length}</p>
-              <p className="text-lg font-bold">Total Value: {formatCurrency(getTotalValue())}</p>
+              <p className="text-lg font-bold text-green-700">Total Value: {formatCurrency(getTotalValue())}</p>
             </div>
           </div>
         </div>
