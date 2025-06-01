@@ -16,6 +16,7 @@ import StockEntry from "./pages/StockEntry";
 import Packing from "./pages/Packing";
 import PrintLabel from "./pages/PrintLabel";
 import QualityCheck from "./pages/QualityCheck";
+import Pallet from "./pages/Pallet";
 import WMSNavigation from "./components/WMSNavigation";
 import NotFound from "./pages/NotFound";
 
@@ -48,7 +49,7 @@ const App = () => (
               <Route path="/packing" element={<Packing />} />
               <Route path="/print-label" element={<PrintLabel />} />
               <Route path="/quality-check" element={<QualityCheck />} />
-              <Route path="/pallet" element={<div className="p-8"><h1 className="text-2xl font-bold">Pallet</h1><p>Pallet functionality coming soon...</p></div>} />
+              <Route path="/pallet" element={<Pallet />} />
               
               <Route path="*" element={<NotFound />} />
             </Routes>

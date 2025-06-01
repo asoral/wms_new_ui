@@ -38,27 +38,27 @@ const DeliveryProcess = ({ salesOrder, onBack }: DeliveryProcessProps) => {
       {/* Sales Order Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Sales Order Summary
+          <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span>Sales Order Summary</span>
             <Badge>{salesOrder.status}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{salesOrder.number}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="text-center p-3 bg-blue-50 rounded-lg">
+              <div className="text-xl md:text-2xl font-bold text-blue-600">{salesOrder.number}</div>
               <div className="text-sm text-gray-600">Order Number</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">{salesOrder.customer}</div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-lg md:text-2xl font-bold text-gray-900 break-words">{salesOrder.customer}</div>
               <div className="text-sm text-gray-600">Customer</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{salesOrder.totalItems}</div>
+            <div className="text-center p-3 bg-green-50 rounded-lg">
+              <div className="text-xl md:text-2xl font-bold text-green-600">{salesOrder.totalItems}</div>
               <div className="text-sm text-gray-600">Total Items</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{formatCurrency(salesOrder.totalValue)}</div>
+            <div className="text-center p-3 bg-purple-50 rounded-lg">
+              <div className="text-lg md:text-2xl font-bold text-purple-600">{formatCurrency(salesOrder.totalValue)}</div>
               <div className="text-sm text-gray-600">Total Value</div>
             </div>
           </div>
@@ -67,7 +67,7 @@ const DeliveryProcess = ({ salesOrder, onBack }: DeliveryProcessProps) => {
 
       {/* Delivery Process */}
       <Tabs defaultValue="scan" className="space-y-4">
-        <TabsList className="grid grid-cols-2 w-full max-w-md">
+        <TabsList className="grid grid-cols-2 w-full max-w-md mx-auto">
           <TabsTrigger value="scan">Scan Items</TabsTrigger>
           <TabsTrigger value="review">Review & Submit</TabsTrigger>
         </TabsList>
@@ -80,11 +80,11 @@ const DeliveryProcess = ({ salesOrder, onBack }: DeliveryProcessProps) => {
           <DeliveryTable entries={deliveryEntries} />
           
           {deliveryEntries.length > 0 && (
-            <div className="flex justify-between items-center">
-              <Button variant="outline" onClick={onBack}>
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+              <Button variant="outline" onClick={onBack} className="order-2 sm:order-1">
                 Cancel
               </Button>
-              <Button onClick={handleSubmitDelivery} size="lg">
+              <Button onClick={handleSubmitDelivery} size="lg" className="order-1 sm:order-2">
                 Submit Delivery Note
               </Button>
             </div>
