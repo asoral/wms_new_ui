@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate } from "react-router-dom";
 import { 
   Search, 
   Scan, 
@@ -17,7 +18,8 @@ import {
   LogOut,
   Users,
   HelpCircle,
-  Warehouse
+  Warehouse,
+  BarChart3
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -38,6 +40,7 @@ const TopBar = ({ isOnline = true, notificationCount = 3, onSync }: TopBarProps)
   const [searchQuery, setSearchQuery] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   const handleSearch = () => {
     console.log("Searching for:", searchQuery);
@@ -49,7 +52,11 @@ const TopBar = ({ isOnline = true, notificationCount = 3, onSync }: TopBarProps)
 
   const handleSync = () => {
     console.log("Syncing data...");
-    onSync?.();
+    navigate("/sync");
+  };
+
+  const handleNotifications = () => {
+    navigate("/notifications");
   };
 
   return (
@@ -90,7 +97,18 @@ const TopBar = ({ isOnline = true, notificationCount = 3, onSync }: TopBarProps)
 
         {/* Right Actions */}
         <div className="flex items-center space-x-2">
-          {/* Sync Button (for web view) */}
+          {/* Reports (Desktop only) */}
+          {!isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/reports")}
+            >
+              <BarChart3 className="w-4 h-4" />
+            </Button>
+          )}
+
+          {/* Sync Button (Desktop only) */}
           {!isMobile && (
             <Button
               variant="ghost"
@@ -107,7 +125,12 @@ const TopBar = ({ isOnline = true, notificationCount = 3, onSync }: TopBarProps)
           )}
 
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="relative"
+            onClick={handleNotifications}
+          >
             <Bell className="w-4 h-4" />
             {notificationCount > 0 && (
               <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full text-xs p-0 flex items-center justify-center bg-red-500">

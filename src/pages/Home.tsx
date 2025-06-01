@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,19 +16,26 @@ import {
   Database,
   Layers,
   ClipboardList,
-  Package2
+  Package2,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
+  AlertTriangle,
+  Calendar,
+  Users
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Home = () => {
   const navigate = useNavigate();
+  const [showAllActions, setShowAllActions] = useState(false);
 
   const quickActions = [
     { icon: Package, label: "Item Enquiry", color: "bg-blue-500", path: "/item-enquiry" },
-    { icon: Search, label: "Bin Enquiry", color: "bg-green-500", path: "/bin-enquiry" },
-    { icon: BarChart3, label: "Stock Count", color: "bg-purple-500", path: "/stock-count" },
     { icon: ShoppingCart, label: "Receive", color: "bg-orange-500", path: "/receive" },
     { icon: Truck, label: "Deliver", color: "bg-red-500", path: "/deliver" },
+    { icon: Search, label: "Bin Enquiry", color: "bg-green-500", path: "/bin-enquiry" },
+    { icon: BarChart3, label: "Stock Count", color: "bg-purple-500", path: "/stock-count" },
     { icon: FileText, label: "Mat. Request", color: "bg-teal-500", path: "/mat-request" },
     { icon: Database, label: "Stock Entry", color: "bg-indigo-500", path: "/stock-entry" },
     { icon: ClipboardList, label: "Pick List", color: "bg-pink-500", path: "/pick-list" },
@@ -36,6 +44,8 @@ const Home = () => {
     { icon: CheckCircle, label: "Quality Check", color: "bg-emerald-500", path: "/quality-check" },
     { icon: Layers, label: "Pallet", color: "bg-yellow-500", path: "/pallet" }
   ];
+
+  const visibleActions = showAllActions ? quickActions : quickActions.slice(0, 3);
 
   const recentActivities = [
     { action: "Stock received", item: "SKU-001", time: "2 min ago", status: "completed" },
@@ -74,7 +84,7 @@ const Home = () => {
             </div>
           </div>
           
-          {/* Quick Stats */}
+          {/* Enhanced Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-4">
@@ -144,7 +154,7 @@ const Home = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {quickActions.map((action, index) => {
+                  {visibleActions.map((action, index) => {
                     const Icon = action.icon;
                     return (
                       <Button
@@ -161,6 +171,26 @@ const Home = () => {
                     );
                   })}
                 </div>
+                
+                {quickActions.length > 3 && (
+                  <Button
+                    variant="ghost"
+                    className="w-full mt-4"
+                    onClick={() => setShowAllActions(!showAllActions)}
+                  >
+                    {showAllActions ? (
+                      <>
+                        <ChevronUp className="w-4 h-4 mr-2" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4 mr-2" />
+                        Show All Actions ({quickActions.length - 3} more)
+                      </>
+                    )}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -193,29 +223,123 @@ const Home = () => {
           </div>
         </div>
 
+        {/* Enhanced Charts and Analytics */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          {/* Stock Aging */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Calendar className="w-5 h-5" />
+                <span>Stock Aging</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">0-30 Days</span>
+                  <span className="font-medium">68%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">31-60 Days</span>
+                  <span className="font-medium">22%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">61-90 Days</span>
+                  <span className="font-medium">7%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-red-600">90+ Days</span>
+                  <span className="font-medium text-red-600">3%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quality Metrics */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <CheckCircle className="w-5 h-5" />
+                <span>Quality Metrics</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Pass Rate</span>
+                  <span className="font-medium text-green-600">96.5%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Pending QC</span>
+                  <Badge variant="outline">8 items</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Failed QC</span>
+                  <Badge variant="destructive">3 items</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Performance Trends */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <TrendingUp className="w-5 h-5" />
+                <span>Performance</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Pick Accuracy</span>
+                  <span className="font-medium text-green-600">98.2%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">On-Time Delivery</span>
+                  <span className="font-medium text-blue-600">94.8%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Cycle Count Accuracy</span>
+                  <span className="font-medium text-purple-600">99.1%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Additional Features */}
         <div className="grid md:grid-cols-2 gap-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Inventory Insights</CardTitle>
-              <CardDescription>Real-time warehouse analytics</CardDescription>
+              <CardTitle>Critical Alerts</CardTitle>
+              <CardDescription>Items requiring immediate attention</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Low Stock Items</span>
+                  <span className="text-sm flex items-center">
+                    <AlertTriangle className="w-4 h-4 text-red-500 mr-2" />
+                    Expiring Batches
+                  </span>
                   <Badge variant="destructive">5 items</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Overstock Items</span>
+                  <span className="text-sm flex items-center">
+                    <AlertTriangle className="w-4 h-4 text-yellow-500 mr-2" />
+                    Low Stock Items
+                  </span>
                   <Badge variant="secondary">12 items</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Quality Issues</span>
-                  <Badge variant="outline">2 items</Badge>
+                  <span className="text-sm flex items-center">
+                    <Users className="w-4 h-4 text-blue-500 mr-2" />
+                    Pending Approvals
+                  </span>
+                  <Badge variant="outline">7 requests</Badge>
                 </div>
                 <Button variant="outline" className="w-full">
-                  View Full Report
+                  View All Alerts
                 </Button>
               </div>
             </CardContent>

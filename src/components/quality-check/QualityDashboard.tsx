@@ -16,14 +16,23 @@ interface QualityDashboardProps {
   };
   onViewInspections: () => void;
   onCreateInspection: () => void;
+  onFilterInspections?: (status: string) => void;
 }
 
-const QualityDashboard = ({ data, onViewInspections, onCreateInspection }: QualityDashboardProps) => {
+const QualityDashboard = ({ data, onViewInspections, onCreateInspection, onFilterInspections }: QualityDashboardProps) => {
+  const handleCardClick = (status: string) => {
+    onFilterInspections?.(status);
+    onViewInspections();
+  };
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-yellow-500">
+        <Card 
+          className="border-l-4 border-l-yellow-500 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => handleCardClick('waiting')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -35,7 +44,10 @@ const QualityDashboard = ({ data, onViewInspections, onCreateInspection }: Quali
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-red-500">
+        <Card 
+          className="border-l-4 border-l-red-500 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => handleCardClick('failed')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -47,7 +59,10 @@ const QualityDashboard = ({ data, onViewInspections, onCreateInspection }: Quali
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
+        <Card 
+          className="border-l-4 border-l-green-500 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => handleCardClick('completed')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -59,7 +74,10 @@ const QualityDashboard = ({ data, onViewInspections, onCreateInspection }: Quali
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500">
+        <Card 
+          className="border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => handleCardClick('testing')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -72,7 +90,7 @@ const QualityDashboard = ({ data, onViewInspections, onCreateInspection }: Quali
         </Card>
       </div>
 
-      {/* Success Rate */}
+      {/* Quality Metrics */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">

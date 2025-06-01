@@ -18,6 +18,9 @@ import Packing from "./pages/Packing";
 import PrintLabel from "./pages/PrintLabel";
 import QualityCheck from "./pages/QualityCheck";
 import Pallet from "./pages/Pallet";
+import Reports from "./pages/Reports";
+import Sync from "./pages/Sync";
+import Notifications from "./pages/Notifications";
 import WMSNavigation from "./components/WMSNavigation";
 import TopBar from "./components/TopBar";
 import BottomNavigation from "./components/BottomNavigation";
@@ -65,6 +68,11 @@ const App = () => {
                   <Route path="/print-label" element={<PrintLabel />} />
                   <Route path="/quality-check" element={<QualityCheck />} />
                   <Route path="/pallet" element={<Pallet />} />
+                  
+                  {/* New Routes */}
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/sync" element={<Sync />} />
+                  <Route path="/notifications" element={<Notifications />} />
                   
                   <Route path="*" element={<NotFound />} />
                 </Routes>

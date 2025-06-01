@@ -33,22 +33,24 @@ const BottomNavigation = ({ isOnline = true, onSync }: BottomNavigationProps) =>
   const navItems = [
     { path: "/", icon: Home, label: "Dashboard" },
     { path: "/actions", icon: Zap, label: "Actions", isAction: true },
-    { path: "/reports", icon: BarChart3, label: "Reports" },
+    { path: "/reports", icon: BarChart3, label: "Reports", isReport: true },
     { path: "/sync", icon: isOnline ? Wifi : WifiOff, label: "Sync", isSync: true },
     { path: "/item-enquiry", icon: Search, label: "Item Enquiry" }
   ];
 
   const actionItems = [
-    { path: "/receive", label: "Receive", icon: "📦" },
+    { path: "/item-enquiry", label: "Item Enquiry", icon: "🔍" },
+    { path: "/bin-enquiry", label: "Bin Enquiry", icon: "📦" },
+    { path: "/stock-count", label: "Stock Count", icon: "🔢" },
+    { path: "/receive", label: "Receive", icon: "📥" },
     { path: "/deliver", label: "Deliver", icon: "🚚" },
     { path: "/mat-request", label: "Material Request", icon: "📋" },
     { path: "/stock-entry", label: "Stock Entry", icon: "📊" },
     { path: "/pick-list", label: "Pick List", icon: "📝" },
     { path: "/packing", label: "Packing", icon: "📦" },
+    { path: "/print-label", label: "Print Label", icon: "🏷️" },
     { path: "/quality-check", label: "Quality Check", icon: "✅" },
     { path: "/pallet", label: "Pallet", icon: "🏗️" },
-    { path: "/stock-count", label: "Stock Count", icon: "🔢" },
-    { path: "/print-label", label: "Print Label", icon: "🏷️" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -57,7 +59,9 @@ const BottomNavigation = ({ isOnline = true, onSync }: BottomNavigationProps) =>
     if (item.isAction) {
       setActionsOpen(true);
     } else if (item.isSync) {
-      onSync?.();
+      navigate("/sync");
+    } else if (item.isReport) {
+      navigate("/reports");
     } else {
       navigate(item.path);
     }
@@ -108,11 +112,11 @@ const BottomNavigation = ({ isOnline = true, onSync }: BottomNavigationProps) =>
 
       {/* Actions Sheet */}
       <Sheet open={actionsOpen} onOpenChange={setActionsOpen}>
-        <SheetContent side="bottom" className="h-[70vh]">
+        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Quick Actions</SheetTitle>
           </SheetHeader>
-          <div className="grid grid-cols-2 gap-4 mt-6">
+          <div className="grid grid-cols-2 gap-4 mt-6 pb-6">
             {actionItems.map((action) => (
               <Button
                 key={action.path}
@@ -124,7 +128,7 @@ const BottomNavigation = ({ isOnline = true, onSync }: BottomNavigationProps) =>
                 }}
               >
                 <span className="text-2xl">{action.icon}</span>
-                <span className="text-sm font-medium">{action.label}</span>
+                <span className="text-sm font-medium text-center">{action.label}</span>
               </Button>
             ))}
           </div>
