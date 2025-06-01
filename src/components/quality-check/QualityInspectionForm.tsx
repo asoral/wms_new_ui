@@ -73,6 +73,7 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
         specification: template.specification,
         acceptanceCriteria: template.acceptanceCriteria,
         reading: "",
+        value: "",
         status: "Pending" as const,
       }));
       setParameters(newParameters);
@@ -88,8 +89,8 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
     setParameters(prev => prev.map(param => {
       if (param.id === id) {
         // Simple validation logic - you can make this more sophisticated
-        const status = reading ? (Math.random() > 0.3 ? "Pass" : "Fail") : "Pending";
-        return { ...param, reading, status };
+        const status = reading ? (Math.random() > 0.3 ? "Accepted" : "Rejected") : "Pending";
+        return { ...param, reading, value: reading, status };
       }
       return param;
     }));
@@ -102,6 +103,7 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
       specification: "",
       acceptanceCriteria: "",
       reading: "",
+      value: "",
       status: "Pending",
     };
     setParameters(prev => [...prev, newParameter]);
@@ -129,8 +131,8 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
 
   const selectedItem = mockItems.find(item => item.code === formData.itemCode);
   const overallResult = parameters.length > 0 ? 
-    (parameters.every(p => p.status === "Pass") ? "Pass" : 
-     parameters.some(p => p.status === "Fail") ? "Fail" : "Pending") : "Pending";
+    (parameters.every(p => p.status === "Accepted") ? "Pass" : 
+     parameters.some(p => p.status === "Rejected") ? "Fail" : "Pending") : "Pending";
 
   return (
     <div className="space-y-6">
@@ -196,8 +198,8 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Incoming">Incoming</SelectItem>
-                <SelectItem value="Outgoing">Outgoing</SelectItem>
-                <SelectItem value="In Process">In Process</SelectItem>
+                <SelectItem value="Final">Final</SelectItem>
+                <SelectItem value="In-Process">In Process</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -274,8 +276,8 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
                       <div className="flex items-center justify-between">
                         <Badge 
                           className={
-                            parameter.status === "Pass" ? "bg-green-100 text-green-800" :
-                            parameter.status === "Fail" ? "bg-red-100 text-red-800" :
+                            parameter.status === "Accepted" ? "bg-green-100 text-green-800" :
+                            parameter.status === "Rejected" ? "bg-red-100 text-red-800" :
                             "bg-gray-100 text-gray-800"
                           }
                         >

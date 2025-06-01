@@ -9,7 +9,11 @@ import QualityInspectionList from "../components/quality-check/QualityInspection
 import QualityInspectionForm from "../components/quality-check/QualityInspectionForm";
 
 export interface QualityParameter {
+  id: string;
+  parameter: string;
   specification: string;
+  acceptanceCriteria: string;
+  reading?: string;
   value: string;
   numericValue?: number;
   status: "Accepted" | "Rejected" | "Pending";
@@ -18,12 +22,18 @@ export interface QualityParameter {
 
 export interface QualityInspection {
   id: string;
+  number: string;
   itemCode: string;
   itemName: string;
+  batchSerial?: string;
   warehouse: string;
   inspectionType: "Incoming" | "In-Process" | "Final" | "Customer Return";
   status: "Draft" | "Submitted" | "Cancelled";
   createdDate: string;
+  inspectedBy?: string;
+  inspectionDate: string;
+  overallResult?: "Pass" | "Fail" | "Pending";
+  remarks?: string;
   parameters: QualityParameter[];
 }
 
@@ -87,13 +97,7 @@ const QualityCheckPage = () => {
         {currentView === "dashboard" && (
           <div className="space-y-6">
             <QualityDashboard 
-              qcWaiting={dashboardData.qcWaiting}
-              qcFailed={dashboardData.qcFailed}
-              qcCompleted={dashboardData.qcCompleted}
-              qcTesting={dashboardData.qcTesting}
-              successRate={dashboardData.successRate}
-              mostTestedItem={dashboardData.mostTestedItem}
-              mostRejectedItem={dashboardData.mostRejectedItem}
+              data={dashboardData}
               onViewInspections={handleViewInspections}
               onCreateInspection={handleCreateInspection}
             />
@@ -113,7 +117,10 @@ const QualityCheckPage = () => {
                 </Button>
               </div>
             </div>
-            <QualityInspectionList onEditInspection={handleEditInspection} />
+            <QualityInspectionList 
+              onCreateNew={handleCreateInspection}
+              onEditInspection={handleEditInspection} 
+            />
           </div>
         )}
 
@@ -129,8 +136,7 @@ const QualityCheckPage = () => {
             </div>
             <QualityInspectionForm 
               inspection={selectedInspection}
-              onSave={() => handleBackToList()}
-              onCancel={() => handleBackToList()}
+              onBack={() => handleBackToList()}
             />
           </div>
         )}

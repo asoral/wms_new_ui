@@ -22,12 +22,28 @@ const mockInspections: QualityInspection[] = [
     itemCode: "ITEM-001",
     itemName: "Steel Rod 10mm",
     batchSerial: "B001",
+    warehouse: "Main Store",
     inspectionType: "Incoming",
     status: "Draft",
+    createdDate: "2024-01-15",
     inspectionDate: "2024-01-15",
     parameters: [
-      { id: "1", parameter: "Length", specification: "10mm ± 0.1", acceptanceCriteria: "9.9-10.1mm" },
-      { id: "2", parameter: "Diameter", specification: "10mm ± 0.05", acceptanceCriteria: "9.95-10.05mm" },
+      { 
+        id: "1", 
+        parameter: "Length", 
+        specification: "10mm ± 0.1", 
+        acceptanceCriteria: "9.9-10.1mm",
+        value: "",
+        status: "Pending"
+      },
+      { 
+        id: "2", 
+        parameter: "Diameter", 
+        specification: "10mm ± 0.05", 
+        acceptanceCriteria: "9.95-10.05mm",
+        value: "",
+        status: "Pending"
+      },
     ]
   },
   {
@@ -36,14 +52,32 @@ const mockInspections: QualityInspection[] = [
     itemCode: "ITEM-002",
     itemName: "Chemical B",
     batchSerial: "B002",
+    warehouse: "Chemical Store",
     inspectionType: "Incoming",
     status: "Submitted",
     inspectedBy: "John Doe",
+    createdDate: "2024-01-14",
     inspectionDate: "2024-01-14",
     overallResult: "Pass",
     parameters: [
-      { id: "1", parameter: "Purity", specification: "≥95%", acceptanceCriteria: "≥95%", reading: "96.5%", status: "Pass" },
-      { id: "2", parameter: "pH Level", specification: "7.0 ± 0.2", acceptanceCriteria: "6.8-7.2", reading: "7.1", status: "Pass" },
+      { 
+        id: "1", 
+        parameter: "Purity", 
+        specification: "≥95%", 
+        acceptanceCriteria: "≥95%", 
+        reading: "96.5%", 
+        value: "96.5%",
+        status: "Accepted" 
+      },
+      { 
+        id: "2", 
+        parameter: "pH Level", 
+        specification: "7.0 ± 0.2", 
+        acceptanceCriteria: "6.8-7.2", 
+        reading: "7.1", 
+        value: "7.1",
+        status: "Accepted" 
+      },
     ]
   },
   {
@@ -51,13 +85,23 @@ const mockInspections: QualityInspection[] = [
     number: "QI-003",
     itemCode: "ITEM-003",
     itemName: "Finished Product X",
-    inspectionType: "Outgoing",
-    status: "Rejected",
+    warehouse: "FG Store",
+    inspectionType: "Final",
+    status: "Submitted",
     inspectedBy: "Jane Smith",
+    createdDate: "2024-01-13",
     inspectionDate: "2024-01-13",
     overallResult: "Fail",
     parameters: [
-      { id: "1", parameter: "Dimensions", specification: "100x50x25mm", acceptanceCriteria: "±0.5mm", reading: "101x50.8x25mm", status: "Fail" },
+      { 
+        id: "1", 
+        parameter: "Dimensions", 
+        specification: "100x50x25mm", 
+        acceptanceCriteria: "±0.5mm", 
+        reading: "101x50.8x25mm", 
+        value: "101x50.8x25mm",
+        status: "Rejected" 
+      },
     ]
   },
 ];
@@ -68,7 +112,7 @@ const QualityInspectionList = ({ onCreateNew, onEditInspection }: QualityInspect
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "Draft": true,
     "Submitted": true,
-    "Rejected": true,
+    "Cancelled": true,
   });
 
   const filteredInspections = mockInspections.filter(inspection => 
@@ -134,8 +178,8 @@ const QualityInspectionList = ({ onCreateNew, onEditInspection }: QualityInspect
             <Tabs value={selectedType} onValueChange={(value) => setSelectedType(value as InspectionType)}>
               <TabsList>
                 <TabsTrigger value="Incoming">Incoming</TabsTrigger>
-                <TabsTrigger value="Outgoing">Outgoing</TabsTrigger>
-                <TabsTrigger value="In Process">In Process</TabsTrigger>
+                <TabsTrigger value="Final">Final</TabsTrigger>
+                <TabsTrigger value="In-Process">In Process</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
