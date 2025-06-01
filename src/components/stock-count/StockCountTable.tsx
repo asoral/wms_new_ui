@@ -1,6 +1,8 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { StockCountEntry } from "../../pages/StockCount";
 
 interface StockCountTableProps {
@@ -8,6 +10,8 @@ interface StockCountTableProps {
 }
 
 const StockCountTable = ({ entries }: StockCountTableProps) => {
+  const isMobile = useIsMobile();
+
   const getStatusBadge = (status: StockCountEntry['status'], difference: number) => {
     switch (status) {
       case 'matched':
@@ -23,6 +27,61 @@ const StockCountTable = ({ entries }: StockCountTableProps) => {
     }
   };
 
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {entries.map((entry, index) => (
+          <Card key={index} className="border-l-4 border-l-orange-500">
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-lg">{entry.itemCode}</h3>
+                    <p className="text-gray-600 text-sm">{entry.itemName}</p>
+                  </div>
+                  <div className="text-right">
+                    {getStatusBadge(entry.status, entry.difference)}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">System Qty:</span>
+                    <p className="font-medium">{entry.systemQty} {entry.uom}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Scanned Qty:</span>
+                    <p className="font-medium">{entry.scannedQty} {entry.uom}</p>
+                  </div>
+                </div>
+
+                {(entry.batch || entry.serial) && (
+                  <div className="flex flex-wrap gap-2">
+                    {entry.batch && (
+                      <Badge variant="outline">Batch: {entry.batch}</Badge>
+                    )}
+                    {entry.serial && (
+                      <Badge variant="outline">Serial: {entry.serial}</Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        {entries.length === 0 && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-gray-500">No items scanned yet. Start scanning items to populate the count.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop table view
   return (
     <div className="overflow-x-auto">
       <Table>

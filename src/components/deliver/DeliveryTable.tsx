@@ -1,6 +1,8 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DeliveryEntry } from "../../pages/Deliver";
 
 interface DeliveryTableProps {
@@ -8,6 +10,8 @@ interface DeliveryTableProps {
 }
 
 const DeliveryTable = ({ entries }: DeliveryTableProps) => {
+  const isMobile = useIsMobile();
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -31,6 +35,81 @@ const DeliveryTable = ({ entries }: DeliveryTableProps) => {
     }
   };
 
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {entries.map((entry, index) => (
+          <Card key={index} className="border-l-4 border-l-blue-500">
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-lg">{entry.itemCode}</h3>
+                    <p className="text-gray-600 text-sm">{entry.itemName}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-lg">{formatCurrency(entry.actualQty * entry.rate)}</p>
+                    <p className="text-sm text-gray-600">{formatCurrency(entry.rate)}/unit</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Warehouse:</span>
+                    <p className="font-medium">{entry.warehouse}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">To Deliver:</span>
+                    <p className="font-medium">{entry.qtyToDeliver}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Actual Qty:</span>
+                    <p className="font-medium">{entry.actualQty}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Variance:</span>
+                    <div className="mt-1">{getVarianceBadge(entry.qtyToDeliver, entry.actualQty)}</div>
+                  </div>
+                </div>
+
+                {(entry.batch || entry.serial) && (
+                  <div className="flex flex-wrap gap-2">
+                    {entry.batch && (
+                      <Badge variant="outline">Batch: {entry.batch}</Badge>
+                    )}
+                    {entry.serial && (
+                      <Badge variant="outline">Serial: {entry.serial}</Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        {entries.length === 0 && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-gray-500">No items added yet. Scan or select items to add them to the delivery.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {entries.length > 0 && (
+          <Card className="bg-gray-50">
+            <CardContent className="p-4">
+              <div className="text-center space-y-2">
+                <p className="text-sm text-gray-600">Total Items: {entries.length}</p>
+                <p className="text-xl font-bold">Total Value: {formatCurrency(getTotalValue())}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop table view
   return (
     <div className="space-y-4">
       <div className="overflow-x-auto">

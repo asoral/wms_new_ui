@@ -1,151 +1,158 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Scan } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Scan, Package } from "lucide-react";
 import { BinLabelData } from "../../pages/PrintLabel";
 
 interface BinLabelFormProps {
   onGenerateLabel: (data: BinLabelData) => void;
 }
 
-// Mock data for warehouses
-const mockWarehouses = [
-  { id: "WH-001", name: "Main Warehouse", group: 0 },
-  { id: "WH-002", name: "Raw Materials", group: 0 },
-  { id: "WH-003", name: "Finished Goods", group: 0 },
-  { id: "WH-004", name: "Quality Control", group: 0 },
-  { id: "WH-005", name: "Packaging", group: 0 },
-];
-
-// Mock items data for bin
-const mockBinItems = {
-  "WH-001": [
-    { itemCode: "ITEM-001", itemName: "Steel Rod 10mm", qty: 150, uom: "Nos", batch: "B001" },
-    { itemCode: "ITEM-002", itemName: "Cement Bag", qty: 50, uom: "Bags" },
-  ],
-  "WH-002": [
-    { itemCode: "ITEM-003", itemName: "Raw Material A", qty: 200, uom: "Kg", batch: "B002" },
-    { itemCode: "ITEM-004", itemName: "Chemical B", qty: 75, uom: "Litres", serial: "S001" },
-  ],
-  "WH-003": [
-    { itemCode: "ITEM-005", itemName: "Finished Product X", qty: 100, uom: "Nos", batch: "B003" },
-  ],
-  "WH-004": [
-    { itemCode: "ITEM-006", itemName: "Test Sample", qty: 25, uom: "Nos" },
-  ],
-  "WH-005": [
-    { itemCode: "ITEM-007", itemName: "Packaging Material", qty: 300, uom: "Nos" },
-  ],
-};
-
 const BinLabelForm = ({ onGenerateLabel }: BinLabelFormProps) => {
-  const [selectedWarehouse, setSelectedWarehouse] = useState("");
-  const [scannedWarehouse, setScannedWarehouse] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
 
-  const handleWarehouseSelect = (warehouseId: string) => {
-    setSelectedWarehouse(warehouseId);
-  };
+  // Mock warehouses (group = 0 means bin-level warehouses)
+  const warehouses = [
+    { id: "WH-001", name: "Main Store - Bin A1", group: 0 },
+    { id: "WH-002", name: "Main Store - Bin A2", group: 0 },
+    { id: "WH-003", name: "Main Store - Bin B1", group: 0 },
+    { id: "WH-004", name: "Raw Material - Bin C1", group: 0 },
+    { id: "WH-005", name: "Finished Goods - Bin D1", group: 0 }
+  ];
 
-  const handleScanWarehouse = () => {
-    if (scannedWarehouse) {
-      const warehouse = mockWarehouses.find(w => w.id === scannedWarehouse);
-      if (warehouse) {
-        setSelectedWarehouse(warehouse.id);
-      }
+  // Mock items in bin
+  const mockBinItems = [
+    {
+      itemCode: "ITM-001",
+      itemName: "Laptop Dell Inspiron",
+      qty: 5,
+      uom: "Nos",
+      batch: "BATCH-001",
+      serial: ""
+    },
+    {
+      itemCode: "ITM-002", 
+      itemName: "Mouse Wireless",
+      qty: 25,
+      uom: "Nos",
+      batch: "",
+      serial: "SRL-001,SRL-002,SRL-003"
+    },
+    {
+      itemCode: "ITM-003",
+      itemName: "Keyboard Mechanical",
+      qty: 10,
+      uom: "Nos",
+      batch: "BATCH-002",
+      serial: ""
     }
+  ];
+
+  const handleScan = () => {
+    setIsScanning(true);
+    // Simulate barcode scan
+    setTimeout(() => {
+      setWarehouseId("WH-001");
+      setIsScanning(false);
+    }, 2000);
   };
 
   const handleGenerateLabel = () => {
-    const warehouse = mockWarehouses.find(w => w.id === selectedWarehouse);
-    if (warehouse) {
-      const items = mockBinItems[selectedWarehouse as keyof typeof mockBinItems] || [];
-      
-      const labelData: BinLabelData = {
-        warehouseId: warehouse.id,
-        warehouseName: warehouse.name,
-        barcode: warehouse.id,
-        items: items,
-      };
-      
-      onGenerateLabel(labelData);
-    }
-  };
+    const selectedWarehouse = warehouses.find(w => w.id === warehouseId);
+    if (!selectedWarehouse) return;
 
-  const selectedWarehouseData = mockWarehouses.find(w => w.id === selectedWarehouse);
-  const items = selectedWarehouse ? mockBinItems[selectedWarehouse as keyof typeof mockBinItems] || [] : [];
+    const labelData: BinLabelData = {
+      warehouseId: selectedWarehouse.id,
+      warehouseName: selectedWarehouse.name,
+      barcode: `BIN-${selectedWarehouse.id}-${Date.now()}`,
+      items: mockBinItems.map(item => ({
+        itemCode: item.itemCode,
+        itemName: item.itemName,
+        qty: item.qty,
+        uom: item.uom,
+        batch: item.batch || undefined,
+        serial: item.serial || undefined
+      }))
+    };
+
+    onGenerateLabel(labelData);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Warehouse Scanner */}
-      <div className="space-y-2">
-        <Label htmlFor="warehouse-scan">Scan Warehouse ID</Label>
-        <div className="flex space-x-2">
-          <Input
-            id="warehouse-scan"
-            placeholder="Scan or type warehouse ID..."
-            value={scannedWarehouse}
-            onChange={(e) => setScannedWarehouse(e.target.value)}
-          />
-          <Button variant="outline" size="icon" onClick={handleScanWarehouse}>
-            <Scan className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
       {/* Warehouse Selection */}
-      <div className="space-y-2">
-        <Label>Select Warehouse</Label>
-        <Select value={selectedWarehouse} onValueChange={handleWarehouseSelect}>
-          <SelectTrigger>
-            <SelectValue placeholder="Choose warehouse..." />
-          </SelectTrigger>
-          <SelectContent>
-            {mockWarehouses.map((warehouse) => (
-              <SelectItem key={warehouse.id} value={warehouse.id}>
-                {warehouse.name} ({warehouse.id})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Select Warehouse/Bin</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleScan}
+              disabled={isScanning}
+              className="flex items-center space-x-2"
+            >
+              <Scan className="w-4 h-4" />
+              <span>{isScanning ? "Scanning..." : "Scan Bin"}</span>
+            </Button>
+          </div>
 
-      {/* Warehouse Info */}
-      {selectedWarehouseData && (
+          <div className="space-y-2">
+            <Label htmlFor="warehouse">Or Select Warehouse</Label>
+            <Select value={warehouseId} onValueChange={setWarehouseId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select warehouse/bin..." />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((warehouse) => (
+                  <SelectItem key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name} ({warehouse.id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bin Items Preview */}
+      {warehouseId && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Warehouse Information</CardTitle>
+            <CardTitle className="text-lg flex items-center space-x-2">
+              <Package className="w-5 h-5" />
+              <span>Items in Bin</span>
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <span className="font-medium">ID:</span> {selectedWarehouseData.id}
-              </div>
-              <div>
-                <span className="font-medium">Name:</span> {selectedWarehouseData.name}
-              </div>
-            </div>
-            
-            {items.length > 0 && (
-              <div className="mt-4">
-                <h4 className="font-medium text-sm mb-2">Items in Bin:</h4>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {items.map((item, index) => (
-                    <div key={index} className="text-xs bg-gray-50 p-2 rounded">
-                      <div className="font-medium">{item.itemName}</div>
-                      <div className="text-gray-600">
-                        {item.itemCode} | Qty: {item.qty} {item.uom}
-                        {item.batch && ` | Batch: ${item.batch}`}
-                        {item.serial && ` | Serial: ${item.serial}`}
+          <CardContent>
+            <div className="space-y-3">
+              {mockBinItems.map((item, index) => (
+                <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-medium">{item.itemCode}</h4>
+                      <p className="text-sm text-gray-600">{item.itemName}</p>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className="font-medium">{item.qty} {item.uom}</span>
+                        {item.batch && (
+                          <Badge variant="outline">Batch: {item.batch}</Badge>
+                        )}
+                        {item.serial && (
+                          <Badge variant="outline">Serial: {item.serial}</Badge>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -153,8 +160,9 @@ const BinLabelForm = ({ onGenerateLabel }: BinLabelFormProps) => {
       {/* Generate Button */}
       <Button 
         onClick={handleGenerateLabel}
-        disabled={!selectedWarehouse}
+        disabled={!warehouseId}
         className="w-full"
+        size="lg"
       >
         Generate Bin Label
       </Button>
