@@ -57,15 +57,15 @@ const WMSNavigation = () => {
         </Button>
       </div>
 
-      {/* Sidebar */}
+      {/* Sidebar - Made independently scrollable */}
       <div className={`
-        fixed left-0 top-0 h-full bg-white shadow-lg z-40 w-64 transform transition-transform duration-300 ease-in-out
+        fixed left-0 top-0 h-screen bg-white shadow-lg z-40 w-64 transform transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0 md:static md:shadow-none md:border-r
+        flex flex-col
       `}>
-        {/* Remove the header section entirely for web view */}
-        
-        <nav className="p-4 space-y-2 h-full overflow-y-auto">
+        {/* Navigation - Make scrollable independently */}
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navigationItems.map((item, index) => {
             const Icon = item.icon;
             return (

@@ -121,7 +121,7 @@ const StockCount = () => {
         </div>
 
         {!session ? (
-          /* Session Setup */
+          /* Session Setup - Fixed to require warehouse selection first */
           <Card>
             <CardHeader>
               <CardTitle>Start Stock Count Session</CardTitle>
@@ -190,9 +190,7 @@ const StockCount = () => {
                 <TabsTrigger value="review" onClick={() => setShowForm(false)} className="relative">
                   Review & Submit
                   {itemsInReview > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 bg-red-500 text-white text-xs flex items-center justify-center">
-                      {itemsInReview}
-                    </Badge>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
                   )}
                 </TabsTrigger>
               </TabsList>

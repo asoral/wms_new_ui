@@ -8,6 +8,8 @@ import { Database, Plus, TrendingUp, TrendingDown, ArrowRightLeft, Eye } from "l
 import StockEntryForm from "../components/stock-entry/StockEntryForm";
 import StockEntryList from "../components/stock-entry/StockEntryList";
 
+export type StockEntryType = 'Material Receipt' | 'Material Issue' | 'Material Transfer' | 'Stock Reconciliation';
+
 export interface StockEntryItem {
   itemCode: string;
   itemName: string;
