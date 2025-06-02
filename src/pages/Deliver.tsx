@@ -3,43 +3,46 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Package, FileText, Printer, ArrowRight, Search, CheckCircle } from "lucide-react";
+import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import SalesOrderList from "../components/deliver/SalesOrderList";
 import DeliveryProcess from "../components/deliver/DeliveryProcess";
 
 export interface SalesOrder {
+  id: string;
   number: string;
   customer: string;
-  date: string;
-  deliveryDate: string;
   totalItems: number;
   totalValue: number;
-  status: 'draft' | 'confirmed' | 'packed' | 'shipped';
+  expectedDelivery: string;
+  status: "draft" | "confirmed" | "packed" | "shipped" | "To Deliver" | "To Deliver and Bill";
+  percentDelivered: number;
   items: SOItem[];
 }
 
 export interface SOItem {
   itemCode: string;
   itemName: string;
-  orderedQty: number;
-  availableQty: number;
-  uom: string;
-  rate: number;
   warehouse: string;
+  qtyToDeliver: number;
+  deliveredQty: number;
+  rate: number;
+  uom: string;
 }
 
 export interface DeliveryEntry {
   itemCode: string;
   itemName: string;
-  deliveredQty: number;
   warehouse: string;
   batch?: string;
   serial?: string;
+  qtyToDeliver: number;
+  actualQty: number;
+  rate: number;
   uom: string;
 }
 

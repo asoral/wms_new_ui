@@ -29,14 +29,14 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
     "Send to Warehouse"
   ];
   
-  const statuses: StockEntryStatus[] = ["Draft", "Submitted", "Cancelled"];
+  const statuses: StockEntryStatus[] = ["draft", "submitted", "cancelled"];
 
   const mockEntries: StockEntry[] = [
     {
       id: "1",
       number: "STE-2024-001",
       type: "Material Issue",
-      status: "Draft",
+      status: "draft",
       createdDate: "2024-01-15",
       createdBy: "John Doe",
       items: [],
@@ -47,7 +47,7 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
       id: "2",
       number: "STE-2024-002",
       type: "Material Transfer",
-      status: "Submitted",
+      status: "submitted",
       createdDate: "2024-01-14",
       createdBy: "Jane Smith",
       items: [],
@@ -63,9 +63,9 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
 
   const getStatusColor = (status: StockEntryStatus) => {
     const colors: Record<StockEntryStatus, string> = {
-      "Draft": "bg-gray-100 text-gray-800",
-      "Submitted": "bg-green-100 text-green-800",
-      "Cancelled": "bg-red-100 text-red-800"
+      "draft": "bg-gray-100 text-gray-800",
+      "submitted": "bg-green-100 text-green-800",
+      "cancelled": "bg-red-100 text-red-800"
     };
     return colors[status] || "bg-gray-100 text-gray-800";
   };
