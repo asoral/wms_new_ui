@@ -1,1 +1,1 @@
-Wms New Ui
+wms_new_ui
