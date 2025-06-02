@@ -3,78 +3,110 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Package, FileText, Calendar, RefreshCcw } from "lucide-react";
+import { Truck, Package, FileText, Printer, ArrowRight, Search, CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import SalesOrderList from "../components/deliver/SalesOrderList";
 import DeliveryProcess from "../components/deliver/DeliveryProcess";
 
 export interface SalesOrder {
-  id: string;
   number: string;
   customer: string;
+  date: string;
+  deliveryDate: string;
   totalItems: number;
   totalValue: number;
-  expectedDelivery: string;
-  status: "To Deliver" | "To Deliver and Bill";
-  percentDelivered: number;
-  items: SalesOrderItem[];
+  status: 'draft' | 'confirmed' | 'packed' | 'shipped';
+  items: SOItem[];
 }
 
-export interface SalesOrderItem {
+export interface SOItem {
   itemCode: string;
   itemName: string;
-  warehouse: string;
-  batch?: string;
-  serial?: string;
-  qtyToDeliver: number;
-  deliveredQty: number;
-  rate: number;
+  orderedQty: number;
+  availableQty: number;
   uom: string;
+  rate: number;
+  warehouse: string;
 }
 
 export interface DeliveryEntry {
   itemCode: string;
   itemName: string;
+  deliveredQty: number;
   warehouse: string;
   batch?: string;
   serial?: string;
-  qtyToDeliver: number;
-  actualQty: number;
-  rate: number;
   uom: string;
 }
 
-const DeliverPage = () => {
-  const [currentView, setCurrentView] = useState<"dashboard" | "orders" | "delivery">("dashboard");
-  const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
+const Deliver = () => {
+  const navigate = useNavigate();
+  const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [soNumber, setSONumber] = useState("");
 
+  // Mock data for dashboard
   const dashboardData = {
     todaysDelivery: 12,
-    totalDeliveries: 156,
-    fgStockValue: 2450000,
-    averageAge: 18
+    totalDeliveries: 145,
+    fgStockValue: 2500000,
+    averageAge: 15
+  };
+
+  // Mock SO data
+  const mockSO: SalesOrder = {
+    number: 'SO-2024-001',
+    customer: 'ABC Industries Ltd',
+    date: '2024-01-15',
+    deliveryDate: '2024-01-16',
+    totalItems: 3,
+    totalValue: 175000,
+    status: 'confirmed',
+    items: [
+      {
+        itemCode: 'ITM-001',
+        itemName: 'Laptop Computer',
+        orderedQty: 10,
+        availableQty: 15,
+        uom: 'Nos',
+        rate: 50000,
+        warehouse: 'Main Store'
+      },
+      {
+        itemCode: 'ITM-002',
+        itemName: 'Wireless Mouse',
+        orderedQty: 50,
+        availableQty: 100,
+        uom: 'Nos',
+        rate: 1500,
+        warehouse: 'Main Store'
+      }
+    ]
+  };
+
+  const selectSO = (soNumber: string) => {
+    setSelectedSO(mockSO);
+    setActiveTab("process");
+  };
+
+  const handleSOSearch = () => {
+    if (soNumber.trim()) {
+      selectSO(soNumber.trim());
+    }
   };
 
   const shortcuts = [
-    { label: "Print Label", icon: FileText, action: () => console.log("Print Label") },
-    { label: "Request QC", icon: Package, action: () => console.log("Request QC") },
-    { label: "Create Picklist", icon: FileText, action: () => console.log("Create Picklist") },
-    { label: "Create Packing List", icon: Package, action: () => console.log("Create Packing List") }
+    { label: 'Print Label', icon: Printer, action: () => navigate('/print-label') },
+    { label: 'Quality Check', icon: CheckCircle, action: () => navigate('/quality-check') },
+    { label: 'Packing', icon: Package, action: () => navigate('/packing') }
   ];
 
-  const handleSelectOrder = (order: SalesOrder) => {
-    setSelectedOrder(order);
-    setCurrentView("delivery");
-  };
-
-  const handleBackToDashboard = () => {
-    setCurrentView("dashboard");
-    setSelectedOrder(null);
-  };
-
-  const handleBackToOrders = () => {
-    setCurrentView("orders");
+  const viewOrders = () => {
+    setActiveTab("orders");
   };
 
   return (
@@ -83,56 +115,76 @@ const DeliverPage = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <Truck className="w-6 h-6 text-blue-600" />
+            <Truck className="w-6 h-6 text-red-600" />
             <h1 className="text-2xl font-bold text-gray-900">Deliver</h1>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon">
-              <RefreshCcw className="w-4 h-4" />
-            </Button>
           </div>
         </div>
 
-        {/* Content */}
-        {currentView === "dashboard" && (
-          <div className="space-y-6">
-            <DeliverDashboard 
-              data={dashboardData}
-              shortcuts={shortcuts}
-              onViewOrders={() => setCurrentView("orders")}
-            />
-          </div>
-        )}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="orders">Sales Orders</TabsTrigger>
+            <TabsTrigger value="process" disabled={!selectedSO}>
+              Delivery Process
+            </TabsTrigger>
+          </TabsList>
 
-        {currentView === "orders" && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Sales Orders</h2>
-              <Button variant="outline" onClick={handleBackToDashboard}>
-                Back to Dashboard
-              </Button>
-            </div>
-            <SalesOrderList onSelectOrder={handleSelectOrder} />
-          </div>
-        )}
+          <TabsContent value="dashboard">
+            <div className="space-y-6">
+              {/* SO Search */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Search className="w-5 h-5" />
+                    <span>Select Sales Order</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex space-x-2">
+                    <div className="flex-1">
+                      <Label htmlFor="soNumber">Sales Order Number</Label>
+                      <Input
+                        id="soNumber"
+                        value={soNumber}
+                        onChange={(e) => setSONumber(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSOSearch()}
+                        placeholder="Enter SO number..."
+                      />
+                    </div>
+                    <div className="pt-6">
+                      <Button onClick={handleSOSearch} disabled={!soNumber.trim()}>
+                        <Search className="w-4 h-4 mr-2" />
+                        Select SO
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {currentView === "delivery" && selectedOrder && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Create Delivery Note</h2>
-              <Button variant="outline" onClick={handleBackToOrders}>
-                Back to Orders
-              </Button>
+              <DeliverDashboard 
+                data={dashboardData} 
+                shortcuts={shortcuts}
+                onViewOrders={viewOrders}
+              />
             </div>
-            <DeliveryProcess 
-              salesOrder={selectedOrder}
-              onBack={handleBackToOrders}
-            />
-          </div>
-        )}
+          </TabsContent>
+
+          <TabsContent value="orders">
+            <SalesOrderList onSelectOrder={selectSO} />
+          </TabsContent>
+
+          <TabsContent value="process">
+            {selectedSO && (
+              <DeliveryProcess 
+                salesOrder={selectedSO}
+                onBack={() => setActiveTab("dashboard")}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
 };
 
-export default DeliverPage;
+export default Deliver;

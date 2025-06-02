@@ -3,95 +3,305 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Database, RefreshCcw, Plus } from "lucide-react";
-import StockEntryList from "../components/stock-entry/StockEntryList";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Database, Plus, TrendingUp, TrendingDown, ArrowRightLeft, Eye } from "lucide-react";
 import StockEntryForm from "../components/stock-entry/StockEntryForm";
-
-export type StockEntryType = "Material Issue" | "Material Receipt" | "Material Transfer" | "Manufacture" | "Repack" | "Send to Subcontractor" | "Material Transfer for Manufacture" | "Material Consumption for Manufacture" | "Receive at Warehouse" | "Send to Warehouse";
-
-export type StockEntryStatus = "Draft" | "Submitted" | "Cancelled";
+import StockEntryList from "../components/stock-entry/StockEntryList";
 
 export interface StockEntryItem {
   itemCode: string;
   itemName: string;
-  fromWarehouse?: string;
-  toWarehouse?: string;
-  qty: number;
-  uom: string;
-  rate?: number;
+  quantity: number;
+  rate: number;
+  amount: number;
+  warehouse: string;
   batch?: string;
-  serial?: string;
+  serialNo?: string;
 }
 
 export interface StockEntry {
   id: string;
-  number: string;
-  type: StockEntryType;
-  status: StockEntryStatus;
-  createdDate: string;
-  createdBy: string;
+  entryNumber: string;
+  entryType: 'receipt' | 'issue' | 'transfer';
+  date: string;
+  warehouse: string;
+  reference?: string;
   items: StockEntryItem[];
-  totalValue?: number;
-  purpose?: string;
+  totalAmount: number;
+  remarks?: string;
+  status: 'draft' | 'submitted' | 'cancelled';
 }
 
-const StockEntryPage = () => {
-  const [currentView, setCurrentView] = useState<"list" | "create">("list");
-  const [selectedType, setSelectedType] = useState<StockEntryType>("Material Issue");
+const StockEntry = () => {
+  const [activeTab, setActiveTab] = useState("list");
+  const [selectedEntry, setSelectedEntry] = useState<StockEntry | null>(null);
+  const [stockEntries, setStockEntries] = useState<StockEntry[]>([
+    {
+      id: '1',
+      entryNumber: 'SE-2024-001',
+      entryType: 'receipt',
+      date: '2024-01-15',
+      warehouse: 'Main Store',
+      reference: 'PO-2024-001',
+      totalAmount: 50000,
+      status: 'submitted',
+      items: [
+        {
+          itemCode: 'ITM-001',
+          itemName: 'Laptop Computer',
+          quantity: 10,
+          rate: 50000,
+          amount: 500000,
+          warehouse: 'Main Store',
+          batch: 'BATCH-001'
+        }
+      ]
+    }
+  ]);
 
-  const handleCreateNew = (type: StockEntryType) => {
-    setSelectedType(type);
-    setCurrentView("create");
+  const handleCreateEntry = (entry: StockEntry) => {
+    const newEntry = {
+      ...entry,
+      id: Date.now().toString(),
+      entryNumber: `SE-2024-${String(stockEntries.length + 1).padStart(3, '0')}`,
+      date: new Date().toISOString().split('T')[0]
+    };
+    
+    setStockEntries(prev => [newEntry, ...prev]);
+    setActiveTab("list");
   };
 
-  const handleBackToList = () => {
-    setCurrentView("list");
+  const handleViewDetails = (entry: StockEntry) => {
+    setSelectedEntry(entry);
+    setActiveTab("view");
+  };
+
+  const todaysEntries = stockEntries.filter(entry => 
+    entry.date === new Date().toISOString().split('T')[0]
+  ).length;
+
+  const getEntryTypeIcon = (type: string) => {
+    switch (type) {
+      case 'receipt': return TrendingUp;
+      case 'issue': return TrendingDown;
+      case 'transfer': return ArrowRightLeft;
+      default: return Database;
+    }
+  };
+
+  const getEntryTypeColor = (type: string) => {
+    switch (type) {
+      case 'receipt': return 'text-green-600';
+      case 'issue': return 'text-red-600';
+      case 'transfer': return 'text-blue-600';
+      default: return 'text-gray-600';
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div className="flex items-center space-x-3">
-            <Database className="w-6 h-6 text-blue-600" />
+            <Database className="w-6 h-6 text-indigo-600" />
             <h1 className="text-2xl font-bold text-gray-900">Stock Entry</h1>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon">
-              <RefreshCcw className="w-4 h-4" />
-            </Button>
-            {currentView === "list" && (
-              <Button onClick={() => setCurrentView("create")}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create New
-              </Button>
-            )}
-          </div>
+          <Button onClick={() => setActiveTab("create")}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Stock Entry
+          </Button>
         </div>
 
-        {/* Content */}
-        {currentView === "list" && (
-          <StockEntryList onCreateNew={handleCreateNew} />
-        )}
+        {/* Dashboard Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Database className="w-5 h-5 text-indigo-500" />
+                <div>
+                  <p className="text-sm text-gray-600">Today's Entries</p>
+                  <p className="text-xl font-bold text-indigo-600">{todaysEntries}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="w-5 h-5 text-green-500" />
+                <div>
+                  <p className="text-sm text-gray-600">Stock Receipts</p>
+                  <p className="text-xl font-bold text-green-600">15</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <TrendingDown className="w-5 h-5 text-red-500" />
+                <div>
+                  <p className="text-sm text-gray-600">Stock Issues</p>
+                  <p className="text-xl font-bold text-red-600">8</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <ArrowRightLeft className="w-5 h-5 text-blue-500" />
+                <div>
+                  <p className="text-sm text-gray-600">Transfers</p>
+                  <p className="text-xl font-bold text-blue-600">3</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        {currentView === "create" && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Create Stock Entry</h2>
-              <Button variant="outline" onClick={handleBackToList}>
-                Back to List
-              </Button>
-            </div>
-            <StockEntryForm 
-              type={selectedType}
-              onBack={handleBackToList}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="list">Stock Entries</TabsTrigger>
+            <TabsTrigger value="create">Create New</TabsTrigger>
+            <TabsTrigger value="view" disabled={!selectedEntry}>View Details</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="list">
+            <StockEntryList 
+              entries={stockEntries}
+              onViewDetails={handleViewDetails}
             />
-          </div>
-        )}
+          </TabsContent>
+
+          <TabsContent value="create">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create Stock Entry</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StockEntryForm onSubmit={handleCreateEntry} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="view">
+            {selectedEntry && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    Stock Entry Details
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={
+                        selectedEntry.status === 'submitted' ? 'default' :
+                        selectedEntry.status === 'draft' ? 'secondary' : 'destructive'
+                      }>
+                        {selectedEntry.status}
+                      </Badge>
+                      <Badge variant="outline" className={getEntryTypeColor(selectedEntry.entryType)}>
+                        {selectedEntry.entryType}
+                      </Badge>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Entry Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Entry Number</p>
+                        <p className="font-medium">{selectedEntry.entryNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Entry Type</p>
+                        <p className="font-medium capitalize">{selectedEntry.entryType}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Date</p>
+                        <p className="font-medium">{selectedEntry.date}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Warehouse</p>
+                        <p className="font-medium">{selectedEntry.warehouse}</p>
+                      </div>
+                    </div>
+
+                    {selectedEntry.reference && (
+                      <div>
+                        <p className="text-sm text-gray-600">Reference</p>
+                        <p className="font-medium">{selectedEntry.reference}</p>
+                      </div>
+                    )}
+
+                    {/* Items */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Items</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2">Item Code</th>
+                              <th className="text-left p-2">Item Name</th>
+                              <th className="text-left p-2">Quantity</th>
+                              <th className="text-left p-2">Rate</th>
+                              <th className="text-left p-2">Amount</th>
+                              <th className="text-left p-2">Batch</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedEntry.items.map((item, index) => (
+                              <tr key={index} className="border-b">
+                                <td className="p-2">{item.itemCode}</td>
+                                <td className="p-2">{item.itemName}</td>
+                                <td className="p-2">{item.quantity}</td>
+                                <td className="p-2">₹{item.rate.toLocaleString()}</td>
+                                <td className="p-2">₹{item.amount.toLocaleString()}</td>
+                                <td className="p-2">{item.batch || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t">
+                      <Button variant="outline" onClick={() => setActiveTab("list")}>
+                        Back to List
+                      </Button>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">Total Amount</p>
+                        <p className="text-lg font-bold">₹{selectedEntry.totalAmount.toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    {selectedEntry.remarks && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">Remarks</h3>
+                        <p className="text-gray-700 bg-gray-50 p-3 rounded">{selectedEntry.remarks}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="reports">
+            <Card>
+              <CardHeader>
+                <CardTitle>Stock Entry Reports</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">Reports functionality coming soon...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
 };
 
-export default StockEntryPage;
+export default StockEntry;
