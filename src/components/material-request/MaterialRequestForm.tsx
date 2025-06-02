@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Scan, Plus, FileText } from "lucide-react";
 import { MaterialRequestPurpose, MaterialRequestItem } from "../../pages/MaterialRequest";
-
+import axios from 'axios';
 interface MaterialRequestFormProps {
   purpose: MaterialRequestPurpose;
   onBack: () => void;
@@ -69,6 +69,41 @@ const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
     });
   };
 
+  
+  const handleSubmitII = async () => {
+    try {
+      const payload = {
+        material_request_type: "Material Transfer",
+        schedule_date: new Date().toISOString().slice(0, 10),
+        items: [
+          {
+            item_code: "001",
+            qty: 2,
+            uom: "Nos",
+            warehouse: "Goods In Transit - DT"
+          }
+        ]
+      };
+  
+      const res = await axios.post(
+        "http://127.0.0.1:8002/api/resource/Material Request",
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "token 8e1c00c24f830a0:33153f06d516c5c"
+          }
+        }
+      );
+  
+      console.log("Material Request Created:", res.data.data);
+      alert(`Material Request ${res.data.data.name} created successfully!`);
+    } catch (error: any) {
+      console.error("Error creating Material Request:", error);
+      alert("Failed to create Material Request: " + error.message);
+    }
+  };
+  
   const handleSubmit = () => {
     console.log("Submitting material request:", { purpose, items });
     // Here you would call the API to create the material request
@@ -83,6 +118,7 @@ const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             Material Request - {purpose}
+            <button onClick={handleSubmitII}>Create</button>
             <Badge>{purpose}</Badge>
           </CardTitle>
         </CardHeader>
