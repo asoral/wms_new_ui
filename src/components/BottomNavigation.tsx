@@ -31,7 +31,7 @@ const BottomNavigation = ({ isOnline = true, onSync }: BottomNavigationProps) =>
   const [actionsOpen, setActionsOpen] = useState(false);
 
   const navItems = [
-    { path: "/Dashboard", icon: Home, label: "Dashboard" },
+    { path: "/dashboard", icon: Home, label: "Dashboard" },
     { path: "/actions", icon: Zap, label: "Actions", isAction: true },
     { path: "/reports", icon: BarChart3, label: "Reports", isReport: true },
     { path: "/sync", icon: isOnline ? Wifi : WifiOff, label: "Sync", isSync: true },

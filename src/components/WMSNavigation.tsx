@@ -26,7 +26,7 @@ const WMSNavigation = () => {
   const navigate = useNavigate();
 
   const navigationItems = [
-    { icon: Home, label: "Dashboard", path: "/" },
+    { icon: Home, label: "Dashboard", path: "/dashboard" },
     { icon: Package, label: "Item Enquiry", path: "/item-enquiry" },
     { icon: Search, label: "Bin Enquiry", path: "/bin-enquiry" },
     { icon: BarChart3, label: "Stock Count", path: "/stock-count" },

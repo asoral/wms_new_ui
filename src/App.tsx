@@ -53,7 +53,7 @@ const App = () => {
               {/* Main Content Area */}
               <div className="flex-1 pb-16 md:pb-0">
                 <Routes>
-                  <Route path="/" element={<Home />} />
+                  <Route path="/dashboard" element={<Home />} />
                   
                   {/* WMS Routes */}
                   <Route path="/item-enquiry" element={<ItemEnquiry />} />
