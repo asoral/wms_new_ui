@@ -62,19 +62,20 @@ const Deliver = () => {
 
   // Mock SO data
   const mockSO: SalesOrder = {
+    id: '1',
     number: 'SO-2024-001',
     customer: 'ABC Industries Ltd',
-    date: '2024-01-15',
-    deliveryDate: '2024-01-16',
-    totalItems: 3,
-    totalValue: 175000,
+    totalItems: 2,
+    totalValue: 575000,
+    expectedDelivery: '2024-01-16',
     status: 'confirmed',
+    percentDelivered: 0,
     items: [
       {
         itemCode: 'ITM-001',
         itemName: 'Laptop Computer',
-        orderedQty: 10,
-        availableQty: 15,
+        qtyToDeliver: 10,
+        deliveredQty: 0,
         uom: 'Nos',
         rate: 50000,
         warehouse: 'Main Store'
@@ -82,8 +83,8 @@ const Deliver = () => {
       {
         itemCode: 'ITM-002',
         itemName: 'Wireless Mouse',
-        orderedQty: 50,
-        availableQty: 100,
+        qtyToDeliver: 50,
+        deliveredQty: 0,
         uom: 'Nos',
         rate: 1500,
         warehouse: 'Main Store'
@@ -91,14 +92,15 @@ const Deliver = () => {
     ]
   };
 
-  const selectSO = (soNumber: string) => {
-    setSelectedSO(mockSO);
+  const selectSO = (order: SalesOrder) => {
+    setSelectedSO(order);
     setActiveTab("process");
   };
 
   const handleSOSearch = () => {
     if (soNumber.trim()) {
-      selectSO(soNumber.trim());
+      setSelectedSO(mockSO);
+      setActiveTab("process");
     }
   };
 

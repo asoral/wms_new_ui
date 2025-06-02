@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,7 +73,7 @@ const StockEntry = () => {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "list" | "form")} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="list">
               <TrendingUp className="w-4 h-4 mr-2" />
