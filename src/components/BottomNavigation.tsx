@@ -105,32 +105,34 @@ const BottomNavigation = ({ isOnline = true, onSync }: BottomNavigationProps) =>
       <Button
         size="icon"
         className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-lg z-40 md:hidden"
-        onClick={() => console.log("Quick action")}
+        onClick={() => setActionsOpen(true)}
       >
         <Plus className="w-6 h-6" />
       </Button>
 
       {/* Actions Sheet */}
       <Sheet open={actionsOpen} onOpenChange={setActionsOpen}>
-        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto">
+        <SheetContent side="bottom" className="h-[80vh]">
           <SheetHeader>
             <SheetTitle>Quick Actions</SheetTitle>
           </SheetHeader>
-          <div className="grid grid-cols-2 gap-4 mt-6 pb-6">
-            {actionItems.map((action) => (
-              <Button
-                key={action.path}
-                variant="outline"
-                className="h-20 flex flex-col items-center justify-center space-y-2"
-                onClick={() => {
-                  navigate(action.path);
-                  setActionsOpen(false);
-                }}
-              >
-                <span className="text-2xl">{action.icon}</span>
-                <span className="text-sm font-medium text-center">{action.label}</span>
-              </Button>
-            ))}
+          <div className="overflow-y-auto h-full pt-6 pb-20">
+            <div className="grid grid-cols-2 gap-4">
+              {actionItems.map((action) => (
+                <Button
+                  key={action.path}
+                  variant="outline"
+                  className="h-20 flex flex-col items-center justify-center space-y-2"
+                  onClick={() => {
+                    navigate(action.path);
+                    setActionsOpen(false);
+                  }}
+                >
+                  <span className="text-2xl">{action.icon}</span>
+                  <span className="text-sm font-medium text-center">{action.label}</span>
+                </Button>
+              ))}
+            </div>
           </div>
         </SheetContent>
       </Sheet>

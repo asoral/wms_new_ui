@@ -10,7 +10,7 @@ import {
   Info, 
   XCircle,
   Trash2,
-  MarkAsRead
+  Check
 } from "lucide-react";
 
 interface Notification {
@@ -108,7 +108,7 @@ const Notifications = () => {
             )}
           </div>
           <Button onClick={markAllAsRead} variant="outline">
-            <MarkAsRead className="w-4 h-4 mr-2" />
+            <Check className="w-4 h-4 mr-2" />
             Mark All Read
           </Button>
         </div>
@@ -144,7 +144,7 @@ const Notifications = () => {
                               variant="ghost"
                               onClick={() => markAsRead(notification.id)}
                             >
-                              <MarkAsRead className="w-4 h-4" />
+                              <Check className="w-4 h-4" />
                             </Button>
                           )}
                           <Button

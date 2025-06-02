@@ -73,15 +73,6 @@ const Home = () => {
               <h1 className="text-2xl font-bold text-gray-900">WMS Dashboard</h1>
               <p className="text-gray-600">Warehouse Management System</p>
             </div>
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input 
-                  placeholder="Search items, orders..." 
-                  className="pl-10 w-64"
-                />
-              </div>
-            </div>
           </div>
           
           {/* Enhanced Quick Stats */}
@@ -172,25 +163,23 @@ const Home = () => {
                   })}
                 </div>
                 
-                {quickActions.length > 3 && (
-                  <Button
-                    variant="ghost"
-                    className="w-full mt-4"
-                    onClick={() => setShowAllActions(!showAllActions)}
-                  >
-                    {showAllActions ? (
-                      <>
-                        <ChevronUp className="w-4 h-4 mr-2" />
-                        Show Less
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="w-4 h-4 mr-2" />
-                        Show All Actions ({quickActions.length - 3} more)
-                      </>
-                    )}
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  className="w-full mt-4"
+                  onClick={() => setShowAllActions(!showAllActions)}
+                >
+                  {showAllActions ? (
+                    <>
+                      <ChevronUp className="w-4 h-4 mr-2" />
+                      Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-4 h-4 mr-2" />
+                      Show All Actions ({quickActions.length - 3} more)
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
           </div>
