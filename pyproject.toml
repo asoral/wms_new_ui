@@ -1,5 +1,5 @@
 [project]
-name = "wms_new"
+name = "wms_new_ui"
 authors = [
     { name = "suman munde", email = "smunde@dexciss.io"}
 ]

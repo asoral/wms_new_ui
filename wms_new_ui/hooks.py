@@ -1,5 +1,5 @@
-app_name = "wms_new"
-app_title = "Wms New"
+app_name = "wms_new_ui"
+app_title = "Wms New ui"
 app_publisher = "suman munde"
 app_description = "wms new app frontend"
 app_email = "smunde@dexciss.io"
