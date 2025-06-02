@@ -63,12 +63,9 @@ const WMSNavigation = () => {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0 md:static md:shadow-none md:border-r
       `}>
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-gray-900">WMS</h2>
-          <p className="text-sm text-gray-600">Warehouse Management</p>
-        </div>
+        {/* Remove the header section entirely for web view */}
         
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-2 h-full overflow-y-auto">
           {navigationItems.map((item, index) => {
             const Icon = item.icon;
             return (

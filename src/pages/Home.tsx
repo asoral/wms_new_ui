@@ -1,9 +1,7 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { 
   Package, 
   Search, 
@@ -45,7 +43,8 @@ const Home = () => {
     { icon: Layers, label: "Pallet", color: "bg-yellow-500", path: "/pallet" }
   ];
 
-  const visibleActions = showAllActions ? quickActions : quickActions.slice(0, 3);
+  // Show only 4 actions by default in one row, rest can be expanded
+  const visibleActions = showAllActions ? quickActions : quickActions.slice(0, 4);
 
   const recentActivities = [
     { action: "Stock received", item: "SKU-001", time: "2 min ago", status: "completed" },
@@ -64,19 +63,12 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50 pb-20 overflow-y-auto">
+      {/* Header - Remove for dashboard but keep for other pages */}
       <div className="bg-white border-b border-gray-200 px-4 py-6">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">WMS Dashboard</h1>
-              <p className="text-gray-600">Warehouse Management System</p>
-            </div>
-          </div>
-          
           {/* Enhanced Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
@@ -144,7 +136,8 @@ const Home = () => {
                 <CardDescription>Access your most used warehouse operations</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {/* Responsive grid - 4 columns on desktop, 2 on mobile, single row by default */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {visibleActions.map((action, index) => {
                     const Icon = action.icon;
                     return (
@@ -163,23 +156,25 @@ const Home = () => {
                   })}
                 </div>
                 
-                <Button
-                  variant="ghost"
-                  className="w-full mt-4"
-                  onClick={() => setShowAllActions(!showAllActions)}
-                >
-                  {showAllActions ? (
-                    <>
-                      <ChevronUp className="w-4 h-4 mr-2" />
-                      Show Less
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="w-4 h-4 mr-2" />
-                      Show All Actions ({quickActions.length - 3} more)
-                    </>
-                  )}
-                </Button>
+                {quickActions.length > 4 && (
+                  <Button
+                    variant="ghost"
+                    className="w-full mt-4"
+                    onClick={() => setShowAllActions(!showAllActions)}
+                  >
+                    {showAllActions ? (
+                      <>
+                        <ChevronUp className="w-4 h-4 mr-2" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4 mr-2" />
+                        Show All Actions ({quickActions.length - 4} more)
+                      </>
+                    )}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -330,9 +325,9 @@ const Home = () => {
                 <Button variant="outline" className="w-full">
                   View All Alerts
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>

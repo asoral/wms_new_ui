@@ -1,6 +1,8 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { StockInfo } from "../../pages/ItemEnquiry";
 
 interface WarehouseStockTableProps {
@@ -8,6 +10,8 @@ interface WarehouseStockTableProps {
 }
 
 const WarehouseStockTable = ({ stockInfo }: WarehouseStockTableProps) => {
+  const isMobile = useIsMobile();
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -22,6 +26,70 @@ const WarehouseStockTable = ({ stockInfo }: WarehouseStockTableProps) => {
     return "bg-red-100 text-red-800";
   };
 
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {stockInfo.map((stock, index) => (
+          <Card key={index} className="border-l-4 border-l-blue-500">
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-lg">{stock.warehouse}</h3>
+                    <p className="text-sm text-gray-600">UOM: {stock.uom}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-blue-600">{stock.qty}</p>
+                    <p className="text-sm text-gray-600">{stock.uom}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Age:</span>
+                    <div className="mt-1">
+                      <Badge className={getAgeColor(stock.age)}>
+                        {stock.age} days
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Valuation:</span>
+                    <p className="font-semibold mt-1">{formatCurrency(stock.valuation)}</p>
+                  </div>
+                </div>
+
+                {(stock.batch || stock.serial) && (
+                  <div className="flex flex-wrap gap-2">
+                    {stock.batch && (
+                      <Badge variant="outline">
+                        Batch: {stock.batch}
+                      </Badge>
+                    )}
+                    {stock.serial && (
+                      <Badge variant="outline">
+                        Serial: {stock.serial}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        {stockInfo.length === 0 && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-gray-500">No stock information available for this item.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop table view
   return (
     <div className="overflow-x-auto">
       <Table>

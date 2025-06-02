@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { BarChart3, Plus, Save, RefreshCcw } from "lucide-react";
 import StockCountForm from "../components/stock-count/StockCountForm";
 import StockCountSummary from "../components/stock-count/StockCountSummary";
@@ -34,54 +36,17 @@ export interface StockCountSession {
 const StockCount = () => {
   const [session, setSession] = useState<StockCountSession | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedWarehouse, setSelectedWarehouse] = useState("");
+  const [selectedPurpose, setSelectedPurpose] = useState<'reconciliation' | 'opening' | null>(null);
 
-  // Mock data for demonstration
-  const mockSession: StockCountSession = {
-    purpose: 'reconciliation',
-    warehouse: 'Main Store',
-    entries: [
-      {
-        itemCode: 'ITM-001',
-        itemName: 'Laptop Computer',
-        warehouse: 'Main Store',
-        batch: 'BATCH-2024-001',
-        systemQty: 75,
-        scannedQty: 73,
-        uom: 'Nos',
-        difference: -2,
-        status: 'variance'
-      },
-      {
-        itemCode: 'ITM-002',
-        itemName: 'Wireless Mouse',
-        warehouse: 'Main Store',
-        systemQty: 100,
-        scannedQty: 100,
-        uom: 'Nos',
-        difference: 0,
-        status: 'matched'
-      },
-      {
-        itemCode: 'ITM-003',
-        itemName: 'USB Cable',
-        warehouse: 'Main Store',
-        batch: 'BATCH-2024-003',
-        systemQty: 200,
-        scannedQty: 205,
-        uom: 'Nos',
-        difference: 5,
-        status: 'variance'
-      }
-    ],
-    totalItems: 3,
-    matchedItems: 1,
-    varianceItems: 2
-  };
+  const warehouses = ["Main Store", "Raw Material Store", "Finished Goods", "Work In Progress"];
 
-  const startSession = (purpose: 'reconciliation' | 'opening', warehouse: string) => {
+  const startSession = () => {
+    if (!selectedWarehouse || !selectedPurpose) return;
+    
     setSession({
-      purpose,
-      warehouse,
+      purpose: selectedPurpose,
+      warehouse: selectedWarehouse,
       entries: [],
       totalItems: 0,
       matchedItems: 0,
@@ -120,15 +85,17 @@ const StockCount = () => {
     if (!session) return;
     
     console.log('Submitting stock count session:', session);
-    // Here you would call the ERPNext API for stock reconciliation
     alert('Stock count submitted successfully!');
   };
 
-  const loadExistingStock = () => {
-    // Simulate loading existing stock for a warehouse
-    setSession(mockSession);
+  const resetSession = () => {
+    setSession(null);
+    setSelectedWarehouse("");
+    setSelectedPurpose(null);
     setShowForm(false);
   };
+
+  const itemsInReview = session ? session.entries.length : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -141,9 +108,9 @@ const StockCount = () => {
           </div>
           {session && (
             <div className="flex items-center space-x-2">
-              <Button variant="outline" onClick={loadExistingStock}>
+              <Button variant="outline" onClick={resetSession}>
                 <RefreshCcw className="w-4 h-4 mr-2" />
-                Load Stock
+                Reset
               </Button>
               <Button onClick={submitSession} disabled={session.entries.length === 0}>
                 <Save className="w-4 h-4 mr-2" />
@@ -159,24 +126,55 @@ const StockCount = () => {
             <CardHeader>
               <CardTitle>Start Stock Count Session</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button 
-                  onClick={() => startSession('reconciliation', 'Main Store')}
-                  className="h-24 flex-col"
-                >
-                  <BarChart3 className="w-8 h-8 mb-2" />
-                  Stock Reconciliation
-                </Button>
-                <Button 
-                  onClick={() => startSession('opening', 'Main Store')}
-                  variant="outline"
-                  className="h-24 flex-col"
-                >
-                  <Plus className="w-8 h-8 mb-2" />
-                  Stock Opening
-                </Button>
+            <CardContent className="space-y-6">
+              {/* Warehouse Selection */}
+              <div>
+                <Label htmlFor="warehouse">Select Warehouse *</Label>
+                <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a warehouse to count" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse} value={warehouse}>
+                        {warehouse}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Purpose Selection */}
+              <div>
+                <Label>Select Count Purpose *</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <Button 
+                    onClick={() => setSelectedPurpose('reconciliation')}
+                    variant={selectedPurpose === 'reconciliation' ? "default" : "outline"}
+                    className="h-24 flex-col"
+                  >
+                    <BarChart3 className="w-8 h-8 mb-2" />
+                    Stock Reconciliation
+                  </Button>
+                  <Button 
+                    onClick={() => setSelectedPurpose('opening')}
+                    variant={selectedPurpose === 'opening' ? "default" : "outline"}
+                    className="h-24 flex-col"
+                  >
+                    <Plus className="w-8 h-8 mb-2" />
+                    Stock Opening
+                  </Button>
+                </div>
+              </div>
+
+              <Button 
+                onClick={startSession} 
+                disabled={!selectedWarehouse || !selectedPurpose}
+                className="w-full"
+                size="lg"
+              >
+                Start Count Session
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -189,15 +187,20 @@ const StockCount = () => {
                 <TabsTrigger value="entry" onClick={() => setShowForm(true)}>
                   Item Entry
                 </TabsTrigger>
-                <TabsTrigger value="review" onClick={() => setShowForm(false)}>
+                <TabsTrigger value="review" onClick={() => setShowForm(false)} className="relative">
                   Review & Submit
+                  {itemsInReview > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 bg-red-500 text-white text-xs flex items-center justify-center">
+                      {itemsInReview}
+                    </Badge>
+                  )}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="entry">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Scan Items</CardTitle>
+                    <CardTitle>Scan Items - {session.warehouse}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <StockCountForm onAddEntry={addEntry} />
