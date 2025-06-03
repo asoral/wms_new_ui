@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import SalesOrderList from "../components/deliver/SalesOrderList";
 import DeliveryProcess from "../components/deliver/DeliveryProcess";
@@ -48,60 +50,123 @@ export interface DeliveryEntry {
 
 const Deliver = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [soNumber, setSONumber] = useState("");
+  const [dashboardData, setDashboardData] = useState({
+    todaysDelivery: 0,
+    totalDeliveries: 0,
+    fgStockValue: 0,
+    averageAge: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for dashboard
-  const dashboardData = {
-    todaysDelivery: 12,
-    totalDeliveries: 145,
-    fgStockValue: 2500000,
-    averageAge: 15
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const defaultCompany = await getUserDefaultCompany();
+
+      // Fetch real data from ERPNext
+      const [soResult, dnResult] = await Promise.allSettled([
+        erpnextAPI.getSalesOrders([['status', '=', 'To Deliver']], defaultCompany || undefined),
+        erpnextAPI.getDeliveryNotes(undefined, defaultCompany || undefined)
+      ]);
+
+      const todaysDelivery = soResult.status === 'fulfilled' && soResult.value?.data ? soResult.value.data.length : 0;
+      const totalDeliveries = dnResult.status === 'fulfilled' && dnResult.value?.data ? dnResult.value.data.length : 0;
+
+      setDashboardData({
+        todaysDelivery,
+        totalDeliveries,
+        fgStockValue: 0, // Calculate from stock balance
+        averageAge: 0 // Calculate from delivery notes
+      });
+
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mock SO data
-  const mockSO: SalesOrder = {
-    id: '1',
-    number: 'SO-2024-001',
-    customer: 'ABC Industries Ltd',
-    totalItems: 2,
-    totalValue: 575000,
-    expectedDelivery: '2024-01-16',
-    status: 'confirmed',
-    percentDelivered: 0,
-    items: [
-      {
-        itemCode: 'ITM-001',
-        itemName: 'Laptop Computer',
-        qtyToDeliver: 10,
-        deliveredQty: 0,
-        uom: 'Nos',
-        rate: 50000,
-        warehouse: 'Main Store'
-      },
-      {
-        itemCode: 'ITM-002',
-        itemName: 'Wireless Mouse',
-        qtyToDeliver: 50,
-        deliveredQty: 0,
-        uom: 'Nos',
-        rate: 1500,
-        warehouse: 'Main Store'
+  const handleSOSearch = async () => {
+    if (!soNumber.trim()) return;
+
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings first.",
+          variant: "destructive"
+        });
+        return;
       }
-    ]
+
+      const result = await erpnextAPI.getSalesOrder(soNumber.trim());
+      if (result?.data) {
+        // Convert ERPNext data to our SalesOrder format
+        const soData = result.data;
+        const salesOrder: SalesOrder = {
+          id: soData.name,
+          number: soData.name,
+          customer: soData.customer,
+          totalItems: soData.items?.length || 0,
+          totalValue: soData.grand_total || 0,
+          expectedDelivery: soData.delivery_date || '',
+          status: soData.status === 'To Deliver' ? 'To Deliver' : 'confirmed',
+          percentDelivered: soData.per_delivered || 0,
+          items: soData.items?.map((item: any) => ({
+            itemCode: item.item_code,
+            itemName: item.item_name,
+            warehouse: item.warehouse,
+            qtyToDeliver: item.qty,
+            deliveredQty: item.delivered_qty || 0,
+            rate: item.rate,
+            uom: item.uom
+          })) || []
+        };
+        
+        setSelectedSO(salesOrder);
+        setActiveTab("process");
+        toast({
+          title: "Sales Order Found",
+          description: `Loaded SO: ${soData.name}`,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch sales order:', error);
+      toast({
+        title: "Sales Order Not Found",
+        description: "Please check the SO number and try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const selectSO = (order: SalesOrder) => {
     setSelectedSO(order);
     setActiveTab("process");
-  };
-
-  const handleSOSearch = () => {
-    if (soNumber.trim()) {
-      setSelectedSO(mockSO);
-      setActiveTab("process");
-    }
   };
 
   const shortcuts = [

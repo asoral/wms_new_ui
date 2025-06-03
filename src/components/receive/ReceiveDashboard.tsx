@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, FileText, Package, CheckCircle, Clock, LucideIcon } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface DashboardData {
   pendingPOs: number;
@@ -21,13 +23,67 @@ interface Shortcut {
 }
 
 interface ReceiveDashboardProps {
-  data: DashboardData;
   onSelectPO: (poNumber: string) => void;
   shortcuts: Shortcut[];
 }
 
-const ReceiveDashboard = ({ data, onSelectPO, shortcuts }: ReceiveDashboardProps) => {
+const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
   const [poNumber, setPONumber] = useState("");
+  const [data, setData] = useState<DashboardData>({
+    pendingPOs: 0,
+    receiptsThisWeek: 0,
+    draftReceipts: 0,
+    pendingQC: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const defaultCompany = await getUserDefaultCompany();
+
+      // Fetch dashboard data from ERPNext
+      const [poResult, prResult] = await Promise.allSettled([
+        erpnextAPI.getPurchaseOrders([['status', '=', 'To Receive']], defaultCompany || undefined),
+        erpnextAPI.getPurchaseReceipts([['docstatus', '=', 0]], defaultCompany || undefined)
+      ]);
+
+      const pendingPOs = poResult.status === 'fulfilled' && poResult.value?.data ? poResult.value.data.length : 0;
+      const draftReceipts = prResult.status === 'fulfilled' && prResult.value?.data ? prResult.value.data.length : 0;
+
+      setData({
+        pendingPOs,
+        receiptsThisWeek: 0, // Calculate this based on date filters
+        draftReceipts,
+        pendingQC: 0 // Calculate based on quality inspection status
+      });
+
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePOSearch = () => {
     if (poNumber.trim()) {
@@ -122,7 +178,9 @@ const ReceiveDashboard = ({ data, onSelectPO, shortcuts }: ReceiveDashboardProps
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">{item.title}</p>
-                    <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
+                    <p className={`text-2xl font-bold ${item.color}`}>
+                      {loading ? "..." : item.value}
+                    </p>
                   </div>
                   <Icon className={`w-8 h-8 ${item.color}`} />
                 </div>

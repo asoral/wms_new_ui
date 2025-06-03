@@ -103,9 +103,9 @@ const Profile = () => {
     setConnectionError('');
 
     try {
-      console.log('Testing connection with Frappe token format:', {
+      console.log('Testing connection with Basic Auth:', {
         url: profile.erpnext_url,
-        tokenFormat: 'token api_key:api_secret',
+        authFormat: 'Basic base64(api_key:api_secret)',
         apiKey: profile.erpnext_api_key ? 'Set' : 'Not set',
         apiSecret: profile.erpnext_api_secret ? 'Set' : 'Not set'
       });
@@ -241,7 +241,7 @@ const Profile = () => {
             {/* Authentication Format Info */}
             <Alert className="border-blue-200 bg-blue-50">
               <AlertDescription className="text-blue-800">
-                <strong>Authentication Format:</strong> This app uses the Frappe Framework token authentication format: <code>token api_key:api_secret</code>
+                <strong>Authentication Format:</strong> This app uses Basic Authentication with base64 encoded credentials
                 <br />
                 <br />
                 <strong>To create API keys in ERPNext:</strong>
@@ -250,6 +250,7 @@ const Profile = () => {
                   <li>Click on "API Access"</li>
                   <li>Generate API Key and Secret</li>
                   <li>Ensure the user has proper permissions for warehouse operations</li>
+                  <li>Make sure CORS is enabled on your ERPNext server</li>
                 </ol>
               </AlertDescription>
             </Alert>
@@ -341,13 +342,14 @@ const Profile = () => {
                   <strong>Connection Error:</strong> {connectionError}
                   <br />
                   <br />
-                  <strong>Common solutions:</strong>
+                  <strong>Troubleshooting Steps:</strong>
                   <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Check if your ERPNext URL is correct and accessible</li>
-                    <li>Verify your API Key and Secret are correct (generated from User Settings → API Access)</li>
-                    <li>Ensure the API user has proper permissions for warehouse operations</li>
-                    <li>Ensure CORS is enabled on your ERPNext server</li>
-                    <li>Try testing the same credentials with Postman using: <code>Authorization: token api_key:api_secret</code></li>
+                    <li>Verify your ERPNext URL is accessible and correct</li>
+                    <li>Check your API Key and Secret are correct (from User Settings → API Access)</li>
+                    <li>Ensure the API user has System Manager or appropriate permissions</li>
+                    <li>Enable CORS in your ERPNext site_config.json: <code>"allow_cors": "*"</code></li>
+                    <li>If using ngrok, make sure to click "Visit Site" when prompted</li>
+                    <li>Test with Postman using Basic Auth: base64(api_key:api_secret)</li>
                   </ul>
                 </AlertDescription>
               </Alert>
