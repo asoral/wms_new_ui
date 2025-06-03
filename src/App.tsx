@@ -5,7 +5,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { AuthProvider } from "@/components/auth/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Home from "./pages/Home";
+import Auth from "./pages/Auth";
 import PickList from "./pages/PickList";
 import ItemEnquiry from "./pages/ItemEnquiry";
 import BinEnquiry from "./pages/BinEnquiry";
@@ -42,46 +45,55 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <div className="flex flex-col min-h-screen">
-            {/* Top Bar - always visible */}
-            <TopBar onSync={handleSync} />
-            
-            <div className="flex flex-1">
-              {/* Desktop Sidebar - only on desktop */}
-              {!isMobile && <WMSNavigation />}
-              
-              {/* Main Content Area */}
-              <div className="flex-1 pb-16 md:pb-0">
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  
-                  {/* WMS Routes */}
-                  <Route path="/item-enquiry" element={<ItemEnquiry />} />
-                  <Route path="/bin-enquiry" element={<BinEnquiry />} />
-                  <Route path="/stock-count" element={<StockCount />} />
-                  <Route path="/receive" element={<Receive />} />
-                  <Route path="/deliver" element={<Deliver />} />
-                  <Route path="/mat-request" element={<MaterialRequest />} />
-                  <Route path="/stock-entry" element={<StockEntry />} />
-                  <Route path="/pick-list" element={<PickList />} />
-                  <Route path="/packing" element={<Packing />} />
-                  <Route path="/print-label" element={<PrintLabel />} />
-                  <Route path="/quality-check" element={<QualityCheck />} />
-                  <Route path="/pallet" element={<Pallet />} />
-                  
-                  {/* New Routes */}
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/sync" element={<Sync />} />
-                  <Route path="/notifications" element={<Notifications />} />
-                  
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </div>
-            </div>
+          <AuthProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/*" element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    {/* Top Bar - always visible */}
+                    <TopBar onSync={handleSync} />
+                    
+                    <div className="flex flex-1">
+                      {/* Desktop Sidebar - only on desktop */}
+                      {!isMobile && <WMSNavigation />}
+                      
+                      {/* Main Content Area */}
+                      <div className="flex-1 pb-16 md:pb-0">
+                        <Routes>
+                          <Route path="/" element={<Home />} />
+                          
+                          {/* WMS Routes */}
+                          <Route path="/item-enquiry" element={<ItemEnquiry />} />
+                          <Route path="/bin-enquiry" element={<BinEnquiry />} />
+                          <Route path="/stock-count" element={<StockCount />} />
+                          <Route path="/receive" element={<Receive />} />
+                          <Route path="/deliver" element={<Deliver />} />
+                          <Route path="/mat-request" element={<MaterialRequest />} />
+                          <Route path="/stock-entry" element={<StockEntry />} />
+                          <Route path="/pick-list" element={<PickList />} />
+                          <Route path="/packing" element={<Packing />} />
+                          <Route path="/print-label" element={<PrintLabel />} />
+                          <Route path="/quality-check" element={<QualityCheck />} />
+                          <Route path="/pallet" element={<Pallet />} />
+                          
+                          {/* New Routes */}
+                          <Route path="/reports" element={<Reports />} />
+                          <Route path="/sync" element={<Sync />} />
+                          <Route path="/notifications" element={<Notifications />} />
+                          
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </div>
+                    </div>
 
-            {/* Bottom Navigation - only on mobile */}
-            {isMobile && <BottomNavigation onSync={handleSync} />}
-          </div>
+                    {/* Bottom Navigation - only on mobile */}
+                    {isMobile && <BottomNavigation onSync={handleSync} />}
+                  </div>
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

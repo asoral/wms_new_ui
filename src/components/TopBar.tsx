@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/components/auth/AuthContext";
 
 interface TopBarProps {
   onSync?: () => void;
@@ -37,6 +38,7 @@ interface TopBarProps {
 const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { signOut, user } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -58,6 +60,11 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
     // Implement dark mode toggle logic
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
   };
 
   return (
@@ -146,7 +153,9 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                {user?.email || 'My Account'}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               
               <DropdownMenuItem onClick={toggleDarkMode}>
@@ -187,7 +196,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
               
               <DropdownMenuSeparator />
               
-              <DropdownMenuItem className="text-red-600">
+              <DropdownMenuItem className="text-red-600" onClick={handleSignOut}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </DropdownMenuItem>
