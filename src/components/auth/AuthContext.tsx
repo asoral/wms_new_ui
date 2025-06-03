@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, fullName?: string, erpnextConfig?: any) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   loading: boolean;
@@ -47,17 +47,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = async (email: string, password: string, fullName?: string, erpnextConfig?: any) => {
     const redirectUrl = `${window.location.origin}/`;
+    
+    const userData: any = {
+      full_name: fullName || ''
+    };
+
+    if (erpnextConfig) {
+      userData.erpnext_url = erpnextConfig.erpnext_url;
+      userData.erpnext_api_key = erpnextConfig.erpnext_api_key;
+      userData.erpnext_api_secret = erpnextConfig.erpnext_api_secret;
+    }
     
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName || ''
-        }
+        data: userData
       }
     });
     
