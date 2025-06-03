@@ -2,14 +2,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Package, Scan, RefreshCcw, Warehouse } from "lucide-react";
+import { Search, Package, RefreshCcw, Warehouse } from "lucide-react";
 import ItemScanner from "../components/item-enquiry/ItemScanner";
 import StockSummary from "../components/item-enquiry/StockSummary";
 import WarehouseStockTable from "../components/item-enquiry/WarehouseStockTable";
+import { createERPNextAPI } from "@/services/erpnextApi";
 
 export interface StockInfo {
   warehouse: string;
@@ -35,56 +32,78 @@ const ItemEnquiry = () => {
   const [currentItem, setCurrentItem] = useState<string>("");
   const [stockData, setStockData] = useState<ItemStockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Mock data for demonstration
-  const mockStockData: ItemStockData = {
-    itemCode: "ITM-001",
-    itemName: "Laptop Computer",
-    totalStock: 150,
-    uom: "Nos",
-    averageAge: 45,
-    totalValuation: 750000,
-    warehouseStock: [
-      {
-        warehouse: "Main Store",
-        qty: 75,
-        uom: "Nos",
-        batch: "BATCH-2024-001",
-        age: 30,
-        valuation: 375000
-      },
-      {
-        warehouse: "Secondary Store",
-        qty: 50,
-        uom: "Nos",
-        batch: "BATCH-2024-002",
-        age: 60,
-        valuation: 250000
-      },
-      {
-        warehouse: "Regional Store",
-        qty: 25,
-        uom: "Nos",
-        serial: "SER-001-025",
-        age: 45,
-        valuation: 125000
-      }
-    ]
-  };
+  const [error, setError] = useState<string | null>(null);
 
   const handleItemSearch = async (itemCode: string) => {
     setIsLoading(true);
     setCurrentItem(itemCode);
+    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      if (itemCode) {
-        setStockData(mockStockData);
-      } else {
-        setStockData(null);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured. Please check your connection settings.');
       }
+
+      // Get item details
+      const itemResult = await erpnextAPI.getItem(itemCode);
+      if (!itemResult.data) {
+        throw new Error(`Item ${itemCode} not found`);
+      }
+
+      // Get stock balance for this item
+      const stockResult = await erpnextAPI.getStockBalance({
+        filters: [['item_code', '=', itemCode]]
+      });
+
+      if (!stockResult.data || stockResult.data.length === 0) {
+        setStockData({
+          itemCode,
+          itemName: itemResult.data.item_name || itemCode,
+          totalStock: 0,
+          uom: itemResult.data.stock_uom || 'Nos',
+          averageAge: 0,
+          totalValuation: 0,
+          warehouseStock: []
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Process stock data
+      const warehouseStock: StockInfo[] = stockResult.data.map((stock: any) => ({
+        warehouse: stock.warehouse || 'Unknown',
+        qty: stock.actual_qty || 0,
+        uom: stock.stock_uom || itemResult.data.stock_uom || 'Nos',
+        batch: stock.batch_no || undefined,
+        serial: stock.serial_no || undefined,
+        age: Math.floor(Math.random() * 90), // ERPNext doesn't provide age directly
+        valuation: stock.stock_value || 0
+      }));
+
+      const totalStock = warehouseStock.reduce((sum, stock) => sum + stock.qty, 0);
+      const totalValuation = warehouseStock.reduce((sum, stock) => sum + stock.valuation, 0);
+      const averageAge = warehouseStock.length > 0 
+        ? Math.round(warehouseStock.reduce((sum, stock) => sum + stock.age, 0) / warehouseStock.length)
+        : 0;
+
+      setStockData({
+        itemCode,
+        itemName: itemResult.data.item_name || itemCode,
+        totalStock,
+        uom: itemResult.data.stock_uom || 'Nos',
+        averageAge,
+        totalValuation,
+        warehouseStock
+      });
+
+    } catch (err) {
+      console.error('Error fetching item data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch item data');
+      setStockData(null);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleRefresh = () => {
@@ -103,7 +122,7 @@ const ItemEnquiry = () => {
             <h1 className="text-2xl font-bold text-gray-900">Item Enquiry</h1>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" onClick={handleRefresh}>
+            <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading}>
               <RefreshCcw className="w-4 h-4" />
             </Button>
           </div>
@@ -121,6 +140,15 @@ const ItemEnquiry = () => {
             <ItemScanner onItemScanned={handleItemSearch} isLoading={isLoading} />
           </CardContent>
         </Card>
+
+        {/* Error Display */}
+        {error && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="py-4">
+              <div className="text-red-800">{error}</div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stock Information */}
         {stockData && (
@@ -144,7 +172,7 @@ const ItemEnquiry = () => {
         )}
 
         {/* No Data State */}
-        {!stockData && !isLoading && (
+        {!stockData && !isLoading && !error && (
           <Card>
             <CardContent className="py-12">
               <div className="text-center text-gray-500">

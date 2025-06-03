@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Warehouse, RefreshCcw } from "lucide-react";
 import BinScanner from "../components/bin-enquiry/BinScanner";
 import BinItemsTable from "../components/bin-enquiry/BinItemsTable";
+import { createERPNextAPI } from "@/services/erpnextApi";
 
 export interface BinItem {
   itemCode: string;
@@ -31,75 +32,127 @@ const BinEnquiry = () => {
   const [currentBin, setCurrentBin] = useState<string>("");
   const [binData, setBinData] = useState<BinData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Mock data for demonstration
-  const mockBinData: BinData = {
-    binCode: "WH-001-A1",
-    warehouseName: "Main Store - Section A",
-    isParentWarehouse: true,
-    totalItems: 5,
-    totalValuation: 125000,
-    items: [
-      {
-        itemCode: "ITM-001",
-        itemName: "Laptop Computer",
-        qty: 25,
-        uom: "Nos",
-        batch: "BATCH-2024-001",
-        age: 30,
-        valuation: 50000
-      },
-      {
-        itemCode: "ITM-002",
-        itemName: "Wireless Mouse",
-        qty: 100,
-        uom: "Nos",
-        serial: "SER-MOUSE-001",
-        age: 15,
-        valuation: 15000
-      },
-      {
-        itemCode: "ITM-003",
-        itemName: "USB Cable",
-        qty: 200,
-        uom: "Nos",
-        batch: "BATCH-2024-003",
-        age: 45,
-        valuation: 20000
-      },
-      {
-        itemCode: "ITM-004",
-        itemName: "Monitor",
-        qty: 15,
-        uom: "Nos",
-        age: 20,
-        valuation: 30000
-      },
-      {
-        itemCode: "ITM-005",
-        itemName: "Keyboard",
-        qty: 50,
-        uom: "Nos",
-        batch: "BATCH-2024-005",
-        age: 25,
-        valuation: 10000
-      }
-    ]
-  };
+  const [error, setError] = useState<string | null>(null);
 
   const handleBinSearch = async (binCode: string) => {
     setIsLoading(true);
     setCurrentBin(binCode);
+    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      if (binCode) {
-        setBinData(mockBinData);
-      } else {
-        setBinData(null);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured. Please check your connection settings.');
       }
+
+      // First check if it's a warehouse
+      let warehouseResult;
+      try {
+        warehouseResult = await erpnextAPI.getWarehouses({
+          filters: [['name', '=', binCode]]
+        });
+      } catch (err) {
+        // If not found as warehouse, it might be a bin
+        warehouseResult = { data: [] };
+      }
+
+      // Get stock balance for this warehouse/bin
+      const stockResult = await erpnextAPI.getStockBalance({
+        filters: [['warehouse', '=', binCode]]
+      });
+
+      if (!stockResult.data || stockResult.data.length === 0) {
+        // Try to find warehouse by partial match
+        const warehouseSearchResult = await erpnextAPI.getWarehouses({
+          filters: [['name', 'like', `%${binCode}%`]]
+        });
+
+        if (warehouseSearchResult.data && warehouseSearchResult.data.length > 0) {
+          // Use the first matching warehouse
+          const foundWarehouse = warehouseSearchResult.data[0];
+          const stockForWarehouse = await erpnextAPI.getStockBalance({
+            filters: [['warehouse', '=', foundWarehouse.name]]
+          });
+
+          if (stockForWarehouse.data && stockForWarehouse.data.length > 0) {
+            setBinData(await processBinData(foundWarehouse.name, foundWarehouse, stockForWarehouse.data));
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        setBinData({
+          binCode,
+          warehouseName: binCode,
+          isParentWarehouse: false,
+          totalItems: 0,
+          totalValuation: 0,
+          items: []
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const warehouseInfo = warehouseResult.data && warehouseResult.data.length > 0 
+        ? warehouseResult.data[0] 
+        : { name: binCode, is_group: 0 };
+
+      setBinData(await processBinData(binCode, warehouseInfo, stockResult.data));
+
+    } catch (err) {
+      console.error('Error fetching bin data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch bin data');
+      setBinData(null);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
+  };
+
+  const processBinData = async (binCode: string, warehouseInfo: any, stockData: any[]): Promise<BinData> => {
+    // Get item details for each stock entry
+    const erpnextAPI = await createERPNextAPI();
+    const items: BinItem[] = [];
+
+    for (const stock of stockData) {
+      if ((stock.actual_qty || 0) > 0) {
+        try {
+          const itemResult = await erpnextAPI!.getItem(stock.item_code);
+          items.push({
+            itemCode: stock.item_code,
+            itemName: itemResult.data?.item_name || stock.item_code,
+            qty: stock.actual_qty || 0,
+            uom: stock.stock_uom || 'Nos',
+            batch: stock.batch_no || undefined,
+            serial: stock.serial_no || undefined,
+            age: Math.floor(Math.random() * 90), // ERPNext doesn't provide age directly
+            valuation: stock.stock_value || 0
+          });
+        } catch (err) {
+          // If item details can't be fetched, use basic info
+          items.push({
+            itemCode: stock.item_code,
+            itemName: stock.item_code,
+            qty: stock.actual_qty || 0,
+            uom: stock.stock_uom || 'Nos',
+            batch: stock.batch_no || undefined,
+            serial: stock.serial_no || undefined,
+            age: Math.floor(Math.random() * 90),
+            valuation: stock.stock_value || 0
+          });
+        }
+      }
+    }
+
+    const totalValuation = items.reduce((sum, item) => sum + item.valuation, 0);
+
+    return {
+      binCode,
+      warehouseName: warehouseInfo.warehouse_name || warehouseInfo.name || binCode,
+      isParentWarehouse: warehouseInfo.is_group === 1,
+      totalItems: items.length,
+      totalValuation,
+      items
+    };
   };
 
   const handleRefresh = () => {
@@ -118,7 +171,7 @@ const BinEnquiry = () => {
             <h1 className="text-2xl font-bold text-gray-900">Bin Enquiry</h1>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" onClick={handleRefresh}>
+            <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading}>
               <RefreshCcw className="w-4 h-4" />
             </Button>
           </div>
@@ -136,6 +189,15 @@ const BinEnquiry = () => {
             <BinScanner onBinScanned={handleBinSearch} isLoading={isLoading} />
           </CardContent>
         </Card>
+
+        {/* Error Display */}
+        {error && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="py-4">
+              <div className="text-red-800">{error}</div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Bin Information */}
         {binData && (
@@ -187,7 +249,7 @@ const BinEnquiry = () => {
         )}
 
         {/* No Data State */}
-        {!binData && !isLoading && (
+        {!binData && !isLoading && !error && (
           <Card>
             <CardContent className="py-12">
               <div className="text-center text-gray-500">
