@@ -37,79 +37,6 @@ const AuthForm = () => {
     erpnextApiSecret: ''
   });
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    const { error } = await signIn(loginForm.email, loginForm.password);
-
-    if (error) {
-      setError(error.message);
-    } else {
-      navigate('/');
-    }
-
-    setLoading(false);
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    if (signupForm.password !== signupForm.confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
-    if (signupForm.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      setLoading(false);
-      return;
-    }
-
-    if (!signupForm.erpnextUrl || !signupForm.erpnextApiKey || !signupForm.erpnextApiSecret) {
-      setError('ERPNext credentials are required');
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await signUp(
-      signupForm.email, 
-      signupForm.password, 
-      signupForm.fullName,
-      {
-        erpnext_url: signupForm.erpnextUrl,
-        erpnext_api_key: signupForm.erpnextApiKey,
-        erpnext_api_secret: signupForm.erpnextApiSecret
-      }
-    );
-
-    if (error) {
-      setError(error.message);
-    } else {
-      setSuccess('Account created successfully! Please check your email for verification.');
-      setSignupForm({ 
-        email: '', 
-        password: '', 
-        confirmPassword: '', 
-        fullName: '',
-        erpnextUrl: '',
-        erpnextApiKey: '',
-        erpnextApiSecret: ''
-      });
-    }
-
-    setLoading(false);
-  };
-
-  const handleSignupClick = () => {
-    setShowOnboarding(true);
-  };
-
   // Show onboarding when requested
   if (showOnboarding) {
     return (
@@ -274,6 +201,79 @@ const AuthForm = () => {
       </div>
     );
   }
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const { error } = await signIn(loginForm.email, loginForm.password);
+
+    if (error) {
+      setError(error.message);
+    } else {
+      navigate('/');
+    }
+
+    setLoading(false);
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    if (signupForm.password !== signupForm.confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    if (signupForm.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
+    if (!signupForm.erpnextUrl || !signupForm.erpnextApiKey || !signupForm.erpnextApiSecret) {
+      setError('ERPNext credentials are required');
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await signUp(
+      signupForm.email, 
+      signupForm.password, 
+      signupForm.fullName,
+      {
+        erpnext_url: signupForm.erpnextUrl,
+        erpnext_api_key: signupForm.erpnextApiKey,
+        erpnext_api_secret: signupForm.erpnextApiSecret
+      }
+    );
+
+    if (error) {
+      setError(error.message);
+    } else {
+      setSuccess('Account created successfully! Please check your email for verification.');
+      setSignupForm({ 
+        email: '', 
+        password: '', 
+        confirmPassword: '', 
+        fullName: '',
+        erpnextUrl: '',
+        erpnextApiKey: '',
+        erpnextApiSecret: ''
+      });
+    }
+
+    setLoading(false);
+  };
+
+  const handleSignupClick = () => {
+    setShowOnboarding(true);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

@@ -22,6 +22,9 @@ export function useERPNextDashboard() {
         setError(null);
 
         const erpnextAPI = await createERPNextAPI();
+        if (!erpnextAPI) {
+          throw new Error('ERPNext API not configured');
+        }
 
         // Fetch multiple data points in parallel
         const [
@@ -117,8 +120,7 @@ export function useERPNextDashboard() {
         });
 
       } catch (err) {
-        console.error('Dashboard fetch error:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred while fetching dashboard data');
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
