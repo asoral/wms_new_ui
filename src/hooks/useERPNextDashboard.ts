@@ -21,68 +21,71 @@ export function useERPNextDashboard() {
         setLoading(true);
         setError(null);
 
+        console.log('Fetching dashboard data...');
+
         const erpnextAPI = await createERPNextAPI();
         if (!erpnextAPI) {
-          throw new Error('ERPNext API not configured');
+          throw new Error('ERPNext API not configured. Please configure your ERPNext settings in the Profile page.');
         }
 
         // Get user's default company
         const defaultCompany = await getUserDefaultCompany();
+        console.log('Default company:', defaultCompany);
 
-        // Fetch multiple data points in parallel
-        const [
-          itemsResult,
-          warehousesResult,
-          stockResult,
-          salesOrdersResult,
-          recentActivityResults
-        ] = await Promise.allSettled([
-          erpnextAPI.getItems(undefined, undefined, defaultCompany || undefined),
+        // Fetch multiple data points in parallel with better error handling
+        const results = await Promise.allSettled([
+          erpnextAPI.getItems(undefined, ['name', 'item_name'], defaultCompany || undefined),
           erpnextAPI.getWarehouses(undefined, defaultCompany || undefined),
           erpnextAPI.getStockBalance(undefined, defaultCompany || undefined),
           erpnextAPI.getSalesOrders([['status', '=', 'To Deliver']], defaultCompany || undefined),
-          Promise.allSettled([
-            erpnextAPI.getPurchaseReceipts(undefined, defaultCompany || undefined),
-            erpnextAPI.getDeliveryNotes(undefined, defaultCompany || undefined),
-            erpnextAPI.getStockEntries(undefined, defaultCompany || undefined),
-            erpnextAPI.getStockReconciliations(undefined, defaultCompany || undefined),
-            erpnextAPI.getPickLists(undefined, defaultCompany || undefined),
-            erpnextAPI.getPackingSlips(undefined, defaultCompany || undefined)
-          ])
         ]);
 
-        // Process results
-        const totalItems = itemsResult.status === 'fulfilled' ? itemsResult.value.data?.length || 0 : 0;
-        const totalWarehouses = warehousesResult.status === 'fulfilled' ? warehousesResult.value.data?.length || 0 : 0;
+        console.log('Dashboard API results:', results);
+
+        // Process results with better error handling
+        const totalItems = results[0].status === 'fulfilled' && results[0].value?.data ? results[0].value.data.length : 0;
+        const totalWarehouses = results[1].status === 'fulfilled' && results[1].value?.data ? results[1].value.data.length : 0;
         
         // Calculate low stock items (items with qty < 10)
-        const lowStockItems = stockResult.status === 'fulfilled' 
-          ? stockResult.value.data?.filter((item: any) => (item.actual_qty || 0) < 10).length || 0 
+        const lowStockItems = results[2].status === 'fulfilled' && results[2].value?.data
+          ? results[2].value.data.filter((item: any) => (item.actual_qty || 0) < 10).length
           : 0;
         
-        const pendingDeliveries = salesOrdersResult.status === 'fulfilled' ? salesOrdersResult.value.data?.length || 0 : 0;
+        const pendingDeliveries = results[3].status === 'fulfilled' && results[3].value?.data ? results[3].value.data.length : 0;
 
-        // Combine and sort recent activity
+        // Get recent activity from various sources
+        const recentActivityResults = await Promise.allSettled([
+          erpnextAPI.getPurchaseReceipts(undefined, defaultCompany || undefined),
+          erpnextAPI.getDeliveryNotes(undefined, defaultCompany || undefined),
+          erpnextAPI.getStockEntries(undefined, defaultCompany || undefined),
+        ]);
+
         const recentActivity: any[] = [];
         
-        if (recentActivityResults.status === 'fulfilled') {
-          recentActivityResults.value.forEach((result, index) => {
-            if (result.status === 'fulfilled' && result.value.data) {
-              const docTypes = ['Purchase Receipt', 'Delivery Note', 'Stock Entry', 'Stock Reconciliation', 'Pick List', 'Packing Slip'];
-              result.value.data.forEach((doc: any) => {
-                recentActivity.push({
-                  ...doc,
-                  doctype: docTypes[index],
-                  modified: doc.modified || doc.posting_date || doc.date
-                });
+        recentActivityResults.forEach((result, index) => {
+          if (result.status === 'fulfilled' && result.value?.data) {
+            const docTypes = ['Purchase Receipt', 'Delivery Note', 'Stock Entry'];
+            result.value.data.slice(0, 8).forEach((doc: any) => {
+              recentActivity.push({
+                ...doc,
+                doctype: docTypes[index],
+                modified: doc.modified || doc.posting_date || doc.creation
               });
-            }
-          });
-        }
+            });
+          }
+        });
 
         // Sort by modified date and limit to 25
-        recentActivity.sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
+        recentActivity.sort((a, b) => new Date(b.modified || '').getTime() - new Date(a.modified || '').getTime());
         const limitedActivity = recentActivity.slice(0, 25);
+
+        console.log('Dashboard data processed:', {
+          totalItems,
+          totalWarehouses,
+          lowStockItems,
+          pendingDeliveries,
+          recentActivityCount: limitedActivity.length
+        });
 
         setData({
           totalItems,
@@ -93,7 +96,9 @@ export function useERPNextDashboard() {
         });
 
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        console.error('Dashboard fetch error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred while fetching dashboard data';
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

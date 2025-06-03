@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Settings, TestTube, Save, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Settings, TestTube, Save, Loader2, CheckCircle, XCircle, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ERPNextAPI } from "@/services/erpnextApi";
@@ -36,6 +37,9 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'success' | 'error'>('none');
+  const [connectionError, setConnectionError] = useState<string>('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [showApiSecret, setShowApiSecret] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -96,18 +100,24 @@ const Profile = () => {
 
     setTesting(true);
     setConnectionStatus('none');
+    setConnectionError('');
 
     try {
+      console.log('Testing connection with:', {
+        url: profile.erpnext_url,
+        apiKey: profile.erpnext_api_key ? 'Set' : 'Not set',
+        apiSecret: profile.erpnext_api_secret ? 'Set' : 'Not set'
+      });
+
       const erpnextAPI = new ERPNextAPI({
         url: profile.erpnext_url,
         apiKey: profile.erpnext_api_key,
         apiSecret: profile.erpnext_api_secret
       });
 
-      // Test connection by fetching companies
-      const result = await erpnextAPI.makeRequest('Company');
+      const result = await erpnextAPI.testConnection();
       
-      if (result.data) {
+      if (result.success) {
         setConnectionStatus('success');
         toast({
           title: "Connection Successful",
@@ -120,13 +130,23 @@ const Profile = () => {
           apiKey: profile.erpnext_api_key,
           apiSecret: profile.erpnext_api_secret
         });
+      } else {
+        setConnectionStatus('error');
+        setConnectionError(result.error || 'Unknown error');
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Unable to connect to ERPNext. Please check your credentials.",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Connection test failed:', error);
       setConnectionStatus('error');
+      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
+      setConnectionError(errorMessage);
       toast({
         title: "Connection Failed",
-        description: "Unable to connect to ERPNext. Please check your credentials.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -138,10 +158,11 @@ const Profile = () => {
     setLoadingCompanies(true);
     try {
       const erpnextAPI = new ERPNextAPI(config);
-      const result = await erpnextAPI.makeRequest('Company');
+      const result = await erpnextAPI.getCompanies();
       
-      if (result.data) {
+      if (result?.data) {
         setCompanies(result.data);
+        console.log('Loaded companies:', result.data);
       }
     } catch (error) {
       console.error('Error loading companies:', error);
@@ -228,24 +249,46 @@ const Profile = () => {
 
             <div>
               <Label htmlFor="erpnext_api_key">API Key</Label>
-              <Input
-                id="erpnext_api_key"
-                type="password"
-                value={profile.erpnext_api_key}
-                onChange={(e) => setProfile(prev => ({ ...prev, erpnext_api_key: e.target.value }))}
-                placeholder="Your ERPNext API Key"
-              />
+              <div className="relative">
+                <Input
+                  id="erpnext_api_key"
+                  type={showApiKey ? "text" : "password"}
+                  value={profile.erpnext_api_key}
+                  onChange={(e) => setProfile(prev => ({ ...prev, erpnext_api_key: e.target.value }))}
+                  placeholder="Your ERPNext API Key"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
 
             <div>
               <Label htmlFor="erpnext_api_secret">API Secret</Label>
-              <Input
-                id="erpnext_api_secret"
-                type="password"
-                value={profile.erpnext_api_secret}
-                onChange={(e) => setProfile(prev => ({ ...prev, erpnext_api_secret: e.target.value }))}
-                placeholder="Your ERPNext API Secret"
-              />
+              <div className="relative">
+                <Input
+                  id="erpnext_api_secret"
+                  type={showApiSecret ? "text" : "password"}
+                  value={profile.erpnext_api_secret}
+                  onChange={(e) => setProfile(prev => ({ ...prev, erpnext_api_secret: e.target.value }))}
+                  placeholder="Your ERPNext API Secret"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                  onClick={() => setShowApiSecret(!showApiSecret)}
+                >
+                  {showApiSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
 
             {/* Connection Test */}
@@ -273,6 +316,24 @@ const Profile = () => {
                 </Badge>
               )}
             </div>
+
+            {/* Connection Error Details */}
+            {connectionStatus === 'error' && connectionError && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertDescription className="text-red-800">
+                  <strong>Connection Error:</strong> {connectionError}
+                  <br />
+                  <br />
+                  <strong>Common solutions:</strong>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Check if your ERPNext URL is correct and accessible</li>
+                    <li>Verify your API Key and Secret are correct</li>
+                    <li>Ensure CORS is enabled on your ERPNext server</li>
+                    <li>Contact your ERPNext administrator for API access</li>
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Default Company Selection */}
             {companies.length > 0 && (
