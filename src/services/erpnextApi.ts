@@ -38,15 +38,8 @@ export class ERPNextAPI {
       Object.keys(params).forEach(key => {
         if (params[key] !== undefined && params[key] !== null) {
           if (key === 'filters' && Array.isArray(params[key])) {
-            // Handle filters as query parameters directly
-            params[key].forEach((filter: any[], index: number) => {
-              if (Array.isArray(filter) && filter.length === 3) {
-                const [field, operator, value] = filter;
-                searchParams.append(`filters[${index}][0]`, field);
-                searchParams.append(`filters[${index}][1]`, operator);
-                searchParams.append(`filters[${index}][2]`, value);
-              }
-            });
+            // Handle filters as JSON string
+            searchParams.append('filters', JSON.stringify(params[key]));
           } else {
             searchParams.append(key, typeof params[key] === 'object' ? JSON.stringify(params[key]) : params[key]);
           }
@@ -234,12 +227,15 @@ export class ERPNextAPI {
       limit_page_length: 100,
       fields: JSON.stringify(['name', 'customer', 'status', 'posting_date'])
     };
+    
+    let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
+    
     return this.makeRequest('Delivery Note', 'GET', null, params);
   }
 
@@ -252,12 +248,15 @@ export class ERPNextAPI {
       limit_page_length: 100,
       fields: JSON.stringify(['name', 'supplier', 'status', 'posting_date'])
     };
+    
+    let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
+    
     return this.makeRequest('Purchase Receipt', 'GET', null, params);
   }
 
@@ -270,12 +269,15 @@ export class ERPNextAPI {
       limit_page_length: 100,
       fields: JSON.stringify(['name', 'material_request_type', 'status', 'schedule_date'])
     };
+    
+    let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
+    
     return this.makeRequest('Material Request', 'GET', null, params);
   }
 
@@ -288,12 +290,15 @@ export class ERPNextAPI {
       limit_page_length: 100,
       fields: JSON.stringify(['name', 'stock_entry_type', 'status', 'posting_date'])
     };
+    
+    let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
+    
     return this.makeRequest('Stock Entry', 'GET', null, params);
   }
 
@@ -306,12 +311,15 @@ export class ERPNextAPI {
       limit_page_length: 100,
       fields: JSON.stringify(['name', 'purpose', 'status', 'date'])
     };
+    
+    let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
+    
     return this.makeRequest('Pick List', 'GET', null, params);
   }
 
@@ -324,12 +332,15 @@ export class ERPNextAPI {
       limit_page_length: 100,
       fields: JSON.stringify(['name', 'delivery_note', 'status', 'creation'])
     };
+    
+    let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
+    
     return this.makeRequest('Packing Slip', 'GET', null, params);
   }
 

@@ -30,6 +30,7 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
       customer: "ABC Electronics Ltd",
       totalItems: 15,
       totalValue: 125000,
+      deliveryDate: "2024-01-15",
       expectedDelivery: "2024-01-15",
       status: "To Deliver",
       percentDelivered: 0,
@@ -38,8 +39,10 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
           itemCode: "ITM-001",
           itemName: "Laptop Dell Inspiron",
           warehouse: "Main Store",
-          qtyToDeliver: 5,
+          orderedQty: 5,
           deliveredQty: 0,
+          pendingQty: 5,
+          qtyToDeliver: 5,
           rate: 25000,
           uom: "Nos"
         }
@@ -51,6 +54,7 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
       customer: "XYZ Corporation",
       totalItems: 8,
       totalValue: 89000,
+      deliveryDate: "2024-01-16",
       expectedDelivery: "2024-01-16",
       status: "To Deliver and Bill",
       percentDelivered: 25,
@@ -62,6 +66,7 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
       customer: "Tech Solutions Inc",
       totalItems: 22,
       totalValue: 156000,
+      deliveryDate: "2024-01-17",
       expectedDelivery: "2024-01-17",
       status: "To Deliver",
       percentDelivered: 50,
@@ -119,7 +124,7 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
       {/* Orders List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredOrders.map((order) => (
-          <Card key={order.id} className="hover:shadow-md transition-shadow">
+          <Card key={order.id || order.number} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{order.number}</CardTitle>
@@ -136,7 +141,7 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <span>{new Date(order.expectedDelivery).toLocaleDateString()}</span>
+                  <span>{new Date(order.expectedDelivery || order.deliveryDate).toLocaleDateString()}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Package className="w-4 h-4 text-gray-500" />
@@ -151,8 +156,8 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">Delivered:</span>
-                  <Badge className={getDeliveryProgressColor(order.percentDelivered)}>
-                    {order.percentDelivered}%
+                  <Badge className={getDeliveryProgressColor(order.percentDelivered || 0)}>
+                    {order.percentDelivered || 0}%
                   </Badge>
                 </div>
                 <Button onClick={() => onSelectOrder(order)}>

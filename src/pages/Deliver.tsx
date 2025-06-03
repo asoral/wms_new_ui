@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Truck, Package, Search, CheckCircle, Printer, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import DeliveryProcess from "../components/deliver/DeliveryProcess";
@@ -18,6 +18,9 @@ export interface SalesOrder {
   totalItems: number;
   totalValue: number;
   items: SOItem[];
+  id?: string;
+  expectedDelivery?: string;
+  percentDelivered?: number;
 }
 
 export interface SOItem {
@@ -29,6 +32,7 @@ export interface SOItem {
   rate: number;
   uom: string;
   warehouse: string;
+  qtyToDeliver?: number;
 }
 
 export interface DeliveryEntry {
@@ -48,6 +52,59 @@ const Deliver = () => {
   const { toast } = useToast();
   const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dashboardData, setDashboardData] = useState({
+    todaysDelivery: 0,
+    totalDeliveries: 0,
+    fgStockValue: 0,
+    averageAge: 0
+  });
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        return;
+      }
+
+      const defaultCompany = await getUserDefaultCompany();
+      
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Fetch delivery notes for today
+      const deliveryNotesResult = await erpnextAPI.getDeliveryNotes(
+        [['posting_date', '=', today]], 
+        defaultCompany || undefined
+      );
+      
+      // Fetch all delivery notes for total count
+      const allDeliveryNotesResult = await erpnextAPI.getDeliveryNotes(
+        undefined, 
+        defaultCompany || undefined
+      );
+
+      // Fetch stock balance to calculate FG stock value (simplified)
+      const stockResult = await erpnextAPI.getStockBalance(
+        undefined, 
+        defaultCompany || undefined
+      );
+
+      setDashboardData({
+        todaysDelivery: deliveryNotesResult.data ? deliveryNotesResult.data.length : 0,
+        totalDeliveries: allDeliveryNotesResult.data ? allDeliveryNotesResult.data.length : 0,
+        fgStockValue: stockResult.data ? 
+          stockResult.data.reduce((sum: number, item: any) => sum + (item.stock_value || 0), 0) : 0,
+        averageAge: 15 // Placeholder - would need custom calculation
+      });
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    }
+  };
 
   const selectSalesOrder = async (soNumber: string) => {
     setLoading(true);
@@ -91,7 +148,8 @@ const Deliver = () => {
           pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
           rate: item.rate || 0,
           uom: item.stock_uom || item.uom,
-          warehouse: item.warehouse || 'Main Store'
+          warehouse: item.warehouse || 'Main Store',
+          qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
         })) : []
       };
 
@@ -107,6 +165,11 @@ const Deliver = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const viewSalesOrders = () => {
+    // This would navigate to a sales orders list view
+    console.log('Navigate to sales orders list');
   };
 
   const shortcuts = [
@@ -131,8 +194,9 @@ const Deliver = () => {
 
         {!selectedSO ? (
           <DeliverDashboard 
-            onSelectSO={selectSalesOrder}
+            data={dashboardData}
             shortcuts={shortcuts}
+            onViewOrders={viewSalesOrders}
           />
         ) : (
           <DeliveryProcess 
