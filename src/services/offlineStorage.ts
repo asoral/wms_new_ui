@@ -72,7 +72,7 @@ class OfflineStorageService {
       const transaction = this.db!.transaction(['pendingRecords'], 'readonly');
       const store = transaction.objectStore('pendingRecords');
       const index = store.index('synced');
-      const request = index.getAll(false);
+      const request = index.getAll(IDBKeyRange.only(false));
 
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);

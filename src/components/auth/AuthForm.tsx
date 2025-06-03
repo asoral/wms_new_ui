@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Warehouse, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import OnboardingCarousel from '@/components/onboarding/OnboardingCarousel';
 
 const AuthForm = () => {
   const navigate = useNavigate();
@@ -36,7 +37,6 @@ const AuthForm = () => {
   });
 
   if (showOnboarding) {
-    const OnboardingCarousel = require('../onboarding/OnboardingCarousel').default;
     return <OnboardingCarousel onComplete={() => setShowOnboarding(false)} />;
   }
 
