@@ -15,6 +15,7 @@ export class ERPNextAPI {
   }
 
   private getAuthHeaders() {
+    // Correct Frappe token authentication format: "token api_key:api_secret"
     return {
       'Authorization': `token ${this.config.apiKey}:${this.config.apiSecret}`,
       'Content-Type': 'application/json',
@@ -31,7 +32,8 @@ export class ERPNextAPI {
     const baseUrl = this.cleanUrl(this.config.url);
     let url = `${baseUrl}/api/resource/${endpoint}`;
     
-    console.log('Making ERPNext API request to:', url);
+    console.log('Making Frappe API request to:', url);
+    console.log('Using token format: token api_key:api_secret');
     
     if (params) {
       const searchParams = new URLSearchParams();
@@ -55,7 +57,12 @@ export class ERPNextAPI {
       options.body = JSON.stringify(data);
     }
 
-    console.log('Request options:', { url, method, headers: options.headers });
+    console.log('Request options:', { 
+      url, 
+      method, 
+      headers: options.headers,
+      hasBody: !!options.body 
+    });
 
     try {
       const response = await fetch(url, options);
@@ -65,15 +72,29 @@ export class ERPNextAPI {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('ERPNext API Error Response:', errorText);
-        throw new Error(`ERPNext API Error: ${response.status} ${response.statusText} - ${errorText}`);
+        console.error('Frappe API Error Response:', errorText);
+        
+        // Parse Frappe error format if possible
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.exc) {
+            throw new Error(`Frappe API Error: ${errorJson.exc}`);
+          }
+          if (errorJson.message) {
+            throw new Error(`Frappe API Error: ${errorJson.message}`);
+          }
+        } catch (parseError) {
+          // If not JSON, use raw error text
+        }
+        
+        throw new Error(`Frappe API Error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('ERPNext API Response:', result);
+      console.log('Frappe API Response:', result);
       return result;
     } catch (error) {
-      console.error('ERPNext API Request Failed:', error);
+      console.error('Frappe API Request Failed:', error);
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         throw new Error('Network error: Unable to connect to ERPNext server. Please check your URL and ensure CORS is enabled on your ERPNext server.');
       }
@@ -81,13 +102,33 @@ export class ERPNextAPI {
     }
   }
 
-  // Test connection to ERPNext
+  // Test connection to ERPNext using the /api/method/frappe.auth.get_logged_user endpoint
   async testConnection() {
     try {
-      console.log('Testing ERPNext connection...');
-      const response = await this.makeRequest('Company', 'GET', null, { limit_page_length: 1 });
-      console.log('Connection test successful:', response);
-      return { success: true, data: response };
+      console.log('Testing Frappe connection...');
+      
+      // Use the auth endpoint to test connection as per Frappe docs
+      const baseUrl = this.cleanUrl(this.config.url);
+      const url = `${baseUrl}/api/method/frappe.auth.get_logged_user`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+        mode: 'cors',
+      });
+      
+      console.log('Auth test response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Auth test failed:', errorText);
+        return { success: false, error: `Authentication failed: ${response.status} ${response.statusText}` };
+      }
+      
+      const result = await response.json();
+      console.log('Auth test successful:', result);
+      
+      return { success: true, data: result };
     } catch (error) {
       console.error('Connection test failed:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Connection failed' };
@@ -96,12 +137,17 @@ export class ERPNextAPI {
 
   // Get list of companies
   async getCompanies() {
-    return this.makeRequest('Company', 'GET', null, { fields: JSON.stringify(['name', 'company_name']) });
+    return this.makeRequest('Company', 'GET', null, { 
+      fields: JSON.stringify(['name', 'company_name']),
+      limit_page_length: 100
+    });
   }
 
   // Item Management
   async getItems(filters?: any, fields?: string[], company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (fields) params.fields = JSON.stringify(fields);
     if (company) {
@@ -116,10 +162,11 @@ export class ERPNextAPI {
     return this.makeRequest(`Item/${itemCode}`);
   }
 
-  // Stock Management - Get Stock Balance using Bin doctype
+  // Stock Management
   async getStockBalance(filters?: any, company?: string) {
     const params: any = {
-      fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'reserved_qty', 'projected_qty'])
+      fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'reserved_qty', 'projected_qty']),
+      limit_page_length: 1000
     };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
@@ -130,22 +177,10 @@ export class ERPNextAPI {
     return this.makeRequest('Bin', 'GET', null, params);
   }
 
-  // Get Stock Ledger Entry for detailed stock information
-  async getStockLedgerEntry(filters?: any, company?: string) {
-    const params: any = {
-      fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'qty_after_transaction', 'posting_date'])
-    };
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) {
-      const companyFilter = [['company', '=', company]];
-      const existingFilters = filters ? JSON.parse(JSON.stringify(filters)) : [];
-      params.filters = JSON.stringify([...existingFilters, ...companyFilter]);
-    }
-    return this.makeRequest('Stock Ledger Entry', 'GET', null, params);
-  }
-
   async getWarehouses(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -157,7 +192,9 @@ export class ERPNextAPI {
 
   // Sales Orders
   async getSalesOrders(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -173,7 +210,9 @@ export class ERPNextAPI {
 
   // Delivery Notes
   async getDeliveryNotes(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -189,7 +228,9 @@ export class ERPNextAPI {
 
   // Purchase Orders
   async getPurchaseOrders(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -205,7 +246,9 @@ export class ERPNextAPI {
 
   // Purchase Receipts
   async getPurchaseReceipts(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -221,7 +264,9 @@ export class ERPNextAPI {
 
   // Material Requests
   async getMaterialRequests(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -237,7 +282,9 @@ export class ERPNextAPI {
 
   // Stock Entries
   async getStockEntries(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -253,7 +300,9 @@ export class ERPNextAPI {
 
   // Pick Lists
   async getPickLists(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -269,7 +318,9 @@ export class ERPNextAPI {
 
   // Packing Slips
   async getPackingSlips(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -285,7 +336,9 @@ export class ERPNextAPI {
 
   // Quality Inspections
   async getQualityInspections(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -301,7 +354,9 @@ export class ERPNextAPI {
 
   // Product Bundles (for Pallets)
   async getProductBundles(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
@@ -317,7 +372,9 @@ export class ERPNextAPI {
 
   // Stock Reconciliation
   async getStockReconciliations(filters?: any, company?: string) {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 100
+    };
     if (filters) params.filters = JSON.stringify(filters);
     if (company) {
       const companyFilter = [['company', '=', company]];
