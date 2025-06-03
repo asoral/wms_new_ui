@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ERPNextConfig {
@@ -58,6 +59,21 @@ export class ERPNextAPI {
     }
   }
 
+  // Test connection to ERPNext
+  async testConnection() {
+    try {
+      const response = await this.makeRequest('Company', 'GET', null, { limit_page_length: 1 });
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Connection failed' };
+    }
+  }
+
+  // Get list of companies
+  async getCompanies() {
+    return this.makeRequest('Company', 'GET', null, { fields: JSON.stringify(['name', 'company_name']) });
+  }
+
   // Item Management
   async getItems(filters?: any, fields?: string[], company?: string) {
     const params: any = {};
@@ -93,16 +109,6 @@ export class ERPNextAPI {
       params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
     }
     return this.makeRequest('Warehouse', 'GET', null, params);
-  }
-
-  // Stock Reconciliation
-  async getStockReconciliations(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Stock Reconciliation${params}`);
-  }
-
-  async createStockReconciliation(data: any) {
-    return this.makeRequest('Stock Reconciliation', 'POST', data);
   }
 
   // Sales Orders
