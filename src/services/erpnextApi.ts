@@ -195,11 +195,12 @@ export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
       .single();
 
     if (error) {
-      throw error;
+      console.error('Failed to get ERPNext config from profiles:', error);
+      throw new Error('ERPNext API not configured. Please check your connection settings.');
     }
 
     if (!profile?.erpnext_url || !profile?.erpnext_api_key || !profile?.erpnext_api_secret) {
-      return null;
+      throw new Error('ERPNext API not configured. Please check your connection settings.');
     }
 
     return {
@@ -209,16 +210,16 @@ export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
     };
   } catch (error) {
     console.error('Failed to get ERPNext config:', error);
-    return null;
+    throw error;
   }
 }
 
 // Factory function to create ERPNext API instance
-export async function createERPNextAPI(): Promise<ERPNextAPI | null> {
+export async function createERPNextAPI(): Promise<ERPNextAPI> {
   const config = await getUserERPNextConfig();
   
   if (!config) {
-    return null;
+    throw new Error('ERPNext API not configured. Please check your connection settings.');
   }
 
   return new ERPNextAPI(config);
