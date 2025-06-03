@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ERPNextConfig {
@@ -21,8 +20,20 @@ export class ERPNextAPI {
     };
   }
 
-  private async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: any) {
-    const url = `${this.config.url}/api/resource/${endpoint}`;
+  public async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: any, params?: any) {
+    let url = `${this.config.url}/api/resource/${endpoint}`;
+    
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.keys(params).forEach(key => {
+        if (params[key] !== undefined && params[key] !== null) {
+          searchParams.append(key, typeof params[key] === 'object' ? JSON.stringify(params[key]) : params[key]);
+        }
+      });
+      if (searchParams.toString()) {
+        url += `?${searchParams.toString()}`;
+      }
+    }
     
     const options: RequestInit = {
       method,
@@ -48,9 +59,15 @@ export class ERPNextAPI {
   }
 
   // Item Management
-  async getItems(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Item${params}`);
+  async getItems(filters?: any, fields?: string[], company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (fields) params.fields = JSON.stringify(fields);
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Item', 'GET', null, params);
   }
 
   async getItem(itemCode: string) {
@@ -58,14 +75,24 @@ export class ERPNextAPI {
   }
 
   // Stock Management
-  async getStockBalance(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Bin${params}`);
+  async getStockBalance(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Bin', 'GET', null, params);
   }
 
-  async getWarehouses(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Warehouse${params}`);
+  async getWarehouses(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Warehouse', 'GET', null, params);
   }
 
   // Stock Reconciliation
@@ -79,9 +106,14 @@ export class ERPNextAPI {
   }
 
   // Sales Orders
-  async getSalesOrders(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Sales Order${params}`);
+  async getSalesOrders(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Sales Order', 'GET', null, params);
   }
 
   async getSalesOrder(name: string) {
@@ -89,9 +121,14 @@ export class ERPNextAPI {
   }
 
   // Delivery Notes
-  async getDeliveryNotes(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Delivery Note${params}`);
+  async getDeliveryNotes(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Delivery Note', 'GET', null, params);
   }
 
   async createDeliveryNote(data: any) {
@@ -99,9 +136,14 @@ export class ERPNextAPI {
   }
 
   // Purchase Orders
-  async getPurchaseOrders(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Purchase Order${params}`);
+  async getPurchaseOrders(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Purchase Order', 'GET', null, params);
   }
 
   async getPurchaseOrder(name: string) {
@@ -109,9 +151,14 @@ export class ERPNextAPI {
   }
 
   // Purchase Receipts
-  async getPurchaseReceipts(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Purchase Receipt${params}`);
+  async getPurchaseReceipts(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Purchase Receipt', 'GET', null, params);
   }
 
   async createPurchaseReceipt(data: any) {
@@ -119,9 +166,14 @@ export class ERPNextAPI {
   }
 
   // Material Requests
-  async getMaterialRequests(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Material Request${params}`);
+  async getMaterialRequests(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Material Request', 'GET', null, params);
   }
 
   async createMaterialRequest(data: any) {
@@ -129,9 +181,14 @@ export class ERPNextAPI {
   }
 
   // Stock Entries
-  async getStockEntries(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Stock Entry${params}`);
+  async getStockEntries(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Stock Entry', 'GET', null, params);
   }
 
   async createStockEntry(data: any) {
@@ -139,9 +196,14 @@ export class ERPNextAPI {
   }
 
   // Pick Lists
-  async getPickLists(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Pick List${params}`);
+  async getPickLists(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Pick List', 'GET', null, params);
   }
 
   async createPickList(data: any) {
@@ -149,9 +211,14 @@ export class ERPNextAPI {
   }
 
   // Packing Slips
-  async getPackingSlips(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Packing Slip${params}`);
+  async getPackingSlips(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Packing Slip', 'GET', null, params);
   }
 
   async createPackingSlip(data: any) {
@@ -159,9 +226,14 @@ export class ERPNextAPI {
   }
 
   // Quality Inspections
-  async getQualityInspections(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Quality Inspection${params}`);
+  async getQualityInspections(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Quality Inspection', 'GET', null, params);
   }
 
   async createQualityInspection(data: any) {
@@ -169,13 +241,33 @@ export class ERPNextAPI {
   }
 
   // Product Bundles (for Pallets)
-  async getProductBundles(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
-    return this.makeRequest(`Product Bundle${params}`);
+  async getProductBundles(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Product Bundle', 'GET', null, params);
   }
 
   async createProductBundle(data: any) {
     return this.makeRequest('Product Bundle', 'POST', data);
+  }
+
+  // Stock Reconciliation
+  async getStockReconciliations(filters?: any, company?: string) {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      params.filters = filters ? [...filters, ...companyFilter] : companyFilter;
+    }
+    return this.makeRequest('Stock Reconciliation', 'GET', null, params);
+  }
+
+  async createStockReconciliation(data: any) {
+    return this.makeRequest('Stock Reconciliation', 'POST', data);
   }
 }
 
@@ -209,6 +301,32 @@ export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
     };
   } catch (error) {
     console.error('Failed to get ERPNext config:', error);
+    return null;
+  }
+}
+
+// Helper function to get user's default company
+export async function getUserDefaultCompany(): Promise<string | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('erpnext_default_company')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return profile?.erpnext_default_company || null;
+  } catch (error) {
+    console.error('Failed to get default company:', error);
     return null;
   }
 }

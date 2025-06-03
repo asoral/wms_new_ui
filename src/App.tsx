@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,6 +23,7 @@ import Pallet from "./pages/Pallet";
 import Reports from "./pages/Reports";
 import Sync from "./pages/Sync";
 import Notifications from "./pages/Notifications";
+import Profile from "./pages/Profile";
 import WMSNavigation from "./components/WMSNavigation";
 import TopBar from "./components/TopBar";
 import BottomNavigation from "./components/BottomNavigation";
@@ -81,6 +81,7 @@ const App = () => {
                           <Route path="/reports" element={<Reports />} />
                           <Route path="/sync" element={<Sync />} />
                           <Route path="/notifications" element={<Notifications />} />
+                          <Route path="/profile" element={<Profile />} />
                           
                           <Route path="*" element={<NotFound />} />
                         </Routes>

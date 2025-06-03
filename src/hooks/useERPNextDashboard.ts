@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { createERPNextAPI } from '@/services/erpnextApi';
+import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
 
 interface DashboardData {
   totalItems: number;
@@ -26,6 +26,9 @@ export function useERPNextDashboard() {
           throw new Error('ERPNext API not configured');
         }
 
+        // Get user's default company
+        const defaultCompany = await getUserDefaultCompany();
+
         // Fetch multiple data points in parallel
         const [
           itemsResult,
@@ -34,47 +37,17 @@ export function useERPNextDashboard() {
           salesOrdersResult,
           recentActivityResults
         ] = await Promise.allSettled([
-          erpnextAPI.getItems(),
-          erpnextAPI.getWarehouses(),
-          erpnextAPI.getStockBalance(),
-          erpnextAPI.getSalesOrders({ filters: [['status', '=', 'To Deliver']] }),
+          erpnextAPI.getItems(undefined, undefined, defaultCompany || undefined),
+          erpnextAPI.getWarehouses(undefined, defaultCompany || undefined),
+          erpnextAPI.getStockBalance(undefined, defaultCompany || undefined),
+          erpnextAPI.getSalesOrders([['status', '=', 'To Deliver']], defaultCompany || undefined),
           Promise.allSettled([
-            erpnextAPI.getPurchaseReceipts({ 
-              filters: [], 
-              fields: ['name', 'posting_date', 'supplier', 'grand_total', 'modified'],
-              limit_page_length: 5,
-              order_by: 'modified desc'
-            }),
-            erpnextAPI.getDeliveryNotes({ 
-              filters: [], 
-              fields: ['name', 'posting_date', 'customer', 'grand_total', 'modified'],
-              limit_page_length: 5,
-              order_by: 'modified desc'
-            }),
-            erpnextAPI.getStockEntries({ 
-              filters: [], 
-              fields: ['name', 'posting_date', 'stock_entry_type', 'modified'],
-              limit_page_length: 5,
-              order_by: 'modified desc'
-            }),
-            erpnextAPI.getStockReconciliations({ 
-              filters: [], 
-              fields: ['name', 'posting_date', 'purpose', 'modified'],
-              limit_page_length: 5,
-              order_by: 'modified desc'
-            }),
-            erpnextAPI.getPickLists({ 
-              filters: [], 
-              fields: ['name', 'date', 'purpose', 'modified'],
-              limit_page_length: 5,
-              order_by: 'modified desc'
-            }),
-            erpnextAPI.getPackingSlips({ 
-              filters: [], 
-              fields: ['name', 'date', 'delivery_note', 'modified'],
-              limit_page_length: 5,
-              order_by: 'modified desc'
-            })
+            erpnextAPI.getPurchaseReceipts(undefined, defaultCompany || undefined),
+            erpnextAPI.getDeliveryNotes(undefined, defaultCompany || undefined),
+            erpnextAPI.getStockEntries(undefined, defaultCompany || undefined),
+            erpnextAPI.getStockReconciliations(undefined, defaultCompany || undefined),
+            erpnextAPI.getPickLists(undefined, defaultCompany || undefined),
+            erpnextAPI.getPackingSlips(undefined, defaultCompany || undefined)
           ])
         ]);
 
