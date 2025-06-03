@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,10 +50,8 @@ const ItemEnquiry = () => {
         throw new Error(`Item ${itemCode} not found`);
       }
 
-      // Get stock balance for this item
-      const stockResult = await erpnextAPI.getStockBalance({
-        filters: [['item_code', '=', itemCode]]
-      });
+      // Get stock balance for this item using corrected filter format
+      const stockResult = await erpnextAPI.getStockBalance([['item_code', '=', itemCode]]);
 
       if (!stockResult.data || stockResult.data.length === 0) {
         setStockData({

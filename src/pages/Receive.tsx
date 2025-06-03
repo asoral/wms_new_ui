@@ -1,12 +1,13 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight, Search } from "lucide-react";
+import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { createERPNextAPI } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 import ReceiveDashboard from "../components/receive/ReceiveDashboard";
 import ReceiveForm from "../components/receive/ReceiveForm";
 import ReceiveTable from "../components/receive/ReceiveTable";
@@ -45,56 +46,72 @@ export interface ReceiveEntry {
 
 const Receive = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [receiveEntries, setReceiveEntries] = useState<ReceiveEntry[]>([]);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [poNumber, setPONumber] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Mock PO data
-  const mockPO: PurchaseOrder = {
-    poNumber: 'PO-2024-001',
-    supplier: 'Tech Supplies Ltd',
-    date: '2024-01-15',
-    totalAmount: 250000,
-    status: 'pending',
-    items: [
-      {
-        itemCode: 'ITM-001',
-        itemName: 'Laptop Computer',
-        orderedQty: 50,
-        receivedQty: 0,
-        pendingQty: 50,
-        uom: 'Nos',
-        rate: 50000,
-        warehouse: 'Main Store'
-      },
-      {
-        itemCode: 'ITM-002',
-        itemName: 'Wireless Mouse',
-        orderedQty: 100,
-        receivedQty: 0,
-        pendingQty: 100,
-        uom: 'Nos',
-        rate: 1500,
-        warehouse: 'Main Store'
-      },
-      {
-        itemCode: 'ITM-003',
-        itemName: 'USB Cable',
-        orderedQty: 200,
-        receivedQty: 50,
-        pendingQty: 150,
-        uom: 'Nos',
-        rate: 500,
-        warehouse: 'Main Store'
+  const selectPO = async (poNumber: string) => {
+    setLoading(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
       }
-    ]
-  };
 
-  const selectPO = (poNumber: string) => {
-    // In real app, fetch PO data from API
-    setSelectedPO(mockPO);
-    setActiveTab("receive");
+      // Fetch PO data from ERPNext
+      const poResult = await erpnextAPI.getPurchaseOrder(poNumber);
+      if (!poResult.data) {
+        toast({
+          title: "Purchase Order Not Found",
+          description: `PO ${poNumber} could not be found in ERPNext.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const po = poResult.data;
+      
+      // Transform ERPNext PO data to our interface
+      const transformedPO: PurchaseOrder = {
+        poNumber: po.name,
+        supplier: po.supplier_name || po.supplier,
+        date: po.schedule_date || po.transaction_date,
+        totalAmount: po.grand_total || 0,
+        status: po.status === 'To Receive' ? 'pending' : 
+                po.status === 'Partially Received' ? 'partial' : 'completed',
+        items: po.items ? po.items.map((item: any) => ({
+          itemCode: item.item_code,
+          itemName: item.item_name,
+          orderedQty: item.qty || 0,
+          receivedQty: item.received_qty || 0,
+          pendingQty: (item.qty || 0) - (item.received_qty || 0),
+          uom: item.stock_uom || item.uom,
+          rate: item.rate || 0,
+          warehouse: item.warehouse || 'Main Store'
+        })) : []
+      };
+
+      setSelectedPO(transformedPO);
+      setActiveTab("receive");
+      
+    } catch (error) {
+      console.error('Error fetching PO:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch Purchase Order from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePOSearch = () => {
@@ -107,17 +124,55 @@ const Receive = () => {
     setReceiveEntries(prev => [...prev, entry]);
   };
 
-  const submitReceipt = () => {
-    console.log('Submitting receipt:', {
-      po: selectedPO,
-      entries: receiveEntries
-    });
-    alert('Purchase receipt created successfully!');
+  const submitReceipt = async () => {
+    if (!selectedPO || receiveEntries.length === 0) return;
     
-    // Reset form
-    setReceiveEntries([]);
-    setSelectedPO(null);
-    setActiveTab("dashboard");
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create Purchase Receipt in ERPNext
+      const receiptData = {
+        supplier: selectedPO.supplier,
+        posting_date: new Date().toISOString().split('T')[0],
+        items: receiveEntries.map(entry => ({
+          item_code: entry.itemCode,
+          qty: entry.receivedQty,
+          warehouse: entry.warehouse,
+          rate: entry.rate,
+          uom: entry.uom,
+          batch_no: entry.batch,
+          serial_no: entry.serial
+        }))
+      };
+
+      await erpnextAPI.createPurchaseReceipt(receiptData);
+      
+      toast({
+        title: "Success",
+        description: "Purchase receipt created successfully!",
+      });
+      
+      // Reset form
+      setReceiveEntries([]);
+      setSelectedPO(null);
+      setActiveTab("dashboard");
+      
+    } catch (error) {
+      console.error('Error creating receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create purchase receipt",
+        variant: "destructive"
+      });
+    }
   };
 
   const shortcuts = [
@@ -138,7 +193,7 @@ const Receive = () => {
           {selectedPO && (
             <div className="flex items-center space-x-2">
               <Badge variant="outline">{selectedPO.poNumber}</Badge>
-              <Button onClick={submitReceipt} disabled={receiveEntries.length === 0}>
+              <Button onClick={submitReceipt} disabled={receiveEntries.length === 0 || loading}>
                 <Package className="w-4 h-4 mr-2" />
                 Create Receipt
               </Button>
@@ -202,7 +257,7 @@ const Receive = () => {
                   </CardContent>
                 </Card>
 
-                {/* Receive Form - Moved to top */}
+                {/* Receive Form */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Scan/Select Items to Receive</CardTitle>
@@ -215,7 +270,7 @@ const Receive = () => {
                   </CardContent>
                 </Card>
 
-                {/* PO Items - Now below the receive form */}
+                {/* PO Items */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Purchase Order Items</CardTitle>
