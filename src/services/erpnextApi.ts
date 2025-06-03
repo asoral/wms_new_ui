@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ERPNextConfig {
@@ -15,7 +14,6 @@ export class ERPNextAPI {
   }
 
   private getAuthHeaders() {
-    // Use Basic Authentication with base64 encoded api_key:api_secret
     const credentials = btoa(`${this.config.apiKey}:${this.config.apiSecret}`);
     return {
       'Authorization': `Basic ${credentials}`,
@@ -91,12 +89,10 @@ export class ERPNextAPI {
     }
   }
 
-  // Test connection using a simple doctype query
   async testConnection() {
     try {
       console.log('Testing ERPNext connection...');
       
-      // Try to fetch a single Company record to test connection
       const result = await this.makeRequest('Company', 'GET', null, { 
         limit_page_length: 1,
         fields: JSON.stringify(['name'])
@@ -114,7 +110,6 @@ export class ERPNextAPI {
     }
   }
 
-  // Get list of companies
   async getCompanies() {
     return this.makeRequest('Company', 'GET', null, { 
       fields: JSON.stringify(['name', 'company_name']),
@@ -122,7 +117,6 @@ export class ERPNextAPI {
     });
   }
 
-  // Item Management
   async getItems(filters?: any, fields?: string[], company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -141,7 +135,6 @@ export class ERPNextAPI {
     return this.makeRequest(`Item/${itemCode}`);
   }
 
-  // Stock Management
   async getStockBalance(filters?: any, company?: string) {
     const params: any = {
       fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'reserved_qty', 'projected_qty']),
@@ -170,7 +163,6 @@ export class ERPNextAPI {
     return this.makeRequest('Warehouse', 'GET', null, params);
   }
 
-  // Sales Orders
   async getSalesOrders(filters?: any, company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -189,7 +181,6 @@ export class ERPNextAPI {
     return this.makeRequest(`Sales Order/${name}`);
   }
 
-  // Purchase Orders
   async getPurchaseOrders(filters?: any, company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -208,7 +199,6 @@ export class ERPNextAPI {
     return this.makeRequest(`Purchase Order/${name}`);
   }
 
-  // Delivery Notes
   async getDeliveryNotes(filters?: any, company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -227,7 +217,6 @@ export class ERPNextAPI {
     return this.makeRequest('Delivery Note', 'POST', data);
   }
 
-  // Purchase Receipts
   async getPurchaseReceipts(filters?: any, company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -246,7 +235,6 @@ export class ERPNextAPI {
     return this.makeRequest('Purchase Receipt', 'POST', data);
   }
 
-  // Material Requests
   async getMaterialRequests(filters?: any, company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -265,7 +253,6 @@ export class ERPNextAPI {
     return this.makeRequest('Material Request', 'POST', data);
   }
 
-  // Stock Entries
   async getStockEntries(filters?: any, company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -284,7 +271,6 @@ export class ERPNextAPI {
     return this.makeRequest('Stock Entry', 'POST', data);
   }
 
-  // Pick Lists
   async getPickLists(filters?: any, company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -303,7 +289,6 @@ export class ERPNextAPI {
     return this.makeRequest('Pick List', 'POST', data);
   }
 
-  // Packing Slips
   async getPackingSlips(filters?: any, company?: string) {
     const params: any = {
       limit_page_length: 100,
@@ -321,9 +306,36 @@ export class ERPNextAPI {
   async createPackingSlip(data: any) {
     return this.makeRequest('Packing Slip', 'POST', data);
   }
+
+  async getQualityInspections(filters?: any, company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'item_code', 'status', 'inspection_type'])
+    };
+    if (filters) params.filters = JSON.stringify(filters);
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      const existingFilters = filters ? JSON.parse(JSON.stringify(filters)) : [];
+      params.filters = JSON.stringify([...existingFilters, ...companyFilter]);
+    }
+    return this.makeRequest('Quality Inspection', 'GET', null, params);
+  }
+
+  async getProductBundles(filters?: any, company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'new_item_code', 'description'])
+    };
+    if (filters) params.filters = JSON.stringify(filters);
+    if (company) {
+      const companyFilter = [['company', '=', company]];
+      const existingFilters = filters ? JSON.parse(JSON.stringify(filters)) : [];
+      params.filters = JSON.stringify([...existingFilters, ...companyFilter]);
+    }
+    return this.makeRequest('Product Bundle', 'GET', null, params);
+  }
 }
 
-// Helper function to get user's ERPNext configuration
 export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -357,7 +369,6 @@ export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
   }
 }
 
-// Helper function to get user's default company
 export async function getUserDefaultCompany(): Promise<string | null> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -383,7 +394,6 @@ export async function getUserDefaultCompany(): Promise<string | null> {
   }
 }
 
-// Factory function to create ERPNext API instance
 export async function createERPNextAPI(): Promise<ERPNextAPI | null> {
   const config = await getUserERPNextConfig();
   

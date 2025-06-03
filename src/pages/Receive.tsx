@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,14 +49,6 @@ const Receive = () => {
   const [receiveEntries, setReceiveEntries] = useState<ReceiveEntry[]>([]);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [poNumber, setPONumber] = useState("");
-
-  // Mock data for dashboard
-  const dashboardData = {
-    pendingPOs: 15,
-    receiptsThisWeek: 45,
-    draftReceipts: 8,
-    pendingQC: 12
-  };
 
   // Mock PO data
   const mockPO: PurchaseOrder = {
@@ -170,44 +161,10 @@ const Receive = () => {
           </TabsList>
 
           <TabsContent value="dashboard">
-            <div className="space-y-6">
-              {/* PO Search */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Search className="w-5 h-5" />
-                    <span>Select Purchase Order</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex space-x-2">
-                    <div className="flex-1">
-                      <Label htmlFor="poNumber">Purchase Order Number</Label>
-                      <Input
-                        id="poNumber"
-                        value={poNumber}
-                        onChange={(e) => setPONumber(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handlePOSearch()}
-                        placeholder="Enter PO number..."
-                      />
-                    </div>
-                    <div className="pt-6">
-                      <Button onClick={handlePOSearch} disabled={!poNumber.trim()}>
-                        <Search className="w-4 h-4 mr-2" />
-                        Select PO
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Dashboard Cards */}
-              <ReceiveDashboard 
-                data={dashboardData} 
-                onSelectPO={selectPO}
-                shortcuts={shortcuts}
-              />
-            </div>
+            <ReceiveDashboard 
+              onSelectPO={selectPO}
+              shortcuts={shortcuts}
+            />
           </TabsContent>
 
           <TabsContent value="receive">
