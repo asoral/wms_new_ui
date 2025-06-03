@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,24 +6,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Eye, EyeOff, CheckCircle, XCircle, Building2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ERPNextAPI } from '@/services/erpnextApi';
 
 const Profile = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showApiSecret, setShowApiSecret] = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
   
   const [profile, setProfile] = useState({
     fullName: '',
     email: '',
     erpnextUrl: '',
     erpnextApiKey: '',
-    erpnextApiSecret: ''
+    erpnextApiSecret: '',
+    erpnextDefaultCompany: ''
   });
 
   useEffect(() => {
@@ -50,7 +53,8 @@ const Profile = () => {
           email: data.email || '',
           erpnextUrl: data.erpnext_url || '',
           erpnextApiKey: data.erpnext_api_key || '',
-          erpnextApiSecret: data.erpnext_api_secret || ''
+          erpnextApiSecret: data.erpnext_api_secret || '',
+          erpnextDefaultCompany: data.erpnext_default_company || ''
         });
       }
     } catch (err) {
@@ -74,7 +78,8 @@ const Profile = () => {
           full_name: profile.fullName,
           erpnext_url: profile.erpnextUrl,
           erpnext_api_key: profile.erpnextApiKey,
-          erpnext_api_secret: profile.erpnextApiSecret
+          erpnext_api_secret: profile.erpnextApiSecret,
+          erpnext_default_company: profile.erpnextDefaultCompany
         })
         .eq('id', user?.id);
 
@@ -105,14 +110,45 @@ const Profile = () => {
         apiSecret: profile.erpnextApiSecret
       });
 
-      // Test the connection by fetching warehouses (simple API call)
-      await erpnextAPI.getWarehouses();
-      setConnectionStatus('success');
+      const result = await erpnextAPI.testConnection();
+      
+      if (result.success) {
+        setConnectionStatus('success');
+        setSuccess('Connection successful! You can now load companies.');
+      } else {
+        setConnectionStatus('error');
+        setError(result.error || 'Connection failed');
+      }
     } catch (err) {
       setConnectionStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to connect to ERPNext');
     } finally {
       setTestingConnection(false);
+    }
+  };
+
+  const loadCompanies = async () => {
+    if (!profile.erpnextUrl || !profile.erpnextApiKey || !profile.erpnextApiSecret) {
+      setError('Please test connection first');
+      return;
+    }
+
+    setLoadingCompanies(true);
+    setError(null);
+
+    try {
+      const erpnextAPI = new ERPNextAPI({
+        url: profile.erpnextUrl,
+        apiKey: profile.erpnextApiKey,
+        apiSecret: profile.erpnextApiSecret
+      });
+
+      const result = await erpnextAPI.getCompanies();
+      setCompanies(result.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load companies');
+    } finally {
+      setLoadingCompanies(false);
     }
   };
 
@@ -217,7 +253,7 @@ const Profile = () => {
             </div>
 
             <div className="pt-4 border-t">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 mb-4">
                 <Button
                   type="button"
                   variant="outline"
@@ -242,6 +278,47 @@ const Profile = () => {
                   </div>
                 )}
               </div>
+
+              {connectionStatus === 'success' && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="flex items-center gap-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={loadCompanies}
+                      disabled={loadingCompanies}
+                    >
+                      {loadingCompanies && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      <Building2 className="w-4 h-4 mr-2" />
+                      Load Companies
+                    </Button>
+                  </div>
+
+                  {companies.length > 0 && (
+                    <div className="space-y-2">
+                      <Label htmlFor="defaultCompany">Default Company</Label>
+                      <Select
+                        value={profile.erpnextDefaultCompany}
+                        onValueChange={(value) => setProfile({ ...profile, erpnextDefaultCompany: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a default company" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies.map((company) => (
+                            <SelectItem key={company.name} value={company.name}>
+                              {company.company_name || company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-gray-500">
+                        This company will be used as default for all WMS operations
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

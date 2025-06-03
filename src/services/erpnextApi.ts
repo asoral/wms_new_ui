@@ -1,10 +1,10 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ERPNextConfig {
   url: string;
   apiKey: string;
   apiSecret: string;
+  defaultCompany?: string;
 }
 
 export class ERPNextAPI {
@@ -47,9 +47,26 @@ export class ERPNextAPI {
     }
   }
 
+  // Test connection method
+  async testConnection() {
+    try {
+      const result = await this.makeRequest('Company?limit_page_length=1');
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Connection failed' };
+    }
+  }
+
+  // Get companies for selection
+  async getCompanies() {
+    return this.makeRequest('Company?fields=["name","company_name"]');
+  }
+
   // Item Management
   async getItems(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
+    const companyFilter = this.config.defaultCompany ? `["company","=","${this.config.defaultCompany}"]` : '';
+    const combinedFilters = filters && companyFilter ? `[${filters},${companyFilter}]` : (filters || companyFilter);
+    const params = combinedFilters ? `?filters=${JSON.stringify(combinedFilters)}` : '';
     return this.makeRequest(`Item${params}`);
   }
 
@@ -59,12 +76,16 @@ export class ERPNextAPI {
 
   // Stock Management
   async getStockBalance(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
+    const companyFilter = this.config.defaultCompany ? `["company","=","${this.config.defaultCompany}"]` : '';
+    const combinedFilters = filters && companyFilter ? `[${filters},${companyFilter}]` : (filters || companyFilter);
+    const params = combinedFilters ? `?filters=${JSON.stringify(combinedFilters)}` : '';
     return this.makeRequest(`Bin${params}`);
   }
 
   async getWarehouses(filters?: any) {
-    const params = filters ? `?filters=${JSON.stringify(filters)}` : '';
+    const companyFilter = this.config.defaultCompany ? `["company","=","${this.config.defaultCompany}"]` : '';
+    const combinedFilters = filters && companyFilter ? `[${filters},${companyFilter}]` : (filters || companyFilter);
+    const params = combinedFilters ? `?filters=${JSON.stringify(combinedFilters)}` : '';
     return this.makeRequest(`Warehouse${params}`);
   }
 
@@ -190,7 +211,7 @@ export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
 
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('erpnext_url, erpnext_api_key, erpnext_api_secret')
+      .select('erpnext_url, erpnext_api_key, erpnext_api_secret, erpnext_default_company')
       .eq('id', user.id)
       .single();
 
@@ -206,7 +227,8 @@ export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
     return {
       url: profile.erpnext_url,
       apiKey: profile.erpnext_api_key,
-      apiSecret: profile.erpnext_api_secret
+      apiSecret: profile.erpnext_api_secret,
+      defaultCompany: profile.erpnext_default_company
     };
   } catch (error) {
     console.error('Failed to get ERPNext config:', error);
