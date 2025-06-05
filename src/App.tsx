@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AuthProvider } from "@/components/auth/AuthContext";
+import { SubscriptionProvider } from "@/components/subscription/SubscriptionContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import SubscriptionGuard from "@/components/subscription/SubscriptionGuard";
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import PickList from "./pages/PickList";
@@ -28,6 +30,7 @@ import WMSNavigation from "./components/WMSNavigation";
 import TopBar from "./components/TopBar";
 import BottomNavigation from "./components/BottomNavigation";
 import NotFound from "./pages/NotFound";
+import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 
 const queryClient = new QueryClient();
 
@@ -46,54 +49,59 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/*" element={
-                <ProtectedRoute>
-                  <div className="flex flex-col min-h-screen">
-                    {/* Top Bar - always visible */}
-                    <TopBar onSync={handleSync} />
-                    
-                    <div className="flex flex-1">
-                      {/* Desktop Sidebar - only on desktop */}
-                      {!isMobile && <WMSNavigation />}
-                      
-                      {/* Main Content Area */}
-                      <div className="flex-1 pb-16 md:pb-0">
-                        <Routes>
-                          <Route path="/" element={<Home />} />
+            <SubscriptionProvider>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+                <Route path="/*" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <div className="flex flex-col min-h-screen">
+                        {/* Top Bar - always visible */}
+                        <TopBar onSync={handleSync} />
+                        
+                        <div className="flex flex-1">
+                          {/* Desktop Sidebar - only on desktop */}
+                          {!isMobile && <WMSNavigation />}
                           
-                          {/* WMS Routes */}
-                          <Route path="/item-enquiry" element={<ItemEnquiry />} />
-                          <Route path="/bin-enquiry" element={<BinEnquiry />} />
-                          <Route path="/stock-count" element={<StockCount />} />
-                          <Route path="/receive" element={<Receive />} />
-                          <Route path="/deliver" element={<Deliver />} />
-                          <Route path="/mat-request" element={<MaterialRequest />} />
-                          <Route path="/stock-entry" element={<StockEntry />} />
-                          <Route path="/pick-list" element={<PickList />} />
-                          <Route path="/packing" element={<Packing />} />
-                          <Route path="/print-label" element={<PrintLabel />} />
-                          <Route path="/quality-check" element={<QualityCheck />} />
-                          <Route path="/pallet" element={<Pallet />} />
+                          {/* Main Content Area */}
+                          <div className="flex-1 pb-16 md:pb-0">
+                            <Routes>
+                              <Route path="/" element={<Home />} />
                           
-                          {/* New Routes */}
-                          <Route path="/reports" element={<Reports />} />
-                          <Route path="/sync" element={<Sync />} />
-                          <Route path="/notifications" element={<Notifications />} />
-                          <Route path="/profile" element={<Profile />} />
-                          
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
-                      </div>
-                    </div>
+                              {/* WMS Routes */}
+                              <Route path="/item-enquiry" element={<ItemEnquiry />} />
+                              <Route path="/bin-enquiry" element={<BinEnquiry />} />
+                              <Route path="/stock-count" element={<StockCount />} />
+                              <Route path="/receive" element={<Receive />} />
+                              <Route path="/deliver" element={<Deliver />} />
+                              <Route path="/mat-request" element={<MaterialRequest />} />
+                              <Route path="/stock-entry" element={<StockEntry />} />
+                              <Route path="/pick-list" element={<PickList />} />
+                              <Route path="/packing" element={<Packing />} />
+                              <Route path="/print-label" element={<PrintLabel />} />
+                              <Route path="/quality-check" element={<QualityCheck />} />
+                              <Route path="/pallet" element={<Pallet />} />
+                              
+                              {/* New Routes */}
+                              <Route path="/reports" element={<Reports />} />
+                              <Route path="/sync" element={<Sync />} />
+                              <Route path="/notifications" element={<Notifications />} />
+                              <Route path="/profile" element={<Profile />} />
+                              
+                              <Route path="*" element={<NotFound />} />
+                            </Routes>
+                          </div>
+                        </div>
 
-                    {/* Bottom Navigation - only on mobile */}
-                    {isMobile && <BottomNavigation onSync={handleSync} />}
-                  </div>
-                </ProtectedRoute>
-              } />
-            </Routes>
+                        {/* Bottom Navigation - only on mobile */}
+                        {isMobile && <BottomNavigation onSync={handleSync} />}
+                      </div>
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </SubscriptionProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
