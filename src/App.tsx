@@ -1,6 +1,6 @@
 
 import { Suspense, lazy } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from "@/components/auth/AuthContext";
 import { SubscriptionProvider } from "@/components/subscription/SubscriptionContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -47,33 +47,32 @@ const App = () => {
                 <Route path="/" element={<Index />} />
 
                 {/* Protected routes that require authentication */}
-                <Route element={<ProtectedRoute />}>
-                  <Route element={<SubscriptionGuard />}>
+                <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
+                  <Route element={<SubscriptionGuard><Outlet /></SubscriptionGuard>}>
                     <Route element={<>
                       <TopBar />
                       <div className="flex-1 overflow-hidden">
-                        <Routes>
-                          <Route path="/home" element={<Home />} />
-                          <Route path="/receive" element={<Receive />} />
-                          <Route path="/pick-list" element={<PickList />} />
-                          <Route path="/stock-entry" element={<StockEntry />} />
-                          <Route path="/material-request" element={<MaterialRequest />} />
-                          <Route path="/packing" element={<Packing />} />
-                          <Route path="/deliver" element={<Deliver />} />
-                          <Route path="/item-enquiry" element={<ItemEnquiry />} />
-                          <Route path="/bin-enquiry" element={<BinEnquiry />} />
-                          <Route path="/stock-count" element={<StockCount />} />
-                          <Route path="/pallet" element={<Pallet />} />
-                          <Route path="/profile" element={<Profile />} />
-                          <Route path="/reports" element={<Reports />} />
-                          <Route path="/print-label" element={<PrintLabel />} />
-                          <Route path="/quality" element={<QualityCheck />} />
-                          <Route path="/sync" element={<Sync />} />
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
+                        <Outlet />
                       </div>
                       <BottomNavigation />
                     </>}>
+                      <Route path="/home" element={<Home />} />
+                      <Route path="/receive" element={<Receive />} />
+                      <Route path="/pick-list" element={<PickList />} />
+                      <Route path="/stock-entry" element={<StockEntry />} />
+                      <Route path="/material-request" element={<MaterialRequest />} />
+                      <Route path="/packing" element={<Packing />} />
+                      <Route path="/deliver" element={<Deliver />} />
+                      <Route path="/item-enquiry" element={<ItemEnquiry />} />
+                      <Route path="/bin-enquiry" element={<BinEnquiry />} />
+                      <Route path="/stock-count" element={<StockCount />} />
+                      <Route path="/pallet" element={<Pallet />} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/print-label" element={<PrintLabel />} />
+                      <Route path="/quality" element={<QualityCheck />} />
+                      <Route path="/sync" element={<Sync />} />
+                      <Route path="*" element={<NotFound />} />
                     </Route>
                   </Route>
                 </Route>
