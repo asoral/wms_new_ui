@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,31 +47,23 @@ const BinEnquiry = () => {
       // First check if it's a warehouse
       let warehouseResult;
       try {
-        warehouseResult = await erpnextAPI.getWarehouses({
-          filters: [['name', '=', binCode]]
-        });
+        warehouseResult = await erpnextAPI.getWarehouses([['name', '=', binCode]]);
       } catch (err) {
         // If not found as warehouse, it might be a bin
         warehouseResult = { data: [] };
       }
 
       // Get stock balance for this warehouse/bin
-      const stockResult = await erpnextAPI.getStockBalance({
-        filters: [['warehouse', '=', binCode]]
-      });
+      const stockResult = await erpnextAPI.getStockBalance([['warehouse', '=', binCode]]);
 
       if (!stockResult.data || stockResult.data.length === 0) {
         // Try to find warehouse by partial match
-        const warehouseSearchResult = await erpnextAPI.getWarehouses({
-          filters: [['name', 'like', `%${binCode}%`]]
-        });
+        const warehouseSearchResult = await erpnextAPI.getWarehouses([['name', 'like', `%${binCode}%`]]);
 
         if (warehouseSearchResult.data && warehouseSearchResult.data.length > 0) {
           // Use the first matching warehouse
           const foundWarehouse = warehouseSearchResult.data[0];
-          const stockForWarehouse = await erpnextAPI.getStockBalance({
-            filters: [['warehouse', '=', foundWarehouse.name]]
-          });
+          const stockForWarehouse = await erpnextAPI.getStockBalance([['warehouse', '=', foundWarehouse.name]]);
 
           if (stockForWarehouse.data && stockForWarehouse.data.length > 0) {
             setBinData(await processBinData(foundWarehouse.name, foundWarehouse, stockForWarehouse.data));
