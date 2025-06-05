@@ -30,7 +30,6 @@ const PrintLabel = lazy(() => import("@/pages/PrintLabel"));
 const QualityCheck = lazy(() => import("@/pages/QualityCheck"));
 const Sync = lazy(() => import("@/pages/Sync"));
 const SubscriptionSuccess = lazy(() => import("@/pages/SubscriptionSuccess"));
-const MakePaymentExempt = lazy(() => import("@/pages/MakePaymentExempt"));
 
 const App = () => {
   return (
@@ -43,7 +42,6 @@ const App = () => {
                 {/* Public routes */}
                 <Route path="/auth" element={<AuthForm />} />
                 <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-                <Route path="/make-payment-exempt" element={<MakePaymentExempt />} />
                 <Route path="/" element={<Index />} />
 
                 {/* Protected routes that require authentication */}
