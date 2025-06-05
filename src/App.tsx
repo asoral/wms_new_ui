@@ -44,36 +44,210 @@ const App = () => {
                 <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                 <Route path="/" element={<Index />} />
 
-                {/* Protected routes that require authentication */}
-                <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
-                  <Route element={<SubscriptionGuard><Outlet /></SubscriptionGuard>}>
-                    <Route element={<>
+                {/* Protected routes that require authentication and subscription */}
+                <Route path="/home" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
                       <TopBar />
                       <div className="flex-1 overflow-hidden">
-                        <Outlet />
+                        <Home />
                       </div>
                       <BottomNavigation />
-                    </>}>
-                      <Route path="/home" element={<Home />} />
-                      <Route path="/receive" element={<Receive />} />
-                      <Route path="/pick-list" element={<PickList />} />
-                      <Route path="/stock-entry" element={<StockEntry />} />
-                      <Route path="/material-request" element={<MaterialRequest />} />
-                      <Route path="/packing" element={<Packing />} />
-                      <Route path="/deliver" element={<Deliver />} />
-                      <Route path="/item-enquiry" element={<ItemEnquiry />} />
-                      <Route path="/bin-enquiry" element={<BinEnquiry />} />
-                      <Route path="/stock-count" element={<StockCount />} />
-                      <Route path="/pallet" element={<Pallet />} />
-                      <Route path="/profile" element={<Profile />} />
-                      <Route path="/reports" element={<Reports />} />
-                      <Route path="/print-label" element={<PrintLabel />} />
-                      <Route path="/quality" element={<QualityCheck />} />
-                      <Route path="/sync" element={<Sync />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Route>
-                  </Route>
-                </Route>
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/receive" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <Receive />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/pick-list" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <PickList />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/stock-entry" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <StockEntry />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/material-request" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <MaterialRequest />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/packing" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <Packing />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/deliver" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <Deliver />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/item-enquiry" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <ItemEnquiry />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/bin-enquiry" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <BinEnquiry />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/stock-count" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <StockCount />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/pallet" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <Pallet />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <Profile />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/reports" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <Reports />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/print-label" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <PrintLabel />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/quality" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <QualityCheck />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/sync" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <Sync />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="*" element={
+                  <ProtectedRoute>
+                    <SubscriptionGuard>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <NotFound />
+                      </div>
+                      <BottomNavigation />
+                    </SubscriptionGuard>
+                  </ProtectedRoute>
+                } />
               </Routes>
             </Suspense>
             <Toaster />
