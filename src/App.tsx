@@ -1,111 +1,89 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useIsMobile } from "@/hooks/use-mobile";
+
+import { Suspense, lazy } from 'react';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from "@/components/auth/AuthContext";
 import { SubscriptionProvider } from "@/components/subscription/SubscriptionContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import SubscriptionGuard from "@/components/subscription/SubscriptionGuard";
-import Home from "./pages/Home";
-import Auth from "./pages/Auth";
-import PickList from "./pages/PickList";
-import ItemEnquiry from "./pages/ItemEnquiry";
-import BinEnquiry from "./pages/BinEnquiry";
-import StockCount from "./pages/StockCount";
-import Receive from "./pages/Receive";
-import Deliver from "./pages/Deliver";
-import MaterialRequest from "./pages/MaterialRequest";
-import StockEntry from "./pages/StockEntry";
-import Packing from "./pages/Packing";
-import PrintLabel from "./pages/PrintLabel";
-import QualityCheck from "./pages/QualityCheck";
-import Pallet from "./pages/Pallet";
-import Reports from "./pages/Reports";
-import Sync from "./pages/Sync";
-import Notifications from "./pages/Notifications";
-import Profile from "./pages/Profile";
-import WMSNavigation from "./components/WMSNavigation";
-import TopBar from "./components/TopBar";
-import BottomNavigation from "./components/BottomNavigation";
-import NotFound from "./pages/NotFound";
-import SubscriptionSuccess from "./pages/SubscriptionSuccess";
+import BottomNavigation from "@/components/BottomNavigation";
+import TopBar from "@/components/TopBar";
+import { Toaster } from "@/components/ui/sonner";
+import AuthForm from "@/components/auth/AuthForm";
 
-const queryClient = new QueryClient();
+// Lazy load pages to improve performance
+const Index = lazy(() => import("@/pages/Index"));
+const Home = lazy(() => import("@/pages/Home"));
+const Receive = lazy(() => import("@/pages/Receive"));
+const PickList = lazy(() => import("@/pages/PickList"));
+const StockEntry = lazy(() => import("@/pages/StockEntry"));
+const ItemEnquiry = lazy(() => import("@/pages/ItemEnquiry"));
+const BinEnquiry = lazy(() => import("@/pages/BinEnquiry"));
+const Deliver = lazy(() => import("@/pages/Deliver"));
+const Packing = lazy(() => import("@/pages/Packing"));
+const StockCount = lazy(() => import("@/pages/StockCount"));
+const Pallet = lazy(() => import("@/pages/Pallet"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const MaterialRequest = lazy(() => import("@/pages/MaterialRequest"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const PrintLabel = lazy(() => import("@/pages/PrintLabel"));
+const QualityCheck = lazy(() => import("@/pages/QualityCheck"));
+const Sync = lazy(() => import("@/pages/Sync"));
+const SubscriptionSuccess = lazy(() => import("@/pages/SubscriptionSuccess"));
+const MakePaymentExempt = lazy(() => import("@/pages/MakePaymentExempt"));
 
 const App = () => {
-  const isMobile = useIsMobile();
-
-  const handleSync = () => {
-    console.log("Syncing data...");
-    // Add sync logic here
-  };
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <SubscriptionProvider>
+    <Router>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <div className="flex flex-col h-screen overflow-hidden">
+            <Suspense fallback={<div>Loading...</div>}>
               <Routes>
-                <Route path="/auth" element={<Auth />} />
+                {/* Public routes */}
+                <Route path="/auth" element={<AuthForm />} />
                 <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-                <Route path="/*" element={
-                  <ProtectedRoute>
-                    <SubscriptionGuard>
-                      <div className="flex flex-col min-h-screen">
-                        {/* Top Bar - always visible */}
-                        <TopBar onSync={handleSync} />
-                        
-                        <div className="flex flex-1">
-                          {/* Desktop Sidebar - only on desktop */}
-                          {!isMobile && <WMSNavigation />}
-                          
-                          {/* Main Content Area */}
-                          <div className="flex-1 pb-16 md:pb-0">
-                            <Routes>
-                              <Route path="/" element={<Home />} />
-                          
-                              {/* WMS Routes */}
-                              <Route path="/item-enquiry" element={<ItemEnquiry />} />
-                              <Route path="/bin-enquiry" element={<BinEnquiry />} />
-                              <Route path="/stock-count" element={<StockCount />} />
-                              <Route path="/receive" element={<Receive />} />
-                              <Route path="/deliver" element={<Deliver />} />
-                              <Route path="/mat-request" element={<MaterialRequest />} />
-                              <Route path="/stock-entry" element={<StockEntry />} />
-                              <Route path="/pick-list" element={<PickList />} />
-                              <Route path="/packing" element={<Packing />} />
-                              <Route path="/print-label" element={<PrintLabel />} />
-                              <Route path="/quality-check" element={<QualityCheck />} />
-                              <Route path="/pallet" element={<Pallet />} />
-                              
-                              {/* New Routes */}
-                              <Route path="/reports" element={<Reports />} />
-                              <Route path="/sync" element={<Sync />} />
-                              <Route path="/notifications" element={<Notifications />} />
-                              <Route path="/profile" element={<Profile />} />
-                              
-                              <Route path="*" element={<NotFound />} />
-                            </Routes>
-                          </div>
-                        </div>
+                <Route path="/make-payment-exempt" element={<MakePaymentExempt />} />
+                <Route path="/" element={<Index />} />
 
-                        {/* Bottom Navigation - only on mobile */}
-                        {isMobile && <BottomNavigation onSync={handleSync} />}
+                {/* Protected routes that require authentication */}
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<SubscriptionGuard />}>
+                    <Route element={<>
+                      <TopBar />
+                      <div className="flex-1 overflow-hidden">
+                        <Routes>
+                          <Route path="/home" element={<Home />} />
+                          <Route path="/receive" element={<Receive />} />
+                          <Route path="/pick-list" element={<PickList />} />
+                          <Route path="/stock-entry" element={<StockEntry />} />
+                          <Route path="/material-request" element={<MaterialRequest />} />
+                          <Route path="/packing" element={<Packing />} />
+                          <Route path="/deliver" element={<Deliver />} />
+                          <Route path="/item-enquiry" element={<ItemEnquiry />} />
+                          <Route path="/bin-enquiry" element={<BinEnquiry />} />
+                          <Route path="/stock-count" element={<StockCount />} />
+                          <Route path="/pallet" element={<Pallet />} />
+                          <Route path="/profile" element={<Profile />} />
+                          <Route path="/reports" element={<Reports />} />
+                          <Route path="/print-label" element={<PrintLabel />} />
+                          <Route path="/quality" element={<QualityCheck />} />
+                          <Route path="/sync" element={<Sync />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
                       </div>
-                    </SubscriptionGuard>
-                  </ProtectedRoute>
-                } />
+                      <BottomNavigation />
+                    </>}>
+                    </Route>
+                  </Route>
+                </Route>
               </Routes>
-            </SubscriptionProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+            </Suspense>
+            <Toaster />
+          </div>
+        </SubscriptionProvider>
+      </AuthProvider>
+    </Router>
   );
 };
 
