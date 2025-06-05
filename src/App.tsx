@@ -42,7 +42,7 @@ const App = () => {
                 {/* Public routes */}
                 <Route path="/auth" element={<AuthForm />} />
                 <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<Navigate to="/home" replace />} />
 
                 {/* Protected routes that require authentication and subscription */}
                 <Route path="/home" element={
