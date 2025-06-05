@@ -427,6 +427,24 @@ export class ERPNextAPI {
     
     return this.makeRequest('Item', 'GET', null, params);
   }
+
+  async getAllEnabledItems(company?: string) {
+    const params: any = {
+      limit_page_length: 0, // 0 means no limit, fetch all records
+      fields: JSON.stringify(['item_code', 'item_name', 'stock_uom', 'disabled'])
+    };
+    
+    let allFilters: any[] = [
+      ['disabled', '=', 0] // Only fetch enabled items
+    ];
+    if (company) allFilters.push(['company', '=', company]);
+    
+    if (allFilters.length > 0) {
+      params.filters = allFilters;
+    }
+    
+    return this.makeRequest('Item', 'GET', null, params);
+  }
 }
 
 export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {

@@ -30,7 +30,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Fetch items from ERPNext for autocomplete with company filter
+  // Fetch all enabled items from ERPNext for autocomplete with company filter
   useEffect(() => {
     const fetchItems = async () => {
       setIsLoadingItems(true);
@@ -38,7 +38,9 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
         const erpnextAPI = await createERPNextAPI();
         if (erpnextAPI) {
           const defaultCompany = await getUserDefaultCompany();
-          const result = await erpnextAPI.getItems([], ['item_code', 'item_name'], defaultCompany || undefined);
+          
+          // Fetch all enabled items without pagination limits
+          const result = await erpnextAPI.getAllEnabledItems(defaultCompany || undefined);
           if (result.data) {
             setItems(result.data);
           }
@@ -173,12 +175,19 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                     className="flex-1 justify-between text-left h-auto min-h-[40px] py-2 px-3"
                     disabled={isLoadingItems}
                   >
-                    <span className="truncate break-words whitespace-normal text-left overflow-hidden">
-                      {selectedItem 
-                        ? `${selectedItem.item_code} - ${selectedItem.item_name}`
-                        : itemCode || "Search item by code or name..."
-                      }
-                    </span>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="truncate">
+                        {selectedItem 
+                          ? selectedItem.item_code
+                          : itemCode || "Search item by code or name..."
+                        }
+                      </div>
+                      {selectedItem && (
+                        <div className="text-sm text-gray-500 truncate">
+                          {selectedItem.item_name}
+                        </div>
+                      )}
+                    </div>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
