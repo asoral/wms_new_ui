@@ -381,6 +381,41 @@ export class ERPNextAPI {
     
     return this.makeRequest('Product Bundle', 'GET', null, params);
   }
+
+  async getStockBalanceReport(filters?: any[], company?: string, includeStockAgeing?: boolean) {
+    const params: any = {
+      fields: JSON.stringify([
+        'item_code', 
+        'warehouse', 
+        'bal_qty', 
+        'bal_val', 
+        'stock_uom',
+        'opening_qty',
+        'opening_val',
+        'in_qty',
+        'in_val',
+        'out_qty', 
+        'out_val'
+      ]),
+      limit_page_length: 1000
+    };
+    
+    let allFilters: any[] = [];
+    if (filters) allFilters = [...filters];
+    if (company) allFilters.push(['company', '=', company]);
+    
+    // Add date filters for today
+    const today = new Date().toISOString().split('T')[0];
+    allFilters.push(['from_date', '=', today]);
+    allFilters.push(['to_date', '=', today]);
+    
+    if (allFilters.length > 0) {
+      params.filters = allFilters;
+    }
+    
+    // For stock balance report, we use a different endpoint
+    return this.makeRequest('Stock Ledger Entry', 'GET', null, params);
+  }
 }
 
 export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {

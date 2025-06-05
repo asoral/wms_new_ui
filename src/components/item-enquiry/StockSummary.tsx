@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Clock, DollarSign, Scale } from "lucide-react";
+import { Package, Clock, DollarSign, TrendingUp } from "lucide-react";
 import { ItemStockData } from "../../pages/ItemEnquiry";
 
 interface StockSummaryProps {
@@ -13,7 +13,8 @@ const StockSummary = ({ stockData }: StockSummaryProps) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      minimumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -26,9 +27,9 @@ const StockSummary = ({ stockData }: StockSummaryProps) => {
       bgColor: "bg-blue-50"
     },
     {
-      title: "Unit of Measure",
-      value: stockData.uom,
-      icon: Scale,
+      title: "Total Valuation",
+      value: formatCurrency(stockData.totalValuation),
+      icon: DollarSign,
       color: "text-green-600",
       bgColor: "bg-green-50"
     },
@@ -40,9 +41,9 @@ const StockSummary = ({ stockData }: StockSummaryProps) => {
       bgColor: "bg-orange-50"
     },
     {
-      title: "Total Valuation",
-      value: formatCurrency(stockData.totalValuation),
-      icon: DollarSign,
+      title: "Warehouses",
+      value: `${stockData.warehouseStock.length}`,
+      icon: TrendingUp,
       color: "text-purple-600",
       bgColor: "bg-purple-50"
     }
@@ -58,6 +59,9 @@ const StockSummary = ({ stockData }: StockSummaryProps) => {
               <CardTitle className="text-lg">{stockData.itemName}</CardTitle>
               <p className="text-sm text-gray-600 mt-1">
                 Item Code: <Badge variant="outline">{stockData.itemCode}</Badge>
+                <span className="ml-4">
+                  UOM: <Badge variant="secondary">{stockData.uom}</Badge>
+                </span>
               </p>
             </div>
           </div>

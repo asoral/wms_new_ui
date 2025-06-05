@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,18 +45,50 @@ const ItemEnquiry = () => {
         throw new Error('ERPNext API not configured. Please check your connection settings.');
       }
 
-      // Get item details
-      const itemResult = await erpnextAPI.getItem(itemCode);
-      if (!itemResult.data) {
-        throw new Error(`Item ${itemCode} not found`);
+      // First, verify the item exists
+      let itemResult;
+      try {
+        itemResult = await erpnextAPI.getItem(itemCode);
+      } catch (err) {
+        // If item is not found, check if it exists in the items list
+        const itemsResult = await erpnextAPI.getItems([
+          ['item_code', '=', itemCode]
+        ], ['item_code', 'item_name', 'stock_uom']);
+        
+        if (!itemsResult.data || itemsResult.data.length === 0) {
+          // Try searching by name
+          const nameSearchResult = await erpnextAPI.getItems([
+            ['item_name', 'like', `%${itemCode}%`]
+          ], ['item_code', 'item_name', 'stock_uom']);
+          
+          if (!nameSearchResult.data || nameSearchResult.data.length === 0) {
+            setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+            setStockData(null);
+            setIsLoading(false);
+            return;
+          } else {
+            itemResult = { data: nameSearchResult.data[0] };
+          }
+        } else {
+          itemResult = { data: itemsResult.data[0] };
+        }
       }
 
-      // Get stock balance for this item using corrected filter format
-      const stockResult = await erpnextAPI.getStockBalance([['item_code', '=', itemCode]]);
+      if (!itemResult.data) {
+        setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+        setStockData(null);
+        setIsLoading(false);
+        return;
+      }
+
+      // Get stock balance using Stock Ledger Entry for accurate data
+      const stockResult = await erpnextAPI.getStockBalanceReport([
+        ['item_code', '=', itemResult.data.item_code || itemCode]
+      ]);
 
       if (!stockResult.data || stockResult.data.length === 0) {
         setStockData({
-          itemCode,
+          itemCode: itemResult.data.item_code || itemCode,
           itemName: itemResult.data.item_name || itemCode,
           totalStock: 0,
           uom: itemResult.data.stock_uom || 'Nos',
@@ -67,36 +100,63 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Process stock data
-      const warehouseStock: StockInfo[] = stockResult.data.map((stock: any) => ({
-        warehouse: stock.warehouse || 'Unknown',
-        qty: stock.actual_qty || 0,
-        uom: stock.stock_uom || itemResult.data.stock_uom || 'Nos',
-        batch: stock.batch_no || undefined,
-        serial: stock.serial_no || undefined,
-        age: Math.floor(Math.random() * 90), // ERPNext doesn't provide age directly
-        valuation: stock.stock_value || 0
-      }));
+      // Process stock data from Stock Ledger entries
+      const warehouseStockMap: { [key: string]: StockInfo } = {};
 
+      stockResult.data.forEach((ledgerEntry: any) => {
+        const warehouse = ledgerEntry.warehouse;
+        const qty = parseFloat(ledgerEntry.bal_qty) || 0;
+        const valuation = parseFloat(ledgerEntry.bal_val) || 0;
+
+        if (qty > 0) { // Only include warehouses with positive stock
+          if (warehouseStockMap[warehouse]) {
+            warehouseStockMap[warehouse].qty += qty;
+            warehouseStockMap[warehouse].valuation += valuation;
+          } else {
+            warehouseStockMap[warehouse] = {
+              warehouse,
+              qty,
+              uom: ledgerEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
+              valuation,
+              age: Math.floor(Math.random() * 90), // TODO: Calculate actual age from stock ageing
+              batch: ledgerEntry.batch_no || undefined,
+              serial: ledgerEntry.serial_no || undefined
+            };
+          }
+        }
+      });
+
+      const warehouseStock = Object.values(warehouseStockMap);
       const totalStock = warehouseStock.reduce((sum, stock) => sum + stock.qty, 0);
       const totalValuation = warehouseStock.reduce((sum, stock) => sum + stock.valuation, 0);
       const averageAge = warehouseStock.length > 0 
         ? Math.round(warehouseStock.reduce((sum, stock) => sum + stock.age, 0) / warehouseStock.length)
         : 0;
 
+      // Get precision for stock UOM from ERPNext (default to 2 decimal places)
+      const stockPrecision = 2; // TODO: Get from UOM master in ERPNext
+
       setStockData({
-        itemCode,
+        itemCode: itemResult.data.item_code || itemCode,
         itemName: itemResult.data.item_name || itemCode,
-        totalStock,
+        totalStock: parseFloat(totalStock.toFixed(stockPrecision)),
         uom: itemResult.data.stock_uom || 'Nos',
         averageAge,
-        totalValuation,
+        totalValuation: parseFloat(totalValuation.toFixed(2)),
         warehouseStock
       });
 
     } catch (err) {
       console.error('Error fetching item data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch item data');
+      if (err instanceof Error) {
+        if (err.message.includes('404') || err.message.includes('not found')) {
+          setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('Failed to fetch item data. Please check your connection and try again.');
+      }
       setStockData(null);
     } finally {
       setIsLoading(false);
