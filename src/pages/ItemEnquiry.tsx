@@ -1,11 +1,14 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, Package, RefreshCcw, Warehouse } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import ItemScanner from "../components/item-enquiry/ItemScanner";
 import StockSummary from "../components/item-enquiry/StockSummary";
 import WarehouseStockTable from "../components/item-enquiry/WarehouseStockTable";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { offlineStorage } from "@/services/offlineStorage";
 
 export interface StockInfo {
   warehouse: string;
@@ -32,11 +35,14 @@ const ItemEnquiry = () => {
   const [stockData, setStockData] = useState<ItemStockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const { toast } = useToast();
 
   const handleItemSearch = async (itemCode: string) => {
     setIsLoading(true);
     setCurrentItem(itemCode);
     setError(null);
+    setIsOffline(false);
     
     try {
       const erpnextAPI = await createERPNextAPI();
@@ -90,13 +96,13 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get stock balance using Bin for accurate data with company filter
+      // Get stock balance using Bin for accurate data - filter by company on frontend
       const stockResult = await erpnextAPI.getStockBalanceReport([
         ['item_code', '=', itemResult.data.item_code || itemCode]
-      ], defaultCompany || undefined);
+      ]);
 
       if (!stockResult.data || stockResult.data.length === 0) {
-        setStockData({
+        const emptyStockData = {
           itemCode: itemResult.data.item_code || itemCode,
           itemName: itemResult.data.item_name || itemCode,
           totalStock: 0,
@@ -104,15 +110,40 @@ const ItemEnquiry = () => {
           averageAge: 0,
           totalValuation: 0,
           warehouseStock: []
-        });
+        };
+        setStockData(emptyStockData);
+        
+        // Cache the result
+        await offlineStorage.cacheData(`stock_${itemCode}`, emptyStockData);
         setIsLoading(false);
         return;
+      }
+
+      // If default company is set, filter warehouses by company
+      let filteredStockData = stockResult.data;
+      if (defaultCompany) {
+        // Get warehouses for the company to filter stock data
+        try {
+          const warehousesResult = await erpnextAPI.getWarehouses([
+            ['company', '=', defaultCompany]
+          ]);
+          
+          if (warehousesResult.data && warehousesResult.data.length > 0) {
+            const companyWarehouses = warehousesResult.data.map((wh: any) => wh.name);
+            filteredStockData = stockResult.data.filter((binEntry: any) => 
+              companyWarehouses.includes(binEntry.warehouse)
+            );
+          }
+        } catch (warehouseError) {
+          console.warn('Could not filter by company warehouses:', warehouseError);
+          // Continue with all stock data if warehouse filtering fails
+        }
       }
 
       // Process stock data from Bin entries
       const warehouseStockMap: { [key: string]: StockInfo } = {};
 
-      stockResult.data.forEach((binEntry: any) => {
+      filteredStockData.forEach((binEntry: any) => {
         const warehouse = binEntry.warehouse;
         const qty = parseFloat(binEntry.actual_qty) || 0;
         const valuation = parseFloat(binEntry.stock_value) || 0;
@@ -145,7 +176,7 @@ const ItemEnquiry = () => {
       // Get precision for stock UOM from ERPNext (default to 2 decimal places)
       const stockPrecision = 2; // TODO: Get from UOM master in ERPNext
 
-      setStockData({
+      const finalStockData = {
         itemCode: itemResult.data.item_code || itemCode,
         itemName: itemResult.data.item_name || itemCode,
         totalStock: parseFloat(totalStock.toFixed(stockPrecision)),
@@ -153,20 +184,42 @@ const ItemEnquiry = () => {
         averageAge,
         totalValuation: parseFloat(totalValuation.toFixed(2)),
         warehouseStock
-      });
+      };
+
+      setStockData(finalStockData);
+      
+      // Cache the result for offline access
+      await offlineStorage.cacheData(`stock_${itemCode}`, finalStockData);
 
     } catch (err) {
       console.error('Error fetching item data:', err);
-      if (err instanceof Error) {
-        if (err.message.includes('404') || err.message.includes('not found')) {
-          setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+      
+      // Try to load from cache if network error
+      try {
+        const cachedData = await offlineStorage.getCachedData(`stock_${itemCode}`);
+        if (cachedData) {
+          setStockData(cachedData);
+          setIsOffline(true);
+          toast({
+            title: "Offline Mode",
+            description: "Showing cached data. Check your internet connection for latest updates.",
+            variant: "default"
+          });
         } else {
-          setError(err.message);
+          throw err; // Re-throw if no cached data available
         }
-      } else {
-        setError('Failed to fetch item data. Please check your connection and try again.');
+      } catch (cacheErr) {
+        if (err instanceof Error) {
+          if (err.message.includes('404') || err.message.includes('not found')) {
+            setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+          } else {
+            setError(err.message);
+          }
+        } else {
+          setError('Failed to fetch item data. Please check your connection and try again.');
+        }
+        setStockData(null);
       }
-      setStockData(null);
     } finally {
       setIsLoading(false);
     }
@@ -186,6 +239,11 @@ const ItemEnquiry = () => {
           <div className="flex items-center space-x-3">
             <Package className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Item Enquiry</h1>
+            {isOffline && (
+              <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                Offline Mode
+              </span>
+            )}
           </div>
           <div className="flex items-center space-x-2">
             <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading}>

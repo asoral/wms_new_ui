@@ -133,6 +133,7 @@ export class ERPNextAPI {
     
     let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
+    // Only add company filter for Item doctype if company is provided
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
@@ -151,6 +152,7 @@ export class ERPNextAPI {
     
     let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
+    // Only add company filter for Item doctype if company is provided
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
@@ -172,7 +174,7 @@ export class ERPNextAPI {
     
     let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
+    // DO NOT add company filter for Bin doctype as it's not supported
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
@@ -414,7 +416,7 @@ export class ERPNextAPI {
     
     let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
+    // DO NOT add company filter for Bin doctype as it's not supported
     
     allFilters.push(['actual_qty', '>', 0]);
     

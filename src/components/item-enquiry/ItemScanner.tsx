@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Scan, Loader2, Check, ChevronsUpDown, X } from "lucide-react";
+import { Search, Scan, Loader2, Check, ChevronsUpDown, X, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { offlineStorage } from "@/services/offlineStorage";
 
 interface ItemScannerProps {
   onItemScanned: (itemCode: string) => void;
@@ -29,8 +32,24 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { toast } = useToast();
+
+  // Monitor online status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Debounced search function
   const searchItems = useMemo(() => {
@@ -48,6 +67,35 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
     setIsLoadingItems(true);
     try {
+      // Try to get cached items first if offline
+      if (!isOnline) {
+        const cachedItems = await offlineStorage.getCachedData('items_list');
+        if (cachedItems) {
+          let filteredItems = cachedItems;
+          if (search.trim()) {
+            filteredItems = cachedItems.filter((item: Item) => 
+              item.item_code.toLowerCase().includes(search.toLowerCase()) ||
+              item.item_name.toLowerCase().includes(search.toLowerCase())
+            );
+          }
+          setItems(filteredItems.slice(0, 20)); // Show first 20 items
+          setHasMore(filteredItems.length > 20);
+          toast({
+            title: "Offline Mode",
+            description: "Showing cached items list",
+            variant: "default"
+          });
+          return;
+        } else {
+          toast({
+            title: "No Cached Data",
+            description: "No items available offline. Please connect to internet.",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       const erpnextAPI = await createERPNextAPI();
       if (erpnextAPI) {
         const defaultCompany = await getUserDefaultCompany();
@@ -59,7 +107,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
         ];
         
         if (search.trim()) {
-          // Search in both item_code and item_name
+          // Create OR condition for item_code and item_name search
           filters.push([
             ['item_code', 'like', `%${search}%`],
             'or',
@@ -79,6 +127,11 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
           if (isNewSearch) {
             setItems(result.data);
             setCurrentPage(1);
+            
+            // Cache all items for offline use (only if no search term to get full list)
+            if (!search.trim()) {
+              await offlineStorage.cacheData('items_list', result.data, 3600000); // Cache for 1 hour
+            }
           } else {
             setItems(prev => [...prev, ...result.data]);
           }
@@ -93,6 +146,29 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
       }
     } catch (error) {
       console.error('Failed to fetch items:', error);
+      
+      // Try to load from cache if online request fails
+      try {
+        const cachedItems = await offlineStorage.getCachedData('items_list');
+        if (cachedItems) {
+          let filteredItems = cachedItems;
+          if (search.trim()) {
+            filteredItems = cachedItems.filter((item: Item) => 
+              item.item_code.toLowerCase().includes(search.toLowerCase()) ||
+              item.item_name.toLowerCase().includes(search.toLowerCase())
+            );
+          }
+          setItems(filteredItems.slice(0, 20));
+          setHasMore(filteredItems.length > 20);
+          toast({
+            title: "Using Cached Data",
+            description: "Network error. Showing cached items list.",
+            variant: "default"
+          });
+        }
+      } catch (cacheError) {
+        console.error('Cache access failed:', cacheError);
+      }
     } finally {
       setIsLoadingItems(false);
     }
@@ -131,7 +207,11 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
-      alert('Camera access denied or not available. Please check permissions.');
+      toast({
+        title: "Camera Error",
+        description: "Camera access denied or not available. Please check permissions.",
+        variant: "destructive"
+      });
       setIsScanning(false);
     }
   };
@@ -198,7 +278,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   };
 
   const loadMoreItems = () => {
-    if (hasMore && !isLoadingItems) {
+    if (hasMore && !isLoadingItems && isOnline) {
       fetchItems(searchTerm, false);
     }
   };
@@ -213,7 +293,14 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
       <TabsContent value="manual">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="itemCode">Item Code / Name</Label>
+            <Label htmlFor="itemCode" className="flex items-center gap-2">
+              Item Code / Name
+              {isOnline ? (
+                <Wifi className="w-4 h-4 text-green-600" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-red-600" />
+              )}
+            </Label>
             <div className="flex space-x-2 mt-1">
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
@@ -273,7 +360,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                             </div>
                           </CommandItem>
                         ))}
-                        {hasMore && (
+                        {hasMore && isOnline && (
                           <CommandItem onSelect={loadMoreItems}>
                             <div className="flex items-center justify-center w-full py-2">
                               {isLoadingItems ? (
