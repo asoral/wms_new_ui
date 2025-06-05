@@ -36,7 +36,7 @@ const App = () => {
     <Router>
       <AuthProvider>
         <SubscriptionProvider>
-          <div className="flex flex-col h-screen overflow-hidden">
+          <div className="flex flex-col h-screen">
             <Suspense fallback={<div>Loading...</div>}>
               <Routes>
                 {/* Public routes */}
@@ -49,7 +49,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <Home />
                       </div>
                       <BottomNavigation />
@@ -61,7 +61,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <Receive />
                       </div>
                       <BottomNavigation />
@@ -73,7 +73,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <PickList />
                       </div>
                       <BottomNavigation />
@@ -85,7 +85,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <StockEntry />
                       </div>
                       <BottomNavigation />
@@ -97,7 +97,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <MaterialRequest />
                       </div>
                       <BottomNavigation />
@@ -109,7 +109,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <Packing />
                       </div>
                       <BottomNavigation />
@@ -121,7 +121,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <Deliver />
                       </div>
                       <BottomNavigation />
@@ -133,7 +133,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <ItemEnquiry />
                       </div>
                       <BottomNavigation />
@@ -145,7 +145,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <BinEnquiry />
                       </div>
                       <BottomNavigation />
@@ -157,7 +157,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <StockCount />
                       </div>
                       <BottomNavigation />
@@ -169,7 +169,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <Pallet />
                       </div>
                       <BottomNavigation />
@@ -181,7 +181,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <Profile />
                       </div>
                       <BottomNavigation />
@@ -193,7 +193,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <Reports />
                       </div>
                       <BottomNavigation />
@@ -205,7 +205,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <PrintLabel />
                       </div>
                       <BottomNavigation />
@@ -217,7 +217,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <QualityCheck />
                       </div>
                       <BottomNavigation />
@@ -229,7 +229,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <Sync />
                       </div>
                       <BottomNavigation />
@@ -241,7 +241,7 @@ const App = () => {
                   <ProtectedRoute>
                     <SubscriptionGuard>
                       <TopBar />
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto">
                         <NotFound />
                       </div>
                       <BottomNavigation />
