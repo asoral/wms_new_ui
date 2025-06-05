@@ -97,6 +97,82 @@ export class ERPNextAPI {
     }
   }
 
+  // New method to call Stock Balance Report
+  public async getStockBalanceReport(filters?: any[], company?: string) {
+    const baseUrl = this.cleanUrl(this.config.url);
+    let url = `${baseUrl}/api/method/erpnext.stock.report.stock_balance.stock_balance.execute`;
+    
+    console.log('Making Stock Balance Report API request to:', url);
+    
+    const reportFilters = {
+      company: company || '',
+      from_date: '2020-01-01', // Use a far back date to get all stock
+      to_date: new Date().toISOString().split('T')[0], // Today's date
+      item_code: filters && filters.length > 0 ? filters.find(f => f[0] === 'item_code')?.[2] : '',
+      warehouse: '',
+      item_group: '',
+      include_uom: 1,
+      show_variant_attributes: 0,
+      show_stock_ageing_data: 1
+    };
+
+    const options: RequestInit = {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      mode: 'cors',
+      body: JSON.stringify({ filters: reportFilters })
+    };
+
+    console.log('Stock Balance Report request body:', reportFilters);
+
+    try {
+      const response = await fetch(url, options);
+      
+      console.log('Stock Balance Report response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Stock Balance Report API Error Response:', errorText);
+        throw new Error(`Stock Balance Report API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Stock Balance Report API Response:', result);
+      
+      // Transform the report data to match our expected format
+      if (result.message && result.message.result && Array.isArray(result.message.result)) {
+        const stockData = result.message.result.map((row: any[]) => {
+          // The columns are typically: [item_code, item_name, item_group, stock_uom, opening_qty, in_qty, out_qty, bal_qty, val_rate, bal_val, warehouse]
+          return {
+            item_code: row[0],
+            item_name: row[1], 
+            item_group: row[2],
+            stock_uom: row[3],
+            opening_qty: parseFloat(row[4]) || 0,
+            in_qty: parseFloat(row[5]) || 0,
+            out_qty: parseFloat(row[6]) || 0,
+            bal_qty: parseFloat(row[7]) || 0,
+            val_rate: parseFloat(row[8]) || 0,
+            bal_val: parseFloat(row[9]) || 0,
+            warehouse: row[10] || '',
+            actual_qty: parseFloat(row[7]) || 0, // bal_qty is the actual quantity
+            stock_value: parseFloat(row[9]) || 0, // bal_val is the stock value
+          };
+        }).filter((item: any) => item.actual_qty > 0); // Only items with positive stock
+
+        return { data: stockData };
+      }
+      
+      return { data: [] };
+    } catch (error) {
+      console.error('Stock Balance Report Request Failed:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Cannot connect to ERPNext server. Please check your URL and ensure CORS is enabled.');
+      }
+      throw error;
+    }
+  }
+
   async testConnection() {
     try {
       console.log('Testing ERPNext connection...');
@@ -127,14 +203,14 @@ export class ERPNextAPI {
 
   async getItems(filters?: any[], fields?: string[], company?: string) {
     const params: any = {
-      limit_page_length: 20, // Default pagination
+      limit_page_length: 20,
       fields: JSON.stringify(fields || ['name', 'item_name', 'item_code', 'stock_uom'])
     };
     
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    // Only add company filter for Item doctype if company is provided
-    if (company) allFilters.push(['company', '=', company]);
+    let allFilters: any[] = [
+      ['disabled', '=', 0] // Only enabled items
+    ];
+    if (filters) allFilters = [...allFilters, ...filters];
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
@@ -150,10 +226,36 @@ export class ERPNextAPI {
       fields: JSON.stringify(fields || ['name', 'item_name', 'item_code', 'stock_uom'])
     };
     
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    // Only add company filter for Item doctype if company is provided
-    if (company) allFilters.push(['company', '=', company]);
+    let allFilters: any[] = [
+      ['disabled', '=', 0] // Only enabled items
+    ];
+    if (filters) allFilters = [...allFilters, ...filters];
+    
+    if (allFilters.length > 0) {
+      params.filters = allFilters;
+    }
+    
+    return this.makeRequest('Item', 'GET', null, params);
+  }
+
+  async searchItems(searchTerm: string, company?: string, limit: number = 20) {
+    const params: any = {
+      limit_page_length: limit,
+      fields: JSON.stringify(['name', 'item_name', 'item_code', 'stock_uom'])
+    };
+    
+    let allFilters: any[] = [
+      ['disabled', '=', 0] // Only enabled items
+    ];
+    
+    if (searchTerm.trim()) {
+      // Search in both item_code and item_name
+      allFilters.push([
+        ['item_code', 'like', `%${searchTerm}%`],
+        'or',
+        ['item_name', 'like', `%${searchTerm}%`]
+      ]);
+    }
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
@@ -167,20 +269,8 @@ export class ERPNextAPI {
   }
 
   async getStockBalance(filters?: any[], company?: string) {
-    const params: any = {
-      fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'reserved_qty', 'projected_qty']),
-      limit_page_length: 500 // Reasonable limit for stock data
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    // DO NOT add company filter for Bin doctype as it's not supported
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Bin', 'GET', null, params);
+    // Use the new Stock Balance Report method instead of Bin
+    return this.getStockBalanceReport(filters, company);
   }
 
   async getWarehouses(filters?: any[], company?: string) {
@@ -402,31 +492,6 @@ export class ERPNextAPI {
     return this.makeRequest('Product Bundle', 'GET', null, params);
   }
 
-  async getStockBalanceReport(filters?: any[], company?: string, includeStockAgeing?: boolean) {
-    const params: any = {
-      fields: JSON.stringify([
-        'item_code', 
-        'warehouse', 
-        'actual_qty', 
-        'stock_value',
-        'stock_uom'
-      ]),
-      limit_page_length: 500 // Reasonable limit for stock reports
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    // DO NOT add company filter for Bin doctype as it's not supported
-    
-    allFilters.push(['actual_qty', '>', 0]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Bin', 'GET', null, params);
-  }
-
   async getItemByBarcode(barcode: string, company?: string) {
     const params: any = {
       limit_page_length: 10,
@@ -434,9 +499,9 @@ export class ERPNextAPI {
     };
     
     let allFilters: any[] = [
+      ['disabled', '=', 0], // Only enabled items
       ['barcodes.barcode', '=', barcode]
     ];
-    if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
@@ -454,7 +519,6 @@ export class ERPNextAPI {
     let allFilters: any[] = [
       ['disabled', '=', 0] // Only fetch enabled items
     ];
-    if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,34 +57,23 @@ const ItemEnquiry = () => {
       try {
         itemResult = await erpnextAPI.getItem(itemCode);
       } catch (err) {
-        // If item is not found, check if it exists in the items list
-        const itemsResult = await erpnextAPI.getItems([
-          ['item_code', '=', itemCode]
-        ], ['item_code', 'item_name', 'stock_uom'], defaultCompany || undefined);
+        // If item is not found, try searching
+        const searchResult = await erpnextAPI.searchItems(itemCode, defaultCompany || undefined, 10);
         
-        if (!itemsResult.data || itemsResult.data.length === 0) {
-          // Try searching by name
-          const nameSearchResult = await erpnextAPI.getItems([
-            ['item_name', 'like', `%${itemCode}%`]
-          ], ['item_code', 'item_name', 'stock_uom'], defaultCompany || undefined);
+        if (!searchResult.data || searchResult.data.length === 0) {
+          // Try searching by barcode
+          const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode, defaultCompany || undefined);
           
-          if (!nameSearchResult.data || nameSearchResult.data.length === 0) {
-            // Try searching by barcode
-            const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode, defaultCompany || undefined);
-            
-            if (!barcodeSearchResult.data || barcodeSearchResult.data.length === 0) {
-              setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
-              setStockData(null);
-              setIsLoading(false);
-              return;
-            } else {
-              itemResult = { data: barcodeSearchResult.data[0] };
-            }
+          if (!barcodeSearchResult.data || barcodeSearchResult.data.length === 0) {
+            setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+            setStockData(null);
+            setIsLoading(false);
+            return;
           } else {
-            itemResult = { data: nameSearchResult.data[0] };
+            itemResult = { data: barcodeSearchResult.data[0] };
           }
         } else {
-          itemResult = { data: itemsResult.data[0] };
+          itemResult = { data: searchResult.data[0] };
         }
       }
 
@@ -96,10 +84,12 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get stock balance using Bin for accurate data - filter by company on frontend
+      // Get stock balance using Stock Balance Report
       const stockResult = await erpnextAPI.getStockBalanceReport([
         ['item_code', '=', itemResult.data.item_code || itemCode]
-      ]);
+      ], defaultCompany || undefined);
+
+      console.log('Stock Balance Report Result:', stockResult);
 
       if (!stockResult.data || stockResult.data.length === 0) {
         const emptyStockData = {
@@ -119,36 +109,15 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // If default company is set, filter warehouses by company
-      let filteredStockData = stockResult.data;
-      if (defaultCompany) {
-        // Get warehouses for the company to filter stock data
-        try {
-          const warehousesResult = await erpnextAPI.getWarehouses([
-            ['company', '=', defaultCompany]
-          ]);
-          
-          if (warehousesResult.data && warehousesResult.data.length > 0) {
-            const companyWarehouses = warehousesResult.data.map((wh: any) => wh.name);
-            filteredStockData = stockResult.data.filter((binEntry: any) => 
-              companyWarehouses.includes(binEntry.warehouse)
-            );
-          }
-        } catch (warehouseError) {
-          console.warn('Could not filter by company warehouses:', warehouseError);
-          // Continue with all stock data if warehouse filtering fails
-        }
-      }
-
-      // Process stock data from Bin entries
+      // Process stock data from Stock Balance Report
       const warehouseStockMap: { [key: string]: StockInfo } = {};
 
-      filteredStockData.forEach((binEntry: any) => {
-        const warehouse = binEntry.warehouse;
-        const qty = parseFloat(binEntry.actual_qty) || 0;
-        const valuation = parseFloat(binEntry.stock_value) || 0;
+      stockResult.data.forEach((stockEntry: any) => {
+        const warehouse = stockEntry.warehouse;
+        const qty = parseFloat(stockEntry.actual_qty) || 0;
+        const valuation = parseFloat(stockEntry.stock_value) || 0;
 
-        if (qty > 0) { // Only include warehouses with positive stock
+        if (qty > 0 && warehouse) { // Only include warehouses with positive stock
           if (warehouseStockMap[warehouse]) {
             warehouseStockMap[warehouse].qty += qty;
             warehouseStockMap[warehouse].valuation += valuation;
@@ -156,7 +125,7 @@ const ItemEnquiry = () => {
             warehouseStockMap[warehouse] = {
               warehouse,
               qty,
-              uom: binEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
+              uom: stockEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
               valuation,
               age: Math.floor(Math.random() * 90), // TODO: Calculate actual age from stock ageing
               batch: undefined,
