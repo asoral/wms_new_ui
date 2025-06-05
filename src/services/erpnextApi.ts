@@ -383,19 +383,14 @@ export class ERPNextAPI {
   }
 
   async getStockBalanceReport(filters?: any[], company?: string, includeStockAgeing?: boolean) {
+    // For stock balance, we need to use the Bin doctype which has the actual stock quantities
     const params: any = {
       fields: JSON.stringify([
         'item_code', 
         'warehouse', 
-        'bal_qty', 
-        'bal_val', 
-        'stock_uom',
-        'opening_qty',
-        'opening_val',
-        'in_qty',
-        'in_val',
-        'out_qty', 
-        'out_val'
+        'actual_qty', 
+        'stock_value',
+        'stock_uom'
       ]),
       limit_page_length: 1000
     };
@@ -404,17 +399,15 @@ export class ERPNextAPI {
     if (filters) allFilters = [...filters];
     if (company) allFilters.push(['company', '=', company]);
     
-    // Add date filters for today
-    const today = new Date().toISOString().split('T')[0];
-    allFilters.push(['from_date', '=', today]);
-    allFilters.push(['to_date', '=', today]);
+    // Only include bins with positive stock
+    allFilters.push(['actual_qty', '>', 0]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
     
-    // For stock balance report, we use a different endpoint
-    return this.makeRequest('Stock Ledger Entry', 'GET', null, params);
+    // Use Bin doctype for stock balance queries
+    return this.makeRequest('Bin', 'GET', null, params);
   }
 }
 

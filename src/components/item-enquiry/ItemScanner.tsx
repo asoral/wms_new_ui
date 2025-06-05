@@ -95,13 +95,15 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="flex-1 justify-between"
+                    className="flex-1 justify-between text-left h-auto min-h-[40px] py-2 px-3"
                     disabled={isLoadingItems}
                   >
-                    {selectedItem 
-                      ? `${selectedItem.item_code} - ${selectedItem.item_name}`
-                      : itemCode || "Search item by code or name..."
-                    }
+                    <span className="truncate break-words whitespace-normal">
+                      {selectedItem 
+                        ? `${selectedItem.item_code} - ${selectedItem.item_name}`
+                        : itemCode || "Search item by code or name..."
+                      }
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -129,9 +131,9 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                                 selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            <div>
-                              <div className="font-medium">{item.item_code}</div>
-                              <div className="text-sm text-gray-500">{item.item_name}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{item.item_code}</div>
+                              <div className="text-sm text-gray-500 break-words">{item.item_name}</div>
                             </div>
                           </CommandItem>
                         ))}

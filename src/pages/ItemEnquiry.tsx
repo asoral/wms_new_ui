@@ -81,7 +81,7 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get stock balance using Stock Ledger Entry for accurate data
+      // Get stock balance using Bin for accurate data
       const stockResult = await erpnextAPI.getStockBalanceReport([
         ['item_code', '=', itemResult.data.item_code || itemCode]
       ]);
@@ -100,13 +100,13 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Process stock data from Stock Ledger entries
+      // Process stock data from Bin entries
       const warehouseStockMap: { [key: string]: StockInfo } = {};
 
-      stockResult.data.forEach((ledgerEntry: any) => {
-        const warehouse = ledgerEntry.warehouse;
-        const qty = parseFloat(ledgerEntry.bal_qty) || 0;
-        const valuation = parseFloat(ledgerEntry.bal_val) || 0;
+      stockResult.data.forEach((binEntry: any) => {
+        const warehouse = binEntry.warehouse;
+        const qty = parseFloat(binEntry.actual_qty) || 0;
+        const valuation = parseFloat(binEntry.stock_value) || 0;
 
         if (qty > 0) { // Only include warehouses with positive stock
           if (warehouseStockMap[warehouse]) {
@@ -116,11 +116,11 @@ const ItemEnquiry = () => {
             warehouseStockMap[warehouse] = {
               warehouse,
               qty,
-              uom: ledgerEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
+              uom: binEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
               valuation,
               age: Math.floor(Math.random() * 90), // TODO: Calculate actual age from stock ageing
-              batch: ledgerEntry.batch_no || undefined,
-              serial: ledgerEntry.serial_no || undefined
+              batch: undefined,
+              serial: undefined
             };
           }
         }
