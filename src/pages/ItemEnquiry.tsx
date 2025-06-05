@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +5,7 @@ import { Search, Package, RefreshCcw, Warehouse } from "lucide-react";
 import ItemScanner from "../components/item-enquiry/ItemScanner";
 import StockSummary from "../components/item-enquiry/StockSummary";
 import WarehouseStockTable from "../components/item-enquiry/WarehouseStockTable";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 
 export interface StockInfo {
   warehouse: string;
@@ -45,6 +44,9 @@ const ItemEnquiry = () => {
         throw new Error('ERPNext API not configured. Please check your connection settings.');
       }
 
+      // Get the user's default company
+      const defaultCompany = await getUserDefaultCompany();
+
       // First, verify the item exists
       let itemResult;
       try {
@@ -53,19 +55,26 @@ const ItemEnquiry = () => {
         // If item is not found, check if it exists in the items list
         const itemsResult = await erpnextAPI.getItems([
           ['item_code', '=', itemCode]
-        ], ['item_code', 'item_name', 'stock_uom']);
+        ], ['item_code', 'item_name', 'stock_uom'], defaultCompany || undefined);
         
         if (!itemsResult.data || itemsResult.data.length === 0) {
           // Try searching by name
           const nameSearchResult = await erpnextAPI.getItems([
             ['item_name', 'like', `%${itemCode}%`]
-          ], ['item_code', 'item_name', 'stock_uom']);
+          ], ['item_code', 'item_name', 'stock_uom'], defaultCompany || undefined);
           
           if (!nameSearchResult.data || nameSearchResult.data.length === 0) {
-            setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
-            setStockData(null);
-            setIsLoading(false);
-            return;
+            // Try searching by barcode
+            const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode, defaultCompany || undefined);
+            
+            if (!barcodeSearchResult.data || barcodeSearchResult.data.length === 0) {
+              setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+              setStockData(null);
+              setIsLoading(false);
+              return;
+            } else {
+              itemResult = { data: barcodeSearchResult.data[0] };
+            }
           } else {
             itemResult = { data: nameSearchResult.data[0] };
           }
@@ -81,10 +90,10 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get stock balance using Bin for accurate data
+      // Get stock balance using Bin for accurate data with company filter
       const stockResult = await erpnextAPI.getStockBalanceReport([
         ['item_code', '=', itemResult.data.item_code || itemCode]
-      ]);
+      ], defaultCompany || undefined);
 
       if (!stockResult.data || stockResult.data.length === 0) {
         setStockData({

@@ -409,6 +409,24 @@ export class ERPNextAPI {
     // Use Bin doctype for stock balance queries
     return this.makeRequest('Bin', 'GET', null, params);
   }
+
+  async getItemByBarcode(barcode: string, company?: string) {
+    const params: any = {
+      limit_page_length: 10,
+      fields: JSON.stringify(['item_code', 'item_name', 'stock_uom'])
+    };
+    
+    let allFilters: any[] = [
+      ['barcodes.barcode', '=', barcode]
+    ];
+    if (company) allFilters.push(['company', '=', company]);
+    
+    if (allFilters.length > 0) {
+      params.filters = allFilters;
+    }
+    
+    return this.makeRequest('Item', 'GET', null, params);
+  }
 }
 
 export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
