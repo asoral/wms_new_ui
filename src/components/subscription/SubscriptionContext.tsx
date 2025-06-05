@@ -84,17 +84,12 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
     }
   };
 
+  // Only check subscription on login/user change
   useEffect(() => {
     refreshSubscription();
   }, [user, session]);
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    if (!user) return;
-    
-    const interval = setInterval(refreshSubscription, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
+  // Remove the auto-refresh interval that was causing page refreshes
 
   const value = {
     hasAccess,
