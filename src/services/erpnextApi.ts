@@ -127,7 +127,25 @@ export class ERPNextAPI {
 
   async getItems(filters?: any[], fields?: string[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 20, // Default pagination
+      fields: JSON.stringify(fields || ['name', 'item_name', 'item_code', 'stock_uom'])
+    };
+    
+    let allFilters: any[] = [];
+    if (filters) allFilters = [...filters];
+    if (company) allFilters.push(['company', '=', company]);
+    
+    if (allFilters.length > 0) {
+      params.filters = allFilters;
+    }
+    
+    return this.makeRequest('Item', 'GET', null, params);
+  }
+
+  async getItemsPaginated(filters?: any[], fields?: string[], company?: string, limit: number = 20, page: number = 1) {
+    const params: any = {
+      limit_page_length: limit,
+      limit_start: (page - 1) * limit,
       fields: JSON.stringify(fields || ['name', 'item_name', 'item_code', 'stock_uom'])
     };
     
@@ -149,7 +167,7 @@ export class ERPNextAPI {
   async getStockBalance(filters?: any[], company?: string) {
     const params: any = {
       fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'reserved_qty', 'projected_qty']),
-      limit_page_length: 1000
+      limit_page_length: 500 // Reasonable limit for stock data
     };
     
     let allFilters: any[] = [];
@@ -182,7 +200,7 @@ export class ERPNextAPI {
 
   async getSalesOrders(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'customer', 'status', 'delivery_date', 'grand_total'])
     };
     
@@ -203,7 +221,7 @@ export class ERPNextAPI {
 
   async getPurchaseOrders(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'supplier', 'status', 'schedule_date', 'grand_total'])
     };
     
@@ -224,7 +242,7 @@ export class ERPNextAPI {
 
   async getDeliveryNotes(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'customer', 'status', 'posting_date'])
     };
     
@@ -245,7 +263,7 @@ export class ERPNextAPI {
 
   async getPurchaseReceipts(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'supplier', 'status', 'posting_date'])
     };
     
@@ -266,7 +284,7 @@ export class ERPNextAPI {
 
   async getMaterialRequests(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'material_request_type', 'status', 'schedule_date'])
     };
     
@@ -287,7 +305,7 @@ export class ERPNextAPI {
 
   async getStockEntries(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'stock_entry_type', 'status', 'posting_date'])
     };
     
@@ -308,7 +326,7 @@ export class ERPNextAPI {
 
   async getPickLists(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'purpose', 'status', 'date'])
     };
     
@@ -329,7 +347,7 @@ export class ERPNextAPI {
 
   async getPackingSlips(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'delivery_note', 'status', 'creation'])
     };
     
@@ -350,7 +368,7 @@ export class ERPNextAPI {
 
   async getQualityInspections(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'item_code', 'status', 'inspection_type'])
     };
     
@@ -367,7 +385,7 @@ export class ERPNextAPI {
 
   async getProductBundles(filters?: any[], company?: string) {
     const params: any = {
-      limit_page_length: 100,
+      limit_page_length: 50,
       fields: JSON.stringify(['name', 'new_item_code', 'description'])
     };
     
@@ -383,7 +401,6 @@ export class ERPNextAPI {
   }
 
   async getStockBalanceReport(filters?: any[], company?: string, includeStockAgeing?: boolean) {
-    // For stock balance, we need to use the Bin doctype which has the actual stock quantities
     const params: any = {
       fields: JSON.stringify([
         'item_code', 
@@ -392,21 +409,19 @@ export class ERPNextAPI {
         'stock_value',
         'stock_uom'
       ]),
-      limit_page_length: 1000
+      limit_page_length: 500 // Reasonable limit for stock reports
     };
     
     let allFilters: any[] = [];
     if (filters) allFilters = [...filters];
     if (company) allFilters.push(['company', '=', company]);
     
-    // Only include bins with positive stock
     allFilters.push(['actual_qty', '>', 0]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
     
-    // Use Bin doctype for stock balance queries
     return this.makeRequest('Bin', 'GET', null, params);
   }
 

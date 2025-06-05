@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,33 +26,89 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   const [open, setOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Fetch all enabled items from ERPNext for autocomplete with company filter
-  useEffect(() => {
-    const fetchItems = async () => {
-      setIsLoadingItems(true);
-      try {
-        const erpnextAPI = await createERPNextAPI();
-        if (erpnextAPI) {
-          const defaultCompany = await getUserDefaultCompany();
-          
-          // Fetch all enabled items without pagination limits
-          const result = await erpnextAPI.getAllEnabledItems(defaultCompany || undefined);
-          if (result.data) {
+  // Debounced search function
+  const searchItems = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    return (searchValue: string, isNewSearch: boolean = false) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(async () => {
+        await fetchItems(searchValue, isNewSearch);
+      }, 300);
+    };
+  }, []);
+
+  // Fetch items with search and pagination
+  const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
+    setIsLoadingItems(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (erpnextAPI) {
+        const defaultCompany = await getUserDefaultCompany();
+        const pageToFetch = isNewSearch ? 1 : currentPage;
+        
+        // Build search filters
+        let filters: any[] = [
+          ['disabled', '=', 0] // Only enabled items
+        ];
+        
+        if (search.trim()) {
+          // Search in both item_code and item_name
+          filters.push([
+            ['item_code', 'like', `%${search}%`],
+            'or',
+            ['item_name', 'like', `%${search}%`]
+          ]);
+        }
+        
+        const result = await erpnextAPI.getItemsPaginated(
+          filters,
+          ['item_code', 'item_name', 'stock_uom'],
+          defaultCompany || undefined,
+          20, // limit per page
+          pageToFetch
+        );
+        
+        if (result.data) {
+          if (isNewSearch) {
             setItems(result.data);
+            setCurrentPage(1);
+          } else {
+            setItems(prev => [...prev, ...result.data]);
+          }
+          
+          // Check if there are more items
+          setHasMore(result.data.length === 20);
+          
+          if (!isNewSearch) {
+            setCurrentPage(prev => prev + 1);
           }
         }
-      } catch (error) {
-        console.error('Failed to fetch items:', error);
-      } finally {
-        setIsLoadingItems(false);
       }
-    };
+    } catch (error) {
+      console.error('Failed to fetch items:', error);
+    } finally {
+      setIsLoadingItems(false);
+    }
+  };
 
-    fetchItems();
+  // Initial load
+  useEffect(() => {
+    fetchItems("", true);
   }, []);
+
+  // Handle search term changes
+  useEffect(() => {
+    if (searchTerm !== itemCode) {
+      searchItems(searchTerm, true);
+    }
+  }, [searchTerm, searchItems]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +122,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
     setIsScanning(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' } // Use back camera if available
+        video: { facingMode: 'environment' }
       });
       
       if (videoRef.current) {
@@ -103,11 +158,8 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0);
     
-    // Convert canvas to blob and process for barcode detection
     canvas.toBlob(async (blob) => {
       if (blob) {
-        // For now, we'll use a simple mock implementation
-        // In a real app, you'd use a barcode detection library like QuaggaJS or ZXing
         const mockBarcode = await simulateBarcodeDetection();
         if (mockBarcode) {
           setItemCode(mockBarcode);
@@ -118,13 +170,9 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
     });
   };
 
-  // Mock barcode detection for demonstration
   const simulateBarcodeDetection = async (): Promise<string | null> => {
-    // This is a mock implementation
-    // In reality, you'd use a barcode scanning library
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Return a random item code from the items list for demonstration
         if (items.length > 0) {
           const randomItem = items[Math.floor(Math.random() * items.length)];
           resolve(randomItem.item_code);
@@ -149,10 +197,11 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
     setOpen(false);
   };
 
-  const filteredItems = items.filter(item =>
-    item.item_code.toLowerCase().includes(itemCode.toLowerCase()) ||
-    item.item_name.toLowerCase().includes(itemCode.toLowerCase())
-  );
+  const loadMoreItems = () => {
+    if (hasMore && !isLoadingItems) {
+      fetchItems(searchTerm, false);
+    }
+  };
 
   return (
     <Tabs defaultValue="manual" className="w-full">
@@ -195,15 +244,18 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                   <Command>
                     <CommandInput 
                       placeholder="Search items..." 
-                      value={itemCode}
-                      onValueChange={setItemCode}
+                      value={searchTerm}
+                      onValueChange={(value) => {
+                        setSearchTerm(value);
+                        setItemCode(value);
+                      }}
                     />
                     <CommandList>
                       <CommandEmpty>
                         {isLoadingItems ? "Loading items..." : "No items found."}
                       </CommandEmpty>
                       <CommandGroup>
-                        {filteredItems.slice(0, 50).map((item) => (
+                        {items.map((item) => (
                           <CommandItem
                             key={item.item_code}
                             value={`${item.item_code} ${item.item_name}`}
@@ -221,6 +273,17 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                             </div>
                           </CommandItem>
                         ))}
+                        {hasMore && (
+                          <CommandItem onSelect={loadMoreItems}>
+                            <div className="flex items-center justify-center w-full py-2">
+                              {isLoadingItems ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <span className="text-sm text-gray-500">Load more items...</span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        )}
                       </CommandGroup>
                     </CommandList>
                   </Command>
