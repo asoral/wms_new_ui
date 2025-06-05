@@ -133,6 +133,12 @@ export class ERPNextAPI {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Stock Balance Report API Error Response:', errorText);
+        
+        // If Stock Balance Report is not available, throw a specific error to fallback to Bin
+        if (response.status === 403) {
+          throw new Error('STOCK_REPORT_NOT_AVAILABLE');
+        }
+        
         throw new Error(`Stock Balance Report API Error: ${response.status} ${response.statusText}`);
       }
 
@@ -269,8 +275,47 @@ export class ERPNextAPI {
   }
 
   async getStockBalance(filters?: any[], company?: string) {
-    // Use the new Stock Balance Report method instead of Bin
-    return this.getStockBalanceReport(filters, company);
+    try {
+      // First try Stock Balance Report
+      return await this.getStockBalanceReport(filters, company);
+    } catch (error) {
+      console.log('Stock Balance Report failed, falling back to Bin doctype:', error);
+      
+      // Fallback to Bin doctype if Stock Balance Report is not available
+      const params: any = {
+        limit_page_length: 0, // Get all records
+        fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'stock_value', 'stock_uom'])
+      };
+      
+      let allFilters: any[] = [
+        ['actual_qty', '>', 0] // Only positive stock
+      ];
+      
+      if (filters) {
+        allFilters = [...allFilters, ...filters];
+      }
+      
+      if (allFilters.length > 0) {
+        params.filters = allFilters;
+      }
+      
+      const result = await this.makeRequest('Bin', 'GET', null, params);
+      
+      if (result.data) {
+        // Transform Bin data to match Stock Balance Report format
+        const transformedData = result.data.map((bin: any) => ({
+          item_code: bin.item_code,
+          warehouse: bin.warehouse,
+          actual_qty: parseFloat(bin.actual_qty) || 0,
+          stock_value: parseFloat(bin.stock_value) || 0,
+          stock_uom: bin.stock_uom || 'Nos'
+        }));
+        
+        return { data: transformedData };
+      }
+      
+      return { data: [] };
+    }
   }
 
   async getWarehouses(filters?: any[], company?: string) {

@@ -84,12 +84,12 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get stock balance using Stock Balance Report
-      const stockResult = await erpnextAPI.getStockBalanceReport([
+      // Get stock balance (will try Stock Balance Report first, then fallback to Bin)
+      const stockResult = await erpnextAPI.getStockBalance([
         ['item_code', '=', itemResult.data.item_code || itemCode]
       ], defaultCompany || undefined);
 
-      console.log('Stock Balance Report Result:', stockResult);
+      console.log('Stock Balance Result:', stockResult);
 
       if (!stockResult.data || stockResult.data.length === 0) {
         const emptyStockData = {
@@ -109,7 +109,7 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Process stock data from Stock Balance Report
+      // Process stock data
       const warehouseStockMap: { [key: string]: StockInfo } = {};
 
       stockResult.data.forEach((stockEntry: any) => {
@@ -234,11 +234,11 @@ const ItemEnquiry = () => {
           </CardContent>
         </Card>
 
-        {/* Error Display */}
+        {/* Error Display - Mobile Friendly */}
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50">
             <CardContent className="py-4">
-              <div className="text-red-800">{error}</div>
+              <div className="text-red-800 break-words">{error}</div>
             </CardContent>
           </Card>
         )}

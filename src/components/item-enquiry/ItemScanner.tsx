@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -301,88 +300,94 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                 <WifiOff className="w-4 h-4 text-red-600" />
               )}
             </Label>
-            <div className="flex space-x-2 mt-1">
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="flex-1 justify-between text-left h-auto min-h-[40px] py-2 px-3"
-                    disabled={isLoadingItems}
-                  >
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="truncate">
-                        {selectedItem 
-                          ? selectedItem.item_code
-                          : itemCode || "Search item by code or name..."
-                        }
-                      </div>
-                      {selectedItem && (
-                        <div className="text-sm text-gray-500 truncate">
-                          {selectedItem.item_name}
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mt-1">
+              <div className="flex-1 min-w-0">
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
+                      disabled={isLoadingItems}
+                    >
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="truncate">
+                          {selectedItem 
+                            ? selectedItem.item_code
+                            : itemCode || "Search item by code or name..."
+                          }
                         </div>
-                      )}
-                    </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput 
-                      placeholder="Search items..." 
-                      value={searchTerm}
-                      onValueChange={(value) => {
-                        setSearchTerm(value);
-                        setItemCode(value);
-                      }}
-                    />
-                    <CommandList>
-                      <CommandEmpty>
-                        {isLoadingItems ? "Loading items..." : "No items found."}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {items.map((item) => (
-                          <CommandItem
-                            key={item.item_code}
-                            value={`${item.item_code} ${item.item_name}`}
-                            onSelect={() => handleItemSelect(item)}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{item.item_code}</div>
-                              <div className="text-sm text-gray-500 break-words">{item.item_name}</div>
-                            </div>
-                          </CommandItem>
-                        ))}
-                        {hasMore && isOnline && (
-                          <CommandItem onSelect={loadMoreItems}>
-                            <div className="flex items-center justify-center w-full py-2">
-                              {isLoadingItems ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <span className="text-sm text-gray-500">Load more items...</span>
-                              )}
-                            </div>
-                          </CommandItem>
+                        {selectedItem && (
+                          <div className="text-sm text-gray-500 truncate">
+                            {selectedItem.item_name}
+                          </div>
                         )}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <Button type="submit" disabled={isLoading || (!selectedItem && !itemCode.trim())}>
+                      </div>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search items..." 
+                        value={searchTerm}
+                        onValueChange={(value) => {
+                          setSearchTerm(value);
+                          setItemCode(value);
+                        }}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {isLoadingItems ? "Loading items..." : "No items found."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {items.map((item) => (
+                            <CommandItem
+                              key={item.item_code}
+                              value={`${item.item_code} ${item.item_name}`}
+                              onSelect={() => handleItemSelect(item)}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{item.item_code}</div>
+                                <div className="text-sm text-gray-500 break-words">{item.item_name}</div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                          {hasMore && isOnline && (
+                            <CommandItem onSelect={loadMoreItems}>
+                              <div className="flex items-center justify-center w-full py-2">
+                                {isLoadingItems ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <span className="text-sm text-gray-500">Load more items...</span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          )}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <Button 
+                type="submit" 
+                disabled={isLoading || (!selectedItem && !itemCode.trim())}
+                className="w-full sm:w-auto sm:min-w-[100px]"
+              >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Search className="w-4 h-4" />
                 )}
-                Search
+                <span className="ml-2 sm:inline">Search</span>
               </Button>
             </div>
           </div>
