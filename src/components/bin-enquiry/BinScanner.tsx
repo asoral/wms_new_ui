@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Scan, Search, Loader2 } from "lucide-react";
+import WarehouseSelector from "./WarehouseSelector";
 
 interface BinScannerProps {
   onBinScanned: (binCode: string) => void;
@@ -40,12 +41,24 @@ const BinScanner = ({ onBinScanned, isLoading }: BinScannerProps) => {
     }
   };
 
+  const handleWarehouseSelected = (warehouseCode: string) => {
+    onBinScanned(warehouseCode);
+  };
+
   return (
-    <Tabs defaultValue="manual" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
+    <Tabs defaultValue="warehouse" className="w-full">
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="warehouse">Select Warehouse</TabsTrigger>
         <TabsTrigger value="manual">Manual Entry</TabsTrigger>
         <TabsTrigger value="scan">Barcode Scanner</TabsTrigger>
       </TabsList>
+
+      <TabsContent value="warehouse" className="space-y-4">
+        <WarehouseSelector 
+          onWarehouseSelected={handleWarehouseSelected}
+          isLoading={isLoading}
+        />
+      </TabsContent>
 
       <TabsContent value="manual" className="space-y-4">
         <div className="space-y-2">
