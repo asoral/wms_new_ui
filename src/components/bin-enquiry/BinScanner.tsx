@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scan, Search, Loader2 } from "lucide-react";
+import { Scan, Loader2 } from "lucide-react";
 import WarehouseSelector from "./WarehouseSelector";
 
 interface BinScannerProps {
@@ -15,12 +15,6 @@ interface BinScannerProps {
 const BinScanner = ({ onBinScanned, isLoading }: BinScannerProps) => {
   const [binCode, setBinCode] = useState("");
   const [isScanning, setIsScanning] = useState(false);
-
-  const handleManualSearch = () => {
-    if (binCode.trim()) {
-      onBinScanned(binCode.trim());
-    }
-  };
 
   const handleScan = () => {
     setIsScanning(true);
@@ -35,21 +29,14 @@ const BinScanner = ({ onBinScanned, isLoading }: BinScannerProps) => {
     }, 2000);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleManualSearch();
-    }
-  };
-
   const handleWarehouseSelected = (warehouseCode: string) => {
     onBinScanned(warehouseCode);
   };
 
   return (
     <Tabs defaultValue="warehouse" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="warehouse">Select Warehouse</TabsTrigger>
-        <TabsTrigger value="manual">Manual Entry</TabsTrigger>
         <TabsTrigger value="scan">Barcode Scanner</TabsTrigger>
       </TabsList>
 
@@ -58,33 +45,6 @@ const BinScanner = ({ onBinScanned, isLoading }: BinScannerProps) => {
           onWarehouseSelected={handleWarehouseSelected}
           isLoading={isLoading}
         />
-      </TabsContent>
-
-      <TabsContent value="manual" className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="binCode">Bin/Warehouse Code</Label>
-          <div className="flex space-x-2">
-            <Input
-              id="binCode"
-              placeholder="Enter bin or warehouse code..."
-              value={binCode}
-              onChange={(e) => setBinCode(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isLoading}
-            />
-            <Button 
-              onClick={handleManualSearch} 
-              disabled={!binCode.trim() || isLoading}
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Search className="w-4 h-4" />
-              )}
-              Search
-            </Button>
-          </div>
-        </div>
       </TabsContent>
 
       <TabsContent value="scan" className="space-y-4">

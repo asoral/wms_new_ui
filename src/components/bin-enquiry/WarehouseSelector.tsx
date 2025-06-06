@@ -4,20 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Warehouse, Loader2, Search } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 
@@ -35,10 +28,10 @@ interface WarehouseSelectorProps {
 const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelectorProps) => {
   const [warehouses, setWarehouses] = useState<WarehouseInfo[]>([]);
   const [filteredWarehouses, setFilteredWarehouses] = useState<WarehouseInfo[]>([]);
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false);
-  const [useDropdown, setUseDropdown] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     loadWarehouses();
@@ -55,6 +48,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       );
       setFilteredWarehouses(filtered);
     }
+    setCurrentPage(1); // Reset to first page when searching
   }, [searchTerm, warehouses]);
 
   const loadWarehouses = async () => {
@@ -78,172 +72,133 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     }
   };
 
-  const handleWarehouseChange = (warehouseCode: string) => {
-    setSelectedWarehouse(warehouseCode);
-    setSearchTerm("");
-  };
-
   const handleWarehouseSelect = (warehouseCode: string) => {
     const warehouse = warehouses.find(w => w.name === warehouseCode);
-    setSelectedWarehouse(warehouseCode);
     setSearchTerm(warehouse?.warehouse_name || warehouse?.name || "");
-  };
-
-  const handleSearchWarehouse = () => {
-    if (selectedWarehouse) {
-      onWarehouseSelected(selectedWarehouse);
-    } else if (searchTerm.trim()) {
-      // If user typed something but didn't select from dropdown, try to find exact match
-      const exactMatch = warehouses.find(w => 
-        w.warehouse_name?.toLowerCase() === searchTerm.toLowerCase() ||
-        w.name.toLowerCase() === searchTerm.toLowerCase()
-      );
-      if (exactMatch) {
-        onWarehouseSelected(exactMatch.name);
-      } else if (filteredWarehouses.length > 0) {
-        // Use first filtered result
-        onWarehouseSelected(filteredWarehouses[0].name);
-      }
-    }
-  };
-
-  const handleDirectSearch = () => {
-    if (searchTerm.trim()) {
-      onWarehouseSelected(searchTerm.trim());
-    }
+    onWarehouseSelected(warehouseCode);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleDirectSearch();
+    if (e.key === 'Enter' && filteredWarehouses.length > 0) {
+      handleWarehouseSelect(filteredWarehouses[0].name);
     }
+  };
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredWarehouses.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentWarehouses = filteredWarehouses.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="warehouse-select">Select or Search Warehouse</Label>
-        
-        {/* Toggle between dropdown and search input */}
-        <div className="flex space-x-2 mb-2">
-          <Button
-            variant={useDropdown ? "default" : "outline"}
-            size="sm"
-            onClick={() => setUseDropdown(true)}
-          >
-            Dropdown
-          </Button>
-          <Button
-            variant={!useDropdown ? "default" : "outline"}
-            size="sm"
-            onClick={() => setUseDropdown(false)}
-          >
-            Search
-          </Button>
-        </div>
-
-        <div className="flex space-x-2">
-          {useDropdown ? (
-            <Select 
-              value={selectedWarehouse} 
-              onValueChange={handleWarehouseChange}
-              disabled={isLoadingWarehouses || isLoading}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Choose a warehouse..." />
-              </SelectTrigger>
-              <SelectContent>
-                <div className="p-2">
-                  <Input
-                    placeholder="Search warehouses..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="mb-2"
-                  />
-                </div>
-                {filteredWarehouses.map((warehouse) => (
-                  <SelectItem key={warehouse.name} value={warehouse.name}>
-                    <div className="flex items-center space-x-2">
-                      <Warehouse className="w-4 h-4" />
-                      <span>{warehouse.warehouse_name || warehouse.name}</span>
-                      {warehouse.is_group === 1 && (
-                        <span className="text-xs text-gray-500">(Group)</span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-                {filteredWarehouses.length === 0 && searchTerm && (
-                  <div className="p-2 text-sm text-gray-500">No warehouses found</div>
-                )}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="flex-1 relative">
-              <Input
-                placeholder="Type warehouse name or code..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={handleKeyPress}
-                disabled={isLoading || isLoadingWarehouses}
-                className="pr-10"
-              />
-              <Search className="w-4 h-4 absolute right-3 top-3 text-gray-400" />
-              
-              {/* Search suggestions dropdown */}
-              {searchTerm && filteredWarehouses.length > 0 && (
-                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  <Command>
-                    <CommandList>
-                      <CommandGroup>
-                        {filteredWarehouses.slice(0, 10).map((warehouse) => (
-                          <CommandItem
-                            key={warehouse.name}
-                            onSelect={() => handleWarehouseSelect(warehouse.name)}
-                            className="cursor-pointer"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <Warehouse className="w-4 h-4" />
-                              <span>{warehouse.warehouse_name || warehouse.name}</span>
-                              {warehouse.is_group === 1 && (
-                                <span className="text-xs text-gray-500">(Group)</span>
-                              )}
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </div>
-              )}
-            </div>
-          )}
-          
-          <Button 
-            onClick={useDropdown ? handleSearchWarehouse : handleDirectSearch}
-            disabled={(!selectedWarehouse && !searchTerm.trim()) || isLoading || isLoadingWarehouses}
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Warehouse className="w-4 h-4" />
-            )}
-            Search
-          </Button>
+        <Label htmlFor="warehouse-search">Search Warehouse</Label>
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+          <Input
+            id="warehouse-search"
+            placeholder="Type warehouse name to search..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={isLoading || isLoadingWarehouses}
+            className="pl-10"
+          />
         </div>
       </div>
       
       {isLoadingWarehouses && (
-        <div className="text-sm text-gray-600">Loading warehouses...</div>
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+          <span className="text-sm text-gray-600">Loading warehouses...</span>
+        </div>
       )}
       
-      {warehouses.length === 0 && !isLoadingWarehouses && (
-        <div className="text-sm text-gray-500">No warehouses found</div>
+      {!isLoadingWarehouses && warehouses.length === 0 && (
+        <div className="text-sm text-gray-500 text-center py-4">No warehouses found</div>
       )}
 
-      {searchTerm && filteredWarehouses.length === 0 && warehouses.length > 0 && (
-        <div className="text-sm text-yellow-600">
-          No warehouses match "{searchTerm}". You can still search directly.
-        </div>
+      {!isLoadingWarehouses && warehouses.length > 0 && (
+        <>
+          {/* Warehouse List */}
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {currentWarehouses.length > 0 ? (
+              currentWarehouses.map((warehouse) => (
+                <div
+                  key={warehouse.name}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                  onClick={() => handleWarehouseSelect(warehouse.name)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Warehouse className="w-4 h-4 text-gray-500" />
+                    <div>
+                      <div className="font-medium">{warehouse.warehouse_name || warehouse.name}</div>
+                      <div className="text-sm text-gray-500">{warehouse.name}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {warehouse.is_group === 1 && (
+                      <span className="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded">Group</span>
+                    )}
+                    <Button size="sm" variant="outline">
+                      Select
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-gray-500 text-center py-4">
+                {searchTerm ? `No warehouses found matching "${searchTerm}"` : "No warehouses available"}
+              </div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNumber = i + 1;
+                  return (
+                    <PaginationItem key={pageNumber}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(pageNumber)}
+                        isActive={currentPage === pageNumber}
+                        className="cursor-pointer"
+                      >
+                        {pageNumber}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+
+          {/* Results count */}
+          <div className="text-sm text-gray-600 text-center">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredWarehouses.length)} of {filteredWarehouses.length} warehouses
+          </div>
+        </>
       )}
     </div>
   );
