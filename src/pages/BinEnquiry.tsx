@@ -81,7 +81,7 @@ const BinEnquiry = () => {
       }
 
       // Get all items in this warehouse (including child warehouses if it's a parent)
-      let stockFilters = [['warehouse', '=', targetWarehouse]];
+      let stockFilters: any[] = [['warehouse', '=', targetWarehouse]];
       
       // If it's a parent warehouse, also get stock from child warehouses
       if (warehouseInfo.is_group === 1) {
@@ -89,7 +89,7 @@ const BinEnquiry = () => {
           const childWarehouses = await erpnextAPI.getWarehouses([['parent_warehouse', '=', targetWarehouse]]);
           if (childWarehouses.data && childWarehouses.data.length > 0) {
             stockFilters = [
-              ['warehouse', 'in', [targetWarehouse, ...childWarehouses.data.map(w => w.name)]]
+              ['warehouse', 'in', [targetWarehouse, ...childWarehouses.data.map((w: any) => w.name)]]
             ];
           }
         } catch (err) {
