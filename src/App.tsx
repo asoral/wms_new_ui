@@ -1,4 +1,3 @@
-
 import { Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from "@/components/auth/AuthContext";
@@ -9,6 +8,7 @@ import BottomNavigation from "@/components/BottomNavigation";
 import TopBar from "@/components/TopBar";
 import { Toaster } from "@/components/ui/sonner";
 import AuthForm from "@/components/auth/AuthForm";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 // Lazy load pages to improve performance
 const Index = lazy(() => import("@/pages/Index"));
@@ -37,7 +37,11 @@ const App = () => {
       <AuthProvider>
         <SubscriptionProvider>
           <div className="flex flex-col h-screen">
-            <Suspense fallback={<div>Loading...</div>}>
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-screen">
+                <LoadingSpinner size={48} />
+              </div>
+            }>
               <Routes>
                 {/* Public routes */}
                 <Route path="/auth" element={<AuthForm />} />

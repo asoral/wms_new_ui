@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,10 +23,22 @@ import {
   Users
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import LoadingSpinner from "@/components/LoadingSpinner";
+
+interface StockAgingData {
+  range_0_30_percent: number;
+  range_31_60_percent: number;
+  range_61_90_percent: number;
+  range_90_plus_percent: number;
+  totalValue: number;
+}
 
 const Home = () => {
   const navigate = useNavigate();
   const [showAllActions, setShowAllActions] = useState(false);
+  const [stockAgingData, setStockAgingData] = useState<StockAgingData | null>(null);
+  const [loadingStockAging, setLoadingStockAging] = useState(true);
 
   const quickActions = [
     { icon: Package, label: "Item Enquiry", color: "bg-blue-500", path: "/item-enquiry" },
@@ -35,7 +46,7 @@ const Home = () => {
     { icon: Truck, label: "Deliver", color: "bg-red-500", path: "/deliver" },
     { icon: Search, label: "Bin Enquiry", color: "bg-green-500", path: "/bin-enquiry" },
     { icon: BarChart3, label: "Stock Count", color: "bg-purple-500", path: "/stock-count" },
-    { icon: FileText, label: "Mat. Request", color: "bg-teal-500", path: "/mat-request" },
+    { icon: FileText, label: "Mat. Request", color: "bg-teal-500", path: "/material-request" },
     { icon: Database, label: "Stock Entry", color: "bg-indigo-500", path: "/stock-entry" },
     { icon: ClipboardList, label: "Pick List", color: "bg-pink-500", path: "/pick-list" },
     { icon: Package2, label: "Packing", color: "bg-cyan-500", path: "/packing" },
@@ -53,6 +64,32 @@ const Home = () => {
     { action: "Quality check", item: "Batch #567", time: "15 min ago", status: "completed" },
     { action: "Delivery scheduled", item: "Order #1235", time: "30 min ago", status: "in-progress" }
   ];
+
+  useEffect(() => {
+    const fetchStockAgingData = async () => {
+      try {
+        setLoadingStockAging(true);
+        const erpnextAPI = await createERPNextAPI();
+        if (!erpnextAPI) {
+          console.log('ERPNext API not configured');
+          return;
+        }
+
+        const defaultCompany = await getUserDefaultCompany();
+        const result = await erpnextAPI.getStockAgingReport([], defaultCompany || undefined);
+        
+        if (result.data) {
+          setStockAgingData(result.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stock aging data:', error);
+      } finally {
+        setLoadingStockAging(false);
+      }
+    };
+
+    fetchStockAgingData();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -219,24 +256,49 @@ const Home = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">0-30 Days</span>
-                  <span className="font-medium">68%</span>
+              {loadingStockAging ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner size={32} />
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">31-60 Days</span>
-                  <span className="font-medium">22%</span>
+              ) : stockAgingData ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">0-30 Days</span>
+                    <span className="font-medium">{stockAgingData.range_0_30_percent}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">31-60 Days</span>
+                    <span className="font-medium">{stockAgingData.range_31_60_percent}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">61-90 Days</span>
+                    <span className="font-medium">{stockAgingData.range_61_90_percent}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-red-600">90+ Days</span>
+                    <span className="font-medium text-red-600">{stockAgingData.range_90_plus_percent}%</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">61-90 Days</span>
-                  <span className="font-medium">7%</span>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">0-30 Days</span>
+                    <span className="font-medium">68%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">31-60 Days</span>
+                    <span className="font-medium">22%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">61-90 Days</span>
+                    <span className="font-medium">7%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-red-600">90+ Days</span>
+                    <span className="font-medium text-red-600">3%</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-red-600">90+ Days</span>
-                  <span className="font-medium text-red-600">3%</span>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 

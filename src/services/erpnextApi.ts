@@ -179,6 +179,97 @@ export class ERPNextAPI {
     }
   }
 
+  // New method to call Stock Aging Report
+  public async getStockAgingReport(filters?: any[], company?: string) {
+    const baseUrl = this.cleanUrl(this.config.url);
+    let url = `${baseUrl}/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute`;
+    
+    console.log('Making Stock Aging Report API request to:', url);
+    
+    const reportFilters = {
+      company: company || '',
+      from_date: '2020-01-01', // Use a far back date to get all stock
+      to_date: new Date().toISOString().split('T')[0], // Today's date
+      warehouse: '',
+      item_code: '',
+      item_group: '',
+      brand: '',
+      show_warehouse_wise_stock: 0,
+      filter_total_zero_qty: 1
+    };
+
+    const options: RequestInit = {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      mode: 'cors',
+      body: JSON.stringify({ filters: reportFilters })
+    };
+
+    console.log('Stock Aging Report request body:', reportFilters);
+
+    try {
+      const response = await fetch(url, options);
+      
+      console.log('Stock Aging Report response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Stock Aging Report API Error Response:', errorText);
+        throw new Error(`Stock Aging Report API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Stock Aging Report API Response:', result);
+      
+      // Transform the report data to calculate aging percentages
+      if (result.message && result.message.result && Array.isArray(result.message.result)) {
+        const agingData = {
+          range_0_30: 0,
+          range_31_60: 0,
+          range_61_90: 0,
+          range_90_plus: 0,
+          totalValue: 0
+        };
+
+        result.message.result.forEach((row: any[]) => {
+          // Stock Aging Report columns: [item_code, item_name, item_group, description, qty, uom, age_0_30, age_31_60, age_61_90, age_90_above, total_value]
+          const age_0_30 = parseFloat(row[6]) || 0;
+          const age_31_60 = parseFloat(row[7]) || 0;
+          const age_61_90 = parseFloat(row[8]) || 0;
+          const age_90_plus = parseFloat(row[9]) || 0;
+          const totalValue = parseFloat(row[10]) || 0;
+
+          agingData.range_0_30 += age_0_30;
+          agingData.range_31_60 += age_31_60;
+          agingData.range_61_90 += age_61_90;
+          agingData.range_90_plus += age_90_plus;
+          agingData.totalValue += totalValue;
+        });
+
+        // Calculate percentages
+        const total = agingData.range_0_30 + agingData.range_31_60 + agingData.range_61_90 + agingData.range_90_plus;
+        
+        return {
+          data: {
+            range_0_30_percent: total > 0 ? Math.round((agingData.range_0_30 / total) * 100) : 0,
+            range_31_60_percent: total > 0 ? Math.round((agingData.range_31_60 / total) * 100) : 0,
+            range_61_90_percent: total > 0 ? Math.round((agingData.range_61_90 / total) * 100) : 0,
+            range_90_plus_percent: total > 0 ? Math.round((agingData.range_90_plus / total) * 100) : 0,
+            totalValue: agingData.totalValue
+          }
+        };
+      }
+      
+      return { data: null };
+    } catch (error) {
+      console.error('Stock Aging Report Request Failed:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Cannot connect to ERPNext server. Please check your URL and ensure CORS is enabled.');
+      }
+      throw error;
+    }
+  }
+
   async testConnection() {
     try {
       console.log('Testing ERPNext connection...');
