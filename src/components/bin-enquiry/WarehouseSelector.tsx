@@ -34,8 +34,8 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     
     return (searchValue: string, isNewSearch: boolean = false) => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(async () => {
-        await fetchWarehouses(searchValue, isNewSearch);
+      timeoutId = setTimeout(() => {
+        fetchWarehouses(searchValue, isNewSearch);
       }, 300);
     };
   }, []);
@@ -116,86 +116,84 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     <div className="space-y-4">
       <div>
         <Label htmlFor="warehouse-search">Warehouse Code / Name</Label>
-        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mt-1">
-          <div className="flex-1 min-w-0">
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={open}
-                  className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
-                  disabled={isLoadingWarehouses || isLoading}
-                >
-                  <div className="flex-1 min-w-0 text-left">
-                    <div className="truncate">
-                      {selectedWarehouse 
-                        ? selectedWarehouse.name
-                        : "Search warehouse by code or name..."
-                      }
-                    </div>
-                    {selectedWarehouse && (
-                      <div className="text-sm text-gray-500 truncate">
-                        {selectedWarehouse.warehouse_name}
-                      </div>
-                    )}
+        <div className="flex-1 min-w-0 mt-1">
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
+                disabled={isLoadingWarehouses || isLoading}
+              >
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="truncate">
+                    {selectedWarehouse 
+                      ? selectedWarehouse.name
+                      : "Search warehouse by code or name..."
+                    }
                   </div>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput 
-                    placeholder="Search warehouses..." 
-                    value={searchTerm}
-                    onValueChange={setSearchTerm}
-                  />
-                  <CommandList>
-                    <CommandEmpty>
-                      {isLoadingWarehouses ? "Loading warehouses..." : searchTerm.trim() ? "No warehouses found." : "Type to search warehouses..."}
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {warehouses.map((warehouse) => (
-                        <CommandItem
-                          key={warehouse.name}
-                          value={`${warehouse.name} ${warehouse.warehouse_name}`}
-                          onSelect={() => handleWarehouseSelect(warehouse)}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedWarehouse?.name === warehouse.name ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            <Warehouse className="w-4 h-4 text-gray-500 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{warehouse.warehouse_name || warehouse.name}</div>
-                              <div className="text-sm text-gray-500 truncate">{warehouse.name}</div>
-                              {warehouse.is_group === 1 && (
-                                <span className="text-xs px-1 py-0.5 bg-blue-100 text-blue-600 rounded mt-1 inline-block">Group</span>
-                              )}
-                            </div>
-                          </div>
-                        </CommandItem>
-                      ))}
-                      {hasMore && searchTerm.trim() && (
-                        <CommandItem onSelect={loadMoreWarehouses}>
-                          <div className="flex items-center justify-center w-full py-2">
-                            {isLoadingWarehouses ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <span className="text-sm text-gray-500">Load more warehouses...</span>
+                  {selectedWarehouse && (
+                    <div className="text-sm text-gray-500 truncate">
+                      {selectedWarehouse.warehouse_name}
+                    </div>
+                  )}
+                </div>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0">
+              <Command>
+                <CommandInput 
+                  placeholder="Search warehouses..." 
+                  value={searchTerm}
+                  onValueChange={setSearchTerm}
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    {isLoadingWarehouses ? "Loading warehouses..." : searchTerm.trim() ? "No warehouses found." : "Type to search warehouses..."}
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {warehouses.map((warehouse) => (
+                      <CommandItem
+                        key={warehouse.name}
+                        value={`${warehouse.name} ${warehouse.warehouse_name}`}
+                        onSelect={() => handleWarehouseSelect(warehouse)}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedWarehouse?.name === warehouse.name ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <Warehouse className="w-4 h-4 text-gray-500 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{warehouse.warehouse_name || warehouse.name}</div>
+                            <div className="text-sm text-gray-500 truncate">{warehouse.name}</div>
+                            {warehouse.is_group === 1 && (
+                              <span className="text-xs px-1 py-0.5 bg-blue-100 text-blue-600 rounded mt-1 inline-block">Group</span>
                             )}
                           </div>
-                        </CommandItem>
-                      )}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
+                        </div>
+                      </CommandItem>
+                    ))}
+                    {hasMore && searchTerm.trim() && (
+                      <CommandItem onSelect={loadMoreWarehouses}>
+                        <div className="flex items-center justify-center w-full py-2">
+                          {isLoadingWarehouses ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <span className="text-sm text-gray-500">Load more warehouses...</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    )}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </div>
