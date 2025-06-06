@@ -32,40 +32,28 @@ export interface APIConfig {
 
 export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
   try {
-    console.log('createERPNextAPI: Starting API creation...');
     const { data: { user } } = await supabase.auth.getUser();
-    console.log('createERPNextAPI: User data:', user ? 'User found' : 'No user');
 
     if (!user) {
       console.error('createERPNextAPI: No user found');
       return null;
     }
 
-    console.log('createERPNextAPI: User metadata:', user.user_metadata);
-
     const erpnext_url = user.user_metadata.erpnext_url;
     const erpnext_api_key = user.user_metadata.erpnext_api_key;
     const erpnext_api_secret = user.user_metadata.erpnext_api_secret;
-
-    console.log('createERPNextAPI: Configuration check:', {
-      hasUrl: !!erpnext_url,
-      hasApiKey: !!erpnext_api_key,
-      hasApiSecret: !!erpnext_api_secret
-    });
 
     if (!erpnext_url || !erpnext_api_key || !erpnext_api_secret) {
       console.error('createERPNextAPI: ERPNext configuration missing for user');
       return null;
     }
 
-    console.log('createERPNextAPI: Creating API instance...');
     const api = new ERPNextAPI({
       apiKey: erpnext_api_key,
       apiSecret: erpnext_api_secret,
       baseURL: erpnext_url,
     });
     
-    console.log('createERPNextAPI: API instance created successfully');
     return api;
   } catch (error) {
     console.error('createERPNextAPI: Error creating ERPNextAPI:', error);
@@ -123,7 +111,6 @@ export class ERPNextAPI {
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret;
     this.baseURL = config.baseURL;
-    console.log('ERPNextAPI: Instance created with baseURL:', this.baseURL);
   }
 
   async testConnection(): Promise<{ success: boolean; error?: string }> {
@@ -167,8 +154,6 @@ export class ERPNextAPI {
       url += `?${searchParams.toString()}`;
     }
 
-    console.log('ERPNextAPI: Making request to:', url);
-
     const options: RequestInit = {
       method,
       headers: {
@@ -182,15 +167,12 @@ export class ERPNextAPI {
     }
 
     const response = await fetch(url, options);
-    console.log('ERPNextAPI: Response status:', response.status);
 
     if (!response.ok) {
-      console.error('ERPNextAPI: Request failed:', response.statusText);
       throw new Error(`Failed to ${method} ${doctype}: ${response.statusText}`);
     }
 
     const result = await response.json();
-    console.log('ERPNextAPI: Response data:', result);
     return result;
   }
 
