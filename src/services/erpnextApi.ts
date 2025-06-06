@@ -452,6 +452,218 @@ export class ERPNextAPI {
     
     return this.makeRequest('Item', 'GET', null, params);
   }
+
+  // Warehouse methods
+  async getWarehouses(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'warehouse_name', 'is_group', 'parent_warehouse'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Warehouse', 'GET', null, params);
+  }
+
+  // Stock Balance methods
+  async getStockBalance(filters?: any[], company?: string) {
+    try {
+      // Try to use Stock Balance Report first
+      return await this.getStockBalanceReport(filters, company);
+    } catch (error) {
+      console.log('Stock Balance Report failed, falling back to Bin data:', error);
+      
+      // Fallback to Bin doctype
+      const params: any = {
+        limit_page_length: 0,
+        fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'stock_uom', 'stock_value'])
+      };
+      
+      let allFilters: any[] = [
+        ['actual_qty', '>', 0] // Only positive stock
+      ];
+      
+      if (filters && filters.length > 0) {
+        allFilters = [...allFilters, ...filters];
+      }
+      
+      if (allFilters.length > 0) {
+        params.filters = allFilters;
+      }
+      
+      const result = await this.makeRequest('Bin', 'GET', null, params);
+      
+      // Transform Bin data to match Stock Balance Report format
+      if (result.data) {
+        const transformedData = result.data.map((bin: any) => ({
+          item_code: bin.item_code,
+          item_name: bin.item_code, // Bin doesn't have item_name, will be filled later
+          warehouse: bin.warehouse,
+          actual_qty: bin.actual_qty,
+          stock_uom: bin.stock_uom,
+          stock_value: bin.stock_value || 0
+        }));
+        
+        return { data: transformedData };
+      }
+      
+      return { data: [] };
+    }
+  }
+
+  // Sales Order methods
+  async getSalesOrders(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'customer', 'status', 'delivery_date', 'grand_total'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Sales Order', 'GET', null, params);
+  }
+
+  async getSalesOrder(name: string) {
+    return this.makeRequest(`Sales Order/${name}`);
+  }
+
+  // Purchase Order methods
+  async getPurchaseOrders(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'supplier', 'status', 'schedule_date', 'grand_total'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Purchase Order', 'GET', null, params);
+  }
+
+  async getPurchaseOrder(name: string) {
+    return this.makeRequest(`Purchase Order/${name}`);
+  }
+
+  // Purchase Receipt methods
+  async getPurchaseReceipts(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'supplier', 'posting_date', 'grand_total', 'docstatus'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Purchase Receipt', 'GET', null, params);
+  }
+
+  async createPurchaseReceipt(data: any) {
+    return this.makeRequest('Purchase Receipt', 'POST', data);
+  }
+
+  // Delivery Note methods
+  async getDeliveryNotes(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'customer', 'posting_date', 'grand_total'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Delivery Note', 'GET', null, params);
+  }
+
+  // Stock Entry methods
+  async getStockEntries(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'stock_entry_type', 'posting_date', 'total_outgoing_value'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Stock Entry', 'GET', null, params);
+  }
+
+  // Material Request methods
+  async getMaterialRequests(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'material_request_type', 'schedule_date', 'status'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Material Request', 'GET', null, params);
+  }
+
+  // Pick List methods
+  async getPickLists(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'purpose', 'creation', 'status'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Pick List', 'GET', null, params);
+  }
+
+  // Packing Slip methods
+  async getPackingSlips(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'delivery_note', 'creation'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Packing Slip', 'GET', null, params);
+  }
+
+  // Quality Inspection methods
+  async getQualityInspections(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'item_code', 'status', 'creation'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Quality Inspection', 'GET', null, params);
+  }
+
+  // Product Bundle methods
+  async getProductBundles(filters?: any[], company?: string) {
+    const params: any = {
+      limit_page_length: 100,
+      fields: JSON.stringify(['name', 'new_item_code', 'description'])
+    };
+    
+    if (filters && filters.length > 0) {
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Product Bundle', 'GET', null, params);
+  }
 }
 
 export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
