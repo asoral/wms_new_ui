@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scan, Plus, Loader2 } from "lucide-react";
+import { Scan, Plus, Loader2, AlertCircle } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useNotification } from "@/hooks/useNotification";
+import { toast } from "sonner";
 import ItemSelector from "./ItemSelector";
 
 interface ItemInfo {
@@ -42,24 +43,29 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
   const [selectedItem, setSelectedItem] = useState<ItemInfo | null>(null);
   const [currentQty, setCurrentQty] = useState<number>(0);
   const [isLoadingQty, setIsLoadingQty] = useState(false);
+  const [qtyError, setQtyError] = useState<string | null>(null);
   const { showError, showSuccess, showLoading, dismiss } = useNotification();
 
   const fetchCurrentQty = async (itemCode: string, batch?: string, serial?: string) => {
     if (!itemCode || !warehouse) return;
     
     setIsLoadingQty(true);
+    setQtyError(null);
+    
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
-        showError('ERPNext API not configured');
+        setQtyError('ERPNext API not configured');
         return;
       }
 
+      console.log('Fetching current qty for:', { itemCode, warehouse, batch, serial });
       const qty = await erpnextAPI.getCurrentStock(itemCode, warehouse, batch, serial);
       setCurrentQty(qty);
+      console.log('Current quantity fetched:', qty);
     } catch (error) {
       console.error('Failed to fetch current quantity:', error);
-      showError('Failed to fetch current stock quantity');
+      setQtyError('Unable to fetch current stock. You can still proceed with the count.');
       setCurrentQty(0);
     } finally {
       setIsLoadingQty(false);
@@ -123,43 +129,57 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
     }
   }, [formData.batch, formData.serial, selectedItem]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedItem) return;
+    if (!selectedItem) {
+      toast.error('Please select an item first');
+      return;
+    }
 
     // Validate required fields
     if (selectedItem.has_batch_no && !formData.batch) {
-      showError('Batch number is required for this item');
+      toast.error('Batch number is required for this item');
       return;
     }
 
     if (selectedItem.has_serial_no && !formData.serial) {
-      showError('Serial number is required for this item');
+      toast.error('Serial number is required for this item');
       return;
     }
 
-    onAddEntry({
-      itemCode: selectedItem.item_code,
-      itemName: selectedItem.item_name,
-      warehouse: warehouse,
-      batch: formData.batch || undefined,
-      serial: formData.serial || undefined,
-      currentQty: currentQty,
-      actualQty: formData.actualQty,
-      uom: selectedItem.stock_uom
-    });
+    if (formData.actualQty < 0) {
+      toast.error('Actual quantity cannot be negative');
+      return;
+    }
 
-    // Reset form
-    setFormData({
-      batch: '',
-      serial: '',
-      actualQty: 0
-    });
-    setSelectedItem(null);
-    setCurrentQty(0);
-    
-    showSuccess('Item added to count successfully');
+    try {
+      await onAddEntry({
+        itemCode: selectedItem.item_code,
+        itemName: selectedItem.item_name,
+        warehouse: warehouse,
+        batch: formData.batch || undefined,
+        serial: formData.serial || undefined,
+        currentQty: currentQty,
+        actualQty: formData.actualQty,
+        uom: selectedItem.stock_uom
+      });
+
+      // Reset form
+      setFormData({
+        batch: '',
+        serial: '',
+        actualQty: 0
+      });
+      setSelectedItem(null);
+      setCurrentQty(0);
+      setQtyError(null);
+      
+      toast.success('Item added to count successfully');
+    } catch (error) {
+      console.error('Error adding item to count:', error);
+      toast.error('Failed to add item to count');
+    }
   };
 
   const shouldShowBatch = selectedItem?.has_batch_no === 1;
@@ -221,13 +241,24 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
               </div>
               <div>
                 <Label>Current Qty</Label>
-                <p className="font-medium">
+                <div className="font-medium">
                   {isLoadingQty ? (
-                    <Loader2 className="w-4 h-4 animate-spin inline" />
+                    <div className="flex items-center">
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Loading...
+                    </div>
+                  ) : qtyError ? (
+                    <div className="flex items-center text-orange-600">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {currentQty} {selectedItem.stock_uom}
+                    </div>
                   ) : (
                     `${currentQty} ${selectedItem.stock_uom}`
                   )}
-                </p>
+                </div>
+                {qtyError && (
+                  <p className="text-xs text-orange-600 mt-1">{qtyError}</p>
+                )}
               </div>
               <div>
                 <Label>UOM</Label>
@@ -270,6 +301,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
             <Input
               id="actualQty"
               type="number"
+              step="any"
               value={formData.actualQty}
               onChange={(e) => setFormData(prev => ({ ...prev, actualQty: Number(e.target.value) }))}
               placeholder="Enter actual quantity..."

@@ -400,36 +400,53 @@ export class ERPNextAPI {
 
   // New method to get current stock quantity for an item in a warehouse
   async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
-    const params: any = {
-      limit_page_length: 1,
-      fields: JSON.stringify(['actual_qty'])
-    };
-    
-    let allFilters: any[] = [
-      ['item_code', '=', itemCode],
-      ['warehouse', '=', warehouse]
-    ];
-    
-    if (batch) {
-      allFilters.push(['batch_no', '=', batch]);
+    try {
+      const params: any = {
+        limit_page_length: 1,
+        fields: JSON.stringify(['actual_qty'])
+      };
+      
+      let allFilters: any[] = [
+        ['item_code', '=', itemCode],
+        ['warehouse', '=', warehouse]
+      ];
+      
+      if (batch) {
+        allFilters.push(['batch_no', '=', batch]);
+      }
+      
+      if (serial) {
+        allFilters.push(['serial_no', '=', serial]);
+      }
+      
+      if (allFilters.length > 0) {
+        params.filters = allFilters;
+      }
+      
+      console.log('Fetching current stock with filters:', allFilters);
+      const result = await this.makeRequest('Bin', 'GET', null, params);
+      
+      if (result.data && result.data.length > 0) {
+        const qty = parseFloat(result.data[0].actual_qty) || 0;
+        console.log('Current stock quantity found:', qty);
+        return qty;
+      }
+      
+      console.log('No stock found, returning 0');
+      return 0;
+    } catch (error) {
+      console.error('Error fetching current stock:', error);
+      // Return 0 instead of throwing error to allow the process to continue
+      return 0;
     }
-    
-    if (serial) {
-      allFilters.push(['serial_no', '=', serial]);
-    }
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    const result = await this.makeRequest('Bin', 'GET', null, params);
-    return result.data && result.data.length > 0 ? parseFloat(result.data[0].actual_qty) || 0 : 0;
   }
 
-  // Updated method to create Stock Reconciliation with proper format
+  // Updated method to create Stock Reconciliation using the correct API endpoint
   async createStockReconciliation(data: any) {
+    const baseUrl = this.cleanUrl(this.config.url);
+    const url = `${baseUrl}/api/resource/Stock Reconciliation`;
+    
     const stockRecData = {
-      doctype: "Stock Reconciliation",
       purpose: data.purpose || "Stock Reconciliation",
       set_warehouse: data.set_warehouse || "",
       company: data.company || "",
@@ -439,13 +456,66 @@ export class ERPNextAPI {
     };
 
     console.log('Creating Stock Reconciliation with data:', stockRecData);
-    return this.makeRequest('Stock Reconciliation', 'POST', stockRecData);
+    
+    const options: RequestInit = {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      mode: 'cors',
+      body: JSON.stringify(stockRecData)
+    };
+
+    try {
+      const response = await fetch(url, options);
+      
+      console.log('Stock Reconciliation creation response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Stock Reconciliation creation error:', errorText);
+        throw new Error(`Failed to create Stock Reconciliation: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Stock Reconciliation created successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Stock Reconciliation creation failed:', error);
+      throw error;
+    }
   }
 
   // Updated method to update existing Stock Reconciliation
   async updateStockReconciliation(name: string, data: any) {
+    const baseUrl = this.cleanUrl(this.config.url);
+    const url = `${baseUrl}/api/resource/Stock Reconciliation/${name}`;
+    
     console.log('Updating Stock Reconciliation:', name, 'with data:', data);
-    return this.makeRequest(`Stock Reconciliation/${name}`, 'PUT', data);
+    
+    const options: RequestInit = {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      mode: 'cors',
+      body: JSON.stringify(data)
+    };
+
+    try {
+      const response = await fetch(url, options);
+      
+      console.log('Stock Reconciliation update response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Stock Reconciliation update error:', errorText);
+        throw new Error(`Failed to update Stock Reconciliation: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Stock Reconciliation updated successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Stock Reconciliation update failed:', error);
+      throw error;
+    }
   }
 
   // New method to get Stock Reconciliation
