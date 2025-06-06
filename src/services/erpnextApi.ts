@@ -1,4 +1,5 @@
-import { getSupabaseClient } from "@/integrations/supabase";
+
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ItemDetails {
   item_code: string;
@@ -32,7 +33,6 @@ export interface APIConfig {
 
 export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
   try {
-    const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -62,7 +62,6 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
 
 export const getUserDefaultCompany = async (): Promise<string | null> => {
   try {
-    const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
