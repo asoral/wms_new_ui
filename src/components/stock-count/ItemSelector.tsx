@@ -206,7 +206,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0">
+            <PopoverContent className="w-full p-0 bg-white z-50">
               <Command>
                 <CommandInput 
                   placeholder="Search items..." 

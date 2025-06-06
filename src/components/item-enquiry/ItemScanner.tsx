@@ -142,6 +142,29 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
             setCurrentPage(prev => prev + 1);
           }
         }
+      } else {
+        // Try to load from cache if API is not available
+        try {
+          const cachedItems = await offlineStorage.getCachedData('items_list');
+          if (cachedItems) {
+            let filteredItems = cachedItems;
+            if (search.trim()) {
+              filteredItems = cachedItems.filter((item: Item) => 
+                item.item_code.toLowerCase().includes(search.toLowerCase()) ||
+                item.item_name.toLowerCase().includes(search.toLowerCase())
+              );
+            }
+            setItems(filteredItems.slice(0, 20));
+            setHasMore(filteredItems.length > 20);
+            toast({
+              title: "API Not Available",
+              description: "Showing cached items list. Please configure ERPNext settings.",
+              variant: "default"
+            });
+          }
+        } catch (cacheError) {
+          console.error('Cache access failed:', cacheError);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch items:', error);
@@ -327,7 +350,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
+                  <PopoverContent className="w-full p-0 bg-white z-50">
                     <Command>
                       <CommandInput 
                         placeholder="Search items..." 
