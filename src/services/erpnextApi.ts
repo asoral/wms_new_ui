@@ -412,16 +412,27 @@ export class ERPNextAPI {
   async getWarehouses(filters?: any[], company?: string) {
     const params: any = {
       limit_page_length: 100,
-      fields: JSON.stringify(['name', 'warehouse_name', 'company'])
+      fields: JSON.stringify(['name', 'warehouse_name', 'company', 'is_group'])
     };
     
     let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
+    if (filters) {
+      // Handle complex OR filters properly
+      allFilters = filters.map(filter => {
+        if (Array.isArray(filter) && filter.some(f => Array.isArray(f))) {
+          // This is a complex OR filter
+          return filter;
+        }
+        return filter;
+      });
+    }
     if (company) allFilters.push(['company', '=', company]);
     
     if (allFilters.length > 0) {
       params.filters = allFilters;
     }
+    
+    console.log('Warehouse API params:', params);
     
     return this.makeRequest('Warehouse', 'GET', null, params);
   }

@@ -60,12 +60,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
 
   // Fetch warehouses with search and pagination
   const fetchWarehouses = async (search: string = "", isNewSearch: boolean = false) => {
-    // Only search if there's a search term
-    if (!search.trim()) {
-      setWarehouses([]);
-      return;
-    }
-
     setIsLoadingWarehouses(true);
     try {
       const erpnextAPI = await createERPNextAPI();
@@ -85,23 +79,25 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
 
       const pageToFetch = isNewSearch ? 1 : currentPage;
       
-      // Build search filters - fix the filter format
+      // Build search filters - simplified approach
       let filters: any[] = [
         ['disabled', '=', 0] // Only enabled warehouses
       ];
       
       if (search.trim()) {
-        // Fix: Use proper OR filter format
+        // Use a simpler OR filter approach
         filters.push([
-          'warehouse_name', 'like', `%${search}%`
-        ]);
-        filters.push(['or']);
-        filters.push([
-          'name', 'like', `%${search}%`
+          ['warehouse_name', 'like', `%${search}%`],
+          'or',
+          ['name', 'like', `%${search}%`]
         ]);
       }
       
+      console.log('Fetching warehouses with filters:', filters);
+      
       const result = await erpnextAPI.getWarehouses(filters, undefined);
+      
+      console.log('Warehouse API result:', result);
       
       if (result.data) {
         if (isNewSearch) {
@@ -141,7 +137,12 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
 
   // Handle search term changes
   useEffect(() => {
-    searchWarehouses(searchTerm, true);
+    if (searchTerm.trim()) {
+      searchWarehouses(searchTerm, true);
+    } else {
+      // If search is empty, load cached warehouses
+      loadCachedWarehouses();
+    }
   }, [searchTerm, searchWarehouses]);
 
   const handleWarehouseSelect = (warehouse: WarehouseInfo) => {
@@ -195,7 +196,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 />
                 <CommandList>
                   <CommandEmpty>
-                    {isLoadingWarehouses ? "Loading warehouses..." : searchTerm.trim() ? "No warehouses found." : "Type to search warehouses..."}
+                    {isLoadingWarehouses ? "Loading warehouses..." : "No warehouses found."}
                   </CommandEmpty>
                   <CommandGroup>
                     {warehouses.map((warehouse) => (
