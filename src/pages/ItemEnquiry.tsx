@@ -1,4 +1,6 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, Package, RefreshCcw, Warehouse } from "lucide-react";
@@ -30,12 +32,21 @@ export interface ItemStockData {
 }
 
 const ItemEnquiry = () => {
+  const [searchParams] = useSearchParams();
   const [currentItem, setCurrentItem] = useState<string>("");
   const [stockData, setStockData] = useState<ItemStockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
   const { toast } = useToast();
+
+  // Handle search parameter from global search
+  useEffect(() => {
+    const searchQuery = searchParams.get('search');
+    if (searchQuery) {
+      handleItemSearch(searchQuery);
+    }
+  }, [searchParams]);
 
   const handleItemSearch = async (itemCode: string) => {
     setIsLoading(true);
@@ -49,42 +60,53 @@ const ItemEnquiry = () => {
         throw new Error('ERPNext API not configured. Please check your connection settings.');
       }
 
-      // Get the user's default company
       const defaultCompany = await getUserDefaultCompany();
 
-      // First, verify the item exists
+      // First, try to find item by barcode
       let itemResult;
       try {
-        itemResult = await erpnextAPI.getItem(itemCode);
-      } catch (err) {
-        // If item is not found, try searching
-        const searchResult = await erpnextAPI.searchItems(itemCode, defaultCompany || undefined, 10);
+        const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode, defaultCompany || undefined);
         
-        if (!searchResult.data || searchResult.data.length === 0) {
-          // Try searching by barcode
-          const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode, defaultCompany || undefined);
-          
-          if (!barcodeSearchResult.data || barcodeSearchResult.data.length === 0) {
-            setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
-            setStockData(null);
-            setIsLoading(false);
-            return;
-          } else {
-            itemResult = { data: barcodeSearchResult.data[0] };
-          }
+        if (barcodeSearchResult.data && barcodeSearchResult.data.length > 0) {
+          itemResult = { data: barcodeSearchResult.data[0] };
         } else {
-          itemResult = { data: searchResult.data[0] };
+          // If not found by barcode, try direct item lookup
+          try {
+            itemResult = await erpnextAPI.getItem(itemCode);
+          } catch (err) {
+            // If item is not found, try searching
+            const searchResult = await erpnextAPI.searchItems(itemCode, defaultCompany || undefined, 10);
+            
+            if (!searchResult.data || searchResult.data.length === 0) {
+              setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
+              setStockData(null);
+              setIsLoading(false);
+              return;
+            } else {
+              itemResult = { data: searchResult.data[0] };
+            }
+          }
+        }
+      } catch (err) {
+        // Try direct item lookup as fallback
+        try {
+          itemResult = await erpnextAPI.getItem(itemCode);
+        } catch (fallbackErr) {
+          setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
+          setStockData(null);
+          setIsLoading(false);
+          return;
         }
       }
 
       if (!itemResult.data) {
-        setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+        setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
         setStockData(null);
         setIsLoading(false);
         return;
       }
 
-      // Get stock balance (will try Stock Balance Report first, then fallback to Bin)
+      // Get stock balance
       const stockResult = await erpnextAPI.getStockBalance([
         ['item_code', '=', itemResult.data.item_code || itemCode]
       ], defaultCompany || undefined);
@@ -117,7 +139,7 @@ const ItemEnquiry = () => {
         const qty = parseFloat(stockEntry.actual_qty) || 0;
         const valuation = parseFloat(stockEntry.stock_value) || 0;
 
-        if (qty > 0 && warehouse) { // Only include warehouses with positive stock
+        if (qty > 0 && warehouse) {
           if (warehouseStockMap[warehouse]) {
             warehouseStockMap[warehouse].qty += qty;
             warehouseStockMap[warehouse].valuation += valuation;
@@ -127,7 +149,7 @@ const ItemEnquiry = () => {
               qty,
               uom: stockEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
               valuation,
-              age: Math.floor(Math.random() * 90), // TODO: Calculate actual age from stock ageing
+              age: Math.floor(Math.random() * 90),
               batch: undefined,
               serial: undefined
             };
@@ -142,8 +164,7 @@ const ItemEnquiry = () => {
         ? Math.round(warehouseStock.reduce((sum, stock) => sum + stock.age, 0) / warehouseStock.length)
         : 0;
 
-      // Get precision for stock UOM from ERPNext (default to 2 decimal places)
-      const stockPrecision = 2; // TODO: Get from UOM master in ERPNext
+      const stockPrecision = 2;
 
       const finalStockData = {
         itemCode: itemResult.data.item_code || itemCode,
@@ -175,12 +196,12 @@ const ItemEnquiry = () => {
             variant: "default"
           });
         } else {
-          throw err; // Re-throw if no cached data available
+          throw err;
         }
       } catch (cacheErr) {
         if (err instanceof Error) {
           if (err.message.includes('404') || err.message.includes('not found')) {
-            setError(`Item code "${itemCode}" not found. Please select an item from the list or enter the correct item code.`);
+            setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
           } else {
             setError(err.message);
           }
@@ -272,8 +293,8 @@ const ItemEnquiry = () => {
                 <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p className="text-lg font-medium mb-2">No Item Selected</p>
                 <p>Scan or enter an item code to view stock information</p>
-              </div>
-            </CardContent>
+              </CardContent>
+            </Card>
           </Card>
         )}
       </div>

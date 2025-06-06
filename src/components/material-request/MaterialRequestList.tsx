@@ -1,197 +1,246 @@
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Search, Plus } from "lucide-react";
-import { MaterialRequest, MaterialRequestPurpose, MaterialRequestStatus } from "../../pages/MaterialRequest";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  MoreHorizontal,
+  FileText,
+  Eye,
+  Edit,
+  Trash2
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MaterialRequest, MaterialRequestPurpose, MaterialRequestStatus } from "@/pages/MaterialRequest";
 
 interface MaterialRequestListProps {
   onCreateNew: (purpose: MaterialRequestPurpose) => void;
 }
 
 const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [purposeFilter, setPurposeFilter] = useState<string>("all");
 
-  const purposes: MaterialRequestPurpose[] = ["Purchase", "Material Transfer", "Material Issue", "Manufacture", "Customer Provided"];
-  
-  const statuses: MaterialRequestStatus[] = ["Draft", "Submitted", "Stopped", "Cancelled", "Pending", "Partially Ordered", "Partially Received", "Ordered", "Issued", "Transferred", "Received"];
-
+  // Mock data
   const mockRequests: MaterialRequest[] = [
     {
       id: "1",
-      number: "MR-2024-001",
+      number: "MAT-REQ-2024-001",
       purpose: "Purchase",
       status: "Draft",
       createdDate: "2024-01-15",
       requestedBy: "John Doe",
-      items: [],
-      totalValue: 125000
+      items: [
+        {
+          itemCode: "ITM-001",
+          itemName: "Steel Rod 12mm",
+          qty: 100,
+          uom: "Nos",
+          rate: 50
+        }
+      ],
+      totalValue: 5000
     },
     {
       id: "2",
-      number: "MR-2024-002",
+      number: "MAT-REQ-2024-002",
       purpose: "Material Transfer",
       status: "Submitted",
       createdDate: "2024-01-14",
       requestedBy: "Jane Smith",
-      items: [],
-      totalValue: 89000
+      items: [
+        {
+          itemCode: "ITM-002",
+          itemName: "Cement 50kg",
+          qty: 50,
+          uom: "Bags",
+          fromWarehouse: "Main Store",
+          toWarehouse: "Site Store"
+        }
+      ]
     }
   ];
 
-  const filteredRequests = mockRequests.filter(request =>
-    request.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    request.requestedBy.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const getStatusColor = (status: MaterialRequestStatus) => {
-    const colors: Record<MaterialRequestStatus, string> = {
-      "Draft": "bg-gray-100 text-gray-800",
-      "Submitted": "bg-blue-100 text-blue-800",
-      "Stopped": "bg-red-100 text-red-800",
-      "Cancelled": "bg-red-100 text-red-800",
-      "Pending": "bg-yellow-100 text-yellow-800",
-      "Partially Ordered": "bg-orange-100 text-orange-800",
-      "Partially Received": "bg-purple-100 text-purple-800",
-      "Ordered": "bg-green-100 text-green-800",
-      "Issued": "bg-green-100 text-green-800",
-      "Transferred": "bg-green-100 text-green-800",
-      "Received": "bg-green-100 text-green-800"
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
+    switch (status) {
+      case "Draft": return "bg-gray-100 text-gray-800";
+      case "Submitted": return "bg-blue-100 text-blue-800";
+      case "Pending": return "bg-yellow-100 text-yellow-800";
+      case "Ordered": return "bg-green-100 text-green-800";
+      case "Cancelled": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
   };
 
-  const toggleSection = (section: string) => {
-    setOpenSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  const getRequestsByPurposeAndStatus = (purpose: MaterialRequestPurpose, status: MaterialRequestStatus) => {
-    return filteredRequests.filter(request => request.purpose === purpose && request.status === status);
-  };
+  const filteredRequests = mockRequests.filter(request => {
+    const matchesSearch = request.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         request.requestedBy.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || request.status === statusFilter;
+    const matchesPurpose = purposeFilter === "all" || request.purpose === purposeFilter;
+    
+    return matchesSearch && matchesStatus && matchesPurpose;
+  });
 
   return (
     <div className="space-y-6">
-      {/* Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="w-5 h-5" />
-            <span>Search Material Requests</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Enter material request number or requester name..."
-          />
-        </CardContent>
-      </Card>
-
-      {/* Quick Create Buttons */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Create New Material Request</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            {purposes.map((purpose) => (
-              <Button
-                key={purpose}
-                variant="outline"
-                onClick={() => onCreateNew(purpose)}
-                className="h-20 flex-col"
-              >
-                <Plus className="w-5 h-5 mb-2" />
-                {purpose}
-              </Button>
-            ))}
+      {/* Header with Actions */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="flex-1 space-y-4 sm:space-y-0 sm:flex sm:gap-4">
+          {/* Search */}
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search material requests..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Material Requests by Purpose */}
-      <div className="space-y-4">
-        {purposes.map((purpose) => (
-          <Card key={purpose}>
-            <Collapsible
-              open={openSections[purpose]}
-              onOpenChange={() => toggleSection(purpose)}
-            >
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-gray-50">
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{purpose}</span>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">
-                        {filteredRequests.filter(r => r.purpose === purpose).length}
-                      </Badge>
-                      <ChevronDown className={`w-4 h-4 transition-transform ${openSections[purpose] ? 'rotate-180' : ''}`} />
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-              </CollapsibleTrigger>
-              
-              <CollapsibleContent>
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    {statuses.map((status) => {
-                      const requests = getRequestsByPurposeAndStatus(purpose, status);
-                      if (requests.length === 0) return null;
+          {/* Filters */}
+          <div className="flex gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="Draft">Draft</SelectItem>
+                <SelectItem value="Submitted">Submitted</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Ordered">Ordered</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
 
-                      return (
-                        <Collapsible key={status}>
-                          <CollapsibleTrigger asChild>
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
-                              <div className="flex items-center space-x-2">
-                                <Badge className={getStatusColor(status)}>
-                                  {status}
-                                </Badge>
-                                <span className="text-sm font-medium">{requests.length} requests</span>
-                              </div>
-                              <ChevronDown className="w-4 h-4" />
-                            </div>
-                          </CollapsibleTrigger>
-                          
-                          <CollapsibleContent>
-                            <div className="mt-2 space-y-2">
-                              {requests.map((request) => (
-                                <div key={request.id} className="p-3 bg-white border rounded-lg">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <h4 className="font-medium">{request.number}</h4>
-                                      <p className="text-sm text-gray-600">Requested by: {request.requestedBy}</p>
-                                      <p className="text-sm text-gray-600">Date: {new Date(request.createdDate).toLocaleDateString()}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      {request.totalValue && (
-                                        <p className="font-semibold">₹{request.totalValue.toLocaleString()}</p>
-                                      )}
-                                      <Button size="sm" variant="outline">
-                                        View Details
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Collapsible>
+            <Select value={purposeFilter} onValueChange={setPurposeFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Purpose" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Purpose</SelectItem>
+                <SelectItem value="Purchase">Purchase</SelectItem>
+                <SelectItem value="Material Transfer">Transfer</SelectItem>
+                <SelectItem value="Material Issue">Issue</SelectItem>
+                <SelectItem value="Manufacture">Manufacture</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Create New Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Create New
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onCreateNew("Purchase")}>
+              Purchase Request
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCreateNew("Material Transfer")}>
+              Material Transfer
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCreateNew("Material Issue")}>
+              Material Issue
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCreateNew("Manufacture")}>
+              Manufacturing Request
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Material Requests List */}
+      <div className="grid gap-4">
+        {filteredRequests.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No material requests found</p>
+              <Button className="mt-4" onClick={() => onCreateNew("Purchase")}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create First Request
+              </Button>
+            </CardContent>
           </Card>
-        ))}
+        ) : (
+          filteredRequests.map((request) => (
+            <Card key={request.id}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h3 className="font-medium">{request.number}</h3>
+                      <p className="text-sm text-gray-500">{request.purpose}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge className={getStatusColor(request.status)}>
+                      {request.status}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-600">
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Requested By:</span>
+                    <p className="font-medium">{request.requestedBy}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Date:</span>
+                    <p className="font-medium">{request.createdDate}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Items:</span>
+                    <p className="font-medium">{request.items.length} item(s)</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Total Value:</span>
+                    <p className="font-medium">
+                      {request.totalValue ? `₹${request.totalValue.toLocaleString()}` : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

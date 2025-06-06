@@ -1,4 +1,6 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,10 +30,19 @@ export interface BinData {
 }
 
 const BinEnquiry = () => {
+  const [searchParams] = useSearchParams();
   const [currentBin, setCurrentBin] = useState<string>("");
   const [binData, setBinData] = useState<BinData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle search parameter from global search
+  useEffect(() => {
+    const searchQuery = searchParams.get('search');
+    if (searchQuery) {
+      handleBinSearch(searchQuery);
+    }
+  }, [searchParams]);
 
   const handleBinSearch = async (binCode: string) => {
     setIsLoading(true);
@@ -49,33 +60,50 @@ const BinEnquiry = () => {
       try {
         warehouseResult = await erpnextAPI.getWarehouses([['name', '=', binCode]]);
       } catch (err) {
-        // If not found as warehouse, it might be a bin
         warehouseResult = { data: [] };
       }
 
-      // Get stock balance for this warehouse/bin
-      const stockResult = await erpnextAPI.getStockBalance([['warehouse', '=', binCode]]);
+      // If not found by exact match, try partial match
+      if (!warehouseResult.data || warehouseResult.data.length === 0) {
+        try {
+          warehouseResult = await erpnextAPI.getWarehouses([['name', 'like', `%${binCode}%`]]);
+        } catch (err) {
+          warehouseResult = { data: [] };
+        }
+      }
+
+      let targetWarehouse = binCode;
+      let warehouseInfo = { name: binCode, is_group: 0, warehouse_name: binCode };
+
+      if (warehouseResult.data && warehouseResult.data.length > 0) {
+        warehouseInfo = warehouseResult.data[0];
+        targetWarehouse = warehouseInfo.name;
+      }
+
+      // Get all items in this warehouse (including child warehouses if it's a parent)
+      let stockFilters = [['warehouse', '=', targetWarehouse]];
+      
+      // If it's a parent warehouse, also get stock from child warehouses
+      if (warehouseInfo.is_group === 1) {
+        try {
+          const childWarehouses = await erpnextAPI.getWarehouses([['parent_warehouse', '=', targetWarehouse]]);
+          if (childWarehouses.data && childWarehouses.data.length > 0) {
+            stockFilters = [
+              ['warehouse', 'in', [targetWarehouse, ...childWarehouses.data.map(w => w.name)]]
+            ];
+          }
+        } catch (err) {
+          console.log('Could not fetch child warehouses, proceeding with parent only');
+        }
+      }
+
+      const stockResult = await erpnextAPI.getStockBalance(stockFilters);
 
       if (!stockResult.data || stockResult.data.length === 0) {
-        // Try to find warehouse by partial match
-        const warehouseSearchResult = await erpnextAPI.getWarehouses([['name', 'like', `%${binCode}%`]]);
-
-        if (warehouseSearchResult.data && warehouseSearchResult.data.length > 0) {
-          // Use the first matching warehouse
-          const foundWarehouse = warehouseSearchResult.data[0];
-          const stockForWarehouse = await erpnextAPI.getStockBalance([['warehouse', '=', foundWarehouse.name]]);
-
-          if (stockForWarehouse.data && stockForWarehouse.data.length > 0) {
-            setBinData(await processBinData(foundWarehouse.name, foundWarehouse, stockForWarehouse.data));
-            setIsLoading(false);
-            return;
-          }
-        }
-
         setBinData({
-          binCode,
-          warehouseName: binCode,
-          isParentWarehouse: false,
+          binCode: targetWarehouse,
+          warehouseName: warehouseInfo.warehouse_name || targetWarehouse,
+          isParentWarehouse: warehouseInfo.is_group === 1,
           totalItems: 0,
           totalValuation: 0,
           items: []
@@ -84,11 +112,7 @@ const BinEnquiry = () => {
         return;
       }
 
-      const warehouseInfo = warehouseResult.data && warehouseResult.data.length > 0 
-        ? warehouseResult.data[0] 
-        : { name: binCode, is_group: 0 };
-
-      setBinData(await processBinData(binCode, warehouseInfo, stockResult.data));
+      setBinData(await processBinData(targetWarehouse, warehouseInfo, stockResult.data));
 
     } catch (err) {
       console.error('Error fetching bin data:', err);
@@ -100,12 +124,14 @@ const BinEnquiry = () => {
   };
 
   const processBinData = async (binCode: string, warehouseInfo: any, stockData: any[]): Promise<BinData> => {
-    // Get item details for each stock entry
     const erpnextAPI = await createERPNextAPI();
     const items: BinItem[] = [];
+    const itemsProcessed = new Set<string>();
 
     for (const stock of stockData) {
-      if ((stock.actual_qty || 0) > 0) {
+      if ((stock.actual_qty || 0) > 0 && !itemsProcessed.has(stock.item_code)) {
+        itemsProcessed.add(stock.item_code);
+        
         try {
           const itemResult = await erpnextAPI!.getItem(stock.item_code);
           items.push({
@@ -115,11 +141,10 @@ const BinEnquiry = () => {
             uom: stock.stock_uom || 'Nos',
             batch: stock.batch_no || undefined,
             serial: stock.serial_no || undefined,
-            age: Math.floor(Math.random() * 90), // ERPNext doesn't provide age directly
+            age: Math.floor(Math.random() * 90),
             valuation: stock.stock_value || 0
           });
         } catch (err) {
-          // If item details can't be fetched, use basic info
           items.push({
             itemCode: stock.item_code,
             itemName: stock.item_code,
@@ -247,8 +272,8 @@ const BinEnquiry = () => {
                 <Warehouse className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p className="text-lg font-medium mb-2">No Bin Selected</p>
                 <p>Scan or enter a bin/warehouse code to view items</p>
-              </div>
-            </CardContent>
+              </CardContent>
+            </Card>
           </Card>
         )}
       </div>

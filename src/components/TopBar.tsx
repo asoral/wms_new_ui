@@ -49,7 +49,30 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       console.log("Searching/Scanning for:", searchQuery);
-      // Implement search/scan logic here
+      
+      // Global search logic
+      const query = searchQuery.trim().toLowerCase();
+      
+      // Check if it's a warehouse/bin search
+      if (query.includes('wh-') || query.includes('warehouse') || query.includes('bin-')) {
+        navigate(`/bin-enquiry?search=${encodeURIComponent(searchQuery)}`);
+        return;
+      }
+      
+      // Check if it's a purchase order
+      if (query.includes('po-') || query.includes('pur-ord')) {
+        navigate(`/receive?po=${encodeURIComponent(searchQuery)}`);
+        return;
+      }
+      
+      // Check if it's a sales order
+      if (query.includes('so-') || query.includes('sal-ord')) {
+        navigate(`/deliver?so=${encodeURIComponent(searchQuery)}`);
+        return;
+      }
+      
+      // Default to item enquiry for any other search
+      navigate(`/item-enquiry?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 
@@ -70,40 +93,33 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
   return (
     <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
       <div className="flex items-center justify-between">
-        {/* Left Section - Logo & App Name */}
+        {/* Left Section - Logo & App Name (Mobile Only) */}
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Warehouse className="w-5 h-5 text-white" />
+          {isMobile && (
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Warehouse className="w-5 h-5 text-white" />
+              </div>
+              <span className="font-bold text-xl text-gray-900">WMS</span>
             </div>
-            <span className="font-bold text-xl text-gray-900">WMS</span>
-          </div>
+          )}
         </div>
 
-        {/* Center Section - Search/Scan (Desktop) */}
-        {!isMobile && (
-          <div className="flex-1 max-w-lg mx-8">
-            <form onSubmit={handleSearch} className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input 
-                placeholder="Search or scan items, orders..." 
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </form>
-          </div>
-        )}
+        {/* Center Section - Search/Scan */}
+        <div className="flex-1 max-w-lg mx-8">
+          <form onSubmit={handleSearch} className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input 
+              placeholder="Search or scan items, orders, warehouses..." 
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </form>
+        </div>
 
         {/* Right Section - Actions */}
         <div className="flex items-center space-x-2">
-          {/* Search/Scan (Mobile) */}
-          {isMobile && (
-            <Button variant="ghost" size="icon" onClick={() => setSearchQuery("")}>
-              <Search className="w-5 h-5" />
-            </Button>
-          )}
-
           {/* Reports (Desktop only) */}
           {!isMobile && (
             <Button variant="ghost" size="icon" onClick={() => navigate("/reports")}>
@@ -204,22 +220,6 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
           </DropdownMenu>
         </div>
       </div>
-
-      {/* Mobile Search Bar */}
-      {isMobile && searchQuery && (
-        <div className="mt-3">
-          <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input 
-              placeholder="Search or scan items, orders..." 
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              autoFocus
-            />
-          </form>
-        </div>
-      )}
     </div>
   );
 };

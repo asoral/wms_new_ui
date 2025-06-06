@@ -1,13 +1,13 @@
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Scan, Plus, FileText } from "lucide-react";
-import { MaterialRequestPurpose, MaterialRequestItem } from "../../pages/MaterialRequest";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
+import { MaterialRequestPurpose, MaterialRequestItem } from "@/pages/MaterialRequest";
 
 interface MaterialRequestFormProps {
   purpose: MaterialRequestPurpose;
@@ -15,243 +15,254 @@ interface MaterialRequestFormProps {
 }
 
 const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
-  const [items, setItems] = useState<MaterialRequestItem[]>([]);
-  const [formData, setFormData] = useState({
-    itemCode: "",
-    qty: "",
-    warehouse: "",
-    fromWarehouse: "",
-    toWarehouse: ""
-  });
+  const [items, setItems] = useState<MaterialRequestItem[]>([
+    {
+      itemCode: "",
+      itemName: "",
+      qty: 0,
+      uom: "Nos"
+    }
+  ]);
 
-  const mockItem = {
-    itemCode: "ITM-001",
-    itemName: "Laptop Dell Inspiron",
-    uom: "Nos",
-    rate: 25000
+  const addItem = () => {
+    setItems([
+      ...items,
+      {
+        itemCode: "",
+        itemName: "",
+        qty: 0,
+        uom: "Nos"
+      }
+    ]);
   };
 
-  const warehouses = ["Main Store", "Raw Material Store", "Finished Goods", "Work In Progress"];
-
-  const handleScan = (field: string) => {
-    if (field === "item") {
-      setFormData(prev => ({ ...prev, itemCode: mockItem.itemCode }));
-    } else if (field === "warehouse") {
-      setFormData(prev => ({ ...prev, warehouse: warehouses[0] }));
+  const removeItem = (index: number) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index));
     }
   };
 
-  const handleAddItem = (e: React.FormEvent) => {
+  const updateItem = (index: number, field: keyof MaterialRequestItem, value: any) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    setItems(updatedItems);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.itemCode || !formData.qty) return;
-
-    const newItem: MaterialRequestItem = {
-      itemCode: formData.itemCode,
-      itemName: mockItem.itemName,
-      qty: parseInt(formData.qty),
-      uom: mockItem.uom,
-      warehouse: formData.warehouse || undefined,
-      fromWarehouse: formData.fromWarehouse || undefined,
-      toWarehouse: formData.toWarehouse || undefined,
-      rate: mockItem.rate
-    };
-
-    setItems([...items, newItem]);
-    
-    // Reset form
-    setFormData({
-      itemCode: "",
-      qty: "",
-      warehouse: "",
-      fromWarehouse: "",
-      toWarehouse: ""
-    });
-  };
-
-  const handleSubmit = () => {
     console.log("Submitting material request:", { purpose, items });
-    // Here you would call the API to create the material request
+    // Implement submission logic here
+    alert("Material request created successfully!");
+    onBack();
   };
-
-  const isTransferType = purpose === "Material Transfer";
 
   return (
     <div className="space-y-6">
-      {/* Purpose Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Material Request - {purpose}
-            <Badge>{purpose}</Badge>
-          </CardTitle>
-        </CardHeader>
-      </Card>
+      {/* Header */}
+      <div className="flex items-center space-x-3">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <h2 className="text-xl font-semibold">Create {purpose} Request</h2>
+      </div>
 
-      {/* Add Items Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Plus className="w-5 h-5" />
-            <span>Add Items</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAddItem} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Request Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="itemCode">Item Code</Label>
-                <div className="flex space-x-2">
-                  <Input
-                    id="itemCode"
-                    value={formData.itemCode}
-                    onChange={(e) => setFormData(prev => ({ ...prev, itemCode: e.target.value }))}
-                    placeholder="Scan or enter item code"
-                  />
-                  <Button type="button" variant="outline" onClick={() => handleScan("item")}>
-                    <Scan className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="qty">Quantity</Label>
+                <Label htmlFor="requestType">Request Type</Label>
                 <Input
-                  id="qty"
-                  type="number"
-                  value={formData.qty}
-                  onChange={(e) => setFormData(prev => ({ ...prev, qty: e.target.value }))}
-                  placeholder="Enter quantity"
-                  min="1"
+                  id="requestType"
+                  value={purpose}
+                  disabled
+                  className="bg-gray-50"
                 />
               </div>
-
-              {isTransferType ? (
-                <>
-                  <div>
-                    <Label htmlFor="fromWarehouse">From Warehouse</Label>
-                    <Select value={formData.fromWarehouse} onValueChange={(value) => setFormData(prev => ({ ...prev, fromWarehouse: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source warehouse" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map((warehouse) => (
-                          <SelectItem key={warehouse} value={warehouse}>
-                            {warehouse}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="toWarehouse">To Warehouse</Label>
-                    <Select value={formData.toWarehouse} onValueChange={(value) => setFormData(prev => ({ ...prev, toWarehouse: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select target warehouse" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map((warehouse) => (
-                          <SelectItem key={warehouse} value={warehouse}>
-                            {warehouse}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <Label htmlFor="warehouse">Warehouse</Label>
-                  <div className="flex space-x-2">
-                    <Select value={formData.warehouse} onValueChange={(value) => setFormData(prev => ({ ...prev, warehouse: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select warehouse" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map((warehouse) => (
-                          <SelectItem key={warehouse} value={warehouse}>
-                            {warehouse}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" variant="outline" onClick={() => handleScan("warehouse")}>
-                      <Scan className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <div>
+                <Label htmlFor="priority">Priority</Label>
+                <Select defaultValue="medium">
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {formData.itemCode && (
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium mb-2">Item Details:</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                  <div>
-                    <span className="text-gray-600">Name:</span>
-                    <div className="font-medium">{mockItem.itemName}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">UOM:</span>
-                    <div className="font-medium">{mockItem.uom}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Rate:</span>
-                    <div className="font-medium">₹{mockItem.rate.toLocaleString()}</div>
-                  </div>
+            {purpose === "Material Transfer" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="fromWarehouse">From Warehouse</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select source warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="main-store">Main Store</SelectItem>
+                      <SelectItem value="site-store">Site Store</SelectItem>
+                      <SelectItem value="raw-materials">Raw Materials</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="toWarehouse">To Warehouse</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select target warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="main-store">Main Store</SelectItem>
+                      <SelectItem value="site-store">Site Store</SelectItem>
+                      <SelectItem value="finished-goods">Finished Goods</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}
 
-            <Button type="submit" className="w-full">
-              Add Item
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Items List */}
-      {items.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Added Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {items.map((item, index) => (
-                <div key={index} className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">{item.itemCode} - {item.itemName}</h4>
-                      <p className="text-sm text-gray-600">
-                        Qty: {item.qty} {item.uom}
-                        {isTransferType ? 
-                          ` | From: ${item.fromWarehouse} → To: ${item.toWarehouse}` :
-                          ` | Warehouse: ${item.warehouse}`
-                        }
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">₹{((item.rate || 0) * item.qty).toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-between items-center mt-6">
-              <Button variant="outline" onClick={onBack}>
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit} size="lg">
-                <FileText className="w-4 h-4 mr-2" />
-                Submit Material Request
-              </Button>
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Enter request description..."
+                rows={3}
+              />
             </div>
           </CardContent>
         </Card>
-      )}
+
+        {/* Items */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Items</CardTitle>
+            <Button type="button" onClick={addItem} size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {items.map((item, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <h4 className="font-medium">Item {index + 1}</h4>
+                    {items.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeItem(index)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>Item Code</Label>
+                      <Input
+                        value={item.itemCode}
+                        onChange={(e) => updateItem(index, 'itemCode', e.target.value)}
+                        placeholder="Enter item code"
+                      />
+                    </div>
+                    <div>
+                      <Label>Item Name</Label>
+                      <Input
+                        value={item.itemName}
+                        onChange={(e) => updateItem(index, 'itemName', e.target.value)}
+                        placeholder="Enter item name"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label>Quantity</Label>
+                        <Input
+                          type="number"
+                          value={item.qty}
+                          onChange={(e) => updateItem(index, 'qty', parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <Label>UOM</Label>
+                        <Select
+                          value={item.uom}
+                          onValueChange={(value) => updateItem(index, 'uom', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Nos">Nos</SelectItem>
+                            <SelectItem value="Kg">Kg</SelectItem>
+                            <SelectItem value="Liters">Liters</SelectItem>
+                            <SelectItem value="Meters">Meters</SelectItem>
+                            <SelectItem value="Bags">Bags</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {purpose === "Purchase" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Rate</Label>
+                        <Input
+                          type="number"
+                          value={item.rate || ""}
+                          onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <Label>Warehouse</Label>
+                        <Select
+                          value={item.warehouse || ""}
+                          onValueChange={(value) => updateItem(index, 'warehouse', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select warehouse" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="main-store">Main Store</SelectItem>
+                            <SelectItem value="raw-materials">Raw Materials</SelectItem>
+                            <SelectItem value="finished-goods">Finished Goods</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Submit Actions */}
+        <div className="flex justify-end space-x-4">
+          <Button type="button" variant="outline" onClick={onBack}>
+            Cancel
+          </Button>
+          <Button type="submit">
+            <Save className="w-4 h-4 mr-2" />
+            Create Request
+          </Button>
+        </div>
+      </form>
     </div>
   );
 };
