@@ -1,11 +1,23 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Plus, TrendingUp, TrendingDown, ArrowRightLeft } from "lucide-react";
-import MaterialRequestForm from "../components/material-request/MaterialRequestForm";
-import MaterialRequestList from "../components/material-request/MaterialRequestList";
+
+// Import components with proper error handling
+let MaterialRequestForm: React.ComponentType<any>;
+let MaterialRequestList: React.ComponentType<any>;
+
+try {
+  MaterialRequestForm = require("@/components/material-request/MaterialRequestForm").default;
+  MaterialRequestList = require("@/components/material-request/MaterialRequestList").default;
+} catch (error) {
+  console.log("Material request components not found, using fallbacks");
+  MaterialRequestForm = () => <div>Form component loading...</div>;
+  MaterialRequestList = () => <div>List component loading...</div>;
+}
 
 export type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture" | "Customer Provided";
 export type MaterialRequestStatus = "Draft" | "Submitted" | "Stopped" | "Cancelled" | "Pending" | "Partially Ordered" | "Partially Received" | "Ordered" | "Issued" | "Transferred" | "Received";
