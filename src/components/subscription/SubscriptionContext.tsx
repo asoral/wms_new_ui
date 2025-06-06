@@ -35,9 +35,18 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
   const [paymentExempt, setPaymentExempt] = useState(false);
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastCheckTime, setLastCheckTime] = useState(0);
 
   const refreshSubscription = async () => {
     if (!user || !session) {
+      setLoading(false);
+      return;
+    }
+
+    // Only check subscription every 5 minutes to prevent excessive API calls
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    if (now - lastCheckTime < fiveMinutes && hasAccess) {
       setLoading(false);
       return;
     }
@@ -54,9 +63,11 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       setSubscribed(data.subscribed || false);
       setPaymentExempt(data.paymentExempt || false);
       setSubscriptionEnd(data.subscriptionEnd || null);
+      setLastCheckTime(now);
     } catch (error) {
       console.error('Error checking subscription:', error);
-      setHasAccess(false);
+      // Don't set hasAccess to false on error - maintain current state
+      // setHasAccess(false);
     } finally {
       setLoading(false);
     }
@@ -84,12 +95,41 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
     }
   };
 
-  // Only check subscription on login/user change
+  // Only check subscription on initial load and user login/logout
   useEffect(() => {
-    refreshSubscription();
-  }, [user, session]);
+    let mounted = true;
+    
+    const checkSubscription = async () => {
+      if (mounted) {
+        await refreshSubscription();
+      }
+    };
 
-  // Remove the auto-refresh interval that was causing page refreshes
+    // Only run if we haven't checked recently or don't have access
+    if (!hasAccess || lastCheckTime === 0) {
+      checkSubscription();
+    } else {
+      setLoading(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]); // Only trigger on user ID change, not on every session change
+
+  // Handle window focus to refresh subscription only if it's been a while
+  useEffect(() => {
+    const handleFocus = () => {
+      const now = Date.now();
+      const thirtyMinutes = 30 * 60 * 1000;
+      if (now - lastCheckTime > thirtyMinutes) {
+        refreshSubscription();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [lastCheckTime]);
 
   const value = {
     hasAccess,
