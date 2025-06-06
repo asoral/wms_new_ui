@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +20,7 @@ export interface StockCountEntry {
   warehouse: string;
   batch?: string;
   serial?: string;
+  serialBatchBundle?: string;
   currentQty: number;
   actualQty: number;
   uom: string;
@@ -112,7 +112,7 @@ const StockCount = () => {
 
       const company = await getUserDefaultCompany();
       
-      // Prepare Stock Reconciliation data
+      // Prepare Stock Reconciliation data with bundle support
       const stockReconciliationData = {
         purpose: session?.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
         set_warehouse: firstEntry.warehouse,
@@ -124,8 +124,9 @@ const StockCount = () => {
           warehouse: firstEntry.warehouse,
           qty: firstEntry.actualQty,
           valuation_rate: 0,
-          batch_no: firstEntry.batch || '',
-          serial_no: firstEntry.serial || ''
+          batch_no: firstEntry.serialBatchBundle ? '' : (firstEntry.batch || ''),
+          serial_no: firstEntry.serialBatchBundle ? '' : (firstEntry.serial || ''),
+          serial_and_batch_bundle: firstEntry.serialBatchBundle || ''
         }]
       };
 
@@ -168,15 +169,16 @@ const StockCount = () => {
 
       const company = await getUserDefaultCompany();
       
-      // Prepare updated data
+      // Prepare updated data with bundle support
       const updatedData = {
         items: allEntries.map(entry => ({
           item_code: entry.itemCode,
           warehouse: entry.warehouse,
           qty: entry.actualQty,
           valuation_rate: 0,
-          batch_no: entry.batch || '',
-          serial_no: entry.serial || ''
+          batch_no: entry.serialBatchBundle ? '' : (entry.batch || ''),
+          serial_no: entry.serialBatchBundle ? '' : (entry.serial || ''),
+          serial_and_batch_bundle: entry.serialBatchBundle || ''
         }))
       };
 

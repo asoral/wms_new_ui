@@ -9,6 +9,7 @@ import { createERPNextAPI } from "@/services/erpnextApi";
 import { useNotification } from "@/hooks/useNotification";
 import { toast } from "sonner";
 import ItemSelector from "./ItemSelector";
+import SerialBatchBundleSelector from './SerialBatchBundleSelector';
 
 interface ItemInfo {
   item_code: string;
@@ -26,6 +27,7 @@ interface StockCountFormProps {
     warehouse: string;
     batch?: string;
     serial?: string;
+    serialBatchBundle?: string;
     currentQty: number;
     actualQty: number;
     uom: string;
@@ -36,7 +38,8 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
   const [formData, setFormData] = useState({
     batch: '',
     serial: '',
-    actualQty: 0
+    actualQty: 0,
+    serialBatchBundle: ''
   });
   const [isScanning, setIsScanning] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ItemInfo | null>(null);
@@ -44,6 +47,8 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
   const [isLoadingQty, setIsLoadingQty] = useState(false);
   const [qtyError, setQtyError] = useState<string | null>(null);
   const { showError, showSuccess, showLoading, dismiss } = useNotification();
+
+  const [useBundle, setUseBundle] = useState(false);
 
   const fetchCurrentQty = async (itemCode: string, batch?: string, serial?: string) => {
     if (!itemCode || !warehouse) return;
@@ -130,13 +135,15 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
     }
   };
 
-  // Only refetch quantity when batch/serial changes, not when item changes
-  useEffect(() => {
-    if (selectedItem && (formData.batch || formData.serial)) {
-      console.log('Batch/Serial changed, refetching quantity');
-      fetchCurrentQty(selectedItem.item_code, formData.batch, formData.serial);
-    }
-  }, [formData.batch, formData.serial]);
+  const handleBundleCreated = (bundleName: string, totalQty: number) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      serialBatchBundle: bundleName,
+      actualQty: totalQty 
+    }));
+    setUseBundle(true);
+    toast.success(`Bundle created with ${totalQty} items`);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,15 +153,22 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       return;
     }
 
-    // Validate required fields
-    if (selectedItem.has_batch_no && !formData.batch) {
-      toast.error('Batch number is required for this item');
+    // Validate based on whether using bundle or traditional method
+    if (useBundle && !formData.serialBatchBundle) {
+      toast.error('Please create a Serial and Batch Bundle first');
       return;
     }
 
-    if (selectedItem.has_serial_no && !formData.serial) {
-      toast.error('Serial number is required for this item');
-      return;
+    if (!useBundle) {
+      if (selectedItem.has_batch_no && !formData.batch) {
+        toast.error('Batch number is required for this item');
+        return;
+      }
+
+      if (selectedItem.has_serial_no && !formData.serial) {
+        toast.error('Serial number is required for this item');
+        return;
+      }
     }
 
     if (formData.actualQty < 0) {
@@ -167,8 +181,9 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         itemCode: selectedItem.item_code,
         itemName: selectedItem.item_name,
         warehouse: warehouse,
-        batch: formData.batch || undefined,
-        serial: formData.serial || undefined,
+        batch: useBundle ? undefined : (formData.batch || undefined),
+        serial: useBundle ? undefined : (formData.serial || undefined),
+        serialBatchBundle: useBundle ? formData.serialBatchBundle : undefined,
         currentQty: currentQty,
         actualQty: formData.actualQty,
         uom: selectedItem.stock_uom
@@ -178,8 +193,9 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         itemCode: selectedItem.item_code,
         itemName: selectedItem.item_name,
         warehouse: warehouse,
-        batch: formData.batch || undefined,
-        serial: formData.serial || undefined,
+        batch: useBundle ? undefined : (formData.batch || undefined),
+        serial: useBundle ? undefined : (formData.serial || undefined),
+        serialBatchBundle: useBundle ? formData.serialBatchBundle : undefined,
         currentQty: currentQty,
         actualQty: formData.actualQty,
         uom: selectedItem.stock_uom
@@ -189,8 +205,10 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       setFormData({
         batch: '',
         serial: '',
-        actualQty: 0
+        actualQty: 0,
+        serialBatchBundle: ''
       });
+      setUseBundle(false);
       setCurrentQty(0);
       setQtyError(null);
       
@@ -203,6 +221,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
 
   const shouldShowBatch = selectedItem?.has_batch_no === 1;
   const shouldShowSerial = selectedItem?.has_serial_no === 1;
+  const shouldShowBundleOption = shouldShowBatch || shouldShowSerial;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -288,8 +307,48 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         </Card>
       )}
 
-      {/* Additional Fields */}
-      {selectedItem && (
+      {/* Serial/Batch Input Method Selection */}
+      {selectedItem && shouldShowBundleOption && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <Label>Serial/Batch Input Method</Label>
+              <div className="flex space-x-4">
+                <Button
+                  type="button"
+                  variant={!useBundle ? "default" : "outline"}
+                  onClick={() => setUseBundle(false)}
+                >
+                  Traditional Entry
+                </Button>
+                <Button
+                  type="button"
+                  variant={useBundle ? "default" : "outline"}
+                  onClick={() => setUseBundle(true)}
+                >
+                  Bundle Entry
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Bundle Selector */}
+      {selectedItem && useBundle && shouldShowBundleOption && (
+        <SerialBatchBundleSelector
+          itemCode={selectedItem.item_code}
+          warehouse={warehouse}
+          hasSerial={shouldShowSerial}
+          hasBatch={shouldShowBatch}
+          transactionType="Inward"
+          onBundleCreated={handleBundleCreated}
+          initialQuantity={formData.actualQty || 1}
+        />
+      )}
+
+      {/* Traditional Additional Fields */}
+      {selectedItem && !useBundle && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {shouldShowBatch && (
             <div>
@@ -325,6 +384,22 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
               onChange={(e) => setFormData(prev => ({ ...prev, actualQty: Number(e.target.value) }))}
               placeholder="Enter actual quantity..."
               required
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Bundle Quantity Input */}
+      {selectedItem && useBundle && formData.serialBatchBundle && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="bundleQty">Bundle Total Quantity</Label>
+            <Input
+              id="bundleQty"
+              type="number"
+              value={formData.actualQty}
+              disabled
+              className="bg-gray-100"
             />
           </div>
         </div>

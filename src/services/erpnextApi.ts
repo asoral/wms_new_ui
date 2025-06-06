@@ -1,869 +1,244 @@
-import { supabase } from '@/integrations/supabase/client';
+import { getSupabaseClient } from "@/integrations/supabase";
 
-export interface ERPNextConfig {
-  url: string;
+export interface ItemDetails {
+  item_code: string;
+  item_name: string;
+  description: string;
+  stock_uom: string;
+  default_warehouse: string;
+}
+
+export interface ItemStock {
+  item_code: string;
+  actual_qty: number;
+  warehouse: string;
+}
+
+export interface StockReconciliationItem {
+  item_code: string;
+  warehouse: string;
+  qty: number;
+  valuation_rate: number;
+  batch_no?: string;
+  serial_no?: string;
+  serial_and_batch_bundle?: string;
+}
+
+export interface APIConfig {
   apiKey: string;
   apiSecret: string;
+  baseURL: string;
 }
 
-export class ERPNextAPI {
-  private config: ERPNextConfig;
-
-  constructor(config: ERPNextConfig) {
-    this.config = config;
-  }
-
-  private getAuthHeaders() {
-    const credentials = btoa(`${this.config.apiKey}:${this.config.apiSecret}`);
-    return {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-  }
-
-  private cleanUrl(url: string): string {
-    return url.replace(/\/+$/, '');
-  }
-
-  public async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: any, params?: any) {
-    const baseUrl = this.cleanUrl(this.config.url);
-    let url = `${baseUrl}/api/resource/${endpoint}`;
-    
-    console.log('Making ERPNext API request to:', url);
-    console.log('Method:', method);
-    
-    if (params && method === 'GET') {
-      const searchParams = new URLSearchParams();
-      Object.keys(params).forEach(key => {
-        if (params[key] !== undefined && params[key] !== null) {
-          if (key === 'filters' && Array.isArray(params[key])) {
-            // Handle filters as JSON string
-            searchParams.append('filters', JSON.stringify(params[key]));
-          } else {
-            searchParams.append(key, typeof params[key] === 'object' ? JSON.stringify(params[key]) : params[key]);
-          }
-        }
-      });
-      if (searchParams.toString()) {
-        url += `?${searchParams.toString()}`;
-      }
-    }
-    
-    const options: RequestInit = {
-      method,
-      headers: this.getAuthHeaders(),
-      mode: 'cors',
-    };
-
-    if (data && method !== 'GET') {
-      options.body = JSON.stringify(data);
-    }
-
-    console.log('Full request URL:', url);
-    console.log('Request headers:', options.headers);
-
-    try {
-      const response = await fetch(url, options);
-      
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('ERPNext API Error Response:', errorText);
-        
-        if (response.status === 403) {
-          throw new Error('Authentication failed. Please check your API Key and Secret.');
-        }
-        if (response.status === 404) {
-          throw new Error('ERPNext endpoint not found. Please check your server URL.');
-        }
-        if (response.status === 417) {
-          throw new Error('ERPNext server configuration issue. Please check if the API endpoint supports the requested filters.');
-        }
-        
-        throw new Error(`ERPNext API Error: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('ERPNext API Response:', result);
-      return result;
-    } catch (error) {
-      console.error('ERPNext API Request Failed:', error);
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('Cannot connect to ERPNext server. Please check your URL and ensure CORS is enabled.');
-      }
-      throw error;
-    }
-  }
-
-  // New method to call Stock Balance Report with warehouse filter
-  public async getStockBalanceReport(filters?: any[], company?: string) {
-    const baseUrl = this.cleanUrl(this.config.url);
-    let url = `${baseUrl}/api/method/erpnext.stock.report.stock_balance.stock_balance.execute`;
-    
-    console.log('Making Stock Balance Report API request to:', url);
-    
-    // Extract warehouse filter if provided
-    let warehouseFilter = '';
-    if (filters && filters.length > 0) {
-      const warehouseFilterItem = filters.find(f => f[0] === 'warehouse');
-      if (warehouseFilterItem) {
-        warehouseFilter = warehouseFilterItem[2];
-      }
-    }
-    
-    const reportFilters = {
-      company: company || '',
-      from_date: '2020-01-01', // Use a far back date to get all stock
-      to_date: new Date().toISOString().split('T')[0], // Today's date
-      item_code: '',
-      warehouse: warehouseFilter, // Apply warehouse filter directly
-      item_group: '',
-      include_uom: 1,
-      show_variant_attributes: 0,
-      show_stock_ageing_data: 1
-    };
-
-    const options: RequestInit = {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      mode: 'cors',
-      body: JSON.stringify({ filters: reportFilters })
-    };
-
-    console.log('Stock Balance Report request body:', reportFilters);
-
-    try {
-      const response = await fetch(url, options);
-      
-      console.log('Stock Balance Report response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Stock Balance Report API Error Response:', errorText);
-        
-        // If Stock Balance Report is not available, throw a specific error to fallback to Bin
-        if (response.status === 403) {
-          throw new Error('STOCK_REPORT_NOT_AVAILABLE');
-        }
-        
-        throw new Error(`Stock Balance Report API Error: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Stock Balance Report API Response:', result);
-      
-      // Transform the report data to match our expected format
-      if (result.message && result.message.result && Array.isArray(result.message.result)) {
-        const stockData = result.message.result.map((row: any[]) => {
-          // The columns are typically: [item_code, item_name, item_group, stock_uom, opening_qty, in_qty, out_qty, bal_qty, val_rate, bal_val, warehouse]
-          return {
-            item_code: row[0],
-            item_name: row[1], 
-            item_group: row[2],
-            stock_uom: row[3],
-            opening_qty: parseFloat(row[4]) || 0,
-            in_qty: parseFloat(row[5]) || 0,
-            out_qty: parseFloat(row[6]) || 0,
-            bal_qty: parseFloat(row[7]) || 0,
-            val_rate: parseFloat(row[8]) || 0,
-            bal_val: parseFloat(row[9]) || 0,
-            warehouse: row[10] || warehouseFilter,
-            actual_qty: parseFloat(row[7]) || 0, // bal_qty is the actual quantity
-            stock_value: parseFloat(row[9]) || 0, // bal_val is the stock value
-          };
-        }).filter((item: any) => item.actual_qty > 0); // Only items with positive stock
-
-        return { data: stockData };
-      }
-      
-      return { data: [] };
-    } catch (error) {
-      console.error('Stock Balance Report Request Failed:', error);
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('Cannot connect to ERPNext server. Please check your URL and ensure CORS is enabled.');
-      }
-      throw error;
-    }
-  }
-
-  async getStockAgingReport(filters?: any[], company?: string) {
-    const baseUrl = this.cleanUrl(this.config.url);
-    let url = `${baseUrl}/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute`;
-    
-    console.log('Making Stock Aging Report API request to:', url);
-    
-    const reportFilters = {
-      company: company || '',
-      from_date: '2020-01-01', // Use a far back date to get all stock
-      to_date: new Date().toISOString().split('T')[0], // Today's date
-      warehouse: '',
-      item_code: '',
-      item_group: '',
-      brand: '',
-      show_warehouse_wise_stock: 0,
-      filter_total_zero_qty: 1
-    };
-
-    const options: RequestInit = {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      mode: 'cors',
-      body: JSON.stringify({ filters: reportFilters })
-    };
-
-    console.log('Stock Aging Report request body:', reportFilters);
-
-    try {
-      const response = await fetch(url, options);
-      
-      console.log('Stock Aging Report response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Stock Aging Report API Error Response:', errorText);
-        throw new Error(`Stock Aging Report API Error: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Stock Aging Report API Response:', result);
-      
-      // Transform the report data to calculate aging percentages
-      if (result.message && result.message.result && Array.isArray(result.message.result)) {
-        const agingData = {
-          range_0_30: 0,
-          range_31_60: 0,
-          range_61_90: 0,
-          range_90_plus: 0,
-          totalValue: 0
-        };
-
-        result.message.result.forEach((row: any[]) => {
-          // Stock Aging Report columns: [item_code, item_name, item_group, description, qty, uom, age_0_30, age_31_60, age_61_90, age_90_above, total_value]
-          const age_0_30 = parseFloat(row[6]) || 0;
-          const age_31_60 = parseFloat(row[7]) || 0;
-          const age_61_90 = parseFloat(row[8]) || 0;
-          const age_90_plus = parseFloat(row[9]) || 0;
-          const totalValue = parseFloat(row[10]) || 0;
-
-          agingData.range_0_30 += age_0_30;
-          agingData.range_31_60 += age_31_60;
-          agingData.range_61_90 += age_61_90;
-          agingData.range_90_plus += age_90_plus;
-          agingData.totalValue += totalValue;
-        });
-
-        // Calculate percentages
-        const total = agingData.range_0_30 + agingData.range_31_60 + agingData.range_61_90 + agingData.range_90_plus;
-        
-        return {
-          data: {
-            range_0_30_percent: total > 0 ? Math.round((agingData.range_0_30 / total) * 100) : 0,
-            range_31_60_percent: total > 0 ? Math.round((agingData.range_31_60 / total) * 100) : 0,
-            range_61_90_percent: total > 0 ? Math.round((agingData.range_61_90 / total) * 100) : 0,
-            range_90_plus_percent: total > 0 ? Math.round((agingData.range_90_plus / total) * 100) : 0,
-            totalValue: agingData.totalValue
-          }
-        };
-      }
-      
-      return { data: null };
-    } catch (error) {
-      console.error('Stock Aging Report Request Failed:', error);
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('Cannot connect to ERPNext server. Please check your URL and ensure CORS is enabled.');
-      }
-      throw error;
-    }
-  }
-
-  async testConnection() {
-    try {
-      console.log('Testing ERPNext connection...');
-      
-      const result = await this.makeRequest('Company', 'GET', null, { 
-        limit_page_length: 1,
-        fields: JSON.stringify(['name'])
-      });
-      
-      if (result && result.data) {
-        console.log('Connection test successful:', result);
-        return { success: true, data: result };
-      } else {
-        return { success: false, error: 'No data returned from ERPNext' };
-      }
-    } catch (error) {
-      console.error('Connection test failed:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Connection failed' };
-    }
-  }
-
-  async getCompanies() {
-    return this.makeRequest('Company', 'GET', null, { 
-      fields: JSON.stringify(['name', 'company_name']),
-      limit_page_length: 100
-    });
-  }
-
-  async getItems(filters?: any[], fields?: string[], company?: string) {
-    const params: any = {
-      limit_page_length: 20,
-      fields: JSON.stringify(fields || ['name', 'item_name', 'item_code', 'stock_uom'])
-    };
-    
-    let allFilters: any[] = [
-      ['disabled', '=', 0] // Only enabled items
-    ];
-    if (filters) allFilters = [...allFilters, ...filters];
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Item', 'GET', null, params);
-  }
-
-  async getItemsPaginated(filters?: any[], fields?: string[], company?: string, limit: number = 20, page: number = 1) {
-    const params: any = {
-      limit_page_length: limit,
-      limit_start: (page - 1) * limit,
-      fields: JSON.stringify(fields || ['name', 'item_name', 'item_code', 'stock_uom'])
-    };
-    
-    let allFilters: any[] = [
-      ['disabled', '=', 0] // Only enabled items
-    ];
-    if (filters) allFilters = [...allFilters, ...filters];
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Item', 'GET', null, params);
-  }
-
-  async searchItems(searchTerm: string, company?: string, limit: number = 20) {
-    const params: any = {
-      limit_page_length: limit,
-      fields: JSON.stringify(['name', 'item_name', 'item_code', 'stock_uom'])
-    };
-    
-    let allFilters: any[] = [
-      ['disabled', '=', 0] // Only enabled items
-    ];
-    
-    if (searchTerm.trim()) {
-      // Search in both item_code and item_name
-      allFilters.push([
-        ['item_code', 'like', `%${searchTerm}%`],
-        'or',
-        ['item_name', 'like', `%${searchTerm}%`]
-      ]);
-    }
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Item', 'GET', null, params);
-  }
-
-  async getItem(itemCode: string) {
-    return this.makeRequest(`Item/${itemCode}`);
-  }
-
-  async getItemByBarcode(barcode: string, company?: string) {
-    const params: any = {
-      limit_page_length: 10,
-      fields: JSON.stringify(['item_code', 'item_name', 'stock_uom'])
-    };
-    
-    let allFilters: any[] = [
-      ['disabled', '=', 0], // Only enabled items
-      ['barcodes.barcode', '=', barcode]
-    ];
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Item', 'GET', null, params);
-  }
-
-  // New method to get item details including batch/serial tracking
-  async getItemDetails(itemCode: string) {
-    return this.makeRequest(`Item/${itemCode}`, 'GET', null, {
-      fields: JSON.stringify(['item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'])
-    });
-  }
-
-  // New method to get current stock quantity for an item in a warehouse
-  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
-    try {
-      const params: any = {
-        limit_page_length: 1,
-        fields: JSON.stringify(['actual_qty'])
-      };
-      
-      let allFilters: any[] = [
-        ['item_code', '=', itemCode],
-        ['warehouse', '=', warehouse]
-      ];
-      
-      if (batch) {
-        allFilters.push(['batch_no', '=', batch]);
-      }
-      
-      if (serial) {
-        allFilters.push(['serial_no', '=', serial]);
-      }
-      
-      if (allFilters.length > 0) {
-        params.filters = allFilters;
-      }
-      
-      console.log('Fetching current stock with filters:', allFilters);
-      const result = await this.makeRequest('Bin', 'GET', null, params);
-      
-      if (result.data && result.data.length > 0) {
-        const qty = parseFloat(result.data[0].actual_qty) || 0;
-        console.log('Current stock quantity found:', qty);
-        return qty;
-      }
-      
-      console.log('No stock found, returning 0');
-      return 0;
-    } catch (error) {
-      console.error('Error fetching current stock:', error);
-      // Return 0 instead of throwing error to allow the process to continue
-      return 0;
-    }
-  }
-
-  // Updated method to create Stock Reconciliation using the correct API endpoint
-  async createStockReconciliation(data: any) {
-    const baseUrl = this.cleanUrl(this.config.url);
-    const url = `${baseUrl}/api/resource/Stock Reconciliation`;
-    
-    const stockRecData = {
-      doctype: "Stock Reconciliation",
-      purpose: data.purpose || "Stock Reconciliation",
-      set_warehouse: data.set_warehouse || "",
-      company: data.company || "",
-      posting_date: data.posting_date || new Date().toISOString().split('T')[0],
-      posting_time: data.posting_time || new Date().toTimeString().split(' ')[0].slice(0, 8),
-      items: (data.items || []).map((item: any) => ({
-        item_code: item.item_code,
-        warehouse: item.warehouse,
-        qty: parseFloat(item.qty) || 0,
-        valuation_rate: parseFloat(item.valuation_rate) || 0,
-        batch_no: item.batch_no || "",
-        serial_no: item.serial_no || ""
-      }))
-    };
-
-    console.log('Creating Stock Reconciliation with data:', stockRecData);
-    
-    const options: RequestInit = {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      mode: 'cors',
-      body: JSON.stringify(stockRecData)
-    };
-
-    try {
-      const response = await fetch(url, options);
-      
-      console.log('Stock Reconciliation creation response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Stock Reconciliation creation error:', errorText);
-        
-        let errorMessage = `Failed to create Stock Reconciliation: ${response.status} ${response.statusText}`;
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.message) {
-            errorMessage = errorData.message;
-          } else if (errorData.exception) {
-            errorMessage = errorData.exception;
-          }
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      console.log('Stock Reconciliation created successfully:', result);
-      return result;
-    } catch (error) {
-      console.error('Stock Reconciliation creation failed:', error);
-      throw error;
-    }
-  }
-
-  // Updated method to update existing Stock Reconciliation
-  async updateStockReconciliation(name: string, data: any) {
-    const baseUrl = this.cleanUrl(this.config.url);
-    const url = `${baseUrl}/api/resource/Stock Reconciliation/${name}`;
-    
-    const updateData = {
-      items: (data.items || []).map((item: any) => ({
-        item_code: item.item_code,
-        warehouse: item.warehouse,
-        qty: parseFloat(item.qty) || 0,
-        valuation_rate: parseFloat(item.valuation_rate) || 0,
-        batch_no: item.batch_no || "",
-        serial_no: item.serial_no || ""
-      }))
-    };
-    
-    console.log('Updating Stock Reconciliation:', name, 'with data:', updateData);
-    
-    const options: RequestInit = {
-      method: 'PUT',
-      headers: this.getAuthHeaders(),
-      mode: 'cors',
-      body: JSON.stringify(updateData)
-    };
-
-    try {
-      const response = await fetch(url, options);
-      
-      console.log('Stock Reconciliation update response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Stock Reconciliation update error:', errorText);
-        
-        let errorMessage = `Failed to update Stock Reconciliation: ${response.status} ${response.statusText}`;
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.message) {
-            errorMessage = errorData.message;
-          } else if (errorData.exception) {
-            errorMessage = errorData.exception;
-          }
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      console.log('Stock Reconciliation updated successfully:', result);
-      return result;
-    } catch (error) {
-      console.error('Stock Reconciliation update failed:', error);
-      throw error;
-    }
-  }
-
-  // New method to get Stock Reconciliation
-  async getStockReconciliation(name: string) {
-    return this.makeRequest(`Stock Reconciliation/${name}`);
-  }
-
-  async getAllEnabledItems(company?: string) {
-    const params: any = {
-      limit_page_length: 0, // 0 means no limit, fetch all records
-      fields: JSON.stringify(['item_code', 'item_name', 'stock_uom', 'disabled'])
-    };
-    
-    let allFilters: any[] = [
-      ['disabled', '=', 0] // Only fetch enabled items
-    ];
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Item', 'GET', null, params);
-  }
-
-  // Warehouse methods
-  async getWarehouses(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'warehouse_name', 'is_group', 'parent_warehouse'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Warehouse', 'GET', null, params);
-  }
-
-  // Stock Balance methods
-  async getStockBalance(filters?: any[], company?: string) {
-    try {
-      // Try to use Stock Balance Report first
-      return await this.getStockBalanceReport(filters, company);
-    } catch (error) {
-      console.log('Stock Balance Report failed, falling back to Bin data:', error);
-      
-      // Fallback to Bin doctype
-      const params: any = {
-        limit_page_length: 0,
-        fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'stock_uom', 'stock_value'])
-      };
-      
-      let allFilters: any[] = [
-        ['actual_qty', '>', 0] // Only positive stock
-      ];
-      
-      if (filters && filters.length > 0) {
-        allFilters = [...allFilters, ...filters];
-      }
-      
-      if (allFilters.length > 0) {
-        params.filters = allFilters;
-      }
-      
-      const result = await this.makeRequest('Bin', 'GET', null, params);
-      
-      // Transform Bin data to match Stock Balance Report format
-      if (result.data) {
-        const transformedData = result.data.map((bin: any) => ({
-          item_code: bin.item_code,
-          item_name: bin.item_code, // Bin doesn't have item_name, will be filled later
-          warehouse: bin.warehouse,
-          actual_qty: bin.actual_qty,
-          stock_uom: bin.stock_uom,
-          stock_value: bin.stock_value || 0
-        }));
-        
-        return { data: transformedData };
-      }
-      
-      return { data: [] };
-    }
-  }
-
-  // Sales Order methods
-  async getSalesOrders(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'customer', 'status', 'delivery_date', 'grand_total'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Sales Order', 'GET', null, params);
-  }
-
-  async getSalesOrder(name: string) {
-    return this.makeRequest(`Sales Order/${name}`);
-  }
-
-  // Purchase Order methods
-  async getPurchaseOrders(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'supplier', 'status', 'schedule_date', 'grand_total'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Purchase Order', 'GET', null, params);
-  }
-
-  async getPurchaseOrder(name: string) {
-    return this.makeRequest(`Purchase Order/${name}`);
-  }
-
-  // Purchase Receipt methods
-  async getPurchaseReceipts(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'supplier', 'posting_date', 'grand_total', 'docstatus'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Purchase Receipt', 'GET', null, params);
-  }
-
-  async createPurchaseReceipt(data: any) {
-    return this.makeRequest('Purchase Receipt', 'POST', data);
-  }
-
-  // Delivery Note methods
-  async getDeliveryNotes(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'customer', 'posting_date', 'grand_total'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Delivery Note', 'GET', null, params);
-  }
-
-  // Stock Entry methods
-  async getStockEntries(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'stock_entry_type', 'posting_date', 'total_outgoing_value'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Stock Entry', 'GET', null, params);
-  }
-
-  // Material Request methods
-  async getMaterialRequests(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'material_request_type', 'schedule_date', 'status'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Material Request', 'GET', null, params);
-  }
-
-  // Pick List methods
-  async getPickLists(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'purpose', 'creation', 'status'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Pick List', 'GET', null, params);
-  }
-
-  // Packing Slip methods
-  async getPackingSlips(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'delivery_note', 'creation'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Packing Slip', 'GET', null, params);
-  }
-
-  // Quality Inspection methods
-  async getQualityInspections(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'item_code', 'status', 'creation'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Quality Inspection', 'GET', null, params);
-  }
-
-  // Product Bundle methods
-  async getProductBundles(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'new_item_code', 'description'])
-    };
-    
-    if (filters && filters.length > 0) {
-      params.filters = filters;
-    }
-    
-    return this.makeRequest('Product Bundle', 'GET', null, params);
-  }
-}
-
-export async function getUserERPNextConfig(): Promise<ERPNextConfig | null> {
+export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
   try {
+    const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('erpnext_url, erpnext_api_key, erpnext_api_secret')
-      .eq('id', user.id)
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    if (!profile?.erpnext_url || !profile?.erpnext_api_key || !profile?.erpnext_api_secret) {
+      console.error('No user found');
       return null;
     }
 
-    return {
-      url: profile.erpnext_url,
-      apiKey: profile.erpnext_api_key,
-      apiSecret: profile.erpnext_api_secret
-    };
+    const erpnext_url = user.user_metadata.erpnext_url;
+    const erpnext_api_key = user.user_metadata.erpnext_api_key;
+    const erpnext_api_secret = user.user_metadata.erpnext_api_secret;
+
+    if (!erpnext_url || !erpnext_api_key || !erpnext_api_secret) {
+      console.error('ERPNext configuration missing for user');
+      return null;
+    }
+
+    return new ERPNextAPI({
+      apiKey: erpnext_api_key,
+      apiSecret: erpnext_api_secret,
+      baseURL: erpnext_url,
+    });
   } catch (error) {
-    console.error('Failed to get ERPNext config:', error);
+    console.error('Error creating ERPNextAPI:', error);
     return null;
   }
-}
+};
 
-export async function getUserDefaultCompany(): Promise<string | null> {
+export const getUserDefaultCompany = async (): Promise<string | null> => {
   try {
+    const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
-      throw new Error('User not authenticated');
+      console.error('No user found');
+      return null;
     }
 
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('erpnext_default_company')
-      .eq('id', user.id)
-      .single();
+    const erpnextAPI = new ERPNextAPI({
+      apiKey: user.user_metadata.erpnext_api_key,
+      apiSecret: user.user_metadata.erpnext_api_secret,
+      baseURL: user.user_metadata.erpnext_url,
+    });
 
-    if (error) {
-      throw error;
+    const response = await fetch(`${erpnextAPI.baseURL}/api/method/frappe.client.get_value?doctype=User&fieldname=company&filters=%7B%22name%22:%22${user.email}%22%7D`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch user default company:', response.statusText);
+      return null;
     }
 
-    return profile?.erpnext_default_company || null;
+    const result = await response.json();
+    if (result.message && result.message.company) {
+      return result.message.company;
+    } else {
+      console.warn('User default company not found in response');
+      return null;
+    }
   } catch (error) {
-    console.error('Failed to get default company:', error);
+    console.error('Error fetching user default company:', error);
     return null;
   }
-}
+};
 
-export async function createERPNextAPI(): Promise<ERPNextAPI | null> {
-  const config = await getUserERPNextConfig();
-  
-  if (!config) {
-    return null;
+class ERPNextAPI {
+  private apiKey: string;
+  private apiSecret: string;
+  public baseURL: string;
+
+  constructor(config: APIConfig) {
+    this.apiKey = config.apiKey;
+    this.apiSecret = config.apiSecret;
+    this.baseURL = config.baseURL;
   }
 
-  return new ERPNextAPI(config);
+  async getItemDetails(itemCode: string): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/resource/Item/${itemCode}?fields=["item_code","item_name", "description", "stock_uom", "default_warehouse", "has_batch_no", "has_serial_no"]`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get item details: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getItemStock(itemCode: string): Promise<ItemStock[]> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?filters=[["item_code", "=", "${itemCode}"] ]&fields=["item_code", "actual_qty", "warehouse"]`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get item stock: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getBinDetails(bin: string): Promise<any> {
+     const response = await fetch(`${this.baseURL}/api/resource/Bin?fields=["*"]&filters=[["name", "=", "${bin}"] ]`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get bin details: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<number> {
+    let filters = `[["item_code", "=", "${itemCode}"], ["warehouse", "=", "${warehouse}"]`;
+    if (batch) {
+      filters += `, ["batch_no", "=", "${batch}"]`;
+    }
+    if (serial) {
+      filters += `, ["serial_no", "=", "${serial}"]`;
+    }
+    filters += `]`;
+
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?filters=${filters}&fields=["actual_qty"]&order_by=posting_date desc, posting_time desc&limit=1`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get current stock: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (data.data && data.data.length > 0) {
+      return data.data[0].actual_qty;
+    } else {
+      return 0;
+    }
+  }
+
+  async createStockReconciliation(data: {
+    purpose: string;
+    set_warehouse: string;
+    company: string;
+    posting_date: string;
+    posting_time: string;
+    items: StockReconciliationItem[];
+  }) {
+    console.log('Creating Stock Reconciliation with data:', data);
+    
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to create Stock Reconciliation:', errorText);
+      throw new Error(`Failed to create Stock Reconciliation: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  }
+
+  async updateStockReconciliation(name: string, data: { items: StockReconciliationItem[] }) {
+    console.log('Updating Stock Reconciliation:', name, 'with data:', data);
+    
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation/${name}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to update Stock Reconciliation:', errorText);
+      throw new Error(`Failed to update Stock Reconciliation: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  }
 }
