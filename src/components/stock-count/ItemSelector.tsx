@@ -29,11 +29,23 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
+  console.log('ItemSelector mounted, props:', { isLoading });
+  console.log('ItemSelector state:', { 
+    itemsCount: items.length, 
+    isLoadingItems, 
+    open, 
+    selectedItem: selectedItem?.item_code,
+    searchTerm,
+    hasMore,
+    currentPage
+  });
+
   // Debounced search function
   const searchItems = useMemo(() => {
     let timeoutId: NodeJS.Timeout;
     
     return (searchValue: string, isNewSearch: boolean = false) => {
+      console.log('Debounced search called:', { searchValue, isNewSearch });
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         fetchItems(searchValue, isNewSearch);
@@ -43,13 +55,16 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
 
   // Load initial items and cached items
   useEffect(() => {
+    console.log('ItemSelector useEffect: loading initial items');
     loadInitialItems();
   }, []);
 
   const loadInitialItems = async () => {
+    console.log('loadInitialItems called');
     try {
       // First try to load from cache
       const cached = await offlineStorage.getCachedData('items_page_1');
+      console.log('Cached items found:', cached ? cached.length : 0);
       if (cached && Array.isArray(cached) && cached.length > 0) {
         console.log('Loading items from cache:', cached.length);
         setItems(cached);
@@ -78,11 +93,14 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
 
   // Fetch items with search and pagination
   const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
+    console.log('fetchItems called:', { search, isNewSearch, currentPage });
     setIsLoadingItems(true);
-    console.log('Fetching items:', { search, isNewSearch, currentPage });
     
     try {
+      console.log('Creating ERPNext API...');
       const erpnextAPI = await createERPNextAPI();
+      console.log('ERPNext API created:', erpnextAPI ? 'SUCCESS' : 'FAILED');
+      
       if (!erpnextAPI) {
         console.error('ERPNext API not configured');
         // Try to load from cache if API is not available
@@ -92,6 +110,8 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
 
       const pageToFetch = isNewSearch ? 1 : currentPage;
       const limit = 20;
+      
+      console.log('Fetching items with params:', { search, pageToFetch, limit });
       
       let result;
       if (search.trim()) {
@@ -106,6 +126,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       
       if (result.data) {
         const itemData = result.data;
+        console.log('Setting items data:', itemData.length);
         
         if (isNewSearch) {
           setItems(itemData);
@@ -151,6 +172,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
 
   // Handle search term changes
   useEffect(() => {
+    console.log('Search term changed:', searchTerm);
     if (searchTerm.trim()) {
       console.log('Searching for items:', searchTerm);
       searchItems(searchTerm, true);
@@ -174,14 +196,17 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     }
   };
 
-  console.log('Current items:', items.length);
+  console.log('Rendering ItemSelector with items:', items.length);
 
   return (
     <div className="space-y-4">
       <div>
         <Label htmlFor="item-search">Item Code / Name</Label>
         <div className="flex-1 min-w-0 mt-1">
-          <Popover open={open} onOpenChange={setOpen}>
+          <Popover open={open} onOpenChange={(newOpen) => {
+            console.log('Popover open state changing:', newOpen);
+            setOpen(newOpen);
+          }}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -189,6 +214,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 aria-expanded={open}
                 className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
                 disabled={isLoadingItems || isLoading}
+                onClick={() => console.log('PopoverTrigger clicked')}
               >
                 <div className="flex-1 min-w-0 text-left">
                   <div className="truncate">
@@ -206,12 +232,15 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white z-50">
+            <PopoverContent className="w-full p-0 bg-white z-50" align="start">
               <Command>
                 <CommandInput 
                   placeholder="Search items..." 
                   value={searchTerm}
-                  onValueChange={setSearchTerm}
+                  onValueChange={(value) => {
+                    console.log('CommandInput value changed:', value);
+                    setSearchTerm(value);
+                  }}
                 />
                 <CommandList>
                   <CommandEmpty>
@@ -222,7 +251,10 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                       <CommandItem
                         key={item.item_code}
                         value={`${item.item_code} ${item.item_name}`}
-                        onSelect={() => handleItemSelect(item)}
+                        onSelect={() => {
+                          console.log('CommandItem selected:', item);
+                          handleItemSelect(item);
+                        }}
                       >
                         <Check
                           className={cn(
