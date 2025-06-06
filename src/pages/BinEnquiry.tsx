@@ -4,10 +4,12 @@ import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Warehouse, RefreshCcw } from "lucide-react";
+import { Search, Warehouse, RefreshCcw, X, Loader2 } from "lucide-react";
 import BinScanner from "../components/bin-enquiry/BinScanner";
 import BinItemsTable from "../components/bin-enquiry/BinItemsTable";
 import { createERPNextAPI } from "@/services/erpnextApi";
+import { offlineStorage } from "@/services/offlineStorage";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export interface BinItem {
   itemCode: string;
@@ -35,6 +37,7 @@ const BinEnquiry = () => {
   const [binData, setBinData] = useState<BinData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   // Handle search parameter from global search
   useEffect(() => {
@@ -45,14 +48,39 @@ const BinEnquiry = () => {
   }, [searchParams]);
 
   const handleBinSearch = async (binCode: string) => {
+    // Cancel any ongoing request
+    if (abortController) {
+      abortController.abort();
+    }
+
+    const newAbortController = new AbortController();
+    setAbortController(newAbortController);
     setIsLoading(true);
     setCurrentBin(binCode);
     setError(null);
     
     try {
+      // First try to get from cache
+      const cacheKey = `warehouse_stock_${binCode}`;
+      const cachedData = await offlineStorage.getCachedData(cacheKey);
+      
+      if (cachedData) {
+        console.log('Loading warehouse stock from cache:', binCode);
+        setBinData(cachedData);
+        setIsLoading(false);
+        setAbortController(null);
+        return;
+      }
+
+      console.log('Fetching warehouse stock from API:', binCode);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         throw new Error('ERPNext API not configured. Please check your connection settings.');
+      }
+
+      // Check if request was aborted
+      if (newAbortController.signal.aborted) {
+        return;
       }
 
       // First check if it's a warehouse
@@ -60,7 +88,13 @@ const BinEnquiry = () => {
       try {
         warehouseResult = await erpnextAPI.getWarehouses([['name', '=', binCode]]);
       } catch (err) {
+        if (newAbortController.signal.aborted) return;
         warehouseResult = { data: [] };
+      }
+
+      // Check if request was aborted
+      if (newAbortController.signal.aborted) {
+        return;
       }
 
       // If not found by exact match, try partial match
@@ -68,6 +102,7 @@ const BinEnquiry = () => {
         try {
           warehouseResult = await erpnextAPI.getWarehouses([['name', 'like', `%${binCode}%`]]);
         } catch (err) {
+          if (newAbortController.signal.aborted) return;
           warehouseResult = { data: [] };
         }
       }
@@ -78,6 +113,11 @@ const BinEnquiry = () => {
       if (warehouseResult.data && warehouseResult.data.length > 0) {
         warehouseInfo = warehouseResult.data[0];
         targetWarehouse = warehouseInfo.name;
+      }
+
+      // Check if request was aborted
+      if (newAbortController.signal.aborted) {
+        return;
       }
 
       // Get all items in this warehouse (including child warehouses if it's a parent)
@@ -93,42 +133,100 @@ const BinEnquiry = () => {
             ];
           }
         } catch (err) {
+          if (newAbortController.signal.aborted) return;
           console.log('Could not fetch child warehouses, proceeding with parent only');
         }
       }
 
+      // Check if request was aborted
+      if (newAbortController.signal.aborted) {
+        return;
+      }
+
       const stockResult = await erpnextAPI.getStockBalance(stockFilters);
 
+      // Check if request was aborted
+      if (newAbortController.signal.aborted) {
+        return;
+      }
+
+      let processedData;
       if (!stockResult.data || stockResult.data.length === 0) {
-        setBinData({
+        processedData = {
           binCode: targetWarehouse,
           warehouseName: warehouseInfo.warehouse_name || targetWarehouse,
           isParentWarehouse: warehouseInfo.is_group === 1,
           totalItems: 0,
           totalValuation: 0,
           items: []
-        });
-        setIsLoading(false);
+        };
+      } else {
+        processedData = await processBinData(targetWarehouse, warehouseInfo, stockResult.data, newAbortController);
+      }
+
+      // Check if request was aborted after processing
+      if (newAbortController.signal.aborted) {
         return;
       }
 
-      setBinData(await processBinData(targetWarehouse, warehouseInfo, stockResult.data));
+      setBinData(processedData);
+      
+      // Cache the result for 10 minutes
+      await offlineStorage.cacheData(cacheKey, processedData, 600000);
 
     } catch (err) {
+      if (newAbortController.signal.aborted) {
+        console.log('Request was cancelled');
+        return;
+      }
+      
       console.error('Error fetching bin data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch bin data');
       setBinData(null);
+
+      // Try to load from cache on error
+      try {
+        const cacheKey = `warehouse_stock_${binCode}`;
+        const cachedData = await offlineStorage.getCachedData(cacheKey);
+        if (cachedData) {
+          console.log('Loading warehouse stock from cache after error:', binCode);
+          setBinData(cachedData);
+          setError(null);
+        }
+      } catch (cacheError) {
+        console.error('Failed to load cached warehouse stock:', cacheError);
+      }
     } finally {
       setIsLoading(false);
+      setAbortController(null);
     }
   };
 
-  const processBinData = async (binCode: string, warehouseInfo: any, stockData: any[]): Promise<BinData> => {
+  const handleCancelSearch = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+    setIsLoading(false);
+    setError(null);
+  };
+
+  const processBinData = async (
+    binCode: string, 
+    warehouseInfo: any, 
+    stockData: any[], 
+    abortController: AbortController
+  ): Promise<BinData> => {
     const erpnextAPI = await createERPNextAPI();
     const items: BinItem[] = [];
     const itemsProcessed = new Set<string>();
 
     for (const stock of stockData) {
+      // Check if request was aborted
+      if (abortController.signal.aborted) {
+        throw new Error('Request cancelled');
+      }
+
       if ((stock.actual_qty || 0) > 0 && !itemsProcessed.has(stock.item_code)) {
         itemsProcessed.add(stock.item_code);
         
@@ -145,6 +243,11 @@ const BinEnquiry = () => {
             valuation: stock.stock_value || 0
           });
         } catch (err) {
+          // Check if request was aborted
+          if (abortController.signal.aborted) {
+            throw new Error('Request cancelled');
+          }
+          
           items.push({
             itemCode: stock.item_code,
             itemName: stock.item_code,
@@ -206,6 +309,29 @@ const BinEnquiry = () => {
           </CardContent>
         </Card>
 
+        {/* Loading State with Cancel */}
+        {isLoading && (
+          <Card className="mb-6 border-blue-200 bg-blue-50">
+            <CardContent className="py-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <LoadingSpinner size={20} className="text-blue-600" />
+                  <div>
+                    <div className="font-medium text-blue-800">Loading warehouse data...</div>
+                    <div className="text-sm text-blue-600">
+                      Fetching stock information for {currentBin}
+                    </div>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleCancelSearch}>
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Error Display */}
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50">
@@ -216,7 +342,7 @@ const BinEnquiry = () => {
         )}
 
         {/* Bin Information */}
-        {binData && (
+        {binData && !isLoading && (
           <div className="space-y-6">
             {/* Summary */}
             <Card>
