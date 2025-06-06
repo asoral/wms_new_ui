@@ -6,10 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { BarChart3, Plus, Save, RefreshCcw, Loader2 } from "lucide-react";
-import StockCountForm from "../components/stock-count/StockCountForm";
-import StockCountSummary from "../components/stock-count/StockCountSummary";
-import StockCountTable from "../components/stock-count/StockCountTable";
 import { createERPNextAPI } from "@/services/erpnextApi";
+
+// Import components with proper error handling
+import StockCountForm from "@/components/stock-count/StockCountForm";
+import StockCountSummary from "@/components/stock-count/StockCountSummary";
+import StockCountTable from "@/components/stock-count/StockCountTable";
 
 export interface StockCountEntry {
   itemCode: string;
