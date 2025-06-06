@@ -120,7 +120,7 @@ const BinEnquiry = () => {
         return;
       }
 
-      // Get all items in this warehouse (including child warehouses if it's a parent)
+      // Build filters for warehouse-specific stock query
       let stockFilters: any[] = [['warehouse', '=', targetWarehouse]];
       
       // If it's a parent warehouse, also get stock from child warehouses
@@ -143,6 +143,7 @@ const BinEnquiry = () => {
         return;
       }
 
+      // Get stock data with warehouse filter applied at database level
       const stockResult = await erpnextAPI.getStockBalance(stockFilters);
 
       // Check if request was aborted

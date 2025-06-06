@@ -97,19 +97,28 @@ export class ERPNextAPI {
     }
   }
 
-  // New method to call Stock Balance Report
+  // New method to call Stock Balance Report with warehouse filter
   public async getStockBalanceReport(filters?: any[], company?: string) {
     const baseUrl = this.cleanUrl(this.config.url);
     let url = `${baseUrl}/api/method/erpnext.stock.report.stock_balance.stock_balance.execute`;
     
     console.log('Making Stock Balance Report API request to:', url);
     
+    // Extract warehouse filter if provided
+    let warehouseFilter = '';
+    if (filters && filters.length > 0) {
+      const warehouseFilterItem = filters.find(f => f[0] === 'warehouse');
+      if (warehouseFilterItem) {
+        warehouseFilter = warehouseFilterItem[2];
+      }
+    }
+    
     const reportFilters = {
       company: company || '',
       from_date: '2020-01-01', // Use a far back date to get all stock
       to_date: new Date().toISOString().split('T')[0], // Today's date
-      item_code: filters && filters.length > 0 ? filters.find(f => f[0] === 'item_code')?.[2] : '',
-      warehouse: '',
+      item_code: '',
+      warehouse: warehouseFilter, // Apply warehouse filter directly
       item_group: '',
       include_uom: 1,
       show_variant_attributes: 0,
@@ -160,7 +169,7 @@ export class ERPNextAPI {
             bal_qty: parseFloat(row[7]) || 0,
             val_rate: parseFloat(row[8]) || 0,
             bal_val: parseFloat(row[9]) || 0,
-            warehouse: row[10] || '',
+            warehouse: row[10] || warehouseFilter,
             actual_qty: parseFloat(row[7]) || 0, // bal_qty is the actual quantity
             stock_value: parseFloat(row[9]) || 0, // bal_val is the stock value
           };
@@ -179,8 +188,7 @@ export class ERPNextAPI {
     }
   }
 
-  // New method to call Stock Aging Report
-  public async getStockAgingReport(filters?: any[], company?: string) {
+  async getStockAgingReport(filters?: any[], company?: string) {
     const baseUrl = this.cleanUrl(this.config.url);
     let url = `${baseUrl}/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute`;
     
@@ -367,7 +375,7 @@ export class ERPNextAPI {
 
   async getStockBalance(filters?: any[], company?: string) {
     try {
-      // First try Stock Balance Report
+      // First try Stock Balance Report with warehouse filter
       return await this.getStockBalanceReport(filters, company);
     } catch (error) {
       console.log('Stock Balance Report failed, falling back to Bin doctype:', error);
