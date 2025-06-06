@@ -42,16 +42,35 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     };
   }, []);
 
-  // Load cached warehouses first
+  // Load initial warehouses and cached warehouses
   useEffect(() => {
-    loadCachedWarehouses();
+    loadInitialWarehouses();
   }, []);
+
+  const loadInitialWarehouses = async () => {
+    try {
+      // First try to load from cache
+      const cached = await offlineStorage.getCachedData('warehouses_page_1');
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        console.log('Loading warehouses from cache:', cached.length);
+        setWarehouses(cached);
+        return;
+      }
+
+      // If no cache, fetch from API
+      console.log('No cached warehouses found, fetching from API...');
+      await fetchWarehouses("", true);
+    } catch (error) {
+      console.error('Failed to load initial warehouses:', error);
+    }
+  };
 
   const loadCachedWarehouses = async () => {
     try {
-      const cached = await offlineStorage.getCachedData('warehouses_all');
+      const cached = await offlineStorage.getCachedData('warehouses_page_1');
       if (cached && Array.isArray(cached)) {
-        setWarehouses(cached.slice(0, 20)); // Show first 20 from cache
+        console.log('Loading cached warehouses:', cached.length);
+        setWarehouses(cached);
       }
     } catch (error) {
       console.error('Failed to load cached warehouses:', error);
@@ -61,60 +80,70 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   // Fetch warehouses with search and pagination
   const fetchWarehouses = async (search: string = "", isNewSearch: boolean = false) => {
     setIsLoadingWarehouses(true);
+    console.log('Fetching warehouses:', { search, isNewSearch, currentPage });
+    
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         console.error('ERPNext API not configured');
         // Try to load from cache if API is not available
-        const cached = await offlineStorage.getCachedData('warehouses_all');
-        if (cached && Array.isArray(cached)) {
-          const filtered = cached.filter((w: WarehouseInfo) => 
-            w.warehouse_name?.toLowerCase().includes(search.toLowerCase()) ||
-            w.name?.toLowerCase().includes(search.toLowerCase())
-          );
-          setWarehouses(filtered.slice(0, 20));
-        }
+        await loadCachedWarehouses();
         return;
       }
 
       const pageToFetch = isNewSearch ? 1 : currentPage;
+      const limit = 20;
       
-      // Build search filters - simplified approach
+      // Build search filters - use the same approach as items
       let filters: any[] = [
         ['disabled', '=', 0] // Only enabled warehouses
       ];
       
       if (search.trim()) {
-        // Use a simpler OR filter approach
-        filters.push([
-          ['warehouse_name', 'like', `%${search}%`],
-          'or',
-          ['name', 'like', `%${search}%`]
-        ]);
+        // Use simple search format that works with ERPNext
+        filters.push(['warehouse_name', 'like', `%${search}%`]);
       }
       
       console.log('Fetching warehouses with filters:', filters);
       
-      const result = await erpnextAPI.getWarehouses(filters, undefined);
+      const params: any = {
+        limit_page_length: limit,
+        limit_start: (pageToFetch - 1) * limit,
+        fields: JSON.stringify(['name', 'warehouse_name', 'company', 'is_group'])
+      };
+      
+      if (filters.length > 0) {
+        params.filters = filters;
+      }
+      
+      const result = await erpnextAPI.makeRequest('Warehouse', 'GET', null, params);
       
       console.log('Warehouse API result:', result);
       
       if (result.data) {
+        const warehouseData = result.data;
+        
         if (isNewSearch) {
-          setWarehouses(result.data);
+          setWarehouses(warehouseData);
           setCurrentPage(1);
           
-          // Cache the search results
-          await offlineStorage.cacheData(`warehouses_search_${search}`, result.data, 300000); // 5 minutes
+          // Cache the results
+          const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_page_1';
+          await offlineStorage.cacheData(cacheKey, warehouseData, 300000); // 5 minutes
         } else {
-          setWarehouses(prev => [...prev, ...result.data]);
+          setWarehouses(prev => [...prev, ...warehouseData]);
         }
         
         // Check if there are more warehouses
-        setHasMore(result.data.length === 20);
+        setHasMore(warehouseData.length === limit);
         
         if (!isNewSearch) {
           setCurrentPage(prev => prev + 1);
+        }
+      } else {
+        console.log('No warehouse data returned');
+        if (isNewSearch) {
+          setWarehouses([]);
         }
       }
     } catch (error) {
@@ -122,9 +151,10 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       
       // Try to load from cache on error
       try {
-        const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_all';
+        const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_page_1';
         const cached = await offlineStorage.getCachedData(cacheKey);
         if (cached && Array.isArray(cached)) {
+          console.log('Loading warehouses from cache after error:', cached.length);
           setWarehouses(cached);
         }
       } catch (cacheError) {
@@ -138,24 +168,29 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   // Handle search term changes
   useEffect(() => {
     if (searchTerm.trim()) {
+      console.log('Searching for warehouses:', searchTerm);
       searchWarehouses(searchTerm, true);
     } else {
-      // If search is empty, load cached warehouses
-      loadCachedWarehouses();
+      console.log('Search term empty, loading initial warehouses');
+      loadInitialWarehouses();
     }
   }, [searchTerm, searchWarehouses]);
 
   const handleWarehouseSelect = (warehouse: WarehouseInfo) => {
+    console.log('Warehouse selected:', warehouse);
     setSelectedWarehouse(warehouse);
     setOpen(false);
     onWarehouseSelected(warehouse.name);
   };
 
   const loadMoreWarehouses = () => {
-    if (hasMore && !isLoadingWarehouses && searchTerm.trim()) {
+    if (hasMore && !isLoadingWarehouses) {
+      console.log('Loading more warehouses...');
       fetchWarehouses(searchTerm, false);
     }
   };
+
+  console.log('Current warehouses:', warehouses.length);
 
   return (
     <div className="space-y-4">
@@ -223,7 +258,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                         </div>
                       </CommandItem>
                     ))}
-                    {hasMore && searchTerm.trim() && (
+                    {hasMore && (
                       <CommandItem onSelect={loadMoreWarehouses}>
                         <div className="flex items-center justify-center w-full py-2">
                           {isLoadingWarehouses ? (
