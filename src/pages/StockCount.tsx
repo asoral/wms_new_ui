@@ -3,15 +3,15 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { BarChart3, Plus, Save, RefreshCcw, Loader2 } from "lucide-react";
+import { BarChart3, Plus, Save, RefreshCcw } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 
 // Import components with proper error handling
 import StockCountForm from "@/components/stock-count/StockCountForm";
 import StockCountSummary from "@/components/stock-count/StockCountSummary";
 import StockCountTable from "@/components/stock-count/StockCountTable";
+import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
 
 export interface StockCountEntry {
   itemCode: string;
@@ -40,39 +40,6 @@ const StockCount = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
   const [selectedPurpose, setSelectedPurpose] = useState<'reconciliation' | 'opening' | null>(null);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [loadingWarehouses, setLoadingWarehouses] = useState(true);
-  const [warehouseError, setWarehouseError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchWarehouses = async () => {
-      try {
-        setLoadingWarehouses(true);
-        setWarehouseError(null);
-
-        const erpnextAPI = await createERPNextAPI();
-        if (!erpnextAPI) {
-          throw new Error('ERPNext API not configured. Please check your connection settings.');
-        }
-
-        const result = await erpnextAPI.getWarehouses();
-        if (result.data) {
-          setWarehouses(result.data);
-        } else {
-          setWarehouses([]);
-        }
-
-      } catch (err) {
-        console.error('Error fetching warehouses:', err);
-        setWarehouseError(err instanceof Error ? err.message : 'Failed to fetch warehouses');
-        setWarehouses([]);
-      } finally {
-        setLoadingWarehouses(false);
-      }
-    };
-
-    fetchWarehouses();
-  }, []);
 
   const startSession = () => {
     if (!selectedWarehouse || !selectedPurpose) return;
@@ -128,6 +95,10 @@ const StockCount = () => {
     setShowForm(false);
   };
 
+  const handleWarehouseSelected = (warehouseCode: string) => {
+    setSelectedWarehouse(warehouseCode);
+  };
+
   const itemsInReview = session ? session.entries.length : 0;
 
   return (
@@ -163,29 +134,12 @@ const StockCount = () => {
               {/* Warehouse Selection */}
               <div>
                 <Label htmlFor="warehouse">Select Warehouse *</Label>
-                {loadingWarehouses ? (
-                  <div className="flex items-center space-x-2 mt-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm text-gray-600">Loading warehouses from ERPNext...</span>
-                  </div>
-                ) : warehouseError ? (
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-red-800 text-sm">{warehouseError}</p>
-                  </div>
-                ) : (
-                  <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a warehouse to count" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {warehouses.map((warehouse) => (
-                        <SelectItem key={warehouse.name} value={warehouse.name}>
-                          {warehouse.warehouse_name || warehouse.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                <div className="mt-2">
+                  <WarehouseSelector 
+                    onWarehouseSelected={handleWarehouseSelected}
+                    isLoading={false}
+                  />
+                </div>
               </div>
 
               {/* Purpose Selection */}
@@ -213,7 +167,7 @@ const StockCount = () => {
 
               <Button 
                 onClick={startSession} 
-                disabled={!selectedWarehouse || !selectedPurpose || loadingWarehouses}
+                disabled={!selectedWarehouse || !selectedPurpose}
                 className="w-full"
                 size="lg"
               >

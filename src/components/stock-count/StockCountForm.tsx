@@ -6,6 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Scan, Plus, Loader2 } from "lucide-react";
+import ItemSelector from "./ItemSelector";
+
+interface ItemInfo {
+  item_code: string;
+  item_name: string;
+  stock_uom: string;
+}
 
 interface StockCountFormProps {
   onAddEntry: (entry: {
@@ -22,65 +29,63 @@ interface StockCountFormProps {
 
 const StockCountForm = ({ onAddEntry }: StockCountFormProps) => {
   const [formData, setFormData] = useState({
-    itemCode: '',
     warehouse: 'Main Store',
     batch: '',
     serial: '',
     scannedQty: 0
   });
   const [isScanning, setIsScanning] = useState(false);
-  const [itemDetails, setItemDetails] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<ItemInfo | null>(null);
 
-  const mockItemLookup = (itemCode: string) => {
-    return {
-      itemName: 'Sample Item',
-      systemQty: 100,
-      uom: 'Nos'
-    };
+  const mockSystemQtyLookup = (itemCode: string) => {
+    // This would typically fetch from ERPNext API
+    return Math.floor(Math.random() * 200) + 50;
   };
 
   const handleItemScan = () => {
     setIsScanning(true);
     
     setTimeout(() => {
-      const scannedItem = "ITM-001";
-      setFormData(prev => ({ ...prev, itemCode: scannedItem }));
-      setItemDetails(mockItemLookup(scannedItem));
+      const scannedItem = {
+        item_code: "ITM-001",
+        item_name: "Sample Scanned Item",
+        stock_uom: "Nos"
+      };
+      setSelectedItem(scannedItem);
       setIsScanning(false);
     }, 2000);
   };
 
-  const handleItemLookup = () => {
-    if (formData.itemCode) {
-      setItemDetails(mockItemLookup(formData.itemCode));
-    }
+  const handleItemSelected = (item: ItemInfo) => {
+    setSelectedItem(item);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!itemDetails || !formData.itemCode) return;
+    if (!selectedItem) return;
+
+    const systemQty = mockSystemQtyLookup(selectedItem.item_code);
 
     onAddEntry({
-      itemCode: formData.itemCode,
-      itemName: itemDetails.itemName,
+      itemCode: selectedItem.item_code,
+      itemName: selectedItem.item_name,
       warehouse: formData.warehouse,
       batch: formData.batch || undefined,
       serial: formData.serial || undefined,
-      systemQty: itemDetails.systemQty,
+      systemQty,
       scannedQty: formData.scannedQty,
-      uom: itemDetails.uom
+      uom: selectedItem.stock_uom
     });
 
     // Reset form
     setFormData({
-      itemCode: '',
       warehouse: 'Main Store',
       batch: '',
       serial: '',
       scannedQty: 0
     });
-    setItemDetails(null);
+    setSelectedItem(null);
   };
 
   return (
@@ -95,22 +100,10 @@ const StockCountForm = ({ onAddEntry }: StockCountFormProps) => {
             </TabsList>
 
             <TabsContent value="manual" className="space-y-4">
-              <div className="flex space-x-2">
-                <div className="flex-1">
-                  <Label htmlFor="itemCode">Item Code</Label>
-                  <Input
-                    id="itemCode"
-                    value={formData.itemCode}
-                    onChange={(e) => setFormData(prev => ({ ...prev, itemCode: e.target.value }))}
-                    placeholder="Enter item code..."
-                  />
-                </div>
-                <div className="pt-6">
-                  <Button type="button" onClick={handleItemLookup}>
-                    Lookup
-                  </Button>
-                </div>
-              </div>
+              <ItemSelector 
+                onItemSelected={handleItemSelected}
+                isLoading={false}
+              />
             </TabsContent>
 
             <TabsContent value="scan" className="space-y-4">
@@ -141,21 +134,21 @@ const StockCountForm = ({ onAddEntry }: StockCountFormProps) => {
       </Card>
 
       {/* Item Details */}
-      {itemDetails && (
+      {selectedItem && (
         <Card className="bg-blue-50">
           <CardContent className="pt-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <Label>Item Name</Label>
-                <p className="font-medium">{itemDetails.itemName}</p>
+                <p className="font-medium">{selectedItem.item_name}</p>
               </div>
               <div>
                 <Label>System Qty</Label>
-                <p className="font-medium">{itemDetails.systemQty} {itemDetails.uom}</p>
+                <p className="font-medium">{mockSystemQtyLookup(selectedItem.item_code)} {selectedItem.stock_uom}</p>
               </div>
               <div>
                 <Label>UOM</Label>
-                <p className="font-medium">{itemDetails.uom}</p>
+                <p className="font-medium">{selectedItem.stock_uom}</p>
               </div>
               <div>
                 <Label>Warehouse</Label>
@@ -167,7 +160,7 @@ const StockCountForm = ({ onAddEntry }: StockCountFormProps) => {
       )}
 
       {/* Additional Fields */}
-      {itemDetails && (
+      {selectedItem && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <Label htmlFor="batch">Batch Number (Optional)</Label>
@@ -202,7 +195,7 @@ const StockCountForm = ({ onAddEntry }: StockCountFormProps) => {
       )}
 
       {/* Submit */}
-      {itemDetails && (
+      {selectedItem && (
         <Button type="submit" className="w-full">
           <Plus className="w-4 h-4 mr-2" />
           Add to Count
