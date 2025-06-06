@@ -7,11 +7,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Warehouse, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createERPNextAPI } from "@/services/erpnextApi";
+import { offlineStorage } from "@/services/offlineStorage";
 
 interface WarehouseInfo {
   name: string;
   warehouse_name: string;
-  is_group: number;
+  is_group?: number;
+  company?: string;
 }
 
 interface WarehouseSelectorProps {
@@ -40,6 +42,22 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     };
   }, []);
 
+  // Load cached warehouses first
+  useEffect(() => {
+    loadCachedWarehouses();
+  }, []);
+
+  const loadCachedWarehouses = async () => {
+    try {
+      const cached = await offlineStorage.getCachedData('warehouses_all');
+      if (cached && Array.isArray(cached)) {
+        setWarehouses(cached.slice(0, 20)); // Show first 20 from cache
+      }
+    } catch (error) {
+      console.error('Failed to load cached warehouses:', error);
+    }
+  };
+
   // Fetch warehouses with search and pagination
   const fetchWarehouses = async (search: string = "", isNewSearch: boolean = false) => {
     // Only search if there's a search term
@@ -53,30 +71,45 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         console.error('ERPNext API not configured');
+        // Try to load from cache if API is not available
+        const cached = await offlineStorage.getCachedData('warehouses_all');
+        if (cached && Array.isArray(cached)) {
+          const filtered = cached.filter((w: WarehouseInfo) => 
+            w.warehouse_name?.toLowerCase().includes(search.toLowerCase()) ||
+            w.name?.toLowerCase().includes(search.toLowerCase())
+          );
+          setWarehouses(filtered.slice(0, 20));
+        }
         return;
       }
 
       const pageToFetch = isNewSearch ? 1 : currentPage;
       
-      // Build search filters
+      // Build search filters - fix the filter format
       let filters: any[] = [
         ['disabled', '=', 0] // Only enabled warehouses
       ];
       
       if (search.trim()) {
+        // Fix: Use proper OR filter format
         filters.push([
-          ['warehouse_name', 'like', `%${search}%`],
-          'or',
-          ['name', 'like', `%${search}%`]
+          'warehouse_name', 'like', `%${search}%`
+        ]);
+        filters.push(['or']);
+        filters.push([
+          'name', 'like', `%${search}%`
         ]);
       }
       
-      const result = await erpnextAPI.getWarehouses(filters, 20, pageToFetch);
+      const result = await erpnextAPI.getWarehouses(filters, undefined);
       
       if (result.data) {
         if (isNewSearch) {
           setWarehouses(result.data);
           setCurrentPage(1);
+          
+          // Cache the search results
+          await offlineStorage.cacheData(`warehouses_search_${search}`, result.data, 300000); // 5 minutes
         } else {
           setWarehouses(prev => [...prev, ...result.data]);
         }
@@ -90,6 +123,17 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       }
     } catch (error) {
       console.error('Failed to fetch warehouses:', error);
+      
+      // Try to load from cache on error
+      try {
+        const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_all';
+        const cached = await offlineStorage.getCachedData(cacheKey);
+        if (cached && Array.isArray(cached)) {
+          setWarehouses(cached);
+        }
+      } catch (cacheError) {
+        console.error('Failed to load cached warehouses:', cacheError);
+      }
     } finally {
       setIsLoadingWarehouses(false);
     }
@@ -134,7 +178,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                     }
                   </div>
                   {selectedWarehouse && (
-                    <div className="text-sm text-gray-500 truncate">
+                    <div className="text-sm text-muted-foreground truncate">
                       {selectedWarehouse.warehouse_name}
                     </div>
                   )}
@@ -167,10 +211,10 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                           )}
                         />
                         <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          <Warehouse className="w-4 h-4 text-gray-500 shrink-0" />
+                          <Warehouse className="w-4 h-4 text-muted-foreground shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium truncate">{warehouse.warehouse_name || warehouse.name}</div>
-                            <div className="text-sm text-gray-500 truncate">{warehouse.name}</div>
+                            <div className="text-sm text-muted-foreground truncate">{warehouse.name}</div>
                             {warehouse.is_group === 1 && (
                               <span className="text-xs px-1 py-0.5 bg-blue-100 text-blue-600 rounded mt-1 inline-block">Group</span>
                             )}
@@ -184,7 +228,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                           {isLoadingWarehouses ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <span className="text-sm text-gray-500">Load more warehouses...</span>
+                            <span className="text-sm text-muted-foreground">Load more warehouses...</span>
                           )}
                         </div>
                       </CommandItem>
