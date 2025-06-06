@@ -373,281 +373,6 @@ export class ERPNextAPI {
     return this.makeRequest(`Item/${itemCode}`);
   }
 
-  async getStockBalance(filters?: any[], company?: string) {
-    try {
-      // First try Stock Balance Report with warehouse filter
-      return await this.getStockBalanceReport(filters, company);
-    } catch (error) {
-      console.log('Stock Balance Report failed, falling back to Bin doctype:', error);
-      
-      // Fallback to Bin doctype if Stock Balance Report is not available
-      const params: any = {
-        limit_page_length: 0, // Get all records
-        fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'stock_value', 'stock_uom'])
-      };
-      
-      let allFilters: any[] = [
-        ['actual_qty', '>', 0] // Only positive stock
-      ];
-      
-      if (filters) {
-        allFilters = [...allFilters, ...filters];
-      }
-      
-      if (allFilters.length > 0) {
-        params.filters = allFilters;
-      }
-      
-      const result = await this.makeRequest('Bin', 'GET', null, params);
-      
-      if (result.data) {
-        // Transform Bin data to match Stock Balance Report format
-        const transformedData = result.data.map((bin: any) => ({
-          item_code: bin.item_code,
-          item_name: bin.item_code, // Bin doesn't have item_name, use item_code as fallback
-          warehouse: bin.warehouse,
-          actual_qty: parseFloat(bin.actual_qty) || 0,
-          stock_value: parseFloat(bin.stock_value) || 0,
-          stock_uom: bin.stock_uom || 'Nos'
-        }));
-        
-        return { data: transformedData };
-      }
-      
-      return { data: [] };
-    }
-  }
-
-  async getWarehouses(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 100,
-      fields: JSON.stringify(['name', 'warehouse_name', 'company', 'is_group'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) {
-      // Handle complex OR filters properly
-      allFilters = filters.map(filter => {
-        if (Array.isArray(filter) && filter.some(f => Array.isArray(f))) {
-          // This is a complex OR filter
-          return filter;
-        }
-        return filter;
-      });
-    }
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    console.log('Warehouse API params:', params);
-    
-    return this.makeRequest('Warehouse', 'GET', null, params);
-  }
-
-  async getSalesOrders(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'customer', 'status', 'delivery_date', 'grand_total'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Sales Order', 'GET', null, params);
-  }
-
-  async getSalesOrder(name: string) {
-    return this.makeRequest(`Sales Order/${name}`);
-  }
-
-  async getPurchaseOrders(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'supplier', 'status', 'schedule_date', 'grand_total'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Purchase Order', 'GET', null, params);
-  }
-
-  async getPurchaseOrder(name: string) {
-    return this.makeRequest(`Purchase Order/${name}`);
-  }
-
-  async getDeliveryNotes(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'customer', 'status', 'posting_date'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Delivery Note', 'GET', null, params);
-  }
-
-  async createDeliveryNote(data: any) {
-    return this.makeRequest('Delivery Note', 'POST', data);
-  }
-
-  async getPurchaseReceipts(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'supplier', 'status', 'posting_date'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Purchase Receipt', 'GET', null, params);
-  }
-
-  async createPurchaseReceipt(data: any) {
-    return this.makeRequest('Purchase Receipt', 'POST', data);
-  }
-
-  async getMaterialRequests(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'material_request_type', 'status', 'schedule_date'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Material Request', 'GET', null, params);
-  }
-
-  async createMaterialRequest(data: any) {
-    return this.makeRequest('Material Request', 'POST', data);
-  }
-
-  async getStockEntries(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'stock_entry_type', 'status', 'posting_date'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Stock Entry', 'GET', null, params);
-  }
-
-  async createStockEntry(data: any) {
-    return this.makeRequest('Stock Entry', 'POST', data);
-  }
-
-  async getPickLists(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'purpose', 'status', 'date'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Pick List', 'GET', null, params);
-  }
-
-  async createPickList(data: any) {
-    return this.makeRequest('Pick List', 'POST', data);
-  }
-
-  async getPackingSlips(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'delivery_note', 'status', 'creation'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Packing Slip', 'GET', null, params);
-  }
-
-  async createPackingSlip(data: any) {
-    return this.makeRequest('Packing Slip', 'POST', data);
-  }
-
-  async getQualityInspections(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'item_code', 'status', 'inspection_type'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Quality Inspection', 'GET', null, params);
-  }
-
-  async getProductBundles(filters?: any[], company?: string) {
-    const params: any = {
-      limit_page_length: 50,
-      fields: JSON.stringify(['name', 'new_item_code', 'description'])
-    };
-    
-    let allFilters: any[] = [];
-    if (filters) allFilters = [...filters];
-    if (company) allFilters.push(['company', '=', company]);
-    
-    if (allFilters.length > 0) {
-      params.filters = allFilters;
-    }
-    
-    return this.makeRequest('Product Bundle', 'GET', null, params);
-  }
-
   async getItemByBarcode(barcode: string, company?: string) {
     const params: any = {
       limit_page_length: 10,
@@ -664,6 +389,51 @@ export class ERPNextAPI {
     }
     
     return this.makeRequest('Item', 'GET', null, params);
+  }
+
+  // New method to get item details including batch/serial tracking
+  async getItemDetails(itemCode: string) {
+    return this.makeRequest(`Item/${itemCode}`, 'GET', null, {
+      fields: JSON.stringify(['item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'])
+    });
+  }
+
+  // New method to get current stock quantity for an item in a warehouse
+  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
+    const params: any = {
+      limit_page_length: 1,
+      fields: JSON.stringify(['actual_qty'])
+    };
+    
+    let allFilters: any[] = [
+      ['item_code', '=', itemCode],
+      ['warehouse', '=', warehouse]
+    ];
+    
+    if (batch) {
+      allFilters.push(['batch_no', '=', batch]);
+    }
+    
+    if (serial) {
+      allFilters.push(['serial_no', '=', serial]);
+    }
+    
+    if (allFilters.length > 0) {
+      params.filters = allFilters;
+    }
+    
+    const result = await this.makeRequest('Bin', 'GET', null, params);
+    return result.data && result.data.length > 0 ? parseFloat(result.data[0].actual_qty) || 0 : 0;
+  }
+
+  // New method to create Stock Reconciliation
+  async createStockReconciliation(data: any) {
+    return this.makeRequest('Stock Reconciliation', 'POST', data);
+  }
+
+  // New method to get Stock Reconciliation
+  async getStockReconciliation(name: string) {
+    return this.makeRequest(`Stock Reconciliation/${name}`);
   }
 
   async getAllEnabledItems(company?: string) {

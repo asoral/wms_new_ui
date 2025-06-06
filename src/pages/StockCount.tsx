@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { BarChart3, Plus, Save, RefreshCcw } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
+import { useNotification } from "@/hooks/useNotification";
 
 // Import components with proper error handling
 import StockCountForm from "@/components/stock-count/StockCountForm";
@@ -19,8 +20,8 @@ export interface StockCountEntry {
   warehouse: string;
   batch?: string;
   serial?: string;
-  systemQty: number;
-  scannedQty: number;
+  currentQty: number;
+  actualQty: number;
   uom: string;
   difference: number;
   status: 'matched' | 'variance' | 'new';
@@ -33,6 +34,7 @@ export interface StockCountSession {
   totalItems: number;
   matchedItems: number;
   varianceItems: number;
+  stockReconciliationNumber?: string;
 }
 
 const StockCount = () => {
@@ -40,6 +42,7 @@ const StockCount = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
   const [selectedPurpose, setSelectedPurpose] = useState<'reconciliation' | 'opening' | null>(null);
+  const { showSuccess, showError, showLoading, dismiss } = useNotification();
 
   const startSession = () => {
     if (!selectedWarehouse || !selectedPurpose) return;
@@ -58,7 +61,7 @@ const StockCount = () => {
   const addEntry = (entry: Omit<StockCountEntry, 'difference' | 'status'>) => {
     if (!session) return;
 
-    const difference = entry.scannedQty - entry.systemQty;
+    const difference = entry.actualQty - entry.currentQty;
     const status: StockCountEntry['status'] = 
       difference === 0 ? 'matched' : 'variance';
 
@@ -81,11 +84,55 @@ const StockCount = () => {
     });
   };
 
-  const submitSession = () => {
-    if (!session) return;
+  const submitSession = async () => {
+    if (!session || session.entries.length === 0) {
+      showError('No items to submit');
+      return;
+    }
     
-    console.log('Submitting stock count session:', session);
-    alert('Stock count submitted successfully!');
+    const loadingToast = showLoading('Creating Stock Reconciliation...');
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        showError('ERPNext API not configured');
+        return;
+      }
+
+      // Prepare Stock Reconciliation data
+      const stockReconciliationData = {
+        purpose: session.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
+        set_warehouse: session.warehouse,
+        items: session.entries.map(entry => ({
+          item_code: entry.itemCode,
+          warehouse: entry.warehouse,
+          qty: entry.actualQty,
+          basic_rate: 0, // You might want to fetch this from item master
+          batch_no: entry.batch || '',
+          serial_no: entry.serial || ''
+        }))
+      };
+
+      console.log('Creating Stock Reconciliation:', stockReconciliationData);
+      
+      const result = await erpnextAPI.createStockReconciliation(stockReconciliationData);
+      
+      if (result.data && result.data.name) {
+        setSession({
+          ...session,
+          stockReconciliationNumber: result.data.name
+        });
+        
+        showSuccess('Stock Reconciliation created successfully!', `Document: ${result.data.name}`);
+      } else {
+        showError('Failed to create Stock Reconciliation');
+      }
+    } catch (error) {
+      console.error('Failed to create Stock Reconciliation:', error);
+      showError('Failed to create Stock Reconciliation', error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      dismiss(loadingToast);
+    }
   };
 
   const resetSession = () => {
@@ -109,6 +156,11 @@ const StockCount = () => {
           <div className="flex items-center space-x-3">
             <BarChart3 className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Stock Count</h1>
+            {session?.stockReconciliationNumber && (
+              <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                {session.stockReconciliationNumber}
+              </div>
+            )}
           </div>
           {session && (
             <div className="flex items-center space-x-2">
@@ -116,9 +168,12 @@ const StockCount = () => {
                 <RefreshCcw className="w-4 h-4 mr-2" />
                 Reset
               </Button>
-              <Button onClick={submitSession} disabled={session.entries.length === 0}>
+              <Button 
+                onClick={submitSession} 
+                disabled={session.entries.length === 0 || !!session.stockReconciliationNumber}
+              >
                 <Save className="w-4 h-4 mr-2" />
-                Submit Count
+                {session.stockReconciliationNumber ? 'Submitted' : 'Submit Count'}
               </Button>
             </div>
           )}
@@ -199,7 +254,10 @@ const StockCount = () => {
                     <CardTitle>Scan Items - {session.warehouse}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <StockCountForm onAddEntry={addEntry} />
+                    <StockCountForm 
+                      warehouse={session.warehouse}
+                      onAddEntry={addEntry} 
+                    />
                   </CardContent>
                 </Card>
               </TabsContent>

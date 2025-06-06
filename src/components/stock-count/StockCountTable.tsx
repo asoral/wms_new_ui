@@ -46,12 +46,12 @@ const StockCountTable = ({ entries }: StockCountTableProps) => {
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">System Qty:</span>
-                    <p className="font-medium">{entry.systemQty} {entry.uom}</p>
+                    <span className="text-gray-600">Current Qty:</span>
+                    <p className="font-medium">{entry.currentQty} {entry.uom}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Scanned Qty:</span>
-                    <p className="font-medium">{entry.scannedQty} {entry.uom}</p>
+                    <span className="text-gray-600">Actual Qty:</span>
+                    <p className="font-medium">{entry.actualQty} {entry.uom}</p>
                   </div>
                 </div>
 
@@ -90,8 +90,8 @@ const StockCountTable = ({ entries }: StockCountTableProps) => {
             <TableHead>Item Code</TableHead>
             <TableHead>Item Name</TableHead>
             <TableHead>Batch/Serial</TableHead>
-            <TableHead className="text-right">System Qty</TableHead>
-            <TableHead className="text-right">Scanned Qty</TableHead>
+            <TableHead className="text-right">Current Qty</TableHead>
+            <TableHead className="text-right">Actual Qty</TableHead>
             <TableHead>UOM</TableHead>
             <TableHead className="text-center">Status</TableHead>
           </TableRow>
@@ -116,8 +116,8 @@ const StockCountTable = ({ entries }: StockCountTableProps) => {
                   <span className="text-gray-400">-</span>
                 )}
               </TableCell>
-              <TableCell className="text-right font-medium">{entry.systemQty}</TableCell>
-              <TableCell className="text-right font-medium">{entry.scannedQty}</TableCell>
+              <TableCell className="text-right font-medium">{entry.currentQty}</TableCell>
+              <TableCell className="text-right font-medium">{entry.actualQty}</TableCell>
               <TableCell>{entry.uom}</TableCell>
               <TableCell className="text-center">
                 {getStatusBadge(entry.status, entry.difference)}
