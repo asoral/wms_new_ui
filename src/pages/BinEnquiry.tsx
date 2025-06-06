@@ -272,8 +272,8 @@ const BinEnquiry = () => {
                 <Warehouse className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p className="text-lg font-medium mb-2">No Bin Selected</p>
                 <p>Scan or enter a bin/warehouse code to view items</p>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
           </Card>
         )}
       </div>

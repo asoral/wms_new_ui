@@ -293,8 +293,8 @@ const ItemEnquiry = () => {
                 <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p className="text-lg font-medium mb-2">No Item Selected</p>
                 <p>Scan or enter an item code to view stock information</p>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
           </Card>
         )}
       </div>
