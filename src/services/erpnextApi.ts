@@ -404,6 +404,7 @@ export class ERPNextAPI {
         // Transform Bin data to match Stock Balance Report format
         const transformedData = result.data.map((bin: any) => ({
           item_code: bin.item_code,
+          item_name: bin.item_code, // Bin doesn't have item_name, use item_code as fallback
           warehouse: bin.warehouse,
           actual_qty: parseFloat(bin.actual_qty) || 0,
           stock_value: parseFloat(bin.stock_value) || 0,

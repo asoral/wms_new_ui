@@ -218,7 +218,6 @@ const BinEnquiry = () => {
     stockData: any[], 
     abortController: AbortController
   ): Promise<BinData> => {
-    const erpnextAPI = await createERPNextAPI();
     const items: BinItem[] = [];
     const itemsProcessed = new Set<string>();
 
@@ -231,35 +230,17 @@ const BinEnquiry = () => {
       if ((stock.actual_qty || 0) > 0 && !itemsProcessed.has(stock.item_code)) {
         itemsProcessed.add(stock.item_code);
         
-        try {
-          const itemResult = await erpnextAPI!.getItem(stock.item_code);
-          items.push({
-            itemCode: stock.item_code,
-            itemName: itemResult.data?.item_name || stock.item_code,
-            qty: stock.actual_qty || 0,
-            uom: stock.stock_uom || 'Nos',
-            batch: stock.batch_no || undefined,
-            serial: stock.serial_no || undefined,
-            age: Math.floor(Math.random() * 90),
-            valuation: stock.stock_value || 0
-          });
-        } catch (err) {
-          // Check if request was aborted
-          if (abortController.signal.aborted) {
-            throw new Error('Request cancelled');
-          }
-          
-          items.push({
-            itemCode: stock.item_code,
-            itemName: stock.item_code,
-            qty: stock.actual_qty || 0,
-            uom: stock.stock_uom || 'Nos',
-            batch: stock.batch_no || undefined,
-            serial: stock.serial_no || undefined,
-            age: Math.floor(Math.random() * 90),
-            valuation: stock.stock_value || 0
-          });
-        }
+        // Use item name from stock balance report directly instead of making individual API calls
+        items.push({
+          itemCode: stock.item_code,
+          itemName: stock.item_name || stock.item_code, // Use item_name from report or fallback to item_code
+          qty: stock.actual_qty || 0,
+          uom: stock.stock_uom || 'Nos',
+          batch: stock.batch_no || undefined,
+          serial: stock.serial_no || undefined,
+          age: Math.floor(Math.random() * 90), // You might want to get actual aging data
+          valuation: stock.stock_value || 0
+        });
       }
     }
 
