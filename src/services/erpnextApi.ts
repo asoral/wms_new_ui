@@ -426,9 +426,26 @@ export class ERPNextAPI {
     return result.data && result.data.length > 0 ? parseFloat(result.data[0].actual_qty) || 0 : 0;
   }
 
-  // New method to create Stock Reconciliation
+  // Updated method to create Stock Reconciliation with proper format
   async createStockReconciliation(data: any) {
-    return this.makeRequest('Stock Reconciliation', 'POST', data);
+    const stockRecData = {
+      doctype: "Stock Reconciliation",
+      purpose: data.purpose || "Stock Reconciliation",
+      set_warehouse: data.set_warehouse || "",
+      company: data.company || "",
+      posting_date: new Date().toISOString().split('T')[0],
+      posting_time: new Date().toTimeString().split(' ')[0],
+      items: data.items || []
+    };
+
+    console.log('Creating Stock Reconciliation with data:', stockRecData);
+    return this.makeRequest('Stock Reconciliation', 'POST', stockRecData);
+  }
+
+  // Updated method to update existing Stock Reconciliation
+  async updateStockReconciliation(name: string, data: any) {
+    console.log('Updating Stock Reconciliation:', name, 'with data:', data);
+    return this.makeRequest(`Stock Reconciliation/${name}`, 'PUT', data);
   }
 
   // New method to get Stock Reconciliation

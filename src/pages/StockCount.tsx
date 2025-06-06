@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { BarChart3, Plus, Save, RefreshCcw } from "lucide-react";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useNotification } from "@/hooks/useNotification";
+import { toast } from "sonner";
 
 // Import components with proper error handling
 import StockCountForm from "@/components/stock-count/StockCountForm";
@@ -35,30 +36,159 @@ export interface StockCountSession {
   matchedItems: number;
   varianceItems: number;
   stockReconciliationNumber?: string;
+  isSubmitted: boolean;
 }
+
+const STORAGE_KEY = 'stockCountSession';
 
 const StockCount = () => {
   const [session, setSession] = useState<StockCountSession | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
   const [selectedPurpose, setSelectedPurpose] = useState<'reconciliation' | 'opening' | null>(null);
-  const { showSuccess, showError, showLoading, dismiss } = useNotification();
+  const [isCreatingReconciliation, setIsCreatingReconciliation] = useState(false);
+
+  // Load session from localStorage on component mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem(STORAGE_KEY);
+    if (savedSession) {
+      try {
+        const parsedSession = JSON.parse(savedSession);
+        setSession(parsedSession);
+        if (parsedSession) {
+          setSelectedWarehouse(parsedSession.warehouse);
+          setSelectedPurpose(parsedSession.purpose);
+          setShowForm(true);
+        }
+      } catch (error) {
+        console.error('Failed to load saved session:', error);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  // Save session to localStorage whenever it changes
+  useEffect(() => {
+    if (session) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [session]);
 
   const startSession = () => {
     if (!selectedWarehouse || !selectedPurpose) return;
     
-    setSession({
+    const newSession: StockCountSession = {
       purpose: selectedPurpose,
       warehouse: selectedWarehouse,
       entries: [],
       totalItems: 0,
       matchedItems: 0,
-      varianceItems: 0
-    });
+      varianceItems: 0,
+      isSubmitted: false
+    };
+
+    setSession(newSession);
     setShowForm(true);
   };
 
-  const addEntry = (entry: Omit<StockCountEntry, 'difference' | 'status'>) => {
+  const createStockReconciliation = async (firstEntry: StockCountEntry) => {
+    if (isCreatingReconciliation) return null;
+    
+    setIsCreatingReconciliation(true);
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast.error('ERPNext API not configured');
+        return null;
+      }
+
+      const company = await getUserDefaultCompany();
+      
+      // Prepare Stock Reconciliation data
+      const stockReconciliationData = {
+        purpose: session?.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
+        set_warehouse: firstEntry.warehouse,
+        company: company || '',
+        items: [{
+          item_code: firstEntry.itemCode,
+          warehouse: firstEntry.warehouse,
+          qty: firstEntry.actualQty,
+          valuation_rate: 0,
+          batch_no: firstEntry.batch || '',
+          serial_no: firstEntry.serial || ''
+        }]
+      };
+
+      console.log('Creating Stock Reconciliation:', stockReconciliationData);
+      
+      const result = await erpnextAPI.createStockReconciliation(stockReconciliationData);
+      
+      if (result.data && result.data.name) {
+        toast.success('Stock Reconciliation created successfully!', {
+          description: `Document: ${result.data.name}`
+        });
+        return result.data.name;
+      } else {
+        toast.error('Failed to create Stock Reconciliation');
+        return null;
+      }
+    } catch (error) {
+      console.error('Failed to create Stock Reconciliation:', error);
+      toast.error('Failed to create Stock Reconciliation', {
+        description: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return null;
+    } finally {
+      setIsCreatingReconciliation(false);
+    }
+  };
+
+  const updateStockReconciliation = async (reconciliationName: string, allEntries: StockCountEntry[]) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast.error('ERPNext API not configured');
+        return false;
+      }
+
+      const company = await getUserDefaultCompany();
+      
+      // Prepare updated data
+      const updatedData = {
+        items: allEntries.map(entry => ({
+          item_code: entry.itemCode,
+          warehouse: entry.warehouse,
+          qty: entry.actualQty,
+          valuation_rate: 0,
+          batch_no: entry.batch || '',
+          serial_no: entry.serial || ''
+        }))
+      };
+
+      console.log('Updating Stock Reconciliation:', reconciliationName, 'with data:', updatedData);
+      
+      const result = await erpnextAPI.updateStockReconciliation(reconciliationName, updatedData);
+      
+      if (result.data) {
+        console.log('Stock Reconciliation updated successfully');
+        return true;
+      } else {
+        toast.error('Failed to update Stock Reconciliation');
+        return false;
+      }
+    } catch (error) {
+      console.error('Failed to update Stock Reconciliation:', error);
+      toast.error('Failed to update Stock Reconciliation', {
+        description: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return false;
+    }
+  };
+
+  const addEntry = async (entry: Omit<StockCountEntry, 'difference' | 'status'>) => {
     if (!session) return;
 
     const difference = entry.actualQty - entry.currentQty;
@@ -75,63 +205,53 @@ const StockCount = () => {
     const matchedItems = updatedEntries.filter(e => e.status === 'matched').length;
     const varianceItems = updatedEntries.filter(e => e.status === 'variance').length;
 
-    setSession({
+    // If this is the first entry and no Stock Reconciliation exists, create one
+    let stockReconciliationNumber = session.stockReconciliationNumber;
+    if (!stockReconciliationNumber && session.entries.length === 0) {
+      stockReconciliationNumber = await createStockReconciliation(newEntry);
+    } else if (stockReconciliationNumber) {
+      // Update existing Stock Reconciliation
+      await updateStockReconciliation(stockReconciliationNumber, updatedEntries);
+    }
+
+    const updatedSession: StockCountSession = {
       ...session,
       entries: updatedEntries,
       totalItems: updatedEntries.length,
       matchedItems,
-      varianceItems
-    });
+      varianceItems,
+      stockReconciliationNumber: stockReconciliationNumber || session.stockReconciliationNumber
+    };
+
+    setSession(updatedSession);
   };
 
   const submitSession = async () => {
-    if (!session || session.entries.length === 0) {
-      showError('No items to submit');
+    if (!session || session.entries.length === 0 || session.isSubmitted) {
+      toast.error('No items to submit or already submitted');
       return;
     }
     
-    const loadingToast = showLoading('Creating Stock Reconciliation...');
-    
     try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        showError('ERPNext API not configured');
-        return;
-      }
-
-      // Prepare Stock Reconciliation data
-      const stockReconciliationData = {
-        purpose: session.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
-        set_warehouse: session.warehouse,
-        items: session.entries.map(entry => ({
-          item_code: entry.itemCode,
-          warehouse: entry.warehouse,
-          qty: entry.actualQty,
-          basic_rate: 0, // You might want to fetch this from item master
-          batch_no: entry.batch || '',
-          serial_no: entry.serial || ''
-        }))
-      };
-
-      console.log('Creating Stock Reconciliation:', stockReconciliationData);
-      
-      const result = await erpnextAPI.createStockReconciliation(stockReconciliationData);
-      
-      if (result.data && result.data.name) {
-        setSession({
+      if (session.stockReconciliationNumber) {
+        // Mark as submitted
+        const submittedSession = {
           ...session,
-          stockReconciliationNumber: result.data.name
-        });
+          isSubmitted: true
+        };
+        setSession(submittedSession);
         
-        showSuccess('Stock Reconciliation created successfully!', `Document: ${result.data.name}`);
+        toast.success('Stock Count submitted successfully!', {
+          description: `Document: ${session.stockReconciliationNumber}`
+        });
       } else {
-        showError('Failed to create Stock Reconciliation');
+        toast.error('No Stock Reconciliation document found');
       }
     } catch (error) {
-      console.error('Failed to create Stock Reconciliation:', error);
-      showError('Failed to create Stock Reconciliation', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      dismiss(loadingToast);
+      console.error('Failed to submit Stock Count:', error);
+      toast.error('Failed to submit Stock Count', {
+        description: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   };
 
@@ -140,6 +260,7 @@ const StockCount = () => {
     setSelectedWarehouse("");
     setSelectedPurpose(null);
     setShowForm(false);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   const handleWarehouseSelected = (warehouseCode: string) => {
@@ -170,10 +291,10 @@ const StockCount = () => {
               </Button>
               <Button 
                 onClick={submitSession} 
-                disabled={session.entries.length === 0 || !!session.stockReconciliationNumber}
+                disabled={session.entries.length === 0 || session.isSubmitted}
               >
                 <Save className="w-4 h-4 mr-2" />
-                {session.stockReconciliationNumber ? 'Submitted' : 'Submit Count'}
+                {session.isSubmitted ? 'Submitted' : 'Submit Count'}
               </Button>
             </div>
           )}
@@ -251,7 +372,7 @@ const StockCount = () => {
               <TabsContent value="entry">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Scan Items - {session.warehouse}</CardTitle>
+                    <CardTitle>Scan Items</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <StockCountForm 
