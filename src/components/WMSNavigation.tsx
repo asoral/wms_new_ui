@@ -26,19 +26,20 @@ const WMSNavigation = () => {
   const navigate = useNavigate();
 
   const navigationItems = [
-    { icon: Home, label: "Dashboard", path: "/" },
+    { icon: Home, label: "Dashboard", path: "/home" },
     { icon: Package, label: "Item Enquiry", path: "/item-enquiry" },
     { icon: Search, label: "Bin Enquiry", path: "/bin-enquiry" },
     { icon: BarChart3, label: "Stock Count", path: "/stock-count" },
     { icon: ShoppingCart, label: "Receive", path: "/receive" },
     { icon: Truck, label: "Deliver", path: "/deliver" },
-    { icon: FileText, label: "Material Request", path: "/mat-request" },
+    { icon: FileText, label: "Material Request", path: "/material-request" },
     { icon: Database, label: "Stock Entry", path: "/stock-entry" },
     { icon: ClipboardList, label: "Pick List", path: "/pick-list" },
     { icon: Package2, label: "Packing", path: "/packing" },
     { icon: Printer, label: "Print Label", path: "/print-label" },
-    { icon: CheckCircle, label: "Quality Check", path: "/quality-check" },
-    { icon: Layers, label: "Pallet", path: "/pallet" }
+    { icon: CheckCircle, label: "Quality Check", path: "/quality" },
+    { icon: Layers, label: "Pallet", path: "/pallet" },
+    { icon: BarChart3, label: "Reports", path: "/reports" }
   ];
 
   const isActive = (path: string) => location.pathname === path;
