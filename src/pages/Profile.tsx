@@ -70,7 +70,7 @@ const Profile = () => {
         // Auto-load companies if credentials exist
         if (data.erpnext_url && data.erpnext_api_key && data.erpnext_api_secret) {
           await loadCompanies({
-            url: data.erpnext_url,
+            baseURL: data.erpnext_url,
             apiKey: data.erpnext_api_key,
             apiSecret: data.erpnext_api_secret
           });
@@ -111,7 +111,7 @@ const Profile = () => {
       });
 
       const erpnextAPI = new ERPNextAPI({
-        url: profile.erpnext_url,
+        baseURL: profile.erpnext_url,
         apiKey: profile.erpnext_api_key,
         apiSecret: profile.erpnext_api_secret
       });
@@ -127,7 +127,7 @@ const Profile = () => {
         
         // Load companies after successful connection
         await loadCompanies({
-          url: profile.erpnext_url,
+          baseURL: profile.erpnext_url,
           apiKey: profile.erpnext_api_key,
           apiSecret: profile.erpnext_api_secret
         });
@@ -155,7 +155,7 @@ const Profile = () => {
     }
   };
 
-  const loadCompanies = async (config: { url: string; apiKey: string; apiSecret: string }) => {
+  const loadCompanies = async (config: { baseURL: string; apiKey: string; apiSecret: string }) => {
     setLoadingCompanies(true);
     try {
       const erpnextAPI = new ERPNextAPI(config);

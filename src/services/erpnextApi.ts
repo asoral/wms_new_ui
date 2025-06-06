@@ -112,6 +112,31 @@ export class ERPNextAPI {
     this.baseURL = config.baseURL;
   }
 
+  async testConnection(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseURL}/api/method/frappe.auth.get_logged_user`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        return { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
+      }
+
+      const result = await response.json();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async getCompanies(): Promise<any> {
+    return this.makeRequest('Company', 'GET', null, { fields: ['name', 'company_name'] });
+  }
+
   async makeRequest(doctype: string, method: string = 'GET', data?: any, params?: any): Promise<any> {
     let url = `${this.baseURL}/api/resource/${doctype}`;
     

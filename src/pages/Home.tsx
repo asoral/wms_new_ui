@@ -75,8 +75,7 @@ const Home = () => {
           return;
         }
 
-        const defaultCompany = await getUserDefaultCompany();
-        const result = await erpnextAPI.getStockAgingReport([], defaultCompany || undefined);
+        const result = await erpnextAPI.getStockAgingReport();
         
         if (result.data) {
           setStockAgingData(result.data);
