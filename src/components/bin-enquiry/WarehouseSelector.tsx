@@ -6,8 +6,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Warehouse, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { ERPNextAPI } from "@/services/erpnextApi";
 import { offlineStorage } from "@/services/offlineStorage";
+import { supabase } from "@/integrations/supabase/client";
 
 interface WarehouseInfo {
   name: string;
@@ -54,25 +55,57 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     }
   };
 
+  // Get ERPNext configuration from user profile
+  const getERPNextConfig = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No user found');
+        return null;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('erpnext_url, erpnext_api_key, erpnext_api_secret')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
+
+      if (!profile?.erpnext_url || !profile?.erpnext_api_key || !profile?.erpnext_api_secret) {
+        console.error('ERPNext configuration incomplete in profile');
+        return null;
+      }
+
+      return {
+        baseURL: profile.erpnext_url,
+        apiKey: profile.erpnext_api_key,
+        apiSecret: profile.erpnext_api_secret
+      };
+    } catch (error) {
+      console.error('Failed to get ERPNext config:', error);
+      return null;
+    }
+  };
+
   // Fetch warehouses with search
   const fetchWarehouses = async (search: string = "") => {
     setIsLoadingWarehouses(true);
     console.log('Fetching warehouses with search:', search);
     
     try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        console.error('ERPNext API not configured');
-        // Try to load from cache if API is not available
-        const cached = await offlineStorage.getCachedData('warehouses_page_1');
-        if (cached && Array.isArray(cached)) {
-          console.log('Loading cached warehouses after API failure:', cached.length);
-          setWarehouses(cached);
-        }
+      const config = await getERPNextConfig();
+      if (!config) {
+        console.error('ERPNext configuration not available');
         setIsLoadingWarehouses(false);
         return;
       }
 
+      const erpnextAPI = new ERPNextAPI(config);
+      
       // Build search filters
       let filters: any[] = [
         ['disabled', '=', 0] // Only enabled warehouses
