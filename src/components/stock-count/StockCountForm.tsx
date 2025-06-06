@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +55,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         setQtyError('ERPNext API not configured');
+        setCurrentQty(0);
         return;
       }
 
@@ -90,12 +90,18 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
   };
 
   const handleItemSelected = async (item: ItemInfo) => {
+    console.log('Item selected, setting item data:', item);
+    
+    // Set the item immediately to prevent reset
+    setSelectedItem(item);
+    
     const loadingToast = showLoading('Fetching item details...');
     
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         showError('ERPNext API not configured');
+        // Keep the item selected even if API fails
         return;
       }
 
@@ -107,27 +113,30 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
           has_batch_no: itemDetails.data.has_batch_no || 0,
           has_serial_no: itemDetails.data.has_serial_no || 0
         };
+        console.log('Updated item with full details:', fullItem);
         setSelectedItem(fullItem);
         await fetchCurrentQty(fullItem.item_code);
       } else {
-        setSelectedItem(item);
+        // Keep the original item if details fetch fails
+        console.log('Keeping original item data');
         await fetchCurrentQty(item.item_code);
       }
     } catch (error) {
       console.error('Failed to fetch item details:', error);
-      setSelectedItem(item);
+      // Keep the original item even if there's an error
       await fetchCurrentQty(item.item_code);
     } finally {
       dismiss(loadingToast);
     }
   };
 
-  // Refetch quantity when batch/serial changes
+  // Only refetch quantity when batch/serial changes, not when item changes
   useEffect(() => {
-    if (selectedItem) {
+    if (selectedItem && (formData.batch || formData.serial)) {
+      console.log('Batch/Serial changed, refetching quantity');
       fetchCurrentQty(selectedItem.item_code, formData.batch, formData.serial);
     }
-  }, [formData.batch, formData.serial, selectedItem]);
+  }, [formData.batch, formData.serial]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,6 +163,17 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
     }
 
     try {
+      console.log('Submitting entry with data:', {
+        itemCode: selectedItem.item_code,
+        itemName: selectedItem.item_name,
+        warehouse: warehouse,
+        batch: formData.batch || undefined,
+        serial: formData.serial || undefined,
+        currentQty: currentQty,
+        actualQty: formData.actualQty,
+        uom: selectedItem.stock_uom
+      });
+
       await onAddEntry({
         itemCode: selectedItem.item_code,
         itemName: selectedItem.item_name,
@@ -165,13 +185,12 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         uom: selectedItem.stock_uom
       });
 
-      // Reset form
+      // Reset form but keep item selected for easier multiple entries
       setFormData({
         batch: '',
         serial: '',
         actualQty: 0
       });
-      setSelectedItem(null);
       setCurrentQty(0);
       setQtyError(null);
       

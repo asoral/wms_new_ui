@@ -447,12 +447,20 @@ export class ERPNextAPI {
     const url = `${baseUrl}/api/resource/Stock Reconciliation`;
     
     const stockRecData = {
+      doctype: "Stock Reconciliation",
       purpose: data.purpose || "Stock Reconciliation",
       set_warehouse: data.set_warehouse || "",
       company: data.company || "",
-      posting_date: new Date().toISOString().split('T')[0],
-      posting_time: new Date().toTimeString().split(' ')[0],
-      items: data.items || []
+      posting_date: data.posting_date || new Date().toISOString().split('T')[0],
+      posting_time: data.posting_time || new Date().toTimeString().split(' ')[0].slice(0, 8),
+      items: (data.items || []).map((item: any) => ({
+        item_code: item.item_code,
+        warehouse: item.warehouse,
+        qty: parseFloat(item.qty) || 0,
+        valuation_rate: parseFloat(item.valuation_rate) || 0,
+        batch_no: item.batch_no || "",
+        serial_no: item.serial_no || ""
+      }))
     };
 
     console.log('Creating Stock Reconciliation with data:', stockRecData);
@@ -472,7 +480,21 @@ export class ERPNextAPI {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Stock Reconciliation creation error:', errorText);
-        throw new Error(`Failed to create Stock Reconciliation: ${response.status} ${response.statusText}`);
+        
+        let errorMessage = `Failed to create Stock Reconciliation: ${response.status} ${response.statusText}`;
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.exception) {
+            errorMessage = errorData.exception;
+          }
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -489,13 +511,24 @@ export class ERPNextAPI {
     const baseUrl = this.cleanUrl(this.config.url);
     const url = `${baseUrl}/api/resource/Stock Reconciliation/${name}`;
     
-    console.log('Updating Stock Reconciliation:', name, 'with data:', data);
+    const updateData = {
+      items: (data.items || []).map((item: any) => ({
+        item_code: item.item_code,
+        warehouse: item.warehouse,
+        qty: parseFloat(item.qty) || 0,
+        valuation_rate: parseFloat(item.valuation_rate) || 0,
+        batch_no: item.batch_no || "",
+        serial_no: item.serial_no || ""
+      }))
+    };
+    
+    console.log('Updating Stock Reconciliation:', name, 'with data:', updateData);
     
     const options: RequestInit = {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       mode: 'cors',
-      body: JSON.stringify(data)
+      body: JSON.stringify(updateData)
     };
 
     try {
@@ -506,7 +539,21 @@ export class ERPNextAPI {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Stock Reconciliation update error:', errorText);
-        throw new Error(`Failed to update Stock Reconciliation: ${response.status} ${response.statusText}`);
+        
+        let errorMessage = `Failed to update Stock Reconciliation: ${response.status} ${response.statusText}`;
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.exception) {
+            errorMessage = errorData.exception;
+          }
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();

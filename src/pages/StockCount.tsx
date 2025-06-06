@@ -94,7 +94,12 @@ const StockCount = () => {
   };
 
   const createStockReconciliation = async (firstEntry: StockCountEntry) => {
-    if (isCreatingReconciliation) return null;
+    console.log('Creating Stock Reconciliation for entry:', firstEntry);
+    
+    if (isCreatingReconciliation) {
+      console.log('Already creating reconciliation, skipping...');
+      return null;
+    }
     
     setIsCreatingReconciliation(true);
     
@@ -112,6 +117,8 @@ const StockCount = () => {
         purpose: session?.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
         set_warehouse: firstEntry.warehouse,
         company: company || '',
+        posting_date: new Date().toISOString().split('T')[0],
+        posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
         items: [{
           item_code: firstEntry.itemCode,
           warehouse: firstEntry.warehouse,
@@ -122,17 +129,20 @@ const StockCount = () => {
         }]
       };
 
-      console.log('Creating Stock Reconciliation:', stockReconciliationData);
+      console.log('Creating Stock Reconciliation with data:', stockReconciliationData);
       
       const result = await erpnextAPI.createStockReconciliation(stockReconciliationData);
+      console.log('Stock Reconciliation creation result:', result);
       
-      if (result.data && result.data.name) {
+      if (result && result.data && result.data.name) {
+        console.log('Stock Reconciliation created successfully:', result.data.name);
         toast.success('Stock Reconciliation created successfully!', {
           description: `Document: ${result.data.name}`
         });
         return result.data.name;
       } else {
-        toast.error('Failed to create Stock Reconciliation');
+        console.error('Failed to create Stock Reconciliation - no name in response:', result);
+        toast.error('Failed to create Stock Reconciliation - Invalid response');
         return null;
       }
     } catch (error) {
@@ -147,6 +157,8 @@ const StockCount = () => {
   };
 
   const updateStockReconciliation = async (reconciliationName: string, allEntries: StockCountEntry[]) => {
+    console.log('Updating Stock Reconciliation:', reconciliationName, 'with entries:', allEntries.length);
+    
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
@@ -168,14 +180,16 @@ const StockCount = () => {
         }))
       };
 
-      console.log('Updating Stock Reconciliation:', reconciliationName, 'with data:', updatedData);
+      console.log('Updating Stock Reconciliation with data:', updatedData);
       
       const result = await erpnextAPI.updateStockReconciliation(reconciliationName, updatedData);
+      console.log('Stock Reconciliation update result:', result);
       
-      if (result.data) {
+      if (result && result.data) {
         console.log('Stock Reconciliation updated successfully');
         return true;
       } else {
+        console.error('Failed to update Stock Reconciliation - invalid response:', result);
         toast.error('Failed to update Stock Reconciliation');
         return false;
       }
@@ -189,7 +203,12 @@ const StockCount = () => {
   };
 
   const addEntry = async (entry: Omit<StockCountEntry, 'difference' | 'status'>) => {
-    if (!session) return;
+    console.log('Adding entry to session:', entry);
+    
+    if (!session) {
+      console.error('No session found when trying to add entry');
+      return;
+    }
 
     const difference = entry.actualQty - entry.currentQty;
     const status: StockCountEntry['status'] = 
@@ -201,17 +220,33 @@ const StockCount = () => {
       status
     };
 
+    console.log('Prepared new entry:', newEntry);
+
     const updatedEntries = [...session.entries, newEntry];
     const matchedItems = updatedEntries.filter(e => e.status === 'matched').length;
     const varianceItems = updatedEntries.filter(e => e.status === 'variance').length;
 
     // If this is the first entry and no Stock Reconciliation exists, create one
     let stockReconciliationNumber = session.stockReconciliationNumber;
+    
     if (!stockReconciliationNumber && session.entries.length === 0) {
+      console.log('Creating Stock Reconciliation for first entry...');
       stockReconciliationNumber = await createStockReconciliation(newEntry);
+      
+      if (!stockReconciliationNumber) {
+        console.error('Failed to create Stock Reconciliation, cannot proceed');
+        toast.error('Failed to create Stock Reconciliation document');
+        return;
+      }
     } else if (stockReconciliationNumber) {
-      // Update existing Stock Reconciliation
-      await updateStockReconciliation(stockReconciliationNumber, updatedEntries);
+      console.log('Updating existing Stock Reconciliation...');
+      const updateSuccess = await updateStockReconciliation(stockReconciliationNumber, updatedEntries);
+      
+      if (!updateSuccess) {
+        console.error('Failed to update Stock Reconciliation');
+        toast.error('Failed to update Stock Reconciliation');
+        return;
+      }
     }
 
     const updatedSession: StockCountSession = {
@@ -223,30 +258,34 @@ const StockCount = () => {
       stockReconciliationNumber: stockReconciliationNumber || session.stockReconciliationNumber
     };
 
+    console.log('Updated session:', updatedSession);
     setSession(updatedSession);
   };
 
   const submitSession = async () => {
+    console.log('Submitting session:', session);
+    
     if (!session || session.entries.length === 0 || session.isSubmitted) {
       toast.error('No items to submit or already submitted');
       return;
     }
     
+    if (!session.stockReconciliationNumber) {
+      toast.error('No Stock Reconciliation document found. Please add items first.');
+      return;
+    }
+    
     try {
-      if (session.stockReconciliationNumber) {
-        // Mark as submitted
-        const submittedSession = {
-          ...session,
-          isSubmitted: true
-        };
-        setSession(submittedSession);
-        
-        toast.success('Stock Count submitted successfully!', {
-          description: `Document: ${session.stockReconciliationNumber}`
-        });
-      } else {
-        toast.error('No Stock Reconciliation document found');
-      }
+      // Mark as submitted
+      const submittedSession = {
+        ...session,
+        isSubmitted: true
+      };
+      setSession(submittedSession);
+      
+      toast.success('Stock Count submitted successfully!', {
+        description: `Document: ${session.stockReconciliationNumber}`
+      });
     } catch (error) {
       console.error('Failed to submit Stock Count:', error);
       toast.error('Failed to submit Stock Count', {
