@@ -101,15 +101,52 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
   }
 };
 
-class ERPNextAPI {
-  private apiKey: string;
-  private apiSecret: string;
+export class ERPNextAPI {
+  public apiKey: string;
+  public apiSecret: string;
   public baseURL: string;
 
   constructor(config: APIConfig) {
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret;
     this.baseURL = config.baseURL;
+  }
+
+  async makeRequest(doctype: string, method: string = 'GET', data?: any, params?: any): Promise<any> {
+    let url = `${this.baseURL}/api/resource/${doctype}`;
+    
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.keys(params).forEach(key => {
+        const value = params[key];
+        if (Array.isArray(value) || typeof value === 'object') {
+          searchParams.append(key, JSON.stringify(value));
+        } else {
+          searchParams.append(key, value);
+        }
+      });
+      url += `?${searchParams.toString()}`;
+    }
+
+    const options: RequestInit = {
+      method,
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    };
+
+    if (data && (method === 'POST' || method === 'PUT')) {
+      options.body = JSON.stringify(data);
+    }
+
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      throw new Error(`Failed to ${method} ${doctype}: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
   async getItemDetails(itemCode: string): Promise<any> {
@@ -128,6 +165,61 @@ class ERPNextAPI {
     return response.json();
   }
 
+  async getItem(itemCode: string): Promise<any> {
+    return this.getItemDetails(itemCode);
+  }
+
+  async getItems(filters?: any, fields?: string[], company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (fields) params.fields = fields;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Item', 'GET', null, params);
+  }
+
+  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit: number = 20, page: number = 1): Promise<any> {
+    const params: any = {
+      limit_page_length: limit,
+      limit_start: (page - 1) * limit
+    };
+    if (filters) params.filters = filters;
+    if (fields) params.fields = fields;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Item', 'GET', null, params);
+  }
+
+  async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<any> {
+    const filters = [
+      ['disabled', '=', 0],
+      ['item_name', 'like', `%${searchTerm}%`]
+    ];
+    
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+    
+    return this.getItemsPaginated(filters, ['item_code', 'item_name', 'stock_uom'], company, limit);
+  }
+
+  async getItemByBarcode(barcode: string, company?: string): Promise<any> {
+    const filters = [['barcode', '=', barcode]];
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+    
+    return this.makeRequest('Item', 'GET', null, { filters });
+  }
+
   async getItemStock(itemCode: string): Promise<ItemStock[]> {
     const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?filters=[["item_code", "=", "${itemCode}"] ]&fields=["item_code", "actual_qty", "warehouse"]`, {
       method: 'GET',
@@ -139,6 +231,203 @@ class ERPNextAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to get item stock: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getWarehouses(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Warehouse', 'GET', null, params);
+  }
+
+  async getStockBalance(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Stock Balance', 'GET', null, params);
+  }
+
+  async getSalesOrders(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Sales Order', 'GET', null, params);
+  }
+
+  async getSalesOrder(soNumber: string): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/resource/Sales Order/${soNumber}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get sales order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getDeliveryNotes(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Delivery Note', 'GET', null, params);
+  }
+
+  async getPurchaseOrders(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Purchase Order', 'GET', null, params);
+  }
+
+  async getPurchaseOrder(poNumber: string): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order/${poNumber}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get purchase order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPurchaseReceipts(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Purchase Receipt', 'GET', null, params);
+  }
+
+  async createPurchaseReceipt(data: any): Promise<any> {
+    return this.makeRequest('Purchase Receipt', 'POST', data);
+  }
+
+  async getMaterialRequests(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Material Request', 'GET', null, params);
+  }
+
+  async getStockEntries(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Stock Entry', 'GET', null, params);
+  }
+
+  async getPickLists(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Pick List', 'GET', null, params);
+  }
+
+  async getPackingSlips(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Packing Slip', 'GET', null, params);
+  }
+
+  async getQualityInspections(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Quality Inspection', 'GET', null, params);
+  }
+
+  async getProductBundles(filters?: any, company?: string): Promise<any> {
+    const params: any = {};
+    if (filters) params.filters = filters;
+    if (company) {
+      if (!filters) filters = [];
+      filters.push(['company', '=', company]);
+      params.filters = filters;
+    }
+    
+    return this.makeRequest('Product Bundle', 'GET', null, params);
+  }
+
+  async getStockAgingReport(filters?: any): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filters: filters || {} })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get stock aging report: ${response.statusText}`);
     }
 
     return response.json();
