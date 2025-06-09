@@ -110,30 +110,20 @@ const StockCount = () => {
 
       const company = await getUserDefaultCompany();
       
-      // CRITICAL: Detect if this entry uses traditional method
-      const usesTraditionalEntry = firstEntry.useTraditionalEntry || (!firstEntry.serialBatchBundle && (firstEntry.batch || firstEntry.serial));
-      
-      console.log('Entry uses traditional entry method:', usesTraditionalEntry);
-      
-      // Prepare Stock Reconciliation data with correct format
+      // Prepare Stock Reconciliation data - always use Serial and Batch Bundle
       const stockReconciliationData = {
         purpose: session?.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
         set_warehouse: firstEntry.warehouse,
         company: company || '',
         posting_date: new Date().toISOString().split('T')[0],
         posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
-        // CRITICAL: Add use_serial_batch_fields flag for traditional entry
-        ...(usesTraditionalEntry ? { use_serial_batch_fields: 1 } : {}),
         items: [{
           item_code: firstEntry.itemCode,
           warehouse: firstEntry.warehouse,
           qty: firstEntry.actualQty,
           valuation_rate: 0,
-          ...(firstEntry.serialBatchBundle ? { 
+          ...(firstEntry.serialBatchBundle && { 
             serial_and_batch_bundle: firstEntry.serialBatchBundle 
-          } : {
-            ...(firstEntry.batch && { batch_no: firstEntry.batch }),
-            ...(firstEntry.serial && { serial_no: firstEntry.serial })
           })
         }]
       };
@@ -175,27 +165,15 @@ const StockCount = () => {
         return false;
       }
 
-      // CRITICAL: Check if any entry uses traditional entry method
-      const hasTraditionalEntry = allEntries.some(entry => 
-        entry.useTraditionalEntry || (!entry.serialBatchBundle && (entry.batch || entry.serial))
-      );
-
-      console.log('Update - has traditional entry:', hasTraditionalEntry);
-
-      // Prepare updated data with correct format
+      // Prepare updated data - always use Serial and Batch Bundle
       const updatedData = {
-        // CRITICAL: Add use_serial_batch_fields flag if any entry uses traditional method
-        ...(hasTraditionalEntry ? { use_serial_batch_fields: 1 } : {}),
         items: allEntries.map(entry => ({
           item_code: entry.itemCode,
           warehouse: entry.warehouse,
           qty: entry.actualQty,
           valuation_rate: 0,
-          ...(entry.serialBatchBundle ? { 
+          ...(entry.serialBatchBundle && { 
             serial_and_batch_bundle: entry.serialBatchBundle 
-          } : {
-            ...(entry.batch && { batch_no: entry.batch }),
-            ...(entry.serial && { serial_no: entry.serial })
           })
         }))
       };

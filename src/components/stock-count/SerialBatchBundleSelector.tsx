@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Package } from 'lucide-react';
 import { getAvailableSerialBatch, createSerialBatchBundle, SerialBatchBundleItem } from '@/services/serialBatchBundleApi';
+import { getUserDefaultCompany } from '@/services/erpnextApi';
 import { toast } from 'sonner';
 
 interface SerialBatchBundleSelectorProps {
@@ -19,6 +20,12 @@ interface SerialBatchBundleSelectorProps {
   initialQuantity?: number;
 }
 
+interface BundleEntry {
+  serial_no?: string;
+  batch_no?: string;
+  qty: number;
+}
+
 const SerialBatchBundleSelector = ({
   itemCode,
   warehouse,
@@ -28,7 +35,7 @@ const SerialBatchBundleSelector = ({
   onBundleCreated,
   initialQuantity = 1
 }: SerialBatchBundleSelectorProps) => {
-  const [entries, setEntries] = useState<SerialBatchBundleItem[]>([]);
+  const [entries, setEntries] = useState<BundleEntry[]>([]);
   const [availableSerials, setAvailableSerials] = useState<string[]>([]);
   const [availableBatches, setAvailableBatches] = useState<Array<{batch_no: string, qty: number}>>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,14 +114,22 @@ const SerialBatchBundleSelector = ({
 
     setIsCreating(true);
     try {
-      const bundleData = {
+      const company = await getUserDefaultCompany();
+      
+      // Convert entries to ERPNext format
+      const bundleItems: SerialBatchBundleItem[] = validEntries.map(entry => ({
         item_code: itemCode,
         warehouse: warehouse,
-        type_of_transaction: transactionType,
-        total_qty: totalQty,
-        entries: validEntries,
+        qty: entry.qty,
+        uom: 'Nos', // Default UOM, should be passed from parent
+        ...(entry.batch_no && { batch_no: entry.batch_no }),
+        ...(entry.serial_no && { serial_no: entry.serial_no })
+      }));
+
+      const bundleData = {
+        items: bundleItems,
         posting_date: new Date().toISOString().split('T')[0],
-        posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+        company: company || '',
       };
 
       const result = await createSerialBatchBundle(bundleData);

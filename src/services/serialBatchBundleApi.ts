@@ -1,32 +1,25 @@
-
-import { createERPNextAPI } from './erpnextApi';
+import { createERPNextAPI, getUserDefaultCompany } from './erpnextApi';
 
 export interface SerialBatchBundleItem {
-  serial_no?: string;
+  item_code: string;
+  warehouse: string;
+  qty: number;
+  uom: string;
   batch_no?: string;
-  qty?: number;
+  serial_no?: string;
 }
 
 export interface SerialBatchBundle {
   name?: string;
-  item_code: string;
-  warehouse: string;
-  type_of_transaction: 'Inward' | 'Outward';
-  total_qty: number;
-  entries: SerialBatchBundleItem[];
-  voucher_type?: string;
-  voucher_no?: string;
-  posting_date?: string;
-  posting_time?: string;
+  items: SerialBatchBundleItem[];
+  posting_date: string;
+  company: string;
 }
 
 export interface SerialBatchBundleResponse {
   data: {
     name: string;
-    item_code: string;
-    warehouse: string;
-    total_qty: number;
-    entries: SerialBatchBundleItem[];
+    items: SerialBatchBundleItem[];
   };
 }
 
@@ -37,30 +30,15 @@ export const createSerialBatchBundle = async (bundleData: SerialBatchBundle): Pr
       throw new Error('ERPNext API not configured');
     }
 
-    console.log('Creating Serial and Batch Bundle:', bundleData);
+    console.log('Creating Serial and Batch Bundle with ERPNext structure:', bundleData);
     
-    // Format data according to ERPNext API requirements
-    const formattedData = {
-      item_code: bundleData.item_code,
-      warehouse: bundleData.warehouse,
-      type_of_transaction: bundleData.type_of_transaction,
-      total_qty: bundleData.total_qty,
-      posting_date: bundleData.posting_date || new Date().toISOString().split('T')[0],
-      posting_time: bundleData.posting_time || new Date().toTimeString().split(' ')[0].slice(0, 8),
-      entries: bundleData.entries.map(entry => ({
-        qty: entry.qty || 1,
-        ...(entry.serial_no && { serial_no: entry.serial_no }),
-        ...(entry.batch_no && { batch_no: entry.batch_no })
-      }))
-    };
-
     const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Serial and Batch Bundle`, {
       method: 'POST',
       headers: {
         'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(formattedData)
+      body: JSON.stringify(bundleData)
     });
 
     if (!response.ok) {
@@ -74,6 +52,38 @@ export const createSerialBatchBundle = async (bundleData: SerialBatchBundle): Pr
     return result;
   } catch (error) {
     console.error('Error creating Serial and Batch Bundle:', error);
+    throw error;
+  }
+};
+
+export const createSerialBatchBundleFromTraditionalEntry = async (
+  itemCode: string,
+  warehouse: string,
+  qty: number,
+  uom: string,
+  batchNo?: string,
+  serialNo?: string
+): Promise<string | null> => {
+  try {
+    const company = await getUserDefaultCompany();
+    
+    const bundleData: SerialBatchBundle = {
+      items: [{
+        item_code: itemCode,
+        warehouse: warehouse,
+        qty: qty,
+        uom: uom,
+        ...(batchNo && { batch_no: batchNo }),
+        ...(serialNo && { serial_no: serialNo })
+      }],
+      posting_date: new Date().toISOString().split('T')[0],
+      company: company || ''
+    };
+
+    const result = await createSerialBatchBundle(bundleData);
+    return result?.data?.name || null;
+  } catch (error) {
+    console.error('Error creating bundle from traditional entry:', error);
     throw error;
   }
 };

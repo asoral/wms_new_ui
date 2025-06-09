@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +11,7 @@ import { toast } from "sonner";
 import ItemSelector from "./ItemSelector";
 import SerialBatchBundleSelector from './SerialBatchBundleSelector';
 import CameraScanner from "../bin-enquiry/CameraScanner";
+import { createSerialBatchBundleFromTraditionalEntry } from '@/services/serialBatchBundleApi';
 
 interface ItemInfo {
   item_code: string;
@@ -200,6 +200,38 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
     }
   };
 
+  const createTraditionalEntryBundle = async (
+    itemCode: string,
+    qty: number,
+    uom: string,
+    batchNo?: string,
+    serialNo?: string
+  ): Promise<string | null> => {
+    try {
+      console.log('Creating Serial and Batch Bundle for traditional entry:', { itemCode, qty, batchNo, serialNo });
+      
+      const bundleName = await createSerialBatchBundleFromTraditionalEntry(
+        itemCode,
+        warehouse,
+        qty,
+        uom,
+        batchNo,
+        serialNo
+      );
+      
+      if (bundleName) {
+        toast.success('Serial and Batch Bundle created for traditional entry');
+        return bundleName;
+      } else {
+        throw new Error('Failed to create bundle');
+      }
+    } catch (error) {
+      console.error('Error creating traditional entry bundle:', error);
+      toast.error('Failed to create Serial and Batch Bundle');
+      return null;
+    }
+  };
+
   const handleBundleCreated = (bundleName: string, totalQty: number) => {
     setFormData(prev => ({ 
       ...prev, 
@@ -234,10 +266,21 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         toast.error('Serial number is required for this item');
         return;
       }
+    }
 
-      // CRITICAL: Create batch and serial numbers BEFORE submitting entry
-      if (formData.batch || formData.serial) {
-        console.log('Creating batch/serial before adding entry:', { batch: formData.batch, serial: formData.serial });
+    if (formData.actualQty < 0) {
+      toast.error('Actual quantity cannot be negative');
+      return;
+    }
+
+    try {
+      let bundleName = formData.serialBatchBundle;
+
+      // For traditional entry with batch/serial, create batch/serial first, then create bundle
+      if (!useBundle && (formData.batch || formData.serial)) {
+        console.log('Traditional entry with batch/serial - creating batch/serial first...');
+        
+        // Create batch and serial numbers first
         const success = await createBatchAndSerial(
           formData.batch || undefined,
           formData.serial || undefined,
@@ -248,26 +291,31 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
           toast.error('Failed to create batch/serial numbers. Please try again.');
           return;
         }
+
+        // Then create the Serial and Batch Bundle
+        bundleName = await createTraditionalEntryBundle(
+          selectedItem.item_code,
+          formData.actualQty,
+          selectedItem.stock_uom,
+          formData.batch || undefined,
+          formData.serial || undefined
+        );
+
+        if (!bundleName) {
+          toast.error('Failed to create Serial and Batch Bundle. Please try again.');
+          return;
+        }
       }
-    }
 
-    if (formData.actualQty < 0) {
-      toast.error('Actual quantity cannot be negative');
-      return;
-    }
-
-    try {
       const entryData = {
         itemCode: selectedItem.item_code,
         itemName: selectedItem.item_name,
         warehouse: warehouse,
-        batch: useBundle ? undefined : (formData.batch || undefined),
-        serial: useBundle ? undefined : (formData.serial || undefined),
-        serialBatchBundle: useBundle ? formData.serialBatchBundle : undefined,
+        serialBatchBundle: bundleName,
         currentQty: currentQty,
         actualQty: formData.actualQty,
         uom: selectedItem.stock_uom,
-        useTraditionalEntry: !useBundle && (!!formData.batch || !!formData.serial)
+        useTraditionalEntry: false // Always false now since we always use bundles
       };
 
       console.log('Submitting entry with data:', entryData);
