@@ -378,7 +378,7 @@ export class ERPNextAPI {
   }
 
   async getItemStock(itemCode: string): Promise<ItemStock[]> {
-    const response = await fetch(`${this.baseURL}/api/resource/Bin?filters=[["item_code", "=", "${itemCode}"] ]&fields=["item_code", "actual_qty", "warehouse"]`, {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?filters=[["item_code", "=", "${itemCode}"], ["is_cancelled", "=", 0]]&fields=["item_code", "actual_qty", "warehouse"]&order_by=posting_date desc, posting_time desc`, {
       method: 'GET',
       headers: {
         'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
@@ -427,7 +427,9 @@ export class ERPNextAPI {
     };
     
     if (filters || company) {
-      const finalFilters = [];
+      const finalFilters = [
+        ['is_cancelled', '=', 0]
+      ];
       
       if (filters && Array.isArray(filters)) {
         finalFilters.push(...filters);
@@ -437,13 +439,13 @@ export class ERPNextAPI {
         finalFilters.push(['company', '=', company]);
       }
       
-      if (finalFilters.length > 0) {
-        params.filters = finalFilters;
-      }
+      params.filters = finalFilters;
+    } else {
+      params.filters = [['is_cancelled', '=', 0]];
     }
     
-    console.log('getStockBalance using Bin doctype with params:', params);
-    return this.makeRequest('Bin', 'GET', null, params);
+    console.log('getStockBalance using Stock Ledger Entry with params:', params);
+    return this.makeRequest('Stock Ledger Entry', 'GET', null, params);
   }
 
   async getSalesOrders(filters?: any, company?: string): Promise<any> {
