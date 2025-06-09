@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ItemDetails {
@@ -39,9 +40,28 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
       return null;
     }
 
-    const erpnext_url = user.user_metadata.erpnext_url;
-    const erpnext_api_key = user.user_metadata.erpnext_api_key;
-    const erpnext_api_secret = user.user_metadata.erpnext_api_secret;
+    // First try to get credentials from the profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('erpnext_url, erpnext_api_key, erpnext_api_secret')
+      .eq('id', user.id)
+      .single();
+
+    let erpnext_url, erpnext_api_key, erpnext_api_secret;
+
+    if (profile && !profileError && profile.erpnext_url && profile.erpnext_api_key && profile.erpnext_api_secret) {
+      // Use profile table data (most up-to-date)
+      erpnext_url = profile.erpnext_url;
+      erpnext_api_key = profile.erpnext_api_key;
+      erpnext_api_secret = profile.erpnext_api_secret;
+      console.log('createERPNextAPI: Using profile table credentials for URL:', erpnext_url);
+    } else {
+      // Fallback to user metadata
+      erpnext_url = user.user_metadata.erpnext_url;
+      erpnext_api_key = user.user_metadata.erpnext_api_key;
+      erpnext_api_secret = user.user_metadata.erpnext_api_secret;
+      console.log('createERPNextAPI: Using user metadata credentials for URL:', erpnext_url);
+    }
 
     if (!erpnext_url || !erpnext_api_key || !erpnext_api_secret) {
       console.error('createERPNextAPI: ERPNext configuration missing for user');
@@ -72,10 +92,45 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
       return null;
     }
 
+    // First try to get the default company from profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('erpnext_default_company, erpnext_url, erpnext_api_key, erpnext_api_secret')
+      .eq('id', user.id)
+      .single();
+
+    let erpnext_url, erpnext_api_key, erpnext_api_secret;
+
+    if (profile && !profileError) {
+      if (profile.erpnext_default_company) {
+        console.log('getUserDefaultCompany: Using profile table default company:', profile.erpnext_default_company);
+        return profile.erpnext_default_company;
+      }
+      
+      // Use profile credentials if available
+      if (profile.erpnext_url && profile.erpnext_api_key && profile.erpnext_api_secret) {
+        erpnext_url = profile.erpnext_url;
+        erpnext_api_key = profile.erpnext_api_key;
+        erpnext_api_secret = profile.erpnext_api_secret;
+      }
+    }
+
+    // Fallback to user metadata if profile data is not available
+    if (!erpnext_url || !erpnext_api_key || !erpnext_api_secret) {
+      erpnext_url = user.user_metadata.erpnext_url;
+      erpnext_api_key = user.user_metadata.erpnext_api_key;
+      erpnext_api_secret = user.user_metadata.erpnext_api_secret;
+    }
+
+    if (!erpnext_url || !erpnext_api_key || !erpnext_api_secret) {
+      console.error('getUserDefaultCompany: ERPNext configuration missing');
+      return null;
+    }
+
     const erpnextAPI = new ERPNextAPI({
-      apiKey: user.user_metadata.erpnext_api_key,
-      apiSecret: user.user_metadata.erpnext_api_secret,
-      baseURL: user.user_metadata.erpnext_url,
+      apiKey: erpnext_api_key,
+      apiSecret: erpnext_api_secret,
+      baseURL: erpnext_url,
     });
 
     const response = await fetch(`${erpnextAPI.baseURL}/api/method/frappe.client.get_value?doctype=User&fieldname=company&filters=%7B%22name%22:%22${user.email}%22%7D`, {
