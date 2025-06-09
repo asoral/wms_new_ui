@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ItemDetails {
@@ -320,10 +319,6 @@ export class ERPNextAPI {
         finalFilters.push(...filters);
       }
       
-      if (company) {
-        finalFilters.push(['company', '=', company]);
-      }
-      
       if (finalFilters.length > 0) {
         params.filters = finalFilters;
       }
@@ -347,25 +342,43 @@ export class ERPNextAPI {
       filters.push(['item_code', 'like', searchValue]);
     }
     
-    if (company) {
-      filters.push(['company', '=', company]);
-    }
-    
     console.log('searchItems filters:', filters);
     return this.getItemsPaginated(filters, ['item_code', 'item_name', 'stock_uom'], company, limit);
   }
 
   async getItemByBarcode(barcode: string, company?: string): Promise<any> {
-    const filters = [['barcode', '=', barcode]];
-    if (company) {
-      filters.push(['company', '=', company]);
-    }
+    console.log('getItemByBarcode called with:', { barcode, company });
     
-    return this.makeRequest('Item', 'GET', null, { filters });
+    try {
+      // First, search for the barcode in Item Barcode doctype
+      const barcodeFilters = [['barcode', '=', barcode]];
+      const barcodeResult = await this.makeRequest('Item Barcode', 'GET', null, { 
+        filters: barcodeFilters,
+        fields: ['parent'] 
+      });
+      
+      console.log('Barcode search result:', barcodeResult);
+      
+      if (barcodeResult.data && barcodeResult.data.length > 0) {
+        const itemCode = barcodeResult.data[0].parent;
+        console.log('Found item code from barcode:', itemCode);
+        
+        // Now get the item details
+        const itemResult = await this.getItemDetails(itemCode);
+        return { data: [itemResult.data] };
+      } else {
+        console.log('No barcode found, returning empty result');
+        return { data: [] };
+      }
+    } catch (error) {
+      console.error('Error in getItemByBarcode:', error);
+      // If Item Barcode doctype doesn't exist, return empty result
+      return { data: [] };
+    }
   }
 
   async getItemStock(itemCode: string): Promise<ItemStock[]> {
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?filters=[["item_code", "=", "${itemCode}"] ]&fields=["item_code", "actual_qty", "warehouse"]`, {
+    const response = await fetch(`${this.baseURL}/api/resource/Bin?filters=[["item_code", "=", "${itemCode}"] ]&fields=["item_code", "actual_qty", "warehouse"]`, {
       method: 'GET',
       headers: {
         'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
@@ -409,15 +422,28 @@ export class ERPNextAPI {
   }
 
   async getStockBalance(filters?: any, company?: string): Promise<any> {
-    const params: any = {};
-    if (filters) params.filters = filters;
-    if (company) {
-      if (!filters) filters = [];
-      filters.push(['company', '=', company]);
-      params.filters = filters;
+    const params: any = {
+      fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'stock_uom']
+    };
+    
+    if (filters || company) {
+      const finalFilters = [];
+      
+      if (filters && Array.isArray(filters)) {
+        finalFilters.push(...filters);
+      }
+      
+      if (company) {
+        finalFilters.push(['company', '=', company]);
+      }
+      
+      if (finalFilters.length > 0) {
+        params.filters = finalFilters;
+      }
     }
     
-    return this.makeRequest('Stock Balance', 'GET', null, params);
+    console.log('getStockBalance using Bin doctype with params:', params);
+    return this.makeRequest('Bin', 'GET', null, params);
   }
 
   async getSalesOrders(filters?: any, company?: string): Promise<any> {
