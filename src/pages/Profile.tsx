@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle, XCircle, Settings, User, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import ERPNextAPI, { configureERPNextAPI, createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
-import { useUser } from '@clerk/clerk-react';
+import { ERPNextAPI, configureERPNextAPI, createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
 
 const Profile = () => {
   const [baseURL, setBaseURL] = useState('');
@@ -18,20 +18,21 @@ const Profile = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "error">("idle");
   const { toast } = useToast();
-  const { user } = useUser();
 
   useEffect(() => {
     const loadConfiguration = async () => {
-      if (user) {
-        const metadata = user.unsafeMetadata;
-        setBaseURL(metadata.erpnextBaseURL as string || '');
-        setApiKey(metadata.erpnextApiKey as string || '');
-        setApiSecret(metadata.erpnextApiSecret as string || '');
-      }
+      // Load from localStorage instead of Clerk metadata
+      const storedBaseURL = localStorage.getItem('erpnextBaseURL') || '';
+      const storedApiKey = localStorage.getItem('erpnextApiKey') || '';
+      const storedApiSecret = localStorage.getItem('erpnextApiSecret') || '';
+      
+      setBaseURL(storedBaseURL);
+      setApiKey(storedApiKey);
+      setApiSecret(storedApiSecret);
     };
 
     loadConfiguration();
-  }, [user]);
+  }, []);
 
   const handleTestConnection = async () => {
     if (!baseURL || !apiKey || !apiSecret) {
@@ -96,15 +97,10 @@ const Profile = () => {
         apiSecret
       });
 
-      if (user) {
-        await user.update({
-          unsafeMetadata: {
-            erpnextBaseURL: baseURL,
-            erpnextApiKey: apiKey,
-            erpnextApiSecret: apiSecret,
-          },
-        });
-      }
+      // Save to localStorage instead of Clerk metadata
+      localStorage.setItem('erpnextBaseURL', baseURL);
+      localStorage.setItem('erpnextApiKey', apiKey);
+      localStorage.setItem('erpnextApiSecret', apiSecret);
 
       toast({
         title: "Success",
