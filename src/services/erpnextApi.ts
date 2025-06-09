@@ -378,19 +378,31 @@ export class ERPNextAPI {
   }
 
   async getItemStock(itemCode: string): Promise<ItemStock[]> {
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?filters=[["item_code", "=", "${itemCode}"], ["is_cancelled", "=", 0]]&fields=["item_code", "actual_qty", "warehouse"]&order_by=posting_date desc, posting_time desc`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    console.log('getItemStock called for item:', itemCode);
+    
+    try {
+      const response = await fetch(`${this.baseURL}/api/resource/Bin?filters=[["item_code", "=", "${itemCode}"]]&fields=["item_code", "actual_qty", "warehouse"]`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to get item stock: ${response.statusText}`);
+      if (!response.ok) {
+        console.error('getItemStock failed:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('getItemStock error response:', errorText);
+        throw new Error(`Failed to get item stock: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('getItemStock result:', result);
+      return result;
+    } catch (error) {
+      console.error('getItemStock error:', error);
+      throw error;
     }
-
-    return response.json();
   }
 
   async getWarehouses(filters?: any, company?: string): Promise<any> {
@@ -422,30 +434,68 @@ export class ERPNextAPI {
   }
 
   async getStockBalance(filters?: any, company?: string): Promise<any> {
+    console.log('getStockBalance called with filters:', filters, 'company:', company);
+    
     const params: any = {
       fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'stock_uom']
     };
     
-    if (filters || company) {
-      const finalFilters = [
-        ['is_cancelled', '=', 0]
-      ];
-      
-      if (filters && Array.isArray(filters)) {
-        finalFilters.push(...filters);
+    try {
+      if (filters || company) {
+        const finalFilters = [];
+        
+        if (filters && Array.isArray(filters)) {
+          finalFilters.push(...filters);
+        }
+        
+        // Only add company filter if company is provided and not empty
+        if (company && company.trim()) {
+          console.log('Adding company filter:', company);
+          finalFilters.push(['company', '=', company]);
+        } else {
+          console.log('No company filter applied - company is empty or undefined');
+        }
+        
+        if (finalFilters.length > 0) {
+          params.filters = finalFilters;
+        }
       }
       
-      if (company) {
-        finalFilters.push(['company', '=', company]);
+      console.log('getStockBalance using Bin doctype with final params:', JSON.stringify(params, null, 2));
+      
+      const result = await this.makeRequest('Bin', 'GET', null, params);
+      console.log('getStockBalance raw result:', result);
+      return result;
+      
+    } catch (error) {
+      console.error('getStockBalance error details:', error);
+      
+      // If Bin access fails, let's try with minimal fields first
+      if (error instanceof Error && error.message.includes('EXPECTATION FAILED')) {
+        console.log('Bin access failed, trying with minimal fields...');
+        
+        try {
+          const minimalParams = {
+            fields: ['item_code', 'warehouse', 'actual_qty']
+          };
+          
+          if (filters && Array.isArray(filters)) {
+            minimalParams.filters = filters;
+          }
+          
+          console.log('Retrying with minimal params:', minimalParams);
+          const retryResult = await this.makeRequest('Bin', 'GET', null, minimalParams);
+          console.log('Retry with minimal fields successful:', retryResult);
+          return retryResult;
+          
+        } catch (retryError) {
+          console.error('Retry with minimal fields also failed:', retryError);
+          throw new Error(`Stock balance access failed. Please check your ERPNext permissions for Bin doctype. Original error: ${error.message}`);
+        }
       }
       
-      params.filters = finalFilters;
-    } else {
-      params.filters = [['is_cancelled', '=', 0]];
+      throw error;
     }
-    
-    console.log('getStockBalance using Stock Ledger Entry with params:', params);
-    return this.makeRequest('Stock Ledger Entry', 'GET', null, params);
   }
 
   async getSalesOrders(filters?: any, company?: string): Promise<any> {
