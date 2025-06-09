@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -266,7 +267,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         currentQty: currentQty,
         actualQty: formData.actualQty,
         uom: selectedItem.stock_uom,
-        useTraditionalEntry: !useBundle && (formData.batch || formData.serial)
+        useTraditionalEntry: !useBundle && (!!formData.batch || !!formData.serial)
       };
 
       console.log('Submitting entry with data:', entryData);

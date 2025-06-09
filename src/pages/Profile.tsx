@@ -118,7 +118,7 @@ const Profile = () => {
 
       const result = await erpnextAPI.testConnection();
       
-      if (result.success) {
+      if (result) {
         setConnectionStatus('success');
         toast({
           title: "Connection Successful",
@@ -133,10 +133,10 @@ const Profile = () => {
         });
       } else {
         setConnectionStatus('error');
-        setConnectionError(result.error || 'Unknown error');
+        setConnectionError('Connection failed');
         toast({
           title: "Connection Failed",
-          description: result.error || "Unable to connect to ERPNext. Please check your credentials.",
+          description: "Unable to connect to ERPNext. Please check your credentials.",
           variant: "destructive"
         });
       }

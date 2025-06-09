@@ -65,14 +65,14 @@ const ItemEnquiry = () => {
       // First, try to find item by barcode
       let itemResult;
       try {
-        const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode, defaultCompany || undefined);
+        const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode);
         
         if (barcodeSearchResult.data && barcodeSearchResult.data.length > 0) {
           itemResult = { data: barcodeSearchResult.data[0] };
         } else {
           // If not found by barcode, try direct item lookup
           try {
-            itemResult = await erpnextAPI.getItem(itemCode);
+            itemResult = await erpnextAPI.getItemDetails(itemCode);
           } catch (err) {
             // If item is not found, try searching
             const searchResult = await erpnextAPI.searchItems(itemCode, defaultCompany || undefined, 10);
@@ -90,7 +90,7 @@ const ItemEnquiry = () => {
       } catch (err) {
         // Try direct item lookup as fallback
         try {
-          itemResult = await erpnextAPI.getItem(itemCode);
+          itemResult = await erpnextAPI.getItemDetails(itemCode);
         } catch (fallbackErr) {
           setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
           setStockData(null);
