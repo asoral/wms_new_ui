@@ -175,18 +175,24 @@ export class ERPNextAPI {
       options.body = JSON.stringify(data);
     }
 
-    const response = await fetch(url, options);
+    try {
+      const response = await fetch(url, options);
+      console.log('Response status:', response.status, response.statusText);
 
-    if (!response.ok) {
-      console.error(`Request failed: ${response.status} ${response.statusText}`);
-      const errorText = await response.text();
-      console.error('Error response:', errorText);
-      throw new Error(`Failed to ${method} ${doctype}: ${response.statusText}`);
+      if (!response.ok) {
+        console.error(`Request failed: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
+        throw new Error(`Failed to ${method} ${doctype}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('API response for', doctype, ':', result);
+      return result;
+    } catch (error) {
+      console.error('Fetch error:', error);
+      throw error;
     }
-
-    const result = await response.json();
-    console.log('API response for', doctype, ':', result);
-    return result;
   }
 
   async getItemDetails(itemCode: string): Promise<any> {
@@ -280,11 +286,10 @@ export class ERPNextAPI {
     ];
     
     if (searchTerm && searchTerm.trim()) {
-      filters.push([
-        ['item_code', 'like', `%${searchTerm}%`],
-        'or',
-        ['item_name', 'like', `%${searchTerm}%`]
-      ]);
+      // Use separate API calls for OR conditions since ERPNext filters don't support complex OR easily
+      // For now, search by item_code and item_name separately and combine results
+      const searchValue = `%${searchTerm}%`;
+      filters.push(['item_code', 'like', searchValue]);
     }
     
     if (company) {
