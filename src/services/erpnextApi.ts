@@ -197,7 +197,9 @@ export class ERPNextAPI {
   }
 
   async getItems(filters?: any, fields?: string[], company?: string): Promise<any> {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 50
+    };
     if (filters) params.filters = filters;
     if (fields) params.fields = fields;
     if (company) {
@@ -268,7 +270,10 @@ export class ERPNextAPI {
   }
 
   async getWarehouses(filters?: any, company?: string): Promise<any> {
-    const params: any = {};
+    const params: any = {
+      limit_page_length: 50,
+      fields: ['name', 'warehouse_name', 'company', 'is_group']
+    };
     if (filters) params.filters = filters;
     if (company) {
       const companyFilters = filters ? [...filters] : [];
