@@ -1,6 +1,6 @@
-
 import { Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/components/auth/AuthContext";
 import { SubscriptionProvider } from "@/components/subscription/SubscriptionContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -65,190 +65,192 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => (
 
 const App = () => {
   return (
-    <Router>
-      <AuthProvider>
-        <SubscriptionProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/auth" element={<AuthForm />} />
-            <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-            <Route path="/" element={<Navigate to="/home" replace />} />
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <Router>
+        <AuthProvider>
+          <SubscriptionProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/auth" element={<AuthForm />} />
+              <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+              <Route path="/" element={<Navigate to="/home" replace />} />
 
-            {/* Protected routes that require authentication and subscription */}
-            <Route path="/home" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <Home />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/receive" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <Receive />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/pick-list" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <PickList />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/stock-entry" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <StockEntry />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/material-request" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <MaterialRequest />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/packing" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <Packing />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/deliver" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <Deliver />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/item-enquiry" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <ItemEnquiry />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/bin-enquiry" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <BinEnquiry />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/stock-count" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <StockCount />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/pallet" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <Pallet />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <Profile />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/reports" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <Reports />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/print-label" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <PrintLabel />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/quality" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <QualityCheck />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/sync" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <Sync />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="*" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <AppLayout>
-                    <NotFound />
-                  </AppLayout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-          </Routes>
-          <Toaster />
-        </SubscriptionProvider>
-      </AuthProvider>
-    </Router>
+              {/* Protected routes that require authentication and subscription */}
+              <Route path="/home" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <Home />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/receive" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <Receive />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/pick-list" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <PickList />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/stock-entry" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <StockEntry />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/material-request" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <MaterialRequest />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/packing" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <Packing />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/deliver" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <Deliver />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/item-enquiry" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <ItemEnquiry />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/bin-enquiry" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <BinEnquiry />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/stock-count" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <StockCount />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/pallet" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <Pallet />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <Profile />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/reports" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <Reports />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/print-label" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <PrintLabel />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/quality" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <QualityCheck />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/sync" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <Sync />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="*" element={
+                <ProtectedRoute>
+                  <SubscriptionGuard>
+                    <AppLayout>
+                      <NotFound />
+                    </AppLayout>
+                  </SubscriptionGuard>
+                </ProtectedRoute>
+              } />
+            </Routes>
+            <Toaster />
+          </SubscriptionProvider>
+        </AuthProvider>
+      </Router>
+    </ThemeProvider>
   );
 };
 
