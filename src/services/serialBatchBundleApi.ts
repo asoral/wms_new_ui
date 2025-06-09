@@ -39,13 +39,28 @@ export const createSerialBatchBundle = async (bundleData: SerialBatchBundle): Pr
 
     console.log('Creating Serial and Batch Bundle:', bundleData);
     
+    // Format data according to ERPNext API requirements
+    const formattedData = {
+      item_code: bundleData.item_code,
+      warehouse: bundleData.warehouse,
+      type_of_transaction: bundleData.type_of_transaction,
+      total_qty: bundleData.total_qty,
+      posting_date: bundleData.posting_date || new Date().toISOString().split('T')[0],
+      posting_time: bundleData.posting_time || new Date().toTimeString().split(' ')[0].slice(0, 8),
+      entries: bundleData.entries.map(entry => ({
+        qty: entry.qty || 1,
+        ...(entry.serial_no && { serial_no: entry.serial_no }),
+        ...(entry.batch_no && { batch_no: entry.batch_no })
+      }))
+    };
+
     const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Serial and Batch Bundle`, {
       method: 'POST',
       headers: {
         'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(bundleData)
+      body: JSON.stringify(formattedData)
     });
 
     if (!response.ok) {

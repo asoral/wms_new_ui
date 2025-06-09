@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,6 @@ import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useNotification } from "@/hooks/useNotification";
 import { toast } from "sonner";
 
-// Import components with proper error handling
 import StockCountForm from "@/components/stock-count/StockCountForm";
 import StockCountSummary from "@/components/stock-count/StockCountSummary";
 import StockCountTable from "@/components/stock-count/StockCountTable";
@@ -67,7 +67,6 @@ const StockCount = () => {
     }
   }, []);
 
-  // Save session to localStorage whenever it changes
   useEffect(() => {
     if (session) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
@@ -112,7 +111,7 @@ const StockCount = () => {
 
       const company = await getUserDefaultCompany();
       
-      // Prepare Stock Reconciliation data with bundle support
+      // Prepare Stock Reconciliation data with correct format
       const stockReconciliationData = {
         purpose: session?.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
         set_warehouse: firstEntry.warehouse,
@@ -124,9 +123,12 @@ const StockCount = () => {
           warehouse: firstEntry.warehouse,
           qty: firstEntry.actualQty,
           valuation_rate: 0,
-          batch_no: firstEntry.serialBatchBundle ? '' : (firstEntry.batch || ''),
-          serial_no: firstEntry.serialBatchBundle ? '' : (firstEntry.serial || ''),
-          serial_and_batch_bundle: firstEntry.serialBatchBundle || ''
+          ...(firstEntry.serialBatchBundle ? { 
+            serial_and_batch_bundle: firstEntry.serialBatchBundle 
+          } : {
+            ...(firstEntry.batch && { batch_no: firstEntry.batch }),
+            ...(firstEntry.serial && { serial_no: firstEntry.serial })
+          })
         }]
       };
 
@@ -167,18 +169,19 @@ const StockCount = () => {
         return false;
       }
 
-      const company = await getUserDefaultCompany();
-      
-      // Prepare updated data with bundle support
+      // Prepare updated data with correct format
       const updatedData = {
         items: allEntries.map(entry => ({
           item_code: entry.itemCode,
           warehouse: entry.warehouse,
           qty: entry.actualQty,
           valuation_rate: 0,
-          batch_no: entry.serialBatchBundle ? '' : (entry.batch || ''),
-          serial_no: entry.serialBatchBundle ? '' : (entry.serial || ''),
-          serial_and_batch_bundle: entry.serialBatchBundle || ''
+          ...(entry.serialBatchBundle ? { 
+            serial_and_batch_bundle: entry.serialBatchBundle 
+          } : {
+            ...(entry.batch && { batch_no: entry.batch }),
+            ...(entry.serial && { serial_no: entry.serial })
+          })
         }))
       };
 
@@ -278,6 +281,31 @@ const StockCount = () => {
     }
     
     try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast.error('ERPNext API not configured');
+        return;
+      }
+
+      // Submit the Stock Reconciliation document
+      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Stock Reconciliation/${session.stockReconciliationNumber}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          docstatus: 1 // Submit the document
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to submit Stock Reconciliation:', errorText);
+        toast.error('Failed to submit Stock Reconciliation');
+        return;
+      }
+
       // Mark as submitted
       const submittedSession = {
         ...session,
@@ -342,13 +370,12 @@ const StockCount = () => {
         </div>
 
         {!session ? (
-          /* Session Setup */
+          /* ... keep existing code (Session Setup) */
           <Card>
             <CardHeader>
               <CardTitle>Start Stock Count Session</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Warehouse Selection */}
               <div>
                 <Label htmlFor="warehouse">Select Warehouse *</Label>
                 <div className="mt-2">
@@ -359,7 +386,6 @@ const StockCount = () => {
                 </div>
               </div>
 
-              {/* Purpose Selection */}
               <div>
                 <Label>Select Count Purpose *</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">

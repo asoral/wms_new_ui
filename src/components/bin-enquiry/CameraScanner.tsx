@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Camera, X, Zap, ZapOff } from "lucide-react";
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 
 interface CameraScannerProps {
   onBarcodeDetected: (code: string) => void;
@@ -12,12 +13,12 @@ interface CameraScannerProps {
 
 const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flashSupported, setFlashSupported] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
+  const codeReader = useRef<BrowserMultiFormatReader | null>(null);
 
   useEffect(() => {
     if (isActive) {
@@ -49,17 +50,16 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
         videoRef.current.play();
       }
 
-      // Check if flash is supported
+      // Check if flash is supported (simplified check)
       const track = mediaStream.getVideoTracks()[0];
       const capabilities = track.getCapabilities();
-      setFlashSupported(!!capabilities.torch);
+      setFlashSupported('torch' in capabilities);
 
       setIsScanning(true);
       
-      // Start scanning loop
-      setTimeout(() => {
-        scanForBarcode();
-      }, 1000);
+      // Initialize barcode scanner
+      codeReader.current = new BrowserMultiFormatReader();
+      startBarcodeScanning();
 
     } catch (err) {
       console.error('Error accessing camera:', err);
@@ -67,10 +67,35 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
     }
   };
 
+  const startBarcodeScanning = async () => {
+    if (!codeReader.current || !videoRef.current) return;
+
+    try {
+      const result = await codeReader.current.decodeFromVideoDevice(
+        undefined,
+        videoRef.current,
+        (result, err) => {
+          if (result) {
+            console.log('Barcode detected:', result.getText());
+            handleBarcodeFound(result.getText());
+          }
+          if (err && !(err instanceof NotFoundException)) {
+            console.error('Barcode scanning error:', err);
+          }
+        }
+      );
+    } catch (err) {
+      console.error('Error starting barcode scanning:', err);
+    }
+  };
+
   const stopCamera = () => {
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
+    }
+    if (codeReader.current) {
+      codeReader.current.reset();
     }
     setIsScanning(false);
     setFlashOn(false);
@@ -87,43 +112,6 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
       setFlashOn(!flashOn);
     } catch (err) {
       console.error('Error toggling flash:', err);
-    }
-  };
-
-  const scanForBarcode = () => {
-    if (!isScanning || !videoRef.current || !canvasRef.current) {
-      return;
-    }
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-
-    if (!context || video.videoWidth === 0) {
-      setTimeout(scanForBarcode, 100);
-      return;
-    }
-
-    // Set canvas size to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    // Draw current video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // Simulate barcode detection (in a real implementation, you'd use a barcode library)
-    // For now, we'll simulate finding a barcode after a delay
-    simulateBarcodeDetection();
-
-    // Continue scanning
-    setTimeout(scanForBarcode, 100);
-  };
-
-  const simulateBarcodeDetection = () => {
-    // Simulate barcode detection with a random chance
-    if (Math.random() < 0.002) { // 0.2% chance per frame
-      const simulatedBarcode = `WH-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-      handleBarcodeFound(simulatedBarcode);
     }
   };
 
@@ -203,9 +191,6 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
               </div>
             </div>
           </div>
-
-          {/* Hidden canvas for frame capture */}
-          <canvas ref={canvasRef} className="hidden" />
         </div>
 
         <div className="mt-4 text-sm text-gray-600 text-center">

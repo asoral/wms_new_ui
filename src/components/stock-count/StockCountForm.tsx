@@ -4,12 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scan, Plus, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Loader2, AlertCircle } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useNotification } from "@/hooks/useNotification";
 import { toast } from "sonner";
 import ItemSelector from "./ItemSelector";
 import SerialBatchBundleSelector from './SerialBatchBundleSelector';
+import CameraScanner from "../bin-enquiry/CameraScanner";
 
 interface ItemInfo {
   item_code: string;
@@ -46,6 +47,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
   const [currentQty, setCurrentQty] = useState<number>(0);
   const [isLoadingQty, setIsLoadingQty] = useState(false);
   const [qtyError, setQtyError] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
   const { showError, showSuccess, showLoading, dismiss } = useNotification();
 
   const [useBundle, setUseBundle] = useState(false);
@@ -77,27 +79,46 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
     }
   };
 
-  const handleItemScan = () => {
-    setIsScanning(true);
+  const handleBarcodeDetected = async (barcode: string) => {
+    console.log('Barcode detected in StockCountForm:', barcode);
+    setShowCamera(false);
     
-    setTimeout(() => {
-      const scannedItem = {
-        item_code: "ITM-001",
-        item_name: "Sample Scanned Item",
-        stock_uom: "Nos",
-        has_batch_no: 0,
-        has_serial_no: 0
-      };
-      setSelectedItem(scannedItem);
-      setIsScanning(false);
-      fetchCurrentQty(scannedItem.item_code);
-    }, 2000);
+    const loadingToast = showLoading('Looking up item by barcode...');
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        showError('ERPNext API not configured');
+        return;
+      }
+
+      // Look up item by barcode
+      const itemByBarcode = await erpnextAPI.getItemByBarcode(barcode);
+      if (itemByBarcode && itemByBarcode.data && itemByBarcode.data.length > 0) {
+        const item = itemByBarcode.data[0];
+        const itemInfo: ItemInfo = {
+          item_code: item.item_code,
+          item_name: item.item_name,
+          stock_uom: item.stock_uom,
+          has_batch_no: item.has_batch_no || 0,
+          has_serial_no: item.has_serial_no || 0
+        };
+        await handleItemSelected(itemInfo);
+        showSuccess('Item found by barcode!');
+      } else {
+        showError('No item found with this barcode');
+      }
+    } catch (error) {
+      console.error('Failed to lookup item by barcode:', error);
+      showError('Failed to lookup item by barcode');
+    } finally {
+      dismiss(loadingToast);
+    }
   };
 
   const handleItemSelected = async (item: ItemInfo) => {
     console.log('Item selected, setting item data:', item);
     
-    // Set the item immediately to prevent reset
     setSelectedItem(item);
     
     const loadingToast = showLoading('Fetching item details...');
@@ -106,11 +127,9 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         showError('ERPNext API not configured');
-        // Keep the item selected even if API fails
         return;
       }
 
-      // Get full item details including batch/serial tracking
       const itemDetails = await erpnextAPI.getItemDetails(item.item_code);
       if (itemDetails.data) {
         const fullItem = {
@@ -122,16 +141,40 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         setSelectedItem(fullItem);
         await fetchCurrentQty(fullItem.item_code);
       } else {
-        // Keep the original item if details fetch fails
         console.log('Keeping original item data');
         await fetchCurrentQty(item.item_code);
       }
     } catch (error) {
       console.error('Failed to fetch item details:', error);
-      // Keep the original item even if there's an error
       await fetchCurrentQty(item.item_code);
     } finally {
       dismiss(loadingToast);
+    }
+  };
+
+  const validateBatch = async (batchNo: string, itemCode: string) => {
+    if (!batchNo || !itemCode) return true;
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return true;
+
+      // Check if batch exists
+      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch/${batchNo}`, {
+        headers: {
+          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const batch = await response.json();
+        return batch.data.item === itemCode;
+      }
+      return false;
+    } catch (error) {
+      console.error('Batch validation error:', error);
+      return false;
     }
   };
 
@@ -153,7 +196,6 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       return;
     }
 
-    // Validate based on whether using bundle or traditional method
     if (useBundle && !formData.serialBatchBundle) {
       toast.error('Please create a Serial and Batch Bundle first');
       return;
@@ -168,6 +210,15 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       if (selectedItem.has_serial_no && !formData.serial) {
         toast.error('Serial number is required for this item');
         return;
+      }
+
+      // Validate batch if provided
+      if (formData.batch) {
+        const isValidBatch = await validateBatch(formData.batch, selectedItem.item_code);
+        if (!isValidBatch) {
+          toast.error('Invalid batch number for this item');
+          return;
+        }
       }
     }
 
@@ -242,27 +293,25 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
             </TabsContent>
 
             <TabsContent value="scan" className="space-y-4">
-              <div className="text-center">
-                <Button 
-                  type="button"
-                  onClick={handleItemScan} 
-                  disabled={isScanning}
-                  size="lg"
-                  className="w-full"
-                >
-                  {isScanning ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Scanning...
-                    </>
-                  ) : (
-                    <>
-                      <Scan className="w-4 h-4 mr-2" />
-                      Scan Item
-                    </>
-                  )}
-                </Button>
-              </div>
+              {!showCamera ? (
+                <div className="text-center">
+                  <Button 
+                    type="button"
+                    onClick={() => setShowCamera(true)} 
+                    disabled={isScanning}
+                    size="lg"
+                    className="w-full"
+                  >
+                    Start Camera Scanner
+                  </Button>
+                </div>
+              ) : (
+                <CameraScanner
+                  onBarcodeDetected={handleBarcodeDetected}
+                  isActive={showCamera}
+                  onClose={() => setShowCamera(false)}
+                />
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
