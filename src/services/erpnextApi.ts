@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ItemDetails {
@@ -436,48 +437,93 @@ export class ERPNextAPI {
   async getStockBalance(filters?: any, company?: string): Promise<any> {
     console.log('getStockBalance called with filters:', filters, 'company:', company);
     
-    const params: any = {
-      fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'valuation_rate']
-    };
-    
-    if (filters || company) {
-      const finalFilters = [];
+    try {
+      // Try to use Stock Ledger Entry for more accurate stock calculation
+      const params: any = {
+        fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'valuation_rate'],
+        limit_page_length: 1000
+      };
+      
+      if (filters || company) {
+        const finalFilters = [];
+        
+        if (filters && Array.isArray(filters)) {
+          finalFilters.push(...filters);
+        }
+        
+        if (finalFilters.length > 0) {
+          params.filters = finalFilters;
+        }
+      }
+      
+      console.log('Using Stock Ledger Entry with params:', params);
+      
+      // Get the latest stock ledger entries
+      const response = await fetch(`${this.baseURL}/api/method/frappe.client.get_list?doctype=Stock Ledger Entry&fields=["item_code","warehouse","actual_qty","stock_value","valuation_rate"]&filters=${JSON.stringify(params.filters || [])}&limit_page_length=1000&order_by=posting_date desc, posting_time desc`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Stock Ledger Entry result:', result);
+        
+        if (result.message && Array.isArray(result.message)) {
+          // Group by item_code and warehouse to get latest stock for each combination
+          const stockMap = new Map();
+          
+          result.message.forEach((entry: any) => {
+            const key = `${entry.item_code}||${entry.warehouse}`;
+            if (!stockMap.has(key) && entry.actual_qty > 0) {
+              stockMap.set(key, {
+                item_code: entry.item_code,
+                warehouse: entry.warehouse,
+                actual_qty: entry.actual_qty,
+                stock_uom: 'Nos',
+                stock_value: entry.stock_value || (entry.actual_qty * (entry.valuation_rate || 0))
+              });
+            }
+          });
+          
+          const transformedData = Array.from(stockMap.values());
+          console.log('Transformed Stock Ledger data:', transformedData);
+          return { data: transformedData };
+        }
+      }
+    } catch (error) {
+      console.error('Stock Ledger Entry failed, falling back to Bin:', error);
+    }
+
+    // Fallback to Bin doctype without company filter
+    try {
+      const params: any = {
+        fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'valuation_rate']
+      };
       
       if (filters && Array.isArray(filters)) {
-        finalFilters.push(...filters);
+        params.filters = filters;
       }
       
-      // Only add company filter if company is provided and not empty
-      if (company && company.trim()) {
-        console.log('Adding company filter:', company);
-        // Try without company filter first if it's causing issues
-        // finalFilters.push(['company', '=', company]);
-      }
+      console.log('Fallback to Bin with params:', params);
       
-      if (finalFilters.length > 0) {
-        params.filters = finalFilters;
-      }
-    }
-    
-    console.log('getStockBalance with params:', params);
-    
-    try {
       const result = await this.makeRequest('Bin', 'GET', null, params);
       console.log('Bin result:', result);
       
-      // Transform Bin data to include stock_value
       if (result.data && Array.isArray(result.data)) {
         const transformedData = result.data
-          .filter((item: any) => item.actual_qty > 0) // Only show items with positive stock
+          .filter((item: any) => item.actual_qty > 0)
           .map((item: any) => ({
             item_code: item.item_code,
             warehouse: item.warehouse,
             actual_qty: item.actual_qty,
-            stock_uom: 'Nos', // Default UOM
+            stock_uom: 'Nos',
             stock_value: item.stock_value || (item.actual_qty * (item.valuation_rate || 0))
           }));
         
-        console.log('Transformed data:', transformedData);
+        console.log('Transformed Bin data:', transformedData);
         return { data: transformedData };
       }
       
