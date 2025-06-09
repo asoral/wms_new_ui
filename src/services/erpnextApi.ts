@@ -1,3 +1,4 @@
+
 import { getAccessToken } from './authService';
 import { offlineStorage } from './offlineStorage';
 
@@ -23,6 +24,7 @@ interface Item {
 interface Warehouse {
   name: string;
   is_group: number;
+  warehouse_name?: string;
 }
 
 interface StockBalance {
@@ -52,10 +54,15 @@ interface DeliveryNote {
 interface PurchaseOrder {
   name: string;
   supplier: string;
+  supplier_name?: string;
+  schedule_date?: string;
+  transaction_date?: string;
+  grand_total?: number;
+  status?: string;
+  items?: any[];
   company: string;
   base_grand_total: number;
   currency: string;
-  status: string;
 }
 
 interface PurchaseReceipt {
@@ -237,6 +244,41 @@ class ERPNextAPI {
     return response.json();
   }
 
+  async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
+    return this.getItems(undefined, searchTerm, company);
+  }
+
+  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit: number = 20, page: number = 1): Promise<ERPNextResponse<Item[]>> {
+    const params = new URLSearchParams();
+    
+    const stockItemFilters = {
+      is_stock_item: 1,
+      ...filters
+    };
+    
+    if (stockItemFilters) {
+      params.append('filters', JSON.stringify(stockItemFilters));
+    }
+    if (fields) {
+      params.append('fields', JSON.stringify(fields));
+    }
+    if (company) {
+      params.append('company', company);
+    }
+    params.append('limit', limit.toString());
+    params.append('offset', ((page - 1) * limit).toString());
+
+    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch items: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async getWarehouses(filters?: any, company?: string): Promise<ERPNextResponse<Warehouse[]>> {
     const params = new URLSearchParams();
     
@@ -340,6 +382,18 @@ class ERPNextAPI {
     return response.json();
   }
 
+  async getSalesOrder(salesOrderName: string): Promise<ERPNextResponse<SalesOrder>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Sales Order/${encodeURIComponent(salesOrderName)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sales order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async getDeliveryNotes(filters?: any, company?: string): Promise<ERPNextResponse<DeliveryNote[]>> {
     const params = new URLSearchParams();
     if (filters) {
@@ -380,6 +434,18 @@ class ERPNextAPI {
     return response.json();
   }
 
+  async getPurchaseOrder(purchaseOrderName: string): Promise<ERPNextResponse<PurchaseOrder>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order/${encodeURIComponent(purchaseOrderName)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async getPurchaseReceipts(filters?: any, company?: string): Promise<ERPNextResponse<PurchaseReceipt[]>> {
     const params = new URLSearchParams();
     if (filters) {
@@ -395,6 +461,22 @@ class ERPNextAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to fetch purchase receipts: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createPurchaseReceipt(data: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to create Purchase Receipt:', errorText);
+      throw new Error(`Failed to create Purchase Receipt: ${response.statusText}`);
     }
 
     return response.json();
@@ -500,7 +582,7 @@ class ERPNextAPI {
     return response.json();
   }
 
-    async getProductBundles(filters?: any, company?: string): Promise<ERPNextResponse<ProductBundle[]>> {
+  async getProductBundles(filters?: any, company?: string): Promise<ERPNextResponse<ProductBundle[]>> {
     const params = new URLSearchParams();
     if (filters) {
       params.append('filters', JSON.stringify(filters));
@@ -515,6 +597,23 @@ class ERPNextAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to fetch product bundles: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getStockAgingReport(filters?: any): Promise<ERPNextResponse<any[]>> {
+    const params = new URLSearchParams();
+    if (filters) {
+      params.append('filters', JSON.stringify(filters));
+    }
+
+    const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock aging report: ${response.statusText}`);
     }
 
     return response.json();
@@ -602,4 +701,6 @@ class ERPNextAPI {
   }
 }
 
+// Export both default and named export for compatibility
+export { ERPNextAPI };
 export default ERPNextAPI;
