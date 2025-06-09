@@ -209,6 +209,57 @@ export class ERPNextAPI {
     return response.json();
   }
 
+  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit: number = 20, page: number = 1): Promise<any> {
+    console.log('getItemsPaginated called with:', { filters, fields, company, limit, page });
+    
+    let filterString = '';
+    if (filters) {
+      filterString = '&filters=' + encodeURIComponent(JSON.stringify(filters));
+    }
+  
+    let fieldsString = '';
+    if (fields) {
+      fieldsString = '&fields=' + encodeURIComponent(JSON.stringify(fields));
+    }
+  
+    let companyFilter = '';
+    if (company) {
+      companyFilter = `&company=${encodeURIComponent(company)}`;
+    }
+
+    const limitStart = (page - 1) * limit;
+    
+    const response = await fetch(`${this.baseURL}/api/resource/Item?limit_page_length=${limit}&limit_start=${limitStart}${filterString}${fieldsString}${companyFilter}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get items paginated: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<any> {
+    console.log('searchItems called with:', { searchTerm, company, limit });
+    
+    const filters = [
+      ['disabled', '=', 0]
+    ];
+    
+    if (searchTerm && searchTerm.trim()) {
+      const searchValue = `%${searchTerm}%`;
+      filters.push(['item_code', 'like', searchValue]);
+    }
+    
+    console.log('searchItems filters:', filters);
+    return this.getItemsPaginated(filters, ['item_code', 'item_name', 'stock_uom'], company, limit);
+  }
+
   async getItemDetails(itemCode: string): Promise<any> {
     const response = await fetch(`${this.baseURL}/api/resource/Item/${encodeURIComponent(itemCode)}`, {
       method: 'GET',
@@ -223,6 +274,10 @@ export class ERPNextAPI {
     }
 
     return response.json();
+  }
+
+  async getItem(itemCode: string): Promise<any> {
+    return this.getItemDetails(itemCode);
   }
 
   async getItemByBarcode(barcode: string): Promise<any> {
@@ -355,6 +410,22 @@ export class ERPNextAPI {
     return response.json();
   }
 
+  async getSalesOrder(soNumber: string): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/resource/Sales Order/${soNumber}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get sales order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async getDeliveryNotes(filters?: any, company?: string): Promise<any> {
     let filterString = '';
     if (filters) {
@@ -407,6 +478,22 @@ export class ERPNextAPI {
     return response.json();
   }
 
+  async getPurchaseOrder(poNumber: string): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order/${poNumber}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get purchase order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async getPurchaseReceipts(filters?: any, company?: string): Promise<any> {
     let filterString = '';
     if (filters) {
@@ -428,6 +515,23 @@ export class ERPNextAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to get purchase receipts: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createPurchaseReceipt(data: any): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create purchase receipt: ${response.statusText}`);
     }
 
     return response.json();
@@ -584,6 +688,39 @@ export class ERPNextAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to get product bundles: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getStockAgingReport(filters?: any): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filters: filters || {} })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get stock aging report: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getCompanies(): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/resource/Company?fields=["name","company_name"]`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get companies: ${response.statusText}`);
     }
 
     return response.json();
