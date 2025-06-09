@@ -418,10 +418,44 @@ export class ERPNextAPI {
   async getItemByBarcode(barcode: string, company?: string): Promise<any> {
     console.log('getItemByBarcode called with:', { barcode, company });
     
-    // Skip barcode lookup due to permission issues, just return empty result
-    // The calling code will fall back to direct item search
-    console.log('Skipping barcode lookup due to permission restrictions');
-    return { data: [] };
+    try {
+      // Query the tabItem Barcode child table to find items with this barcode
+      const response = await fetch(`${this.baseURL}/api/resource/tabItem Barcode?filters=[["barcode", "=", "${barcode}"]]&fields=["parent", "barcode"]`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error('getItemByBarcode failed:', response.status, response.statusText);
+        return { data: [] };
+      }
+
+      const result = await response.json();
+      console.log('Barcode lookup result:', result);
+
+      if (!result.data || result.data.length === 0) {
+        console.log('No items found with barcode:', barcode);
+        return { data: [] };
+      }
+
+      // Get the parent item code from the first matching barcode
+      const parentItemCode = result.data[0].parent;
+      console.log('Found parent item code:', parentItemCode);
+
+      // Now fetch the full item details using the parent item code
+      const itemDetails = await this.getItemDetails(parentItemCode);
+      console.log('Item details for barcode:', itemDetails);
+
+      // Return in the expected format
+      return { data: [itemDetails.data] };
+
+    } catch (error) {
+      console.error('getItemByBarcode error:', error);
+      return { data: [] };
+    }
   }
 
   async getItemStock(itemCode: string): Promise<ItemStock[]> {
