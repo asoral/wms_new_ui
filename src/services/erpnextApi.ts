@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ItemDetails {
@@ -199,12 +198,12 @@ export class ERPNextAPI {
 
   async getItems(filters?: any, fields?: string[], company?: string): Promise<any> {
     const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (fields) params.fields = JSON.stringify(fields);
+    if (filters) params.filters = filters;
+    if (fields) params.fields = fields;
     if (company) {
       const companyFilters = filters ? [...filters] : [];
       companyFilters.push(['company', '=', company]);
-      params.filters = JSON.stringify(companyFilters);
+      params.filters = companyFilters;
     }
     
     return this.makeRequest('Item', 'GET', null, params);
@@ -215,12 +214,12 @@ export class ERPNextAPI {
       limit_page_length: limit,
       limit_start: (page - 1) * limit
     };
-    if (filters) params.filters = JSON.stringify(filters);
-    if (fields) params.fields = JSON.stringify(fields);
+    if (filters) params.filters = filters;
+    if (fields) params.fields = fields;
     if (company) {
       const companyFilters = filters ? [...filters] : [];
       companyFilters.push(['company', '=', company]);
-      params.filters = JSON.stringify(companyFilters);
+      params.filters = companyFilters;
     }
     
     return this.makeRequest('Item', 'GET', null, params);
@@ -229,7 +228,11 @@ export class ERPNextAPI {
   async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<any> {
     const filters = [
       ['disabled', '=', 0],
-      ['item_name', 'like', `%${searchTerm}%`]
+      [
+        ['item_code', 'like', `%${searchTerm}%`],
+        'or',
+        ['item_name', 'like', `%${searchTerm}%`]
+      ]
     ];
     
     if (company) {
@@ -266,11 +269,11 @@ export class ERPNextAPI {
 
   async getWarehouses(filters?: any, company?: string): Promise<any> {
     const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
+    if (filters) params.filters = filters;
     if (company) {
       const companyFilters = filters ? [...filters] : [];
       companyFilters.push(['company', '=', company]);
-      params.filters = JSON.stringify(companyFilters);
+      params.filters = companyFilters;
     }
     
     return this.makeRequest('Warehouse', 'GET', null, params);

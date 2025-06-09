@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { offlineStorage } from "@/services/offlineStorage";
+import { useLocation } from "react-router-dom";
 
 interface ItemScannerProps {
   onItemScanned: (itemCode: string) => void;
@@ -35,6 +36,22 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
+  const location = useLocation();
+
+  // Close popover when route changes
+  useEffect(() => {
+    setOpen(false);
+    setIsScanning(false);
+    stopCamera();
+  }, [location.pathname]);
+
+  // Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      setOpen(false);
+      stopCamera();
+    };
+  }, []);
 
   // Monitor online status
   useEffect(() => {
@@ -50,16 +67,9 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
     };
   }, []);
 
-  // Debounced search function
-  const searchItems = useMemo(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    return (searchValue: string, isNewSearch: boolean = false) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(async () => {
-        await fetchItems(searchValue, isNewSearch);
-      }, 300);
-    };
+  // Initial load
+  useEffect(() => {
+    fetchItems("", true);
   }, []);
 
   // Fetch items with search and pagination
@@ -77,20 +87,8 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
               item.item_name.toLowerCase().includes(search.toLowerCase())
             );
           }
-          setItems(filteredItems.slice(0, 20)); // Show first 20 items
+          setItems(filteredItems.slice(0, 20));
           setHasMore(filteredItems.length > 20);
-          toast({
-            title: "Offline Mode",
-            description: "Showing cached items list",
-            variant: "default"
-          });
-          return;
-        } else {
-          toast({
-            title: "No Cached Data",
-            description: "No items available offline. Please connect to internet.",
-            variant: "destructive"
-          });
           return;
         }
       }
@@ -100,76 +98,41 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
         const defaultCompany = await getUserDefaultCompany();
         const pageToFetch = isNewSearch ? 1 : currentPage;
         
-        // Build search filters
-        let filters: any[] = [
-          ['disabled', '=', 0] // Only enabled items
-        ];
-        
+        let result;
         if (search.trim()) {
-          // Create OR condition for item_code and item_name search
-          filters.push([
-            ['item_code', 'like', `%${search}%`],
-            'or',
-            ['item_name', 'like', `%${search}%`]
-          ]);
+          result = await erpnextAPI.searchItems(search, defaultCompany || undefined, 20);
+        } else {
+          result = await erpnextAPI.getItemsPaginated(
+            [['disabled', '=', 0]],
+            ['item_code', 'item_name', 'stock_uom'],
+            defaultCompany || undefined,
+            20,
+            pageToFetch
+          );
         }
-        
-        const result = await erpnextAPI.getItemsPaginated(
-          filters,
-          ['item_code', 'item_name', 'stock_uom'],
-          defaultCompany || undefined,
-          20, // limit per page
-          pageToFetch
-        );
         
         if (result.data) {
           if (isNewSearch) {
             setItems(result.data);
             setCurrentPage(1);
             
-            // Cache all items for offline use (only if no search term to get full list)
             if (!search.trim()) {
-              await offlineStorage.cacheData('items_list', result.data, 3600000); // Cache for 1 hour
+              await offlineStorage.cacheData('items_list', result.data, 3600000);
             }
           } else {
             setItems(prev => [...prev, ...result.data]);
           }
           
-          // Check if there are more items
           setHasMore(result.data.length === 20);
           
           if (!isNewSearch) {
             setCurrentPage(prev => prev + 1);
           }
         }
-      } else {
-        // Try to load from cache if API is not available
-        try {
-          const cachedItems = await offlineStorage.getCachedData('items_list');
-          if (cachedItems) {
-            let filteredItems = cachedItems;
-            if (search.trim()) {
-              filteredItems = cachedItems.filter((item: Item) => 
-                item.item_code.toLowerCase().includes(search.toLowerCase()) ||
-                item.item_name.toLowerCase().includes(search.toLowerCase())
-              );
-            }
-            setItems(filteredItems.slice(0, 20));
-            setHasMore(filteredItems.length > 20);
-            toast({
-              title: "API Not Available",
-              description: "Showing cached items list. Please configure ERPNext settings.",
-              variant: "default"
-            });
-          }
-        } catch (cacheError) {
-          console.error('Cache access failed:', cacheError);
-        }
       }
     } catch (error) {
       console.error('Failed to fetch items:', error);
       
-      // Try to load from cache if online request fails
       try {
         const cachedItems = await offlineStorage.getCachedData('items_list');
         if (cachedItems) {
@@ -182,11 +145,6 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
           }
           setItems(filteredItems.slice(0, 20));
           setHasMore(filteredItems.length > 20);
-          toast({
-            title: "Using Cached Data",
-            description: "Network error. Showing cached items list.",
-            variant: "default"
-          });
         }
       } catch (cacheError) {
         console.error('Cache access failed:', cacheError);
@@ -196,9 +154,16 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
     }
   };
 
-  // Initial load
-  useEffect(() => {
-    fetchItems("", true);
+  // Debounced search function
+  const searchItems = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    return (searchValue: string, isNewSearch: boolean = false) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(async () => {
+        await fetchItems(searchValue, isNewSearch);
+      }, 300);
+    };
   }, []);
 
   // Handle search term changes
@@ -342,7 +307,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                           }
                         </div>
                         {selectedItem && (
-                          <div className="text-sm text-gray-500 truncate">
+                          <div className="text-sm text-muted-foreground truncate">
                             {selectedItem.item_name}
                           </div>
                         )}
@@ -350,7 +315,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0 bg-white z-50">
+                  <PopoverContent className="w-full p-0">
                     <Command>
                       <CommandInput 
                         placeholder="Search items..." 
@@ -379,7 +344,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium truncate">{item.item_code}</div>
-                                <div className="text-sm text-gray-500 break-words">{item.item_name}</div>
+                                <div className="text-sm text-muted-foreground break-words">{item.item_name}</div>
                               </div>
                             </CommandItem>
                           ))}
@@ -389,7 +354,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                                 {isLoadingItems ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
                                 ) : (
-                                  <span className="text-sm text-gray-500">Load more items...</span>
+                                  <span className="text-sm text-muted-foreground">Load more items...</span>
                                 )}
                               </div>
                             </CommandItem>
