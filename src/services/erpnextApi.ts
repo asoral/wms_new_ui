@@ -604,7 +604,8 @@ export class ERPNextAPI {
     if (company) {
       if (!filters) filters = [];
       filters.push(['company', '=', company]);
-      params.filters = filters;
+      params.filters = params.filters || [];
+      params.filters.push(['company', '=', company]);
     }
     
     return this.makeRequest('Material Request', 'GET', null, params);
@@ -782,5 +783,159 @@ export class ERPNextAPI {
 
     const result = await response.json();
     return result;
+  }
+
+  async createBatch(batchData: {
+    batch_id: string;
+    item: string;
+    manufacturing_date?: string;
+    expiry_date?: string;
+  }): Promise<any> {
+    console.log('Creating new batch:', batchData);
+    
+    const data = {
+      batch_id: batchData.batch_id,
+      item: batchData.item,
+      manufacturing_date: batchData.manufacturing_date || new Date().toISOString().split('T')[0],
+      expiry_date: batchData.expiry_date
+    };
+
+    const response = await fetch(`${this.baseURL}/api/resource/Batch`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to create batch:', errorText);
+      throw new Error(`Failed to create batch: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Batch created successfully:', result);
+    return result;
+  }
+
+  async createSerialNo(serialData: {
+    serial_no: string;
+    item_code: string;
+    warehouse?: string;
+  }): Promise<any> {
+    console.log('Creating new serial number:', serialData);
+    
+    const data = {
+      serial_no: serialData.serial_no,
+      item_code: serialData.item_code,
+      warehouse: serialData.warehouse
+    };
+
+    const response = await fetch(`${this.baseURL}/api/resource/Serial No`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to create serial number:', errorText);
+      throw new Error(`Failed to create serial number: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Serial number created successfully:', result);
+    return result;
+  }
+
+  async validateBatch(batchNo: string, itemCode: string): Promise<boolean> {
+    if (!batchNo || !itemCode) return true;
+    
+    try {
+      // Check if batch exists
+      const response = await fetch(`${this.baseURL}/api/resource/Batch/${batchNo}`, {
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const batch = await response.json();
+        return batch.data.item === itemCode;
+      } else if (response.status === 404) {
+        // Batch doesn't exist, create it
+        console.log('Batch not found, creating new batch:', batchNo);
+        await this.createBatch({
+          batch_id: batchNo,
+          item: itemCode
+        });
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      console.error('Batch validation/creation error:', error);
+      // Try to create the batch if validation fails
+      try {
+        await this.createBatch({
+          batch_id: batchNo,
+          item: itemCode
+        });
+        return true;
+      } catch (createError) {
+        console.error('Failed to create batch:', createError);
+        return false;
+      }
+    }
+  }
+
+  async validateSerial(serialNo: string, itemCode: string, warehouse?: string): Promise<boolean> {
+    if (!serialNo || !itemCode) return true;
+    
+    try {
+      // Check if serial exists
+      const response = await fetch(`${this.baseURL}/api/resource/Serial No/${serialNo}`, {
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const serial = await response.json();
+        return serial.data.item_code === itemCode;
+      } else if (response.status === 404) {
+        // Serial doesn't exist, create it
+        console.log('Serial not found, creating new serial:', serialNo);
+        await this.createSerialNo({
+          serial_no: serialNo,
+          item_code: itemCode,
+          warehouse: warehouse
+        });
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      console.error('Serial validation/creation error:', error);
+      // Try to create the serial if validation fails
+      try {
+        await this.createSerialNo({
+          serial_no: serialNo,
+          item_code: itemCode,
+          warehouse: warehouse
+        });
+        return true;
+      } catch (createError) {
+        console.error('Failed to create serial:', createError);
+        return false;
+      }
+    }
   }
 }

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useNotification } from "@/hooks/useNotification";
 import { toast } from "sonner";
@@ -152,28 +152,40 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
     }
   };
 
-  const validateBatch = async (batchNo: string, itemCode: string) => {
+  const validateBatch = async (batchNo: string, itemCode: string): Promise<boolean> => {
     if (!batchNo || !itemCode) return true;
     
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return true;
 
-      // Check if batch exists
-      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch/${batchNo}`, {
-        headers: {
-          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (response.ok) {
-        const batch = await response.json();
-        return batch.data.item === itemCode;
+      const isValid = await erpnextAPI.validateBatch(batchNo, itemCode);
+      if (isValid) {
+        toast.success('Batch validated successfully');
       }
-      return false;
+      return isValid;
     } catch (error) {
       console.error('Batch validation error:', error);
+      toast.error('Failed to validate/create batch');
+      return false;
+    }
+  };
+
+  const validateSerial = async (serialNo: string, itemCode: string): Promise<boolean> => {
+    if (!serialNo || !itemCode) return true;
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return true;
+
+      const isValid = await erpnextAPI.validateSerial(serialNo, itemCode, warehouse);
+      if (isValid) {
+        toast.success('Serial number validated successfully');
+      }
+      return isValid;
+    } catch (error) {
+      console.error('Serial validation error:', error);
+      toast.error('Failed to validate/create serial number');
       return false;
     }
   };
@@ -212,11 +224,20 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         return;
       }
 
-      // Validate batch if provided
+      // Validate batch if provided (will create if not exists)
       if (formData.batch) {
         const isValidBatch = await validateBatch(formData.batch, selectedItem.item_code);
         if (!isValidBatch) {
-          toast.error('Invalid batch number for this item');
+          toast.error('Failed to validate/create batch number');
+          return;
+        }
+      }
+
+      // Validate serial if provided (will create if not exists)
+      if (formData.serial) {
+        const isValidSerial = await validateSerial(formData.serial, selectedItem.item_code);
+        if (!isValidSerial) {
+          toast.error('Failed to validate/create serial number');
           return;
         }
       }
@@ -290,6 +311,34 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                 onItemSelected={handleItemSelected}
                 isLoading={false}
               />
+              
+              {/* Current Stock Info - Inline Display */}
+              {selectedItem && (
+                <div className="flex items-center justify-between text-sm bg-gray-50 p-3 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-600">Current Stock:</span>
+                    {isLoadingQty ? (
+                      <div className="flex items-center">
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        <span>Loading...</span>
+                      </div>
+                    ) : qtyError ? (
+                      <div className="flex items-center text-orange-600">
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        <span>{currentQty} {selectedItem.stock_uom}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-green-600">
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        <span className="font-medium">{currentQty} {selectedItem.stock_uom}</span>
+                      </div>
+                    )}
+                  </div>
+                  {qtyError && (
+                    <span className="text-xs text-orange-600">{qtyError}</span>
+                  )}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="scan" className="space-y-4">
@@ -316,45 +365,6 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
           </Tabs>
         </CardContent>
       </Card>
-
-      {/* Item Details */}
-      {selectedItem && (
-        <Card className="bg-blue-50">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <Label>Item Name</Label>
-                <p className="font-medium">{selectedItem.item_name}</p>
-              </div>
-              <div>
-                <Label>Current Qty</Label>
-                <div className="font-medium">
-                  {isLoadingQty ? (
-                    <div className="flex items-center">
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Loading...
-                    </div>
-                  ) : qtyError ? (
-                    <div className="flex items-center text-orange-600">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {currentQty} {selectedItem.stock_uom}
-                    </div>
-                  ) : (
-                    `${currentQty} ${selectedItem.stock_uom}`
-                  )}
-                </div>
-                {qtyError && (
-                  <p className="text-xs text-orange-600 mt-1">{qtyError}</p>
-                )}
-              </div>
-              <div>
-                <Label>UOM</Label>
-                <p className="font-medium">{selectedItem.stock_uom}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Serial/Batch Input Method Selection */}
       {selectedItem && shouldShowBundleOption && (
