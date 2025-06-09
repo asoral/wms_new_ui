@@ -6,15 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Package } from 'lucide-react';
-import { getAvailableSerialBatch, createSerialBatchBundle, SerialBatchBundleItem } from '@/services/serialBatchBundleApi';
+import { getAvailableSerialBatch, createSerialBatchBundle, SerialBatchBundleEntry } from '@/services/serialBatchBundleApi';
 import { getUserDefaultCompany } from '@/services/erpnextApi';
 import { toast } from 'sonner';
 
 interface SerialBatchBundleSelectorProps {
   itemCode: string;
-  warehouse: string;
+  itemName: string;
+  itemGroup: string;
   hasSerial: boolean;
   hasBatch: boolean;
+  warehouse: string;
   transactionType: 'Inward' | 'Outward';
   onBundleCreated: (bundleName: string, totalQty: number) => void;
   initialQuantity?: number;
@@ -28,9 +30,11 @@ interface BundleEntry {
 
 const SerialBatchBundleSelector = ({
   itemCode,
-  warehouse,
+  itemName,
+  itemGroup,
   hasSerial,
   hasBatch,
+  warehouse,
   transactionType,
   onBundleCreated,
   initialQuantity = 1
@@ -49,13 +53,10 @@ const SerialBatchBundleSelector = ({
 
   useEffect(() => {
     // Initialize with default entry
-    if (hasSerial && !hasBatch) {
-      setEntries([{ serial_no: '', qty: 1 }]);
-    } else if (hasBatch && !hasSerial) {
-      setEntries([{ batch_no: '', qty: initialQuantity }]);
-    } else if (hasSerial && hasBatch) {
-      setEntries([{ serial_no: '', batch_no: '', qty: 1 }]);
-    }
+    const defaultEntry: BundleEntry = { qty: initialQuantity };
+    if (hasSerial) defaultEntry.serial_no = '';
+    if (hasBatch) defaultEntry.batch_no = '';
+    setEntries([defaultEntry]);
   }, [hasSerial, hasBatch, initialQuantity]);
 
   const loadAvailableSerialBatch = async () => {
@@ -77,12 +78,9 @@ const SerialBatchBundleSelector = ({
   };
 
   const addEntry = () => {
-    const newEntry: SerialBatchBundleItem = {};
+    const newEntry: BundleEntry = { qty: 1 };
     if (hasSerial) newEntry.serial_no = '';
     if (hasBatch) newEntry.batch_no = '';
-    if (hasSerial && !hasBatch) newEntry.qty = 1;
-    if (hasBatch) newEntry.qty = 1;
-    
     setEntries([...entries, newEntry]);
   };
 
@@ -90,7 +88,7 @@ const SerialBatchBundleSelector = ({
     setEntries(entries.filter((_, i) => i !== index));
   };
 
-  const updateEntry = (index: number, field: keyof SerialBatchBundleItem, value: string | number) => {
+  const updateEntry = (index: number, field: keyof BundleEntry, value: string | number) => {
     const updatedEntries = [...entries];
     updatedEntries[index] = { ...updatedEntries[index], [field]: value };
     setEntries(updatedEntries);
@@ -117,19 +115,33 @@ const SerialBatchBundleSelector = ({
       const company = await getUserDefaultCompany();
       
       // Convert entries to ERPNext format
-      const bundleItems: SerialBatchBundleItem[] = validEntries.map(entry => ({
-        item_code: itemCode,
-        warehouse: warehouse,
+      const bundleEntries: SerialBatchBundleEntry[] = validEntries.map(entry => ({
         qty: entry.qty,
-        uom: 'Nos', // Default UOM, should be passed from parent
+        warehouse: warehouse,
+        delivered_qty: 0,
+        incoming_rate: 0,
+        outgoing_rate: 0,
+        stock_value_difference: 0,
+        is_outward: transactionType === 'Outward' ? 1 : 0,
         ...(entry.batch_no && { batch_no: entry.batch_no }),
         ...(entry.serial_no && { serial_no: entry.serial_no })
       }));
 
       const bundleData = {
-        items: bundleItems,
-        posting_date: new Date().toISOString().split('T')[0],
         company: company || '',
+        item_code: itemCode,
+        item_name: itemName,
+        item_group: itemGroup,
+        has_serial_no: hasSerial ? 1 : 0,
+        has_batch_no: hasBatch ? 1 : 0,
+        warehouse: warehouse,
+        type_of_transaction: transactionType,
+        total_qty: totalQty,
+        avg_rate: 0,
+        total_amount: 0,
+        posting_date: new Date().toISOString().split('T')[0],
+        posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+        entries: bundleEntries
       };
 
       const result = await createSerialBatchBundle(bundleData);

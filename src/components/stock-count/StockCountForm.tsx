@@ -202,6 +202,10 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
 
   const createTraditionalEntryBundle = async (
     itemCode: string,
+    itemName: string,
+    itemGroup: string,
+    hasSerial: number,
+    hasBatch: number,
     qty: number,
     uom: string,
     batchNo?: string,
@@ -212,6 +216,10 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       
       const bundleName = await createSerialBatchBundleFromTraditionalEntry(
         itemCode,
+        itemName,
+        itemGroup,
+        hasSerial,
+        hasBatch,
         warehouse,
         qty,
         uom,
@@ -295,6 +303,10 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         // Then create the Serial and Batch Bundle
         bundleName = await createTraditionalEntryBundle(
           selectedItem.item_code,
+          selectedItem.item_name,
+          'Default Item Group', // You might want to get this from item details
+          selectedItem.has_serial_no || 0,
+          selectedItem.has_batch_no || 0,
           formData.actualQty,
           selectedItem.stock_uom,
           formData.batch || undefined,
@@ -448,9 +460,11 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       {selectedItem && useBundle && shouldShowBundleOption && (
         <SerialBatchBundleSelector
           itemCode={selectedItem.item_code}
-          warehouse={warehouse}
+          itemName={selectedItem.item_name}
+          itemGroup="Default Item Group" // You might want to get this from item details
           hasSerial={shouldShowSerial}
           hasBatch={shouldShowBatch}
+          warehouse={warehouse}
           transactionType="Inward"
           onBundleCreated={handleBundleCreated}
           initialQuantity={formData.actualQty || 1}

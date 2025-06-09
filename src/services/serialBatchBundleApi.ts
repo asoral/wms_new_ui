@@ -1,4 +1,17 @@
+
 import { createERPNextAPI, getUserDefaultCompany } from './erpnextApi';
+
+export interface SerialBatchBundleEntry {
+  batch_no?: string;
+  serial_no?: string;
+  qty: number;
+  warehouse: string;
+  delivered_qty?: number;
+  incoming_rate?: number;
+  outgoing_rate?: number;
+  stock_value_difference?: number;
+  is_outward?: number;
+}
 
 export interface SerialBatchBundleItem {
   item_code: string;
@@ -11,15 +24,29 @@ export interface SerialBatchBundleItem {
 
 export interface SerialBatchBundle {
   name?: string;
-  items: SerialBatchBundleItem[];
-  posting_date: string;
   company: string;
+  item_code: string;
+  item_name: string;
+  item_group?: string;
+  has_serial_no: number;
+  has_batch_no: number;
+  warehouse: string;
+  type_of_transaction: 'Inward' | 'Outward';
+  total_qty: number;
+  avg_rate?: number;
+  total_amount?: number;
+  voucher_type?: string;
+  voucher_no?: string;
+  voucher_detail_no?: string;
+  posting_date: string;
+  posting_time?: string;
+  entries: SerialBatchBundleEntry[];
 }
 
 export interface SerialBatchBundleResponse {
   data: {
     name: string;
-    items: SerialBatchBundleItem[];
+    entries: SerialBatchBundleEntry[];
   };
 }
 
@@ -58,6 +85,10 @@ export const createSerialBatchBundle = async (bundleData: SerialBatchBundle): Pr
 
 export const createSerialBatchBundleFromTraditionalEntry = async (
   itemCode: string,
+  itemName: string,
+  itemGroup: string,
+  hasSerial: number,
+  hasBatch: number,
   warehouse: string,
   qty: number,
   uom: string,
@@ -67,17 +98,33 @@ export const createSerialBatchBundleFromTraditionalEntry = async (
   try {
     const company = await getUserDefaultCompany();
     
+    const bundleEntry: SerialBatchBundleEntry = {
+      qty: qty,
+      warehouse: warehouse,
+      delivered_qty: 0,
+      incoming_rate: 0,
+      outgoing_rate: 0,
+      stock_value_difference: 0,
+      is_outward: 0,
+      ...(batchNo && { batch_no: batchNo }),
+      ...(serialNo && { serial_no: serialNo })
+    };
+
     const bundleData: SerialBatchBundle = {
-      items: [{
-        item_code: itemCode,
-        warehouse: warehouse,
-        qty: qty,
-        uom: uom,
-        ...(batchNo && { batch_no: batchNo }),
-        ...(serialNo && { serial_no: serialNo })
-      }],
+      company: company || '',
+      item_code: itemCode,
+      item_name: itemName,
+      item_group: itemGroup,
+      has_serial_no: hasSerial,
+      has_batch_no: hasBatch,
+      warehouse: warehouse,
+      type_of_transaction: 'Inward',
+      total_qty: qty,
+      avg_rate: 0,
+      total_amount: 0,
       posting_date: new Date().toISOString().split('T')[0],
-      company: company || ''
+      posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+      entries: [bundleEntry]
     };
 
     const result = await createSerialBatchBundle(bundleData);
