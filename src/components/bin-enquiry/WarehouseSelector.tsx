@@ -28,6 +28,13 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   const [selectedWarehouse, setSelectedWarehouse] = useState<WarehouseInfo | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      setOpen(false);
+    };
+  }, []);
+
   // Load initial warehouses
   useEffect(() => {
     loadInitialWarehouses();
@@ -39,14 +46,12 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       // First try to load from cache
       const cached = await offlineStorage.getCachedData('warehouses_page_1');
       if (cached && Array.isArray(cached) && cached.length > 0) {
-        console.log('Loading warehouses from cache:', cached.length);
         setWarehouses(cached);
         setIsLoadingWarehouses(false);
         return;
       }
 
       // If no cache, fetch from API
-      console.log('No cached warehouses found, fetching from API...');
       await fetchWarehouses("");
     } catch (error) {
       console.error('Failed to load initial warehouses:', error);
@@ -57,7 +62,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   // Fetch warehouses with search
   const fetchWarehouses = async (search: string = "") => {
     setIsLoadingWarehouses(true);
-    console.log('Fetching warehouses with search:', search);
     
     try {
       const erpnextAPI = await createERPNextAPI();
@@ -66,7 +70,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         // Try to load from cache if API is not available
         const cached = await offlineStorage.getCachedData('warehouses_page_1');
         if (cached && Array.isArray(cached)) {
-          console.log('Loading cached warehouses after API failure:', cached.length);
           setWarehouses(cached);
         }
         setIsLoadingWarehouses(false);
@@ -82,32 +85,26 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         filters.push(['warehouse_name', 'like', `%${search}%`]);
       }
       
-      console.log('Fetching warehouses with filters:', filters);
-      
       const params: any = {
         limit_page_length: 50,
         limit_start: 0,
-        fields: JSON.stringify(['name', 'warehouse_name', 'company', 'is_group'])
+        fields: ['name', 'warehouse_name', 'company', 'is_group']
       };
       
       if (filters.length > 0) {
-        params.filters = JSON.stringify(filters);
+        params.filters = filters;
       }
       
       const result = await erpnextAPI.makeRequest('Warehouse', 'GET', null, params);
       
-      console.log('Warehouse API result:', result);
-      
       if (result && result.data) {
         const warehouseData = result.data;
-        console.log('Setting warehouses:', warehouseData.length);
         setWarehouses(warehouseData);
         
         // Cache the results
         const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_page_1';
         await offlineStorage.cacheData(cacheKey, warehouseData, 300000); // 5 minutes
       } else {
-        console.log('No warehouse data returned or unexpected format');
         setWarehouses([]);
       }
     } catch (error) {
@@ -118,7 +115,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_page_1';
         const cached = await offlineStorage.getCachedData(cacheKey);
         if (cached && Array.isArray(cached)) {
-          console.log('Loading warehouses from cache after error:', cached.length);
           setWarehouses(cached);
         }
       } catch (cacheError) {
@@ -141,15 +137,10 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   }, [searchTerm]);
 
   const handleWarehouseSelect = (warehouse: WarehouseInfo) => {
-    console.log('Warehouse selected:', warehouse);
     setSelectedWarehouse(warehouse);
     setOpen(false);
     onWarehouseSelected(warehouse.name);
   };
-
-  console.log('Current warehouses count:', warehouses.length);
-  console.log('Is loading warehouses:', isLoadingWarehouses);
-  console.log('Dropdown open:', open);
 
   return (
     <div className="space-y-4">
@@ -181,7 +172,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white z-50" align="start">
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg" align="start">
               <Command>
                 <CommandInput 
                   placeholder="Search warehouses..." 

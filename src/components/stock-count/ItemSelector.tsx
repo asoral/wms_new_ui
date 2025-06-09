@@ -29,6 +29,13 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      setOpen(false);
+    };
+  }, []);
+
   // Debounced search function
   const searchItems = useMemo(() => {
     let timeoutId: NodeJS.Timeout;
@@ -193,7 +200,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white z-50" align="start">
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg" align="start">
               <Command>
                 <CommandInput 
                   placeholder="Search items..." 
