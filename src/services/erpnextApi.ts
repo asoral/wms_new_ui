@@ -48,6 +48,8 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
       return null;
     }
 
+    console.log('createERPNextAPI: Creating API instance with URL:', erpnext_url);
+
     const api = new ERPNextAPI({
       apiKey: erpnext_api_key,
       apiSecret: erpnext_api_secret,
@@ -141,20 +143,25 @@ export class ERPNextAPI {
   async makeRequest(doctype: string, method: string = 'GET', data?: any, params?: any): Promise<any> {
     let url = `${this.baseURL}/api/resource/${doctype}`;
     
+    console.log('makeRequest called with:', { doctype, method, params });
+    
     if (params) {
       const searchParams = new URLSearchParams();
       Object.keys(params).forEach(key => {
         const value = params[key];
-        if (Array.isArray(value) || typeof value === 'object') {
+        if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
           searchParams.append(key, JSON.stringify(value));
-        } else {
+        } else if (value !== undefined && value !== null) {
           searchParams.append(key, String(value));
         }
       });
-      url += `?${searchParams.toString()}`;
+      
+      if (searchParams.toString()) {
+        url += `?${searchParams.toString()}`;
+      }
     }
 
-    console.log('Making request to:', url);
+    console.log('Final request URL:', url);
 
     const options: RequestInit = {
       method,
@@ -171,11 +178,14 @@ export class ERPNextAPI {
     const response = await fetch(url, options);
 
     if (!response.ok) {
+      console.error(`Request failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
       throw new Error(`Failed to ${method} ${doctype}: ${response.statusText}`);
     }
 
     const result = await response.json();
-    console.log('API response:', result);
+    console.log('API response for', doctype, ':', result);
     return result;
   }
 
@@ -200,50 +210,88 @@ export class ERPNextAPI {
   }
 
   async getItems(filters?: any, fields?: string[], company?: string): Promise<any> {
+    console.log('getItems called with filters:', filters, 'fields:', fields, 'company:', company);
+    
     const params: any = {
       limit_page_length: 50
     };
-    if (filters) params.filters = filters;
-    if (fields) params.fields = fields;
-    if (company) {
-      const companyFilters = filters ? [...filters] : [];
-      companyFilters.push(['company', '=', company]);
-      params.filters = companyFilters;
+    
+    if (fields && fields.length > 0) {
+      params.fields = fields;
     }
     
+    if (filters || company) {
+      const finalFilters = [];
+      
+      if (filters && Array.isArray(filters)) {
+        finalFilters.push(...filters);
+      }
+      
+      if (company) {
+        finalFilters.push(['company', '=', company]);
+      }
+      
+      if (finalFilters.length > 0) {
+        params.filters = finalFilters;
+      }
+    }
+    
+    console.log('getItems final params:', params);
     return this.makeRequest('Item', 'GET', null, params);
   }
 
   async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit: number = 20, page: number = 1): Promise<any> {
+    console.log('getItemsPaginated called with:', { filters, fields, company, limit, page });
+    
     const params: any = {
       limit_page_length: limit,
       limit_start: (page - 1) * limit
     };
-    if (filters) params.filters = filters;
-    if (fields) params.fields = fields;
-    if (company) {
-      const companyFilters = filters ? [...filters] : [];
-      companyFilters.push(['company', '=', company]);
-      params.filters = companyFilters;
+    
+    if (fields && fields.length > 0) {
+      params.fields = fields;
     }
     
+    if (filters || company) {
+      const finalFilters = [];
+      
+      if (filters && Array.isArray(filters)) {
+        finalFilters.push(...filters);
+      }
+      
+      if (company) {
+        finalFilters.push(['company', '=', company]);
+      }
+      
+      if (finalFilters.length > 0) {
+        params.filters = finalFilters;
+      }
+    }
+    
+    console.log('getItemsPaginated final params:', params);
     return this.makeRequest('Item', 'GET', null, params);
   }
 
   async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<any> {
+    console.log('searchItems called with:', { searchTerm, company, limit });
+    
     const filters = [
-      ['disabled', '=', 0],
-      [
+      ['disabled', '=', 0]
+    ];
+    
+    if (searchTerm && searchTerm.trim()) {
+      filters.push([
         ['item_code', 'like', `%${searchTerm}%`],
         'or',
         ['item_name', 'like', `%${searchTerm}%`]
-      ]
-    ];
+      ]);
+    }
     
     if (company) {
       filters.push(['company', '=', company]);
     }
     
+    console.log('searchItems filters:', filters);
     return this.getItemsPaginated(filters, ['item_code', 'item_name', 'stock_uom'], company, limit);
   }
 
@@ -273,17 +321,30 @@ export class ERPNextAPI {
   }
 
   async getWarehouses(filters?: any, company?: string): Promise<any> {
+    console.log('getWarehouses called with filters:', filters, 'company:', company);
+    
     const params: any = {
       limit_page_length: 50,
       fields: ['name', 'warehouse_name', 'company', 'is_group']
     };
-    if (filters) params.filters = filters;
-    if (company) {
-      const companyFilters = filters ? [...filters] : [];
-      companyFilters.push(['company', '=', company]);
-      params.filters = companyFilters;
+    
+    if (filters || company) {
+      const finalFilters = [];
+      
+      if (filters && Array.isArray(filters)) {
+        finalFilters.push(...filters);
+      }
+      
+      if (company) {
+        finalFilters.push(['company', '=', company]);
+      }
+      
+      if (finalFilters.length > 0) {
+        params.filters = finalFilters;
+      }
     }
     
+    console.log('getWarehouses final params:', params);
     return this.makeRequest('Warehouse', 'GET', null, params);
   }
 
