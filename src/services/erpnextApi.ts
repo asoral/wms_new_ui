@@ -154,6 +154,8 @@ export class ERPNextAPI {
       url += `?${searchParams.toString()}`;
     }
 
+    console.log('Making request to:', url);
+
     const options: RequestInit = {
       method,
       headers: {
@@ -173,6 +175,7 @@ export class ERPNextAPI {
     }
 
     const result = await response.json();
+    console.log('API response:', result);
     return result;
   }
 
