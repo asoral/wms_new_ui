@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ItemDetails {
@@ -347,35 +346,82 @@ export class ERPNextAPI {
     return this.getItemsPaginated(filters, ['item_code', 'item_name', 'stock_uom'], company, limit);
   }
 
+  async getStockBalance(filters?: any, company?: string): Promise<any> {
+    console.log('getStockBalance called with filters:', filters, 'company:', company);
+    
+    try {
+      // First get warehouses for the company if company is specified
+      let warehouseFilters: string[] = [];
+      
+      if (company && company.trim()) {
+        console.log('Getting warehouses for company:', company);
+        try {
+          const warehousesResult = await this.getWarehouses([['company', '=', company]]);
+          if (warehousesResult.data && warehousesResult.data.length > 0) {
+            warehouseFilters = warehousesResult.data.map((wh: any) => wh.name);
+            console.log('Found warehouses for company:', warehouseFilters);
+          }
+        } catch (whError) {
+          console.error('Error getting warehouses, proceeding without warehouse filter:', whError);
+        }
+      }
+
+      // Build filters for Bin doctype
+      const params: any = {
+        fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'valuation_rate'],
+        limit_page_length: 1000
+      };
+      
+      const finalFilters = [];
+      
+      // Add item filters if provided
+      if (filters && Array.isArray(filters)) {
+        finalFilters.push(...filters);
+      }
+      
+      // Add warehouse filter if we have company-specific warehouses
+      if (warehouseFilters.length > 0) {
+        finalFilters.push(['warehouse', 'in', warehouseFilters]);
+      }
+      
+      if (finalFilters.length > 0) {
+        params.filters = finalFilters;
+      }
+      
+      console.log('Getting stock from Bin with params:', params);
+      
+      const result = await this.makeRequest('Bin', 'GET', null, params);
+      console.log('Bin result:', result);
+      
+      if (result.data && Array.isArray(result.data)) {
+        const transformedData = result.data
+          .filter((item: any) => item.actual_qty > 0)
+          .map((item: any) => ({
+            item_code: item.item_code,
+            warehouse: item.warehouse,
+            actual_qty: item.actual_qty,
+            stock_uom: 'Nos',
+            stock_value: item.stock_value || (item.actual_qty * (item.valuation_rate || 0))
+          }));
+        
+        console.log('Transformed Bin data:', transformedData);
+        return { data: transformedData };
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('getStockBalance error:', error);
+      throw new Error(`Stock balance access failed. Please check your ERPNext permissions. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async getItemByBarcode(barcode: string, company?: string): Promise<any> {
     console.log('getItemByBarcode called with:', { barcode, company });
     
-    try {
-      // First, search for the barcode in Item Barcode doctype
-      const barcodeFilters = [['barcode', '=', barcode]];
-      const barcodeResult = await this.makeRequest('Item Barcode', 'GET', null, { 
-        filters: barcodeFilters,
-        fields: ['parent'] 
-      });
-      
-      console.log('Barcode search result:', barcodeResult);
-      
-      if (barcodeResult.data && barcodeResult.data.length > 0) {
-        const itemCode = barcodeResult.data[0].parent;
-        console.log('Found item code from barcode:', itemCode);
-        
-        // Now get the item details
-        const itemResult = await this.getItemDetails(itemCode);
-        return { data: [itemResult.data] };
-      } else {
-        console.log('No barcode found, returning empty result');
-        return { data: [] };
-      }
-    } catch (error) {
-      console.error('Error in getItemByBarcode:', error);
-      // If Item Barcode doctype doesn't exist, return empty result
-      return { data: [] };
-    }
+    // Skip barcode lookup due to permission issues, just return empty result
+    // The calling code will fall back to direct item search
+    console.log('Skipping barcode lookup due to permission restrictions');
+    return { data: [] };
   }
 
   async getItemStock(itemCode: string): Promise<ItemStock[]> {
@@ -432,106 +478,6 @@ export class ERPNextAPI {
     
     console.log('getWarehouses final params:', params);
     return this.makeRequest('Warehouse', 'GET', null, params);
-  }
-
-  async getStockBalance(filters?: any, company?: string): Promise<any> {
-    console.log('getStockBalance called with filters:', filters, 'company:', company);
-    
-    try {
-      // Try to use Stock Ledger Entry for more accurate stock calculation
-      const params: any = {
-        fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'valuation_rate'],
-        limit_page_length: 1000
-      };
-      
-      if (filters || company) {
-        const finalFilters = [];
-        
-        if (filters && Array.isArray(filters)) {
-          finalFilters.push(...filters);
-        }
-        
-        if (finalFilters.length > 0) {
-          params.filters = finalFilters;
-        }
-      }
-      
-      console.log('Using Stock Ledger Entry with params:', params);
-      
-      // Get the latest stock ledger entries
-      const response = await fetch(`${this.baseURL}/api/method/frappe.client.get_list?doctype=Stock Ledger Entry&fields=["item_code","warehouse","actual_qty","stock_value","valuation_rate"]&filters=${JSON.stringify(params.filters || [])}&limit_page_length=1000&order_by=posting_date desc, posting_time desc`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Stock Ledger Entry result:', result);
-        
-        if (result.message && Array.isArray(result.message)) {
-          // Group by item_code and warehouse to get latest stock for each combination
-          const stockMap = new Map();
-          
-          result.message.forEach((entry: any) => {
-            const key = `${entry.item_code}||${entry.warehouse}`;
-            if (!stockMap.has(key) && entry.actual_qty > 0) {
-              stockMap.set(key, {
-                item_code: entry.item_code,
-                warehouse: entry.warehouse,
-                actual_qty: entry.actual_qty,
-                stock_uom: 'Nos',
-                stock_value: entry.stock_value || (entry.actual_qty * (entry.valuation_rate || 0))
-              });
-            }
-          });
-          
-          const transformedData = Array.from(stockMap.values());
-          console.log('Transformed Stock Ledger data:', transformedData);
-          return { data: transformedData };
-        }
-      }
-    } catch (error) {
-      console.error('Stock Ledger Entry failed, falling back to Bin:', error);
-    }
-
-    // Fallback to Bin doctype without company filter
-    try {
-      const params: any = {
-        fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'valuation_rate']
-      };
-      
-      if (filters && Array.isArray(filters)) {
-        params.filters = filters;
-      }
-      
-      console.log('Fallback to Bin with params:', params);
-      
-      const result = await this.makeRequest('Bin', 'GET', null, params);
-      console.log('Bin result:', result);
-      
-      if (result.data && Array.isArray(result.data)) {
-        const transformedData = result.data
-          .filter((item: any) => item.actual_qty > 0)
-          .map((item: any) => ({
-            item_code: item.item_code,
-            warehouse: item.warehouse,
-            actual_qty: item.actual_qty,
-            stock_uom: 'Nos',
-            stock_value: item.stock_value || (item.actual_qty * (item.valuation_rate || 0))
-          }));
-        
-        console.log('Transformed Bin data:', transformedData);
-        return { data: transformedData };
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('getStockBalance error:', error);
-      throw new Error(`Stock balance access failed. Please check your ERPNext permissions. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
   }
 
   async getSalesOrders(filters?: any, company?: string): Promise<any> {
