@@ -43,9 +43,12 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   const loadInitialWarehouses = async () => {
     setIsLoadingWarehouses(true);
     try {
+      console.log('Loading initial warehouses...');
+      
       // First try to load from cache
       const cached = await offlineStorage.getCachedData('warehouses_page_1');
       if (cached && Array.isArray(cached) && cached.length > 0) {
+        console.log('Loading warehouses from cache:', cached.length);
         setWarehouses(cached);
         setIsLoadingWarehouses(false);
         return;
@@ -64,6 +67,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     setIsLoadingWarehouses(true);
     
     try {
+      console.log('Fetching warehouses from API, search:', search);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         console.error('ERPNext API not configured');
@@ -76,35 +80,29 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      // Build search filters
-      let filters: any[] = [
-        ['disabled', '=', 0] // Only enabled warehouses
-      ];
+      // Build search filters - start with basic filter for enabled warehouses
+      let filters = [['disabled', '=', 0]];
       
       if (search.trim()) {
         filters.push(['warehouse_name', 'like', `%${search}%`]);
       }
       
-      const params: any = {
-        limit_page_length: 50,
-        limit_start: 0,
-        fields: ['name', 'warehouse_name', 'company', 'is_group']
-      };
+      console.log('API filters:', filters);
       
-      if (filters.length > 0) {
-        params.filters = filters;
-      }
-      
-      const result = await erpnextAPI.makeRequest('Warehouse', 'GET', null, params);
+      const result = await erpnextAPI.getWarehouses(filters);
+      console.log('API result:', result);
       
       if (result && result.data) {
         const warehouseData = result.data;
+        console.log('Setting warehouses:', warehouseData.length);
         setWarehouses(warehouseData);
         
-        // Cache the results
-        const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_page_1';
-        await offlineStorage.cacheData(cacheKey, warehouseData, 300000); // 5 minutes
+        // Cache the results only if it's the initial load (no search)
+        if (!search.trim()) {
+          await offlineStorage.cacheData('warehouses_page_1', warehouseData, 300000); // 5 minutes
+        }
       } else {
+        console.log('No warehouses found in API response');
         setWarehouses([]);
       }
     } catch (error) {
@@ -115,6 +113,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_page_1';
         const cached = await offlineStorage.getCachedData(cacheKey);
         if (cached && Array.isArray(cached)) {
+          console.log('Loading warehouses from cache after error');
           setWarehouses(cached);
         }
       } catch (cacheError) {

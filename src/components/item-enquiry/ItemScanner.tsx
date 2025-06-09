@@ -76,6 +76,8 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
     setIsLoadingItems(true);
     try {
+      console.log('Fetching items, search:', search, 'isNewSearch:', isNewSearch);
+      
       // Try to get cached items first if offline
       if (!isOnline) {
         const cachedItems = await offlineStorage.getCachedData('items_list');
@@ -100,8 +102,10 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
         
         let result;
         if (search.trim()) {
+          console.log('Searching items with term:', search);
           result = await erpnextAPI.searchItems(search, defaultCompany || undefined, 20);
         } else {
+          console.log('Fetching paginated items, page:', pageToFetch);
           result = await erpnextAPI.getItemsPaginated(
             [['disabled', '=', 0]],
             ['item_code', 'item_name', 'stock_uom'],
@@ -110,6 +114,8 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
             pageToFetch
           );
         }
+        
+        console.log('API result:', result);
         
         if (result.data) {
           if (isNewSearch) {
