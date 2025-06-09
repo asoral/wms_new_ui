@@ -36,10 +36,15 @@ interface StockBalance {
 interface SalesOrder {
   name: string;
   customer: string;
+  customer_name?: string;
   company: string;
   base_grand_total: number;
+  grand_total?: number;
   currency: string;
   status: string;
+  delivery_date?: string;
+  transaction_date?: string;
+  items?: any[];
 }
 
 interface DeliveryNote {
@@ -113,6 +118,11 @@ interface ProductBundle {
   description: string;
 }
 
+interface Company {
+  name: string;
+  company_name: string;
+}
+
 let erpnextConfig: ERPNextConfig | null = null;
 
 export const configureERPNextAPI = (config: ERPNextConfig) => {
@@ -170,6 +180,18 @@ class ERPNextAPI {
     };
   }
 
+  async testConnection(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseURL}/api/method/frappe.auth.get_logged_in_user_details`, {
+        headers: this.getHeaders(),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      return false;
+    }
+  }
+
   async getLoggedInUserDetails(): Promise<ERPNextResponse<any>> {
     const response = await fetch(`${this.baseURL}/api/method/frappe.auth.get_logged_in_user_details`, {
       headers: this.getHeaders(),
@@ -177,6 +199,18 @@ class ERPNextAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to fetch user details: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getCompanies(): Promise<ERPNextResponse<Company[]>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Company`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch companies: ${response.statusText}`);
     }
 
     return response.json();

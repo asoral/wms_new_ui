@@ -93,7 +93,14 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       console.log('API result:', result);
       
       if (result && result.data) {
-        const warehouseData = result.data;
+        // Map Warehouse[] to WarehouseInfo[] by ensuring warehouse_name is present
+        const warehouseData: WarehouseInfo[] = result.data.map(warehouse => ({
+          name: warehouse.name,
+          warehouse_name: warehouse.warehouse_name || warehouse.name, // Use name as fallback
+          is_group: warehouse.is_group,
+          company: (warehouse as any).company
+        }));
+        
         console.log('Setting warehouses:', warehouseData.length);
         setWarehouses(warehouseData);
         
