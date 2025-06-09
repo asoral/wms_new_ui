@@ -436,65 +436,121 @@ export class ERPNextAPI {
   async getStockBalance(filters?: any, company?: string): Promise<any> {
     console.log('getStockBalance called with filters:', filters, 'company:', company);
     
+    try {
+      // Use ERPNext's Stock Balance Report API to get the exact same data as the Stock Balance report
+      const reportFilters: any = {
+        from_date: '2020-01-01', // Use a date far in the past to get all stock
+        to_date: new Date().toISOString().split('T')[0], // Today's date
+        company: company || ''
+      };
+
+      // Add item filter if provided
+      if (filters && Array.isArray(filters)) {
+        for (const filter of filters) {
+          if (filter[0] === 'item_code' && filter[1] === '=') {
+            reportFilters.item_code = filter[2];
+            break;
+          }
+        }
+      }
+
+      console.log('getStockBalance using Stock Balance Report with filters:', reportFilters);
+
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.stock_balance.stock_balance.execute`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filters: reportFilters })
+      });
+
+      if (!response.ok) {
+        console.error('Stock Balance Report failed:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Stock Balance Report error response:', errorText);
+        
+        // Fallback to Bin doctype if Stock Balance Report fails
+        return this.getStockBalanceFromBin(filters, company);
+      }
+
+      const result = await response.json();
+      console.log('Stock Balance Report raw result:', result);
+
+      // Transform the report data to match our expected format
+      if (result.message && result.message.result && Array.isArray(result.message.result)) {
+        const transformedData = result.message.result.map((row: any[]) => {
+          // Stock Balance Report columns: Item, Item Name, Item Group, Warehouse, Stock UOM, Balance Qty, Balance Value, Opening Qty, Opening Value, In Qty, In Value, Out Qty, Out Value
+          return {
+            item_code: row[0],
+            item_name: row[1],
+            warehouse: row[3],
+            stock_uom: row[4],
+            actual_qty: row[5] || 0,
+            stock_value: row[6] || 0
+          };
+        }).filter((item: any) => item.actual_qty > 0); // Only include items with positive stock
+
+        console.log('Transformed Stock Balance data:', transformedData);
+        return { data: transformedData };
+      } else {
+        console.log('No stock data found in report, returning empty result');
+        return { data: [] };
+      }
+
+    } catch (error) {
+      console.error('getStockBalance error:', error);
+      
+      // Fallback to Bin doctype
+      return this.getStockBalanceFromBin(filters, company);
+    }
+  }
+
+  private async getStockBalanceFromBin(filters?: any, company?: string): Promise<any> {
+    console.log('Falling back to Bin doctype for stock balance');
+    
     const params: any = {
-      fields: ['item_code', 'warehouse', 'actual_qty', 'stock_value', 'stock_uom']
+      fields: ['item_code', 'warehouse', 'actual_qty']
     };
     
+    if (filters || company) {
+      const finalFilters = [];
+      
+      if (filters && Array.isArray(filters)) {
+        finalFilters.push(...filters);
+      }
+      
+      if (company && company.trim()) {
+        console.log('Adding company filter:', company);
+        finalFilters.push(['company', '=', company]);
+      }
+      
+      if (finalFilters.length > 0) {
+        params.filters = finalFilters;
+      }
+    }
+    
+    console.log('getStockBalanceFromBin with params:', params);
+    
     try {
-      if (filters || company) {
-        const finalFilters = [];
-        
-        if (filters && Array.isArray(filters)) {
-          finalFilters.push(...filters);
-        }
-        
-        // Only add company filter if company is provided and not empty
-        if (company && company.trim()) {
-          console.log('Adding company filter:', company);
-          finalFilters.push(['company', '=', company]);
-        } else {
-          console.log('No company filter applied - company is empty or undefined');
-        }
-        
-        if (finalFilters.length > 0) {
-          params.filters = finalFilters;
-        }
-      }
-      
-      console.log('getStockBalance using Bin doctype with final params:', JSON.stringify(params, null, 2));
-      
       const result = await this.makeRequest('Bin', 'GET', null, params);
-      console.log('getStockBalance raw result:', result);
-      return result;
+      console.log('Bin fallback result:', result);
       
-    } catch (error) {
-      console.error('getStockBalance error details:', error);
-      
-      // If Bin access fails, let's try with minimal fields first
-      if (error instanceof Error && error.message.includes('EXPECTATION FAILED')) {
-        console.log('Bin access failed, trying with minimal fields...');
+      // Transform Bin data to include stock_uom and stock_value
+      if (result.data && Array.isArray(result.data)) {
+        const transformedData = result.data.map((item: any) => ({
+          ...item,
+          stock_uom: 'NOS', // Default UOM, should be fetched from item master
+          stock_value: 0 // Bin doesn't have valuation data
+        }));
         
-        try {
-          const minimalParams = {
-            fields: ['item_code', 'warehouse', 'actual_qty']
-          };
-          
-          if (filters && Array.isArray(filters)) {
-            minimalParams.filters = filters;
-          }
-          
-          console.log('Retrying with minimal params:', minimalParams);
-          const retryResult = await this.makeRequest('Bin', 'GET', null, minimalParams);
-          console.log('Retry with minimal fields successful:', retryResult);
-          return retryResult;
-          
-        } catch (retryError) {
-          console.error('Retry with minimal fields also failed:', retryError);
-          throw new Error(`Stock balance access failed. Please check your ERPNext permissions for Bin doctype. Original error: ${error.message}`);
-        }
+        return { data: transformedData };
       }
       
-      throw error;
+      return result;
+    } catch (binError) {
+      console.error('Bin fallback also failed:', binError);
+      throw new Error(`Stock balance access failed. Please check your ERPNext permissions. Error: ${binError instanceof Error ? binError.message : 'Unknown error'}`);
     }
   }
 
