@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +25,7 @@ export interface StockCountEntry {
   uom: string;
   difference: number;
   status: 'matched' | 'variance' | 'new';
+  useTraditionalEntry?: boolean;
 }
 
 export interface StockCountSession {
@@ -48,7 +48,6 @@ const StockCount = () => {
   const [selectedPurpose, setSelectedPurpose] = useState<'reconciliation' | 'opening' | null>(null);
   const [isCreatingReconciliation, setIsCreatingReconciliation] = useState(false);
 
-  // Load session from localStorage on component mount
   useEffect(() => {
     const savedSession = localStorage.getItem(STORAGE_KEY);
     if (savedSession) {
@@ -111,6 +110,11 @@ const StockCount = () => {
 
       const company = await getUserDefaultCompany();
       
+      // CRITICAL: Detect if this entry uses traditional method
+      const usesTraditionalEntry = firstEntry.useTraditionalEntry || (!firstEntry.serialBatchBundle && (firstEntry.batch || firstEntry.serial));
+      
+      console.log('Entry uses traditional entry method:', usesTraditionalEntry);
+      
       // Prepare Stock Reconciliation data with correct format
       const stockReconciliationData = {
         purpose: session?.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
@@ -118,6 +122,8 @@ const StockCount = () => {
         company: company || '',
         posting_date: new Date().toISOString().split('T')[0],
         posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+        // CRITICAL: Add use_serial_batch_fields flag for traditional entry
+        ...(usesTraditionalEntry ? { use_serial_batch_fields: 1 } : {}),
         items: [{
           item_code: firstEntry.itemCode,
           warehouse: firstEntry.warehouse,
@@ -169,8 +175,17 @@ const StockCount = () => {
         return false;
       }
 
+      // CRITICAL: Check if any entry uses traditional entry method
+      const hasTraditionalEntry = allEntries.some(entry => 
+        entry.useTraditionalEntry || (!entry.serialBatchBundle && (entry.batch || entry.serial))
+      );
+
+      console.log('Update - has traditional entry:', hasTraditionalEntry);
+
       // Prepare updated data with correct format
       const updatedData = {
+        // CRITICAL: Add use_serial_batch_fields flag if any entry uses traditional method
+        ...(hasTraditionalEntry ? { use_serial_batch_fields: 1 } : {}),
         items: allEntries.map(entry => ({
           item_code: entry.itemCode,
           warehouse: entry.warehouse,
@@ -287,7 +302,6 @@ const StockCount = () => {
         return;
       }
 
-      // Submit the Stock Reconciliation document
       const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Stock Reconciliation/${session.stockReconciliationNumber}`, {
         method: 'PUT',
         headers: {
@@ -295,7 +309,7 @@ const StockCount = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          docstatus: 1 // Submit the document
+          docstatus: 1
         })
       });
 
@@ -306,7 +320,6 @@ const StockCount = () => {
         return;
       }
 
-      // Mark as submitted
       const submittedSession = {
         ...session,
         isSubmitted: true
@@ -341,7 +354,6 @@ const StockCount = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <BarChart3 className="w-6 h-6 text-blue-600" />
@@ -370,7 +382,6 @@ const StockCount = () => {
         </div>
 
         {!session ? (
-          /* ... keep existing code (Session Setup) */
           <Card>
             <CardHeader>
               <CardTitle>Start Stock Count Session</CardTitle>
@@ -420,7 +431,6 @@ const StockCount = () => {
           </Card>
         ) : (
           <div className="space-y-6">
-            {/* Session Summary */}
             <StockCountSummary session={session} />
 
             <Tabs value={showForm ? "entry" : "review"} className="w-full">

@@ -32,6 +32,7 @@ interface StockCountFormProps {
     currentQty: number;
     actualQty: number;
     uom: string;
+    useTraditionalEntry?: boolean;
   }) => void;
 }
 
@@ -51,6 +52,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
   const { showError, showSuccess, showLoading, dismiss } = useNotification();
 
   const [useBundle, setUseBundle] = useState(false);
+  const [isCreatingBatchSerial, setIsCreatingBatchSerial] = useState(false);
 
   const fetchCurrentQty = async (itemCode: string, batch?: string, serial?: string) => {
     if (!itemCode || !warehouse) return;
@@ -92,7 +94,6 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         return;
       }
 
-      // Look up item by barcode
       const itemByBarcode = await erpnextAPI.getItemByBarcode(barcode);
       if (itemByBarcode && itemByBarcode.data && itemByBarcode.data.length > 0) {
         const item = itemByBarcode.data[0];
@@ -152,41 +153,49 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
     }
   };
 
-  const validateBatch = async (batchNo: string, itemCode: string): Promise<boolean> => {
-    if (!batchNo || !itemCode) return true;
+  const createBatchAndSerial = async (batchNo?: string, serialNo?: string, itemCode?: string): Promise<boolean> => {
+    if (!itemCode) return true;
+    
+    setIsCreatingBatchSerial(true);
+    const loadingToast = showLoading('Creating batch/serial numbers...');
     
     try {
       const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return true;
-
-      const isValid = await erpnextAPI.validateBatch(batchNo, itemCode);
-      if (isValid) {
-        toast.success('Batch validated successfully');
+      if (!erpnextAPI) {
+        showError('ERPNext API not configured');
+        return false;
       }
-      return isValid;
-    } catch (error) {
-      console.error('Batch validation error:', error);
-      toast.error('Failed to validate/create batch');
-      return false;
-    }
-  };
 
-  const validateSerial = async (serialNo: string, itemCode: string): Promise<boolean> => {
-    if (!serialNo || !itemCode) return true;
-    
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return true;
-
-      const isValid = await erpnextAPI.validateSerial(serialNo, itemCode, warehouse);
-      if (isValid) {
-        toast.success('Serial number validated successfully');
+      // Create batch if provided
+      if (batchNo) {
+        console.log('Creating/validating batch:', batchNo, 'for item:', itemCode);
+        const isValidBatch = await erpnextAPI.validateBatch(batchNo, itemCode);
+        if (!isValidBatch) {
+          showError(`Failed to create/validate batch number: ${batchNo}`);
+          return false;
+        }
+        showSuccess(`Batch ${batchNo} created/validated successfully`);
       }
-      return isValid;
+
+      // Create serial if provided
+      if (serialNo) {
+        console.log('Creating/validating serial:', serialNo, 'for item:', itemCode);
+        const isValidSerial = await erpnextAPI.validateSerial(serialNo, itemCode, warehouse);
+        if (!isValidSerial) {
+          showError(`Failed to create/validate serial number: ${serialNo}`);
+          return false;
+        }
+        showSuccess(`Serial ${serialNo} created/validated successfully`);
+      }
+
+      return true;
     } catch (error) {
-      console.error('Serial validation error:', error);
-      toast.error('Failed to validate/create serial number');
+      console.error('Error creating batch/serial:', error);
+      showError('Failed to create batch/serial numbers');
       return false;
+    } finally {
+      setIsCreatingBatchSerial(false);
+      dismiss(loadingToast);
     }
   };
 
@@ -213,6 +222,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       return;
     }
 
+    // For traditional entry validation
     if (!useBundle) {
       if (selectedItem.has_batch_no && !formData.batch) {
         toast.error('Batch number is required for this item');
@@ -224,20 +234,17 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         return;
       }
 
-      // Validate batch if provided (will create if not exists)
-      if (formData.batch) {
-        const isValidBatch = await validateBatch(formData.batch, selectedItem.item_code);
-        if (!isValidBatch) {
-          toast.error('Failed to validate/create batch number');
-          return;
-        }
-      }
-
-      // Validate serial if provided (will create if not exists)
-      if (formData.serial) {
-        const isValidSerial = await validateSerial(formData.serial, selectedItem.item_code);
-        if (!isValidSerial) {
-          toast.error('Failed to validate/create serial number');
+      // CRITICAL: Create batch and serial numbers BEFORE submitting entry
+      if (formData.batch || formData.serial) {
+        console.log('Creating batch/serial before adding entry:', { batch: formData.batch, serial: formData.serial });
+        const success = await createBatchAndSerial(
+          formData.batch || undefined,
+          formData.serial || undefined,
+          selectedItem.item_code
+        );
+        
+        if (!success) {
+          toast.error('Failed to create batch/serial numbers. Please try again.');
           return;
         }
       }
@@ -249,7 +256,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
     }
 
     try {
-      console.log('Submitting entry with data:', {
+      const entryData = {
         itemCode: selectedItem.item_code,
         itemName: selectedItem.item_name,
         warehouse: warehouse,
@@ -258,20 +265,13 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         serialBatchBundle: useBundle ? formData.serialBatchBundle : undefined,
         currentQty: currentQty,
         actualQty: formData.actualQty,
-        uom: selectedItem.stock_uom
-      });
+        uom: selectedItem.stock_uom,
+        useTraditionalEntry: !useBundle && (formData.batch || formData.serial)
+      };
 
-      await onAddEntry({
-        itemCode: selectedItem.item_code,
-        itemName: selectedItem.item_name,
-        warehouse: warehouse,
-        batch: useBundle ? undefined : (formData.batch || undefined),
-        serial: useBundle ? undefined : (formData.serial || undefined),
-        serialBatchBundle: useBundle ? formData.serialBatchBundle : undefined,
-        currentQty: currentQty,
-        actualQty: formData.actualQty,
-        uom: selectedItem.stock_uom
-      });
+      console.log('Submitting entry with data:', entryData);
+
+      await onAddEntry(entryData);
 
       // Reset form but keep item selected for easier multiple entries
       setFormData({
@@ -366,17 +366,18 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         </CardContent>
       </Card>
 
-      {/* Serial/Batch Input Method Selection */}
+      {/* Serial/Batch Input Method Selection - Fixed Mobile Layout */}
       {selectedItem && shouldShowBundleOption && (
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-4">
               <Label>Serial/Batch Input Method</Label>
-              <div className="flex space-x-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant={!useBundle ? "default" : "outline"}
                   onClick={() => setUseBundle(false)}
+                  className="text-sm px-3 py-2"
                 >
                   Traditional Entry
                 </Button>
@@ -384,6 +385,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                   type="button"
                   variant={useBundle ? "default" : "outline"}
                   onClick={() => setUseBundle(true)}
+                  className="text-sm px-3 py-2"
                 >
                   Bundle Entry
                 </Button>
@@ -418,6 +420,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                 onChange={(e) => setFormData(prev => ({ ...prev, batch: e.target.value }))}
                 placeholder="Enter batch number..."
                 required
+                disabled={isCreatingBatchSerial}
               />
             </div>
           )}
@@ -430,6 +433,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                 onChange={(e) => setFormData(prev => ({ ...prev, serial: e.target.value }))}
                 placeholder="Enter serial number..."
                 required
+                disabled={isCreatingBatchSerial}
               />
             </div>
           )}
@@ -466,9 +470,22 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
 
       {/* Submit */}
       {selectedItem && (
-        <Button type="submit" className="w-full" disabled={isLoadingQty}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add to Count
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={isLoadingQty || isCreatingBatchSerial}
+        >
+          {isCreatingBatchSerial ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Creating Batch/Serial...
+            </>
+          ) : (
+            <>
+              <Plus className="w-4 h-4 mr-2" />
+              Add to Count
+            </>
+          )}
         </Button>
       )}
     </form>
