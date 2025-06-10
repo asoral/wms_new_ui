@@ -1,283 +1,104 @@
-
 import { ERPNextConfig } from './types';
-import { ERPNextBaseAPI } from './baseApi';
+import { ERPNextAuthAPI } from './authApi';
 import { ERPNextItemsAPI } from './itemsApi';
 import { ERPNextStockAPI } from './stockApi';
 import { ERPNextWarehouseAPI } from './warehouseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
-import { ERPNextMaterialAPI } from './materialApi';
-import { ERPNextCompanyAPI } from './companyApi';
-import { ERPNextOtherAPIs } from './otherApis';
-import { ERPNextDashboardAPI } from './dashboardApi';
+import { ERPNextManufacturingAPI } from './manufacturingApi';
+import { ERPNextCRMAPI } from './crmApi';
+import { ERPNextAccountsAPI } from './accountsApi';
+import { ERPNextQualityAPI } from './qualityApi';
+import { ERPNextAssetsAPI } from './assetsApi';
+import { ERPNextSupportAPI } from './supportApi';
+import { ERPNextBinAPI } from './binApi';
 
-let erpnextConfig: ERPNextConfig | null = null;
+export class ERPNextAPI extends ERPNextBinAPI {
+  public auth: ERPNextAuthAPI;
+  public items: ERPNextItemsAPI;
+  public stock: ERPNextStockAPI;
+  public warehouse: ERPNextWarehouseAPI;
+  public sales: ERPNextSalesAPI;
+  public purchase: ERPNextPurchaseAPI;
+  public manufacturing: ERPNextManufacturingAPI;
+  public crm: ERPNextCRMAPI;
+  public accounts: ERPNextAccountsAPI;
+  public quality: ERPNextQualityAPI;
+  public assets: ERPNextAssetsAPI;
+  public support: ERPNextSupportAPI;
 
-export const configureERPNextAPI = (config: ERPNextConfig) => {
-  erpnextConfig = config;
-  localStorage.setItem('erpnextBaseURL', config.baseURL);
-  localStorage.setItem('erpnextApiKey', config.apiKey);
-  localStorage.setItem('erpnextApiSecret', config.apiSecret);
+  constructor(config: ERPNextConfig) {
+    super(config.baseURL, config.apiKey, config.apiSecret);
+    this.auth = new ERPNextAuthAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.items = new ERPNextItemsAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.stock = new ERPNextStockAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.warehouse = new ERPNextWarehouseAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.sales = new ERPNextSalesAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.purchase = new ERPNextPurchaseAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.manufacturing = new ERPNextManufacturingAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.crm = new ERPNextCRMAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.accounts = new ERPNextAccountsAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.quality = new ERPNextQualityAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.assets = new ERPNextAssetsAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.support = new ERPNextSupportAPI(config.baseURL, config.apiKey, config.apiSecret);
+  }
+}
+
+export const configureERPNextAPI = async (
+  baseURL: string,
+  apiKey: string,
+  apiSecret: string
+): Promise<ERPNextAPI | null> => {
+  if (!baseURL || !apiKey || !apiSecret) {
+    console.error('ERPNext API configuration is incomplete.');
+    return null;
+  }
+
+  const api = new ERPNextAPI({ baseURL, apiKey, apiSecret });
+  const isConnected = await api.auth.testConnection();
+
+  if (!isConnected) {
+    console.error('Failed to connect to ERPNext with provided credentials.');
+    return null;
+  }
+
+  return api;
 };
 
 export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
-  if (!erpnextConfig) {
-    const baseURL = localStorage.getItem('erpnextBaseURL');
-    const apiKey = localStorage.getItem('erpnextApiKey');
-    const apiSecret = localStorage.getItem('erpnextApiSecret');
-    
-    if (baseURL && apiKey && apiSecret) {
-      erpnextConfig = { baseURL, apiKey, apiSecret };
-    } else {
-      console.warn('ERPNext API not configured. Configure credentials first.');
-      return null;
-    }
+  const baseURL = localStorage.getItem('erpnextBaseURL') || '';
+  const apiKey = localStorage.getItem('erpnextAPIKey') || '';
+  const apiSecret = localStorage.getItem('erpnextAPISecret') || '';
+
+  if (!baseURL || !apiKey || !apiSecret) {
+    console.warn('ERPNext API configuration not found in localStorage.');
+    return null;
   }
 
-  return new ERPNextAPI(erpnextConfig.baseURL, erpnextConfig.apiKey, erpnextConfig.apiSecret);
+  return configureERPNextAPI(baseURL, apiKey, apiSecret);
 };
 
 export const getUserDefaultCompany = async (): Promise<string | null> => {
   try {
-    const storedCompany = localStorage.getItem('erpnextDefaultCompany');
-    if (storedCompany) {
-      return storedCompany;
-    }
+    const baseURL = localStorage.getItem('erpnextBaseURL') || '';
+    const apiKey = localStorage.getItem('erpnextAPIKey') || '';
+    const apiSecret = localStorage.getItem('erpnextAPISecret') || '';
 
-    const erpnextAPI = await createERPNextAPI();
-    if (!erpnextAPI) {
-      console.error('ERPNext API not configured');
+    if (!baseURL || !apiKey || !apiSecret) {
+      console.warn('ERPNext API configuration not found in localStorage.');
       return null;
     }
 
-    const userDetails = await erpnextAPI.getLoggedInUserDetails();
-    if (userDetails && userDetails.data && userDetails.data.defaults && userDetails.data.defaults.company) {
-      const company = userDetails.data.defaults.company;
-      localStorage.setItem('erpnextDefaultCompany', company);
-      return company;
-    } else {
-      console.warn('Unable to retrieve default company from user details.');
-      return null;
+    const api = new ERPNextAuthAPI(baseURL, apiKey, apiSecret);
+    const userDetails = await api.getLoggedInUserDetails();
+
+    if (userDetails && userDetails.data && userDetails.data.company) {
+      return userDetails.data.company;
     }
+
+    return null;
   } catch (error) {
-    console.error('Error fetching user details:', error);
+    console.error('Failed to fetch user details:', error);
     return null;
   }
 };
-
-export class ERPNextAPI extends ERPNextBaseAPI {
-  private itemsApi: ERPNextItemsAPI;
-  private stockApi: ERPNextStockAPI;
-  private warehouseApi: ERPNextWarehouseAPI;
-  private salesApi: ERPNextSalesAPI;
-  private purchaseApi: ERPNextPurchaseAPI;
-  private materialApi: ERPNextMaterialAPI;
-  private companyApi: ERPNextCompanyAPI;
-  private otherApis: ERPNextOtherAPIs;
-  private dashboardApi: ERPNextDashboardAPI;
-
-  constructor(baseURL: string, apiKey: string, apiSecret: string) {
-    super(baseURL, apiKey, apiSecret);
-    this.itemsApi = new ERPNextItemsAPI(baseURL, apiKey, apiSecret);
-    this.stockApi = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
-    this.warehouseApi = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
-    this.salesApi = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
-    this.purchaseApi = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
-    this.materialApi = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
-    this.companyApi = new ERPNextCompanyAPI(baseURL, apiKey, apiSecret);
-    this.otherApis = new ERPNextOtherAPIs(baseURL, apiKey, apiSecret);
-    this.dashboardApi = new ERPNextDashboardAPI(baseURL, apiKey, apiSecret);
-  }
-
-  // Items API methods
-  getItems(filters?: any, searchTerm?: string, company?: string) {
-    return this.itemsApi.getItems(filters, searchTerm, company);
-  }
-
-  searchItems(searchTerm: string, company?: string, limitPageLength?: number) {
-    return this.itemsApi.searchItems(searchTerm, company, limitPageLength);
-  }
-
-  getItemsPaginated(filters?: any, fields?: string[], company?: string, limitPageLength?: number, page?: number) {
-    return this.itemsApi.getItemsPaginated(filters, fields, company, limitPageLength, page);
-  }
-
-  getItemByBarcode(barcode: string) {
-    return this.itemsApi.getItemByBarcode(barcode);
-  }
-
-  getItemDetails(itemCode: string) {
-    return this.itemsApi.getItemDetails(itemCode);
-  }
-
-  // Stock API methods
-  getStockBalance(filters?: any, company?: string) {
-    return this.stockApi.getStockBalance(filters, company);
-  }
-
-  getBinSummary(itemCode: string, warehouse?: string) {
-    return this.stockApi.getBinSummary(itemCode, warehouse);
-  }
-
-  getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
-    return this.stockApi.getCurrentStock(itemCode, warehouse, batch, serial);
-  }
-
-  getStockLedgerEntries(filters?: any, company?: string) {
-    return this.stockApi.getStockLedgerEntries(filters, company);
-  }
-
-  getStockAgingReport(filters?: any) {
-    return this.stockApi.getStockAgingReport(filters);
-  }
-
-  getItemShortageReport(filters?: any) {
-    return this.stockApi.getItemShortageReport(filters);
-  }
-
-  getStockProjectedQtyReport(filters?: any) {
-    return this.stockApi.getStockProjectedQtyReport(filters);
-  }
-
-  getStockEntries(filters?: any, company?: string, limitPageLength?: number) {
-    return this.stockApi.getStockEntries(filters, company, limitPageLength);
-  }
-
-  createStockEntry(entryData: any) {
-    return this.stockApi.createStockEntry(entryData);
-  }
-
-  createStockReconciliation(reconciliationData: any) {
-    return this.stockApi.createStockReconciliation(reconciliationData);
-  }
-
-  updateStockReconciliation(name: string, reconciliationData: any) {
-    return this.stockApi.updateStockReconciliation(name, reconciliationData);
-  }
-
-  submitStockReconciliation(name: string) {
-    return this.stockApi.submitStockReconciliation(name);
-  }
-
-  // Warehouse API methods
-  getWarehouses(filters?: any, company?: string) {
-    return this.warehouseApi.getWarehouses(filters, company);
-  }
-
-  // Sales API methods
-  getSalesOrders(filters?: any, company?: string, limitPageLength?: number) {
-    return this.salesApi.getSalesOrders(filters, company, limitPageLength);
-  }
-
-  getSalesOrder(soNumber: string) {
-    return this.salesApi.getSalesOrder(soNumber);
-  }
-
-  getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
-    return this.salesApi.getDeliveryNotes(filters, company, limitPageLength);
-  }
-
-  createDeliveryNote(deliveryData: any) {
-    return this.salesApi.createDeliveryNote(deliveryData);
-  }
-
-  getPendingSalesOrders(company?: string) {
-    return this.salesApi.getPendingSalesOrders(company);
-  }
-
-  getDeliveryDrafts(company?: string) {
-    return this.salesApi.getDeliveryDrafts(company);
-  }
-
-  // Purchase API methods
-  getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchaseApi.getPurchaseOrders(filters, company, limitPageLength);
-  }
-
-  getPurchaseOrder(poNumber: string) {
-    return this.purchaseApi.getPurchaseOrder(poNumber);
-  }
-
-  getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchaseApi.getPurchaseReceipts(filters, company, limitPageLength);
-  }
-
-  createPurchaseReceipt(receiptData: any) {
-    return this.purchaseApi.createPurchaseReceipt(receiptData);
-  }
-
-  getPendingPurchaseOrders(company?: string) {
-    return this.purchaseApi.getPendingPurchaseOrders(company);
-  }
-
-  getReceiptDrafts(company?: string) {
-    return this.purchaseApi.getReceiptDrafts(company);
-  }
-
-  getQualityInspectionsPending(company?: string) {
-    return this.purchaseApi.getQualityInspectionsPending(company);
-  }
-
-  // Material API methods
-  getMaterialRequests(filters?: any, company?: string, limitPageLength?: number) {
-    return this.materialApi.getMaterialRequests(filters, company, limitPageLength);
-  }
-
-  getMaterialRequest(mrNumber: string) {
-    return this.materialApi.getMaterialRequest(mrNumber);
-  }
-
-  createMaterialRequest(requestData: any) {
-    return this.materialApi.createMaterialRequest(requestData);
-  }
-
-  // Company API methods
-  getCompanies() {
-    return this.companyApi.getCompanies();
-  }
-
-  // Other APIs methods
-  getPickLists(filters?: any, company?: string, limitPageLength?: number) {
-    return this.otherApis.getPickLists(filters, company, limitPageLength);
-  }
-
-  getPackingSlips(filters?: any, company?: string, limitPageLength?: number) {
-    return this.otherApis.getPackingSlips(filters, company, limitPageLength);
-  }
-
-  getQualityInspections(filters?: any, company?: string, limitPageLength?: number) {
-    return this.otherApis.getQualityInspections(filters, company, limitPageLength);
-  }
-
-  getProductBundles(filters?: any, company?: string, limitPageLength?: number) {
-    return this.otherApis.getProductBundles(filters, company, limitPageLength);
-  }
-
-  validateBatch(batchNo: string, itemCode: string) {
-    return this.otherApis.validateBatch(batchNo, itemCode);
-  }
-
-  validateSerial(serialNo: string, itemCode: string, warehouse: string) {
-    return this.otherApis.validateSerial(serialNo, itemCode, warehouse);
-  }
-
-  // Dashboard API methods
-  getDashboardMetrics(company?: string) {
-    return this.dashboardApi.getDashboardMetrics(company);
-  }
-
-  getRecentActivities(company?: string, limitPageLength?: number) {
-    return this.dashboardApi.getRecentActivities(company, limitPageLength);
-  }
-
-  getOperationalMetrics(company?: string) {
-    return this.dashboardApi.getOperationalMetrics(company);
-  }
-
-  getFinancialMetrics(company?: string) {
-    return this.dashboardApi.getFinancialMetrics(company);
-  }
-}
-
-// Re-export types for convenience
-export * from './types';

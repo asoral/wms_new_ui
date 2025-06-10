@@ -2,11 +2,10 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, TrendingUp, DollarSign, Calendar, Loader2 } from "lucide-react";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { Package, TrendingUp, DollarSign, Loader2 } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { toast } from "sonner";
-import ItemSelector from "@/components/item-enquiry/ItemSelector";
-import { Item } from "@/services/erp/erpnext/types";
+import ItemDropdownSelector from "@/components/item-enquiry/ItemDropdownSelector";
 
 export interface ItemData {
   item_code: string;
@@ -58,27 +57,42 @@ const ItemEnquiry = () => {
         return;
       }
 
-      console.log('Fetching stock balance for:', itemCode);
+      console.log('Fetching bin data for:', itemCode);
       
-      // Get detailed item info
+      // Get item details first
       const itemDetails = await erpnextAPI.getItemDetails(itemCode);
       
-      // Get stock balance
-      const stockResponse = await erpnextAPI.getStockBalance({ item_code: itemCode });
+      // Get user's default company to filter warehouses
+      const defaultCompany = await getUserDefaultCompany();
+      let companyWarehouses: string[] = [];
+      
+      if (defaultCompany) {
+        // Get all warehouses for the company
+        const warehousesResult = await erpnextAPI.getWarehouses([['company', '=', defaultCompany]]);
+        if (warehousesResult.data) {
+          companyWarehouses = warehousesResult.data.map(w => w.name);
+        }
+      }
+      
+      // Get bin data filtered by company warehouses
+      const binResponse = await erpnextAPI.getBinByItem(itemCode, companyWarehouses.length > 0 ? companyWarehouses : undefined);
       
       let totalStockValue = 0;
       let totalQty = 0;
       const warehouses: Array<{ warehouse: string; actual_qty: number; stock_value: number }> = [];
 
-      if (stockResponse.data && Array.isArray(stockResponse.data)) {
-        stockResponse.data.forEach((stock: any) => {
-          totalQty += stock.actual_qty || 0;
-          totalStockValue += stock.stock_value || 0;
-          warehouses.push({
-            warehouse: stock.warehouse || '',
-            actual_qty: stock.actual_qty || 0,
-            stock_value: stock.stock_value || 0
-          });
+      if (binResponse.data && Array.isArray(binResponse.data)) {
+        binResponse.data.forEach((bin: any) => {
+          if (bin.actual_qty > 0) { // Only include warehouses with stock
+            totalQty += bin.actual_qty || 0;
+            const stockValue = (bin.actual_qty || 0) * (bin.valuation_rate || 0);
+            totalStockValue += stockValue;
+            warehouses.push({
+              warehouse: bin.warehouse || '',
+              actual_qty: bin.actual_qty || 0,
+              stock_value: stockValue
+            });
+          }
         });
       }
 
@@ -95,10 +109,10 @@ const ItemEnquiry = () => {
       };
 
       setSelectedItem(enrichedItem);
-      console.log('Item details loaded:', enrichedItem);
+      console.log('Item details loaded from BIN:', enrichedItem);
       
     } catch (error) {
-      console.error('Error fetching item stock:', error);
+      console.error('Error fetching item bin data:', error);
       toast.error('Failed to fetch item stock details');
     } finally {
       setIsLoadingStock(false);
@@ -119,7 +133,7 @@ const ItemEnquiry = () => {
               <CardTitle>Search Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <ItemSelector
+              <ItemDropdownSelector
                 onItemSelected={handleItemSelect}
                 isLoading={isLoadingStock}
               />
