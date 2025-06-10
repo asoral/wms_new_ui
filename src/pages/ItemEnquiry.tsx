@@ -150,14 +150,17 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Process stock data from Bin doctype
+      // Process stock data from Bin doctype - fix the data processing
       const warehouseStockMap: { [key: string]: StockInfo } = {};
 
       binResult.data.forEach((binEntry: any) => {
         const warehouse = binEntry.warehouse;
+        // Use actual_qty from Bin doctype, not qty
         const qty = parseFloat(binEntry.actual_qty) || 0;
+        // Use stock_value from Bin doctype
         const valuation = parseFloat(binEntry.stock_value) || 0;
 
+        // Only process entries with positive stock
         if (qty > 0 && warehouse) {
           if (warehouseStockMap[warehouse]) {
             warehouseStockMap[warehouse].qty += qty;
@@ -166,9 +169,9 @@ const ItemEnquiry = () => {
             warehouseStockMap[warehouse] = {
               warehouse,
               qty,
-              uom: binEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
+              uom: itemResult.data.stock_uom || 'Nos',
               valuation,
-              age: Math.floor(Math.random() * 90),
+              age: Math.floor(Math.random() * 90), // Random age for now
               batch: binEntry.batch_no || undefined,
               serial: binEntry.serial_no || undefined
             };
