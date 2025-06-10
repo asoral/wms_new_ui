@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
 
@@ -110,7 +109,7 @@ export const useEnhancedDashboard = () => {
         erpnextAPI.getDashboardMetrics(defaultCompany || undefined),
         erpnextAPI.getOperationalMetrics(defaultCompany || undefined),
         erpnextAPI.getFinancialMetrics(defaultCompany || undefined),
-        erpnextAPI.getStockAgingReport(undefined, defaultCompany || undefined)
+        erpnextAPI.getStockAgingReport()
       ]);
 
       setStats(dashboardStats);

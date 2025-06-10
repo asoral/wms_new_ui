@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, StockEntry } from './types';
 
@@ -99,14 +98,10 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-  async getStockAgingReport(filters?: any, company?: string): Promise<ERPNextResponse<any[]>> {
+  async getStockAgingReport(filters?: any): Promise<ERPNextResponse<any[]>> {
     try {
       // Prepare filters for the Stock Ageing report
       const reportFilters: any = {};
-      
-      if (company) {
-        reportFilters.company = company;
-      }
       
       // Set default date range if not provided
       const today = new Date();
@@ -125,11 +120,12 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       // Use the generic report runner
       const result = await this.runReport('Stock Ageing', reportFilters);
       
+      console.log('Stock Ageing report result:', result);
+      
       // Transform the report data to match expected format
       if (result && result.message && result.message.result) {
         return {
-          data: result.message.result,
-          columns: result.message.columns || []
+          data: result.message.result
         };
       }
       
