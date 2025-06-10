@@ -30,7 +30,7 @@ export const useERPNextDashboard = () => {
           return;
         }
 
-        // Fetch various data for dashboard using corrected API calls
+        // Fetch various data for dashboard using the new API structure
         const [itemsResponse, warehousesResponse, ordersResponse, stockBalanceResponse] = await Promise.all([
           erpnextAPI.getItems(),
           erpnextAPI.getWarehouses(),

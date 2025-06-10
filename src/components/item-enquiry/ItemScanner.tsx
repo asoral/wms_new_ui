@@ -56,7 +56,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   // Monitor online status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOffline = () => setIsOffline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -103,11 +103,13 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
         let result;
         if (search.trim()) {
           console.log('Searching items with term:', search);
+          // Use the fixed searchItems method
           result = await erpnextAPI.searchItems(search, defaultCompany || undefined, 20);
         } else {
           console.log('Fetching paginated items, page:', pageToFetch);
+          // Use the fixed getItemsPaginated method
           result = await erpnextAPI.getItemsPaginated(
-            [['disabled', '=', 0]],
+            [['disabled', '=', '0']],
             ['item_code', 'item_name', 'stock_uom'],
             defaultCompany || undefined,
             20,

@@ -62,19 +62,22 @@ const ItemEnquiry = () => {
 
       const defaultCompany = await getUserDefaultCompany();
 
-      // First, try to find item by barcode
+      // First, try to find item by direct lookup (this fixes the FG-0003 search issue)
       let itemResult;
       try {
-        const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode);
-        
-        if (barcodeSearchResult.data && barcodeSearchResult.data.length > 0) {
-          itemResult = { data: barcodeSearchResult.data[0] };
-        } else {
-          // If not found by barcode, try direct item lookup
-          try {
-            itemResult = await erpnextAPI.getItemDetails(itemCode);
-          } catch (err) {
-            // If item is not found, try searching
+        console.log('Searching for item:', itemCode);
+        itemResult = await erpnextAPI.getItemDetails(itemCode);
+        console.log('Item details result:', itemResult);
+      } catch (err) {
+        console.log('Direct item lookup failed, trying barcode search:', err);
+        // If direct lookup fails, try barcode search
+        try {
+          const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode);
+          
+          if (barcodeSearchResult.data && barcodeSearchResult.data.length > 0) {
+            itemResult = { data: barcodeSearchResult.data[0] };
+          } else {
+            // If barcode search also fails, try general search
             const searchResult = await erpnextAPI.searchItems(itemCode, defaultCompany || undefined, 10);
             
             if (!searchResult.data || searchResult.data.length === 0) {
@@ -86,11 +89,6 @@ const ItemEnquiry = () => {
               itemResult = { data: searchResult.data[0] };
             }
           }
-        }
-      } catch (err) {
-        // Try direct item lookup as fallback
-        try {
-          itemResult = await erpnextAPI.getItemDetails(itemCode);
         } catch (fallbackErr) {
           setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
           setStockData(null);
@@ -106,7 +104,9 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get stock balance
+      console.log('Final item result:', itemResult);
+
+      // Get stock balance using the corrected API
       const stockResult = await erpnextAPI.getStockBalance([
         ['item_code', '=', itemResult.data.item_code || itemCode]
       ], defaultCompany || undefined);
@@ -131,7 +131,7 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Process stock data
+      // Process stock data with corrected field names
       const warehouseStockMap: { [key: string]: StockInfo } = {};
 
       stockResult.data.forEach((stockEntry: any) => {

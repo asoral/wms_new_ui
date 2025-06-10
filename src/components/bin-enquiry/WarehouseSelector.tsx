@@ -74,7 +74,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      // Build search filters using correct Frappe format (removed disabled filter, added search)
+      // Build search filters using correct Frappe format
       let filters = [['is_group', '=', '0']];
       
       if (search.trim()) {
@@ -83,6 +83,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       
       console.log('API filters:', filters);
       
+      // Use the new warehouse API with proper parameter handling
       const result = await erpnextAPI.getWarehouses(filters);
       console.log('API result:', result);
       
