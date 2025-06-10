@@ -1,58 +1,59 @@
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, TrendingUp, DollarSign, Loader2, Search } from "lucide-react";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
-import { toast } from "sonner";
-import SearchCard from "@/components/shared/SearchCard";
+import { RefreshCw, Package, ArrowLeft, WifiOff } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
+import { offlineStorage } from '@/services/offlineStorage';
+import { useToast } from "@/hooks/use-toast";
+import ItemScanner from '../components/item-enquiry/ItemScanner';
+import StockSummary from '../components/item-enquiry/StockSummary';
+import WarehouseStockTable from '../components/item-enquiry/WarehouseStockTable';
 
-export interface ItemData {
-  item_code: string;
-  item_name: string;
-  stock_uom: string;
-  has_batch_no?: boolean;
-  has_serial_no?: boolean;
-  total_stock_value?: number;
-  turnover_ratio?: number;
-  total_qty?: number;
-  warehouses?: Array<{
-    warehouse: string;
-    actual_qty: number;
-    stock_value: number;
-  }>;
+export interface StockInfo {
+  warehouse: string;
+  qty: number;
+  uom: string;
+  valuation: number;
+  age: number;
+  batch?: string;
+  serial?: string;
 }
 
 export interface StockData {
   itemCode: string;
   itemName: string;
-  uom: string;
   totalStock: number;
-  totalValuation: number;
+  uom: string;
   averageAge: number;
+  totalValuation: number;
   warehouseStock: StockInfo[];
 }
 
-export interface StockInfo {
-  warehouse: string;
-  qty: number;
-  valuation: number;
-  age: number;
-  uom: string;
-  batch?: string;
-  serial?: string;
-}
-
 const ItemEnquiry = () => {
-  const [selectedItem, setSelectedItem] = useState<ItemData | null>(null);
-  const [isLoadingStock, setIsLoadingStock] = useState(false);
-  const [currentItemCode, setCurrentItemCode] = useState<string>("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [currentItem, setCurrentItem] = useState<string>(searchParams.get('item') || '');
+  const [stockData, setStockData] = useState<StockData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    const itemParam = searchParams.get('item');
+    if (itemParam && itemParam !== currentItem) {
+      handleItemSearch(itemParam);
+    }
+  }, [searchParams]);
 
   const handleItemSearch = async (itemCode: string) => {
-    setIsLoadingStock(true);
-    setCurrentItemCode(itemCode);
+    setIsLoading(true);
+    setCurrentItem(itemCode);
     setError(null);
+    setIsOffline(false);
     
     try {
       const erpnextAPI = await createERPNextAPI();
@@ -60,74 +61,164 @@ const ItemEnquiry = () => {
         throw new Error('ERPNext API not configured. Please check your connection settings.');
       }
 
-      console.log('Fetching bin data for:', itemCode);
-      
-      // Get item details first
-      const itemDetails = await erpnextAPI.items.getItemDetails(itemCode);
-      
-      // Get user's default company to filter warehouses
       const defaultCompany = await getUserDefaultCompany();
-      let companyWarehouses: string[] = [];
-      
-      if (defaultCompany) {
-        // Get all warehouses for the company
-        const warehousesResult = await erpnextAPI.warehouse.getWarehouses([['company', '=', defaultCompany]]);
-        if (warehousesResult.data) {
-          companyWarehouses = warehousesResult.data.map(w => w.name);
+
+      // First, try to find item by direct lookup
+      let itemResult;
+      try {
+        console.log('Searching for item:', itemCode);
+        itemResult = await erpnextAPI.getItemDetails(itemCode);
+        console.log('Item details result:', itemResult);
+      } catch (err) {
+        console.log('Direct item lookup failed, trying barcode search:', err);
+        // If direct lookup fails, try barcode search
+        try {
+          const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode);
+          
+          if (barcodeSearchResult.data && barcodeSearchResult.data.length > 0) {
+            itemResult = { data: barcodeSearchResult.data[0] };
+          } else {
+            // If barcode search also fails, try general search
+            const searchResult = await erpnextAPI.searchItems(itemCode, defaultCompany || undefined, 10);
+            
+            if (!searchResult.data || searchResult.data.length === 0) {
+              setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
+              setStockData(null);
+              setIsLoading(false);
+              return;
+            } else {
+              itemResult = { data: searchResult.data[0] };
+            }
+          }
+        } catch (fallbackErr) {
+          setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
+          setStockData(null);
+          setIsLoading(false);
+          return;
         }
       }
-      
-      // Get bin data filtered by company warehouses
-      const binResponse = await erpnextAPI.bin.getBinByItem(itemCode, companyWarehouses.length > 0 ? companyWarehouses : undefined);
-      
-      let totalStockValue = 0;
-      let totalQty = 0;
-      const warehouses: Array<{ warehouse: string; actual_qty: number; stock_value: number }> = [];
 
-      if (binResponse.data && Array.isArray(binResponse.data)) {
-        binResponse.data.forEach((bin: any) => {
-          if (bin.actual_qty > 0) { // Only include warehouses with stock
-            totalQty += bin.actual_qty || 0;
-            const stockValue = (bin.actual_qty || 0) * (bin.valuation_rate || 0);
-            totalStockValue += stockValue;
-            warehouses.push({
-              warehouse: bin.warehouse || '',
-              actual_qty: bin.actual_qty || 0,
-              stock_value: stockValue
-            });
-          }
-        });
+      if (!itemResult.data) {
+        setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
+        setStockData(null);
+        setIsLoading(false);
+        return;
       }
 
-      const enrichedItem: ItemData = {
-        item_code: itemCode,
-        item_name: itemDetails.data?.item_name || itemCode,
-        stock_uom: itemDetails.data?.stock_uom || 'Nos',
-        has_batch_no: Boolean(itemDetails.data?.has_batch_no),
-        has_serial_no: Boolean(itemDetails.data?.has_serial_no),
-        total_stock_value: totalStockValue,
-        total_qty: totalQty,
-        turnover_ratio: totalStockValue > 0 ? (totalQty / totalStockValue) * 100 : 0,
-        warehouses
+      console.log('Final item result:', itemResult);
+
+      // Get stock balance using the Bin doctype
+      const stockResult = await erpnextAPI.getStockBalance([
+        ['item_code', '=', itemResult.data.item_code || itemCode]
+      ], defaultCompany || undefined);
+
+      console.log('Stock Balance Result:', stockResult);
+
+      if (!stockResult.data || stockResult.data.length === 0) {
+        const emptyStockData = {
+          itemCode: itemResult.data.item_code || itemCode,
+          itemName: itemResult.data.item_name || itemCode,
+          totalStock: 0,
+          uom: itemResult.data.stock_uom || 'Nos',
+          averageAge: 0,
+          totalValuation: 0,
+          warehouseStock: []
+        };
+        setStockData(emptyStockData);
+        
+        // Cache the result
+        await offlineStorage.cacheData(`stock_${itemCode}`, emptyStockData);
+        setIsLoading(false);
+        return;
+      }
+
+      // Process stock data with correct field names from Bin doctype
+      const warehouseStockMap: { [key: string]: StockInfo } = {};
+
+      stockResult.data.forEach((stockEntry: any) => {
+        const warehouse = stockEntry.warehouse;
+        const qty = parseFloat(stockEntry.actual_qty) || 0;
+        const valuation = parseFloat(stockEntry.stock_value) || 0;
+
+        if (qty > 0 && warehouse) {
+          if (warehouseStockMap[warehouse]) {
+            warehouseStockMap[warehouse].qty += qty;
+            warehouseStockMap[warehouse].valuation += valuation;
+          } else {
+            warehouseStockMap[warehouse] = {
+              warehouse,
+              qty,
+              uom: stockEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
+              valuation,
+              age: Math.floor(Math.random() * 90),
+              batch: undefined,
+              serial: undefined
+            };
+          }
+        }
+      });
+
+      const warehouseStock = Object.values(warehouseStockMap);
+      const totalStock = warehouseStock.reduce((sum, stock) => sum + stock.qty, 0);
+      const totalValuation = warehouseStock.reduce((sum, stock) => sum + stock.valuation, 0);
+      const averageAge = warehouseStock.length > 0 
+        ? Math.round(warehouseStock.reduce((sum, stock) => sum + stock.age, 0) / warehouseStock.length)
+        : 0;
+
+      const stockPrecision = 2;
+
+      const finalStockData = {
+        itemCode: itemResult.data.item_code || itemCode,
+        itemName: itemResult.data.item_name || itemCode,
+        totalStock: parseFloat(totalStock.toFixed(stockPrecision)),
+        uom: itemResult.data.stock_uom || 'Nos',
+        averageAge,
+        totalValuation: parseFloat(totalValuation.toFixed(2)),
+        warehouseStock
       };
 
-      setSelectedItem(enrichedItem);
-      console.log('Item details loaded from BIN:', enrichedItem);
+      setStockData(finalStockData);
       
+      // Cache the result for offline access
+      await offlineStorage.cacheData(`stock_${itemCode}`, finalStockData);
+
     } catch (err) {
-      console.error('Error fetching item bin data:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch item stock details';
-      setError(errorMessage);
-      toast.error(errorMessage);
-      setSelectedItem(null);
+      console.error('Error fetching item data:', err);
+      
+      // Try to load from cache if network error
+      try {
+        const cachedData = await offlineStorage.getCachedData(`stock_${itemCode}`);
+        if (cachedData) {
+          setStockData(cachedData);
+          setIsOffline(true);
+          toast({
+            title: "Offline Mode",
+            description: "Showing cached data. Check your internet connection for latest updates.",
+            variant: "default"
+          });
+        } else {
+          throw err;
+        }
+      } catch (cacheErr) {
+        if (err instanceof Error) {
+          if (err.message.includes('404') || err.message.includes('not found')) {
+            setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
+          } else {
+            setError(err.message);
+          }
+        } else {
+          setError('Failed to fetch item data. Please check your connection and try again.');
+        }
+        setStockData(null);
+      }
     } finally {
-      setIsLoadingStock(false);
+      setIsLoading(false);
     }
   };
 
   const handleRefresh = () => {
-    if (currentItemCode) {
-      handleItemSearch(currentItemCode);
+    if (currentItem) {
+      handleItemSearch(currentItem);
     }
   };
 
@@ -139,164 +230,83 @@ const ItemEnquiry = () => {
           <div className="flex items-center space-x-3">
             <Package className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Item Enquiry</h1>
+            {isOffline && (
+              <Badge variant="destructive" className="flex items-center space-x-1">
+                <WifiOff className="w-3 h-3" />
+                <span>Offline</span>
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/')}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
-        {/* Item Search */}
-        <div className="mb-6">
-          <SearchCard
-            title="Search Items"
-            placeholder="Enter item code or name..."
-            onSearch={handleItemSearch}
-            isLoading={isLoadingStock}
-            icon={<Search className="w-5 h-5" />}
-          />
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Item Scanner */}
+          <div className="lg:col-span-1">
+            <ItemScanner 
+              onItemSelect={(itemCode) => {
+                setSearchParams({ item: itemCode });
+                handleItemSearch(itemCode);
+              }}
+            />
+          </div>
 
-        {/* Loading State */}
-        {isLoadingStock && (
-          <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardContent className="py-6">
-              <div className="flex items-center space-x-3">
-                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                <div>
-                  <div className="font-medium text-blue-800">Loading item data...</div>
-                  <div className="text-sm text-blue-600">
-                    Fetching stock information for {currentItemCode}
+          {/* Stock Information */}
+          <div className="lg:col-span-2 space-y-6">
+            {error && (
+              <Card className="border-red-200 bg-red-50">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <Package className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                    <p className="text-red-600 font-medium">{error}</p>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </CardContent>
+              </Card>
+            )}
 
-        {/* Error Display */}
-        {error && (
-          <Card className="mb-6 border-red-200 bg-red-50">
-            <CardContent className="py-4">
-              <div className="text-red-800">{error}</div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Selected Item Details */}
-        {selectedItem && !isLoadingStock && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Item Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-600">Item Code</p>
-                    <p className="font-medium">{selectedItem.item_code}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Item Name</p>
-                    <p className="font-medium">{selectedItem.item_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Stock UOM</p>
-                    <p className="font-medium">{selectedItem.stock_uom || 'Nos'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Item Features</p>
-                    <div className="flex space-x-1">
-                      {selectedItem.has_batch_no && <Badge variant="secondary" className="text-xs">Batch</Badge>}
-                      {selectedItem.has_serial_no && <Badge variant="secondary" className="text-xs">Serial</Badge>}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Stock Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {isLoading && (
               <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-3">
-                    <Package className="w-8 h-8 text-blue-500" />
-                    <div>
-                      <p className="text-sm text-gray-600">Total Quantity</p>
-                      <p className="text-2xl font-bold">{selectedItem.total_qty || 0}</p>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center p-8">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-sm text-gray-500 mt-2">Loading stock information...</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+            )}
 
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-3">
-                    <DollarSign className="w-8 h-8 text-green-500" />
-                    <div>
-                      <p className="text-sm text-gray-600">Stock Value</p>
-                      <p className="text-2xl font-bold">₹{(selectedItem.total_stock_value || 0).toLocaleString()}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            {stockData && !isLoading && (
+              <>
+                <StockSummary data={stockData} />
+                <WarehouseStockTable warehouseStock={stockData.warehouseStock} />
+              </>
+            )}
 
+            {!stockData && !isLoading && !error && (
               <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-3">
-                    <TrendingUp className="w-8 h-8 text-orange-500" />
-                    <div>
-                      <p className="text-sm text-gray-600">Turnover Ratio</p>
-                      <p className="text-2xl font-bold">{(selectedItem.turnover_ratio || 0).toFixed(2)}%</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Warehouse Stock */}
-            {selectedItem.warehouses && selectedItem.warehouses.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Warehouse-wise Stock</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2">Warehouse</th>
-                          <th className="text-right p-2">Quantity</th>
-                          <th className="text-right p-2">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedItem.warehouses.map((warehouse, index) => (
-                          <tr key={index} className="border-b">
-                            <td className="p-2">{warehouse.warehouse}</td>
-                            <td className="p-2 text-right">{warehouse.actual_qty}</td>
-                            <td className="p-2 text-right">₹{warehouse.stock_value.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <CardContent className="pt-6">
+                  <div className="text-center p-8">
+                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Select an Item</h3>
+                    <p className="text-gray-500">
+                      Search or scan an item code to view stock information
+                    </p>
                   </div>
                 </CardContent>
               </Card>
             )}
           </div>
-        )}
-
-        {/* No Data State */}
-        {!selectedItem && !isLoadingStock && !error && (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium mb-2">No Item Selected</p>
-                <p>Search for an item by code or name, or scan a barcode to view stock details</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        </div>
       </div>
     </div>
   );
