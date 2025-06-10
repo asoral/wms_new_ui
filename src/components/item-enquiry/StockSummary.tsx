@@ -2,13 +2,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, Clock, DollarSign, TrendingUp } from "lucide-react";
-import { ItemStockData } from "../../pages/ItemEnquiry";
+import { StockData } from "../../pages/ItemEnquiry";
 
 interface StockSummaryProps {
-  stockData: ItemStockData;
+  data: StockData;
 }
 
-const StockSummary = ({ stockData }: StockSummaryProps) => {
+const StockSummary = ({ data }: StockSummaryProps) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -21,28 +21,28 @@ const StockSummary = ({ stockData }: StockSummaryProps) => {
   const summaryCards = [
     {
       title: "Total Stock",
-      value: `${stockData.totalStock} ${stockData.uom}`,
+      value: `${data.totalStock} ${data.uom}`,
       icon: Package,
       color: "text-blue-600",
       bgColor: "bg-blue-50"
     },
     {
       title: "Total Valuation",
-      value: formatCurrency(stockData.totalValuation),
+      value: formatCurrency(data.totalValuation),
       icon: DollarSign,
       color: "text-green-600",
       bgColor: "bg-green-50"
     },
     {
       title: "Average Age",
-      value: `${stockData.averageAge} days`,
+      value: `${data.averageAge} days`,
       icon: Clock,
       color: "text-orange-600",
       bgColor: "bg-orange-50"
     },
     {
       title: "Warehouses",
-      value: `${stockData.warehouseStock.length}`,
+      value: `${data.warehouseStock.length}`,
       icon: TrendingUp,
       color: "text-purple-600",
       bgColor: "bg-purple-50"
@@ -56,11 +56,11 @@ const StockSummary = ({ stockData }: StockSummaryProps) => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg">{stockData.itemName}</CardTitle>
+              <CardTitle className="text-lg">{data.itemName}</CardTitle>
               <p className="text-sm text-gray-600 mt-1">
-                Item Code: <Badge variant="outline">{stockData.itemCode}</Badge>
+                Item Code: <Badge variant="outline">{data.itemCode}</Badge>
                 <span className="ml-4">
-                  UOM: <Badge variant="secondary">{stockData.uom}</Badge>
+                  UOM: <Badge variant="secondary">{data.uom}</Badge>
                 </span>
               </p>
             </div>
