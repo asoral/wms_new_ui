@@ -1,38 +1,25 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance } from './types';
 
 export class ERPNextStockAPI extends ERPNextBaseAPI {
   async getStockBalance(filters?: any, company?: string): Promise<ERPNextResponse<StockBalance[]>> {
     try {
-      // Build filters object for query report
-      const reportFilters: any = {};
+      // Use Bin doctype instead of Stock Balance report for accurate data
+      let finalFilters = [];
       
       if (company) {
-        reportFilters.company = company;
+        finalFilters.push(['company', '=', company]);
       }
       
       // Handle specific filter conditions
       if (filters) {
         const frappeFilters = this.convertToFrappeFilters(filters);
-        frappeFilters.forEach(filter => {
-          const [field, operator, value] = filter;
-          if (field === 'actual_qty' && operator === '<') {
-            reportFilters.actual_qty = `<${value}`;
-          } else if (operator === '=') {
-            reportFilters[field] = value;
-          }
-        });
+        finalFilters = [...finalFilters, ...frappeFilters];
       }
       
-      const params = new URLSearchParams({
-        report_name: 'Stock Balance',
-        filters: JSON.stringify(reportFilters)
-      });
-      
-      params.append('limit_page_length', '100'); // Default limit
+      const params = this.buildQueryParams(finalFilters, ['item_code', 'warehouse', 'actual_qty', 'valuation_rate', 'stock_uom'], 100);
 
-      const response = await fetch(`${this.baseURL}/api/method/frappe.desk.query_report.run?${params}`, {
+      const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
         headers: this.getHeaders(),
       });
 
@@ -42,15 +29,15 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
       const result = await response.json();
       
-      // Transform query report result to match expected format
-      if (result.message && result.message.result) {
-        const stockData = result.message.result.map((row: any[]) => ({
-          item_code: row[0],
-          warehouse: row[1],
-          actual_qty: row[2] || 0,
-          valuation_rate: row[3] || 0,
-          stock_value: (row[2] || 0) * (row[3] || 0),
-          stock_uom: row[4] || 'Nos'
+      // Transform Bin data to match expected StockBalance format
+      if (result.data && Array.isArray(result.data)) {
+        const stockData = result.data.map((bin: any) => ({
+          item_code: bin.item_code,
+          warehouse: bin.warehouse,
+          actual_qty: parseFloat(bin.actual_qty) || 0,
+          valuation_rate: parseFloat(bin.valuation_rate) || 0,
+          stock_value: (parseFloat(bin.actual_qty) || 0) * (parseFloat(bin.valuation_rate) || 0),
+          stock_uom: bin.stock_uom || 'Nos'
         }));
         
         return { data: stockData };

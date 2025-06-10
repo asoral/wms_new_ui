@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Package, ArrowLeft, Wifi, WifiOff } from "lucide-react";
+import { RefreshCw, Package, ArrowLeft, WifiOff } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
 import { offlineStorage } from '@/services/offlineStorage';
 import { useToast } from "@/hooks/use-toast";
@@ -63,7 +63,7 @@ const ItemEnquiry = () => {
 
       const defaultCompany = await getUserDefaultCompany();
 
-      // First, try to find item by direct lookup (this fixes the FG-0003 search issue)
+      // First, try to find item by direct lookup
       let itemResult;
       try {
         console.log('Searching for item:', itemCode);
@@ -107,7 +107,7 @@ const ItemEnquiry = () => {
 
       console.log('Final item result:', itemResult);
 
-      // Get stock balance using the corrected API
+      // Get stock balance using the Bin doctype
       const stockResult = await erpnextAPI.getStockBalance([
         ['item_code', '=', itemResult.data.item_code || itemCode]
       ], defaultCompany || undefined);
@@ -132,7 +132,7 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Process stock data with corrected field names
+      // Process stock data with correct field names from Bin doctype
       const warehouseStockMap: { [key: string]: StockInfo } = {};
 
       stockResult.data.forEach((stockEntry: any) => {
@@ -249,7 +249,7 @@ const ItemEnquiry = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Item Scanner/Selector */}
+          {/* Item Scanner */}
           <div className="lg:col-span-1">
             <ItemScanner 
               onItemSelect={(itemCode) => {
