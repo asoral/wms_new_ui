@@ -1,5 +1,4 @@
 
-// ERPNext API Types
 export interface ERPNextConfig {
   baseURL: string;
   apiKey: string;
@@ -15,18 +14,14 @@ export interface Item {
   item_code: string;
   item_name: string;
   stock_uom: string;
-  has_batch_no?: number;
-  has_serial_no?: number;
-  barcodes?: Array<{
-    barcode: string;
-    barcode_type: string;
-  }>;
+  has_batch_no?: boolean;
+  has_serial_no?: boolean;
 }
 
 export interface Warehouse {
   name: string;
-  is_group: number;
-  warehouse_name?: string;
+  warehouse_name: string;
+  is_group?: number;
   company?: string;
 }
 
@@ -34,102 +29,74 @@ export interface StockBalance {
   item_code: string;
   warehouse: string;
   actual_qty: number;
-  valuation_rate?: number;
-  stock_value?: number;
+  valuation_rate: number;
+  stock_value: number;
   stock_uom?: string;
 }
 
 export interface SalesOrder {
   name: string;
   customer: string;
-  customer_name?: string;
-  company: string;
-  base_grand_total: number;
-  grand_total?: number;
-  currency: string;
   status: string;
-  delivery_date?: string;
-  transaction_date?: string;
-  items?: any[];
+  company: string;
 }
 
 export interface DeliveryNote {
   name: string;
   customer: string;
-  company: string;
-  grand_total: number;
-  currency: string;
   status: string;
-  posting_date?: string;
-  posting_time?: string;
+  company: string;
 }
 
 export interface PurchaseOrder {
   name: string;
   supplier: string;
-  supplier_name?: string;
-  schedule_date?: string;
-  transaction_date?: string;
-  grand_total?: number;
-  status?: string;
-  items?: any[];
+  status: string;
   company: string;
-  base_grand_total: number;
-  currency: string;
 }
 
 export interface PurchaseReceipt {
   name: string;
   supplier: string;
-  company: string;
-  grand_total: number;
-  currency: string;
   status: string;
-  posting_date?: string;
-  posting_time?: string;
+  company: string;
 }
 
 export interface MaterialRequest {
   name: string;
-  company: string;
-  material_request_type: string;
   status: string;
-  transaction_date?: string;
-  required_date?: string;
+  company: string;
 }
 
 export interface StockEntry {
   name: string;
-  company: string;
-  purpose: string;
   status: string;
-  posting_date?: string;
-  posting_time?: string;
+  company: string;
 }
 
 export interface PickList {
   name: string;
-  company: string;
   status: string;
+  company: string;
 }
 
 export interface PackingSlip {
   name: string;
-  customer: string;
-  company: string;
   status: string;
+  company: string;
 }
 
 export interface QualityInspection {
   name: string;
-  company: string;
+  item_code: string;
   status: string;
+  company: string;
 }
 
 export interface ProductBundle {
   name: string;
-  product_bundle_id: string;
-  description: string;
+  new_item_code: string;
+  company: string;
 }
 
 export interface Company {
@@ -148,11 +115,11 @@ export interface DashboardMetrics {
 
 export interface RecentActivity {
   id: string;
-  type: 'receipt' | 'delivery' | 'stock_entry' | 'material_request';
+  type: string;
   title: string;
   subtitle: string;
   time: string;
-  status: 'completed' | 'pending' | 'cancelled';
+  status: string;
   reference: string;
 }
 

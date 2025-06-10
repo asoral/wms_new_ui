@@ -46,7 +46,7 @@ export class ERPNextBinAPI extends ERPNextBaseAPI {
       let filters = [['item_code', '=', itemCode]];
       
       if (warehouses && warehouses.length > 0) {
-        filters.push(['warehouse', 'in', warehouses]);
+        filters.push(['warehouse', 'in', warehouses.join(',')]);
       }
 
       return this.getBinData(filters);

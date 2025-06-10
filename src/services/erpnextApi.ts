@@ -28,7 +28,7 @@ export type {
   RecentActivity,
   OperationalMetrics,
   FinancialMetrics
-} from './erp/erpnext';
+} from './erp/erpnext/types';
 
 // Import and re-export as default
 import { ERPNextAPI } from './erp/erpnext';

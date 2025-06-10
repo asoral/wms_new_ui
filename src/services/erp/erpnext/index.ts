@@ -1,3 +1,4 @@
+
 import { ERPNextConfig } from './types';
 import { ERPNextAuthAPI } from './authApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -41,6 +42,155 @@ export class ERPNextAPI extends ERPNextBinAPI {
     this.quality = new ERPNextQualityAPI(config.baseURL, config.apiKey, config.apiSecret);
     this.assets = new ERPNextAssetsAPI(config.baseURL, config.apiKey, config.apiSecret);
     this.support = new ERPNextSupportAPI(config.baseURL, config.apiKey, config.apiSecret);
+  }
+
+  // Delegate methods to appropriate modules
+  async getItems(filters?: any, searchTerm?: string, company?: string) {
+    return this.items.getItems(filters, searchTerm, company);
+  }
+
+  async searchItems(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.items.searchItems(searchTerm, company, limitPageLength);
+  }
+
+  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limitPageLength?: number, page?: number) {
+    return this.items.getItemsPaginated(filters, fields, company, limitPageLength, page);
+  }
+
+  async getItemDetails(itemCode: string) {
+    return this.items.getItemDetails(itemCode);
+  }
+
+  async getWarehouses(filters?: any, company?: string) {
+    return this.warehouse.getWarehouses(filters, company);
+  }
+
+  async getStockBalance(filters?: any, company?: string) {
+    return this.stock.getStockBalance(filters, company);
+  }
+
+  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
+    return this.stock.getCurrentStock(itemCode, warehouse, batch, serial);
+  }
+
+  async getSalesOrders(filters?: any, company?: string) {
+    return this.sales.getSalesOrders(filters, company);
+  }
+
+  async getSalesOrder(name: string) {
+    return this.sales.getSalesOrder(name);
+  }
+
+  async getDeliveryNotes(filters?: any, company?: string) {
+    return this.sales.getDeliveryNotes(filters, company);
+  }
+
+  async getPurchaseOrders(filters?: any, company?: string) {
+    return this.purchase.getPurchaseOrders(filters, company);
+  }
+
+  async getPurchaseOrder(name: string) {
+    return this.purchase.getPurchaseOrder(name);
+  }
+
+  async getPurchaseReceipts(filters?: any, company?: string) {
+    return this.purchase.getPurchaseReceipts(filters, company);
+  }
+
+  async createPurchaseReceipt(data: any) {
+    return this.purchase.createPurchaseReceipt(data);
+  }
+
+  async getPendingPurchaseOrders(company?: string) {
+    return this.purchase.getPendingPurchaseOrders(company);
+  }
+
+  async getReceiptDrafts(company?: string) {
+    return this.purchase.getReceiptDrafts(company);
+  }
+
+  async getMaterialRequests(filters?: any, company?: string) {
+    return this.getDocumentList('Material Request', filters);
+  }
+
+  async getStockEntries(filters?: any, company?: string) {
+    return this.stock.getStockEntries(filters, company);
+  }
+
+  async createStockReconciliation(data: any) {
+    return this.stock.createStockReconciliation(data);
+  }
+
+  async updateStockReconciliation(name: string, data: any) {
+    return this.stock.updateStockReconciliation(name, data);
+  }
+
+  async getPickLists(filters?: any, company?: string) {
+    return this.getDocumentList('Pick List', filters);
+  }
+
+  async getPackingSlips(filters?: any, company?: string) {
+    return this.getDocumentList('Packing Slip', filters);
+  }
+
+  async getQualityInspections(filters?: any, company?: string) {
+    return this.quality.getQualityInspections(filters, company);
+  }
+
+  async getQualityInspectionsPending(company?: string) {
+    return this.quality.getQualityInspectionsPending(company);
+  }
+
+  async getProductBundles(filters?: any, company?: string) {
+    return this.getDocumentList('Product Bundle', filters);
+  }
+
+  async getCompanies() {
+    return this.getDocumentList('Company');
+  }
+
+  async getStockAgingReport() {
+    return this.stock.getStockAgingReport();
+  }
+
+  async getDashboardMetrics(company?: string) {
+    // This would be a custom implementation
+    return {
+      totalItems: 0,
+      lowStockItems: 0,
+      pendingOrders: 0,
+      totalWarehouses: 0,
+      totalStockValue: 0,
+      recentActivitiesCount: 0
+    };
+  }
+
+  async getOperationalMetrics(company?: string) {
+    return {
+      pickAccuracy: 0,
+      putawaySpeed: 0,
+      cycleCountAccuracy: 0,
+      orderFulfillmentRate: 0,
+      warehouseUtilization: 0,
+      averageProcessingTime: 0
+    };
+  }
+
+  async getFinancialMetrics(company?: string) {
+    return {
+      stockTurnoverRatio: 0,
+      carryingCostPercentage: 0,
+      deadStockValue: 0,
+      abcAnalysis: {
+        classA: 0,
+        classB: 0,
+        classC: 0
+      }
+    };
+  }
+
+  async getRecentActivities(company?: string, limit?: number) {
+    return [];
   }
 }
 
@@ -102,3 +252,6 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
     return null;
   }
 };
+
+// Export types
+export * from './types';
