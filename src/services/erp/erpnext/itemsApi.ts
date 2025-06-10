@@ -1,109 +1,58 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, Item } from './types';
 
 export class ERPNextItemsAPI extends ERPNextBaseAPI {
-  async getItems(filters?: any, searchTerm?: string, company?: string): Promise<ERPNextResponse<Item[]>> {
-    let finalFilters = [['is_stock_item', '=', '1']];
-    if (filters) {
-      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
-    }
-    // Remove company filter from item search as it's not permitted
-    
-    const fields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
-    const params = this.buildQueryParams(finalFilters, fields);
-    
-    if (searchTerm) {
-      const orFilters = [
-        ['item_code', 'like', `%${searchTerm}%`],
-        ['item_name', 'like', `%${searchTerm}%`]
-      ];
-      params.append('or_filters', JSON.stringify(orFilters));
-    }
+  /**
+   * Search items by code or name using ERPNext's search_link endpoint
+   */
+  async searchItems(query: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
+    const params = new URLSearchParams({
+      doctype: 'Item',
+      txt: query,
+      page_length: limit.toString(),
+      filters: JSON.stringify([['Item', 'disabled', '=', '0'], ['Item', 'is_stock_item', '=', '1']]),
+    });
 
-    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
+    const response = await fetch(`${this.baseURL}/api/method/frappe.desk.search.search_link?${params}`, {
       headers: this.getHeaders(),
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch items: ${response.statusText}`);
+      throw new Error(`Failed to search items: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    // result.message contains an array of [name, label] tuples
+    const items: Item[] = await Promise.all(
+      result.message.slice(0, limit).map(async ([name]) => {
+        const details = await this.getItemDetails(name as string);
+        return details.data as Item;
+      })
+    );
+
+    return { data: items };
   }
 
-  async searchItems(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<Item[]>> {
-    let filters = [['is_stock_item', '=', '1']];
-    // Remove company filter from item search as it's not permitted
-    
-    const fields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
-    const params = this.buildQueryParams(filters, fields, limitPageLength);
-    
-    const orFilters = [
-      ['item_code', 'like', `%${searchTerm}%`],
-      ['item_name', 'like', `%${searchTerm}%`]
-    ];
-    params.append('or_filters', JSON.stringify(orFilters));
-
-    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
-      headers: this.getHeaders(),
+  /**
+   * Fetch detailed item record, including batch/serial flags and barcodes
+   */
+  async getItemDetails(itemCode: string): Promise<ERPNextResponse<Item>> {
+    const params = new URLSearchParams({
+      fields: JSON.stringify([
+        'name',
+        'item_code',
+        'item_name',
+        'stock_uom',
+        'has_batch_no',
+        'has_serial_no',
+        'barcodes'
+      ])
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to search items: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limitPageLength: number = 20, page: number = 1): Promise<ERPNextResponse<Item[]>> {
-    let finalFilters = [['is_stock_item', '=', '1']];
-    if (filters) {
-      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
-    }
-    // Remove company filter from item search as it's not permitted
-    
-    const defaultFields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
-    const params = this.buildQueryParams(finalFilters, fields || defaultFields, limitPageLength);
-    params.append('start', ((page - 1) * limitPageLength).toString());
-
-    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch paginated items: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
-    const params = this.buildQueryParams([['barcode', '=', barcode]]);
-
-    const response = await fetch(`${this.baseURL}/api/resource/Item Barcode?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch item by barcode: ${response.statusText}`);
-    }
-
-    const barcodeResult = await response.json();
-    
-    if (barcodeResult.data && barcodeResult.data.length > 0) {
-      const itemCode = barcodeResult.data[0].parent;
-      return this.getItemDetails(itemCode);
-    }
-
-    return { data: [] };
-  }
-
-  async getItemDetails(itemCode: string): Promise<ERPNextResponse<any>> {
-    // Use the correct format for fetching item with barcodes (child table)
-    const response = await fetch(`${this.baseURL}/api/resource/Item/${itemCode}?fields=["name","item_name","item_code","stock_uom","has_batch_no","has_serial_no","barcodes"]`, {
-      headers: this.getHeaders(),
-    });
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Item/${encodeURIComponent(itemCode)}?${params}`,
+      { headers: this.getHeaders() }
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch item details: ${response.statusText}`);
@@ -113,27 +62,75 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     return { data: result.data };
   }
 
-  async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
-    // First try to find the item through Item Barcode doctype
-    try {
-      const barcodeParams = this.buildQueryParams([['barcode', '=', barcode]]);
-      const barcodeResponse = await fetch(`${this.baseURL}/api/resource/Item Barcode?${barcodeParams}`, {
-        headers: this.getHeaders(),
-      });
+  /**
+   * Lookup an item by barcode through the Item Barcode doctype
+   */
+  async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item>> {
+    const params = new URLSearchParams({
+      fields: JSON.stringify(['parent']),
+      filters: JSON.stringify([['barcode', '=', barcode]])
+    });
 
-      if (barcodeResponse.ok) {
-        const barcodeResult = await barcodeResponse.json();
-        if (barcodeResult.data && barcodeResult.data.length > 0) {
-          const itemCode = barcodeResult.data[0].parent;
-          const itemDetails = await this.getItemDetails(itemCode);
-          return { data: itemDetails.data ? [itemDetails.data] : [] };
-        }
-      }
-    } catch (error) {
-      console.log('Barcode search failed, trying direct item search');
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Item Barcode?${params}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch barcode record: ${response.statusText}`);
     }
 
-    // If barcode search fails, try searching items directly
-    return this.searchItems(barcode);
+    const result = await response.json();
+    if (!result.data || result.data.length === 0) {
+      throw new Error(`No item found for barcode ${barcode}`);
+    }
+
+    // Parent field contains the Item code
+    return this.getItemDetails(result.data[0].parent);
+  }
+
+  /**
+   * Fetch items with filters, pagination, and optional text search
+   */
+  async getItems(
+    filters: Record<string, any> = {},
+    searchText?: string,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<ERPNextResponse<Item[]>> {
+    const conditions: any[] = [['is_stock_item', '=', '1']];
+    Object.entries(filters).forEach(([field, val]) => {
+      conditions.push([field, '=', val]);
+    });
+    if (searchText) {
+      conditions.push(['item_code', 'like', `%${searchText}%`]);
+      conditions.push(['item_name', 'like', `%${searchText}%`]);
+    }
+
+    const params = new URLSearchParams({
+      filters: JSON.stringify(conditions),
+      fields: JSON.stringify([
+        'name',
+        'item_code',
+        'item_name',
+        'stock_uom',
+        'has_batch_no',
+        'has_serial_no'
+      ]),
+      limit_page_length: limit.toString(),
+      limit_start: offset.toString(),
+    });
+
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Item?${params}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch items: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return { data: result.data };
   }
 }
