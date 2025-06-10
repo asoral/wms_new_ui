@@ -64,7 +64,7 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
   }
 };
 
-class ERPNextAPI extends ERPNextBaseAPI {
+export class ERPNextAPI extends ERPNextBaseAPI {
   private itemsApi: ERPNextItemsAPI;
   private stockApi: ERPNextStockAPI;
   private warehouseApi: ERPNextWarehouseAPI;
@@ -88,59 +88,143 @@ class ERPNextAPI extends ERPNextBaseAPI {
     this.dashboardApi = new ERPNextDashboardAPI(baseURL, apiKey, apiSecret);
   }
 
-  // Items API
-  getItems = this.itemsApi.getItems.bind(this.itemsApi);
-  searchItems = this.itemsApi.searchItems.bind(this.itemsApi);
-  getItemsPaginated = this.itemsApi.getItemsPaginated.bind(this.itemsApi);
-  getItemByBarcode = this.itemsApi.getItemByBarcode.bind(this.itemsApi);
-  getItemDetails = this.itemsApi.getItemDetails.bind(this.itemsApi);
+  // Items API methods
+  getItems(filters?: any, searchTerm?: string, company?: string) {
+    return this.itemsApi.getItems(filters, searchTerm, company);
+  }
 
-  // Stock API
-  getStockBalance = this.stockApi.getStockBalance.bind(this.stockApi);
-  getCurrentStock = this.stockApi.getCurrentStock.bind(this.stockApi);
-  getStockLedgerEntries = this.stockApi.getStockLedgerEntries.bind(this.stockApi);
-  getStockAgingReport = this.stockApi.getStockAgingReport.bind(this.stockApi);
-  getStockEntries = this.stockApi.getStockEntries.bind(this.stockApi);
-  createStockReconciliation = this.stockApi.createStockReconciliation.bind(this.stockApi);
-  updateStockReconciliation = this.stockApi.updateStockReconciliation.bind(this.stockApi);
+  searchItems(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.itemsApi.searchItems(searchTerm, company, limitPageLength);
+  }
 
-  // Warehouse API
-  getWarehouses = this.warehouseApi.getWarehouses.bind(this.warehouseApi);
+  getItemsPaginated(filters?: any, fields?: string[], company?: string, limitPageLength?: number, page?: number) {
+    return this.itemsApi.getItemsPaginated(filters, fields, company, limitPageLength, page);
+  }
 
-  // Sales API
-  getSalesOrders = this.salesApi.getSalesOrders.bind(this.salesApi);
-  getSalesOrder = this.salesApi.getSalesOrder.bind(this.salesApi);
-  getDeliveryNotes = this.salesApi.getDeliveryNotes.bind(this.salesApi);
+  getItemByBarcode(barcode: string) {
+    return this.itemsApi.getItemByBarcode(barcode);
+  }
 
-  // Purchase API
-  getPurchaseOrders = this.purchaseApi.getPurchaseOrders.bind(this.purchaseApi);
-  getPurchaseOrder = this.purchaseApi.getPurchaseOrder.bind(this.purchaseApi);
-  getPurchaseReceipts = this.purchaseApi.getPurchaseReceipts.bind(this.purchaseApi);
-  createPurchaseReceipt = this.purchaseApi.createPurchaseReceipt.bind(this.purchaseApi);
+  getItemDetails(itemCode: string) {
+    return this.itemsApi.getItemDetails(itemCode);
+  }
 
-  // Material API
-  getMaterialRequests = this.materialApi.getMaterialRequests.bind(this.materialApi);
+  // Stock API methods
+  getStockBalance(filters?: any, company?: string) {
+    return this.stockApi.getStockBalance(filters, company);
+  }
 
-  // Company API
-  getCompanies = this.companyApi.getCompanies.bind(this.companyApi);
+  getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
+    return this.stockApi.getCurrentStock(itemCode, warehouse, batch, serial);
+  }
 
-  // Other APIs
-  getPickLists = this.otherApis.getPickLists.bind(this.otherApis);
-  getPackingSlips = this.otherApis.getPackingSlips.bind(this.otherApis);
-  getQualityInspections = this.otherApis.getQualityInspections.bind(this.otherApis);
-  getProductBundles = this.otherApis.getProductBundles.bind(this.otherApis);
-  validateBatch = this.otherApis.validateBatch.bind(this.otherApis);
-  validateSerial = this.otherApis.validateSerial.bind(this.otherApis);
+  getStockLedgerEntries(filters?: any, company?: string) {
+    return this.stockApi.getStockLedgerEntries(filters, company);
+  }
 
-  // Dashboard API
-  getDashboardMetrics = this.dashboardApi.getDashboardMetrics.bind(this.dashboardApi);
-  getRecentActivities = this.dashboardApi.getRecentActivities.bind(this.dashboardApi);
-  getOperationalMetrics = this.dashboardApi.getOperationalMetrics.bind(this.dashboardApi);
-  getFinancialMetrics = this.dashboardApi.getFinancialMetrics.bind(this.dashboardApi);
+  getStockAgingReport(filters?: any) {
+    return this.stockApi.getStockAgingReport(filters);
+  }
+
+  getStockEntries(filters?: any, company?: string, limitPageLength?: number) {
+    return this.stockApi.getStockEntries(filters, company, limitPageLength);
+  }
+
+  createStockReconciliation(reconciliationData: any) {
+    return this.stockApi.createStockReconciliation(reconciliationData);
+  }
+
+  updateStockReconciliation(name: string, reconciliationData: any) {
+    return this.stockApi.updateStockReconciliation(name, reconciliationData);
+  }
+
+  // Warehouse API methods
+  getWarehouses(filters?: any, company?: string) {
+    return this.warehouseApi.getWarehouses(filters, company);
+  }
+
+  // Sales API methods
+  getSalesOrders(filters?: any, company?: string, limitPageLength?: number) {
+    return this.salesApi.getSalesOrders(filters, company, limitPageLength);
+  }
+
+  getSalesOrder(soNumber: string) {
+    return this.salesApi.getSalesOrder(soNumber);
+  }
+
+  getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
+    return this.salesApi.getDeliveryNotes(filters, company, limitPageLength);
+  }
+
+  // Purchase API methods
+  getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
+    return this.purchaseApi.getPurchaseOrders(filters, company, limitPageLength);
+  }
+
+  getPurchaseOrder(poNumber: string) {
+    return this.purchaseApi.getPurchaseOrder(poNumber);
+  }
+
+  getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
+    return this.purchaseApi.getPurchaseReceipts(filters, company, limitPageLength);
+  }
+
+  createPurchaseReceipt(receiptData: any) {
+    return this.purchaseApi.createPurchaseReceipt(receiptData);
+  }
+
+  // Material API methods
+  getMaterialRequests(filters?: any, company?: string, limitPageLength?: number) {
+    return this.materialApi.getMaterialRequests(filters, company, limitPageLength);
+  }
+
+  // Company API methods
+  getCompanies() {
+    return this.companyApi.getCompanies();
+  }
+
+  // Other APIs methods
+  getPickLists(filters?: any, company?: string, limitPageLength?: number) {
+    return this.otherApis.getPickLists(filters, company, limitPageLength);
+  }
+
+  getPackingSlips(filters?: any, company?: string, limitPageLength?: number) {
+    return this.otherApis.getPackingSlips(filters, company, limitPageLength);
+  }
+
+  getQualityInspections(filters?: any, company?: string, limitPageLength?: number) {
+    return this.otherApis.getQualityInspections(filters, company, limitPageLength);
+  }
+
+  getProductBundles(filters?: any, company?: string, limitPageLength?: number) {
+    return this.otherApis.getProductBundles(filters, company, limitPageLength);
+  }
+
+  validateBatch(batchNo: string, itemCode: string) {
+    return this.otherApis.validateBatch(batchNo, itemCode);
+  }
+
+  validateSerial(serialNo: string, itemCode: string, warehouse: string) {
+    return this.otherApis.validateSerial(serialNo, itemCode, warehouse);
+  }
+
+  // Dashboard API methods
+  getDashboardMetrics(company?: string) {
+    return this.dashboardApi.getDashboardMetrics(company);
+  }
+
+  getRecentActivities(company?: string, limitPageLength?: number) {
+    return this.dashboardApi.getRecentActivities(company, limitPageLength);
+  }
+
+  getOperationalMetrics(company?: string) {
+    return this.dashboardApi.getOperationalMetrics(company);
+  }
+
+  getFinancialMetrics(company?: string) {
+    return this.dashboardApi.getFinancialMetrics(company);
+  }
 }
-
-export { ERPNextAPI };
-export default ERPNextAPI;
 
 // Re-export types for convenience
 export * from './types';

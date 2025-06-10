@@ -30,4 +30,6 @@ export type {
   FinancialMetrics
 } from './erp/erpnext';
 
+// Import and re-export as default
+import { ERPNextAPI } from './erp/erpnext';
 export default ERPNextAPI;

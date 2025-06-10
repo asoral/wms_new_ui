@@ -1,27 +1,28 @@
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Package, RefreshCcw, Warehouse } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { RefreshCw, Package, ArrowLeft, Wifi, WifiOff } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
+import { offlineStorage } from '@/services/offlineStorage';
 import { useToast } from "@/hooks/use-toast";
-import ItemScanner from "../components/item-enquiry/ItemScanner";
-import StockSummary from "../components/item-enquiry/StockSummary";
-import WarehouseStockTable from "../components/item-enquiry/WarehouseStockTable";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
-import { offlineStorage } from "@/services/offlineStorage";
+import ItemScanner from '../components/item-enquiry/ItemScanner';
+import StockSummary from '../components/item-enquiry/StockSummary';
+import WarehouseStockTable from '../components/item-enquiry/WarehouseStockTable';
 
 export interface StockInfo {
   warehouse: string;
   qty: number;
   uom: string;
+  valuation: number;
+  age: number;
   batch?: string;
   serial?: string;
-  age: number;
-  valuation: number;
 }
 
-export interface ItemStockData {
+export interface StockData {
   itemCode: string;
   itemName: string;
   totalStock: number;
@@ -32,19 +33,19 @@ export interface ItemStockData {
 }
 
 const ItemEnquiry = () => {
-  const [searchParams] = useSearchParams();
-  const [currentItem, setCurrentItem] = useState<string>("");
-  const [stockData, setStockData] = useState<ItemStockData | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [currentItem, setCurrentItem] = useState<string>(searchParams.get('item') || '');
+  const [stockData, setStockData] = useState<StockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
-  const { toast } = useToast();
 
-  // Handle search parameter from global search
   useEffect(() => {
-    const searchQuery = searchParams.get('search');
-    if (searchQuery) {
-      handleItemSearch(searchQuery);
+    const itemParam = searchParams.get('item');
+    if (itemParam && itemParam !== currentItem) {
+      handleItemSearch(itemParam);
     }
   }, [searchParams]);
 
@@ -222,7 +223,7 @@ const ItemEnquiry = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 pb-24">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -230,73 +231,82 @@ const ItemEnquiry = () => {
             <Package className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Item Enquiry</h1>
             {isOffline && (
-              <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                Offline Mode
-              </span>
+              <Badge variant="destructive" className="flex items-center space-x-1">
+                <WifiOff className="w-3 h-3" />
+                <span>Offline</span>
+              </Badge>
             )}
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading}>
-              <RefreshCcw className="w-4 h-4" />
+            <Button variant="outline" size="sm" onClick={() => navigate('/')}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
 
-        {/* Item Scanner/Search */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Search className="w-5 h-5" />
-              <span>Search Item</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ItemScanner onItemScanned={handleItemSearch} isLoading={isLoading} />
-          </CardContent>
-        </Card>
-
-        {/* Error Display - Mobile Friendly */}
-        {error && (
-          <Card className="mb-6 border-red-200 bg-red-50">
-            <CardContent className="py-4">
-              <div className="text-red-800 break-words">{error}</div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Stock Information */}
-        {stockData && (
-          <div className="space-y-6">
-            {/* Summary */}
-            <StockSummary stockData={stockData} />
-
-            {/* Detailed Stock by Warehouse */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Warehouse className="w-5 h-5" />
-                  <span>Stock by Warehouse</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <WarehouseStockTable stockInfo={stockData.warehouseStock} />
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Item Scanner/Selector */}
+          <div className="lg:col-span-1">
+            <ItemScanner 
+              onItemSelect={(itemCode) => {
+                setSearchParams({ item: itemCode });
+                handleItemSearch(itemCode);
+              }}
+            />
           </div>
-        )}
 
-        {/* No Data State */}
-        {!stockData && !isLoading && !error && (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium mb-2">No Item Selected</p>
-                <p>Scan or enter an item code to view stock information</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          {/* Stock Information */}
+          <div className="lg:col-span-2 space-y-6">
+            {error && (
+              <Card className="border-red-200 bg-red-50">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <Package className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                    <p className="text-red-600 font-medium">{error}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {isLoading && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center p-8">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-sm text-gray-500 mt-2">Loading stock information...</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {stockData && !isLoading && (
+              <>
+                <StockSummary data={stockData} />
+                <WarehouseStockTable data={stockData.warehouseStock} />
+              </>
+            )}
+
+            {!stockData && !isLoading && !error && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center p-8">
+                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Select an Item</h3>
+                    <p className="text-gray-500">
+                      Search or scan an item code to view stock information
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

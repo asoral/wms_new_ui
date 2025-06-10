@@ -1,62 +1,38 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Scan, Loader2, Check, ChevronsUpDown, X, Wifi, WifiOff } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
-import { offlineStorage } from "@/services/offlineStorage";
-import { useLocation } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, Scan, Package, Wifi, WifiOff } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
+import { offlineStorage } from '@/services/offlineStorage';
+import CameraScanner from './CameraScanner';
 
-interface ItemScannerProps {
-  onItemScanned: (itemCode: string) => void;
-  isLoading: boolean;
-}
-
-interface Item {
+export interface Item {
   item_code: string;
   item_name: string;
+  stock_uom: string;
 }
 
-const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
-  const [itemCode, setItemCode] = useState("");
+interface ItemScannerProps {
+  onItemSelect: (itemCode: string) => void;
+}
+
+const ItemScanner = ({ onItemSelect }: ItemScannerProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { toast } = useToast();
-  const location = useLocation();
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Close popover when route changes
-  useEffect(() => {
-    setOpen(false);
-    setIsScanning(false);
-    stopCamera();
-  }, [location.pathname]);
-
-  // Cleanup when component unmounts
-  useEffect(() => {
-    return () => {
-      setOpen(false);
-      stopCamera();
-    };
-  }, []);
-
-  // Monitor online status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOffline(false);
+    const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -67,10 +43,25 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
     };
   }, []);
 
-  // Initial load
   useEffect(() => {
     fetchItems("", true);
   }, []);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchItems(searchQuery, true);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
 
   // Fetch items with search and pagination
   const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
@@ -162,283 +153,128 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
     }
   };
 
-  // Debounced search function
-  const searchItems = useMemo(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    return (searchValue: string, isNewSearch: boolean = false) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(async () => {
-        await fetchItems(searchValue, isNewSearch);
-      }, 300);
-    };
-  }, []);
-
-  // Handle search term changes
-  useEffect(() => {
-    if (searchTerm !== itemCode) {
-      searchItems(searchTerm, true);
-    }
-  }, [searchTerm, searchItems]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const codeToSubmit = selectedItem?.item_code || itemCode.trim();
-    if (codeToSubmit) {
-      onItemScanned(codeToSubmit);
-    }
+  const handleBarcodeScanned = (barcode: string) => {
+    setSearchQuery(barcode);
+    setShowScanner(false);
+    onItemSelect(barcode);
   };
 
-  const startCamera = async () => {
-    setIsScanning(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      toast({
-        title: "Camera Error",
-        description: "Camera access denied or not available. Please check permissions.",
-        variant: "destructive"
-      });
-      setIsScanning(false);
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setIsScanning(false);
-  };
-
-  const captureFrame = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    const context = canvas.getContext('2d');
-    
-    if (!context) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    context.drawImage(video, 0, 0);
-    
-    canvas.toBlob(async (blob) => {
-      if (blob) {
-        const mockBarcode = await simulateBarcodeDetection();
-        if (mockBarcode) {
-          setItemCode(mockBarcode);
-          onItemScanned(mockBarcode);
-          stopCamera();
-        }
-      }
-    });
-  };
-
-  const simulateBarcodeDetection = async (): Promise<string | null> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (items.length > 0) {
-          const randomItem = items[Math.floor(Math.random() * items.length)];
-          resolve(randomItem.item_code);
-        } else {
-          resolve(null);
-        }
-      }, 1000);
-    });
-  };
-
-  const handleScan = () => {
-    if (isScanning) {
-      captureFrame();
-    } else {
-      startCamera();
-    }
-  };
-
-  const handleItemSelect = (item: Item) => {
-    setSelectedItem(item);
-    setItemCode(item.item_code);
-    setOpen(false);
-  };
-
-  const loadMoreItems = () => {
-    if (hasMore && !isLoadingItems && isOnline) {
-      fetchItems(searchTerm, false);
+  const loadMore = () => {
+    if (!isLoadingItems && hasMore) {
+      fetchItems(searchQuery, false);
     }
   };
 
   return (
-    <Tabs defaultValue="manual" className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-4">
-        <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-        <TabsTrigger value="scan">Scan Code</TabsTrigger>
-      </TabsList>
-      
-      <TabsContent value="manual">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="itemCode" className="flex items-center gap-2">
-              Item Code / Name
+    <div className="space-y-4">
+      {/* Search Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Package className="w-5 h-5" />
+              <span>Select Item</span>
+            </div>
+            <div className="flex items-center space-x-2">
               {isOnline ? (
-                <Wifi className="w-4 h-4 text-green-600" />
+                <Wifi className="w-4 h-4 text-green-500" />
               ) : (
-                <WifiOff className="w-4 h-4 text-red-600" />
+                <WifiOff className="w-4 h-4 text-red-500" />
               )}
-            </Label>
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mt-1">
-              <div className="flex-1 min-w-0">
-                <Popover open={open} onOpenChange={setOpen}>
-                  <PopoverTrigger asChild>
+              <Badge variant={isOnline ? "default" : "destructive"}>
+                {isOnline ? "Online" : "Offline"}
+              </Badge>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex space-x-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search by item code or name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setShowScanner(true)}
+              className="flex items-center space-x-2"
+            >
+              <Scan className="w-4 h-4" />
+              <span>Scan</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Items List */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-64">
+            {isLoadingItems && items.length === 0 ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-sm text-gray-500 mt-2">Loading items...</p>
+                </div>
+              </div>
+            ) : items.length === 0 ? (
+              <div className="text-center p-8">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">No items found</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {items.map((item, index) => (
+                  <div
+                    key={`${item.item_code}-${index}`}
+                    onClick={() => onItemSelect(item.item_code)}
+                    className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{item.item_code}</p>
+                        <p className="text-gray-600 text-xs mt-1">{item.item_name}</p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {item.stock_uom}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                
+                {hasMore && (
+                  <div className="text-center pt-4">
                     <Button
                       variant="outline"
-                      role="combobox"
-                      aria-expanded={open}
-                      className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
+                      onClick={loadMore}
                       disabled={isLoadingItems}
+                      className="w-full"
                     >
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="truncate">
-                          {selectedItem 
-                            ? selectedItem.item_code
-                            : itemCode || "Search item by code or name..."
-                          }
-                        </div>
-                        {selectedItem && (
-                          <div className="text-sm text-muted-foreground truncate">
-                            {selectedItem.item_name}
-                          </div>
-                        )}
-                      </div>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      {isLoadingItems ? "Loading..." : "Load More"}
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Search items..." 
-                        value={searchTerm}
-                        onValueChange={(value) => {
-                          setSearchTerm(value);
-                          setItemCode(value);
-                        }}
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          {isLoadingItems ? "Loading items..." : "No items found."}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {items.map((item) => (
-                            <CommandItem
-                              key={item.item_code}
-                              value={`${item.item_code} ${item.item_name}`}
-                              onSelect={() => handleItemSelect(item)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{item.item_code}</div>
-                                <div className="text-sm text-muted-foreground break-words">{item.item_name}</div>
-                              </div>
-                            </CommandItem>
-                          ))}
-                          {hasMore && isOnline && (
-                            <CommandItem onSelect={loadMoreItems}>
-                              <div className="flex items-center justify-center w-full py-2">
-                                {isLoadingItems ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">Load more items...</span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          )}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <Button 
-                type="submit" 
-                disabled={isLoading || (!selectedItem && !itemCode.trim())}
-                className="w-full sm:w-auto sm:min-w-[100px]"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Search className="w-4 h-4" />
+                  </div>
                 )}
-                <span className="ml-2 sm:inline">Search</span>
-              </Button>
-            </div>
-          </div>
-        </form>
-      </TabsContent>
-      
-      <TabsContent value="scan">
-        <div className="text-center space-y-4">
-          {!isScanning ? (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
-              <Scan className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-gray-600 mb-4">Position item barcode in the scanner area</p>
-              <Button onClick={handleScan} disabled={isLoading} size="lg">
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Scan className="w-4 h-4 mr-2" />
-                )}
-                Start Scanning
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="relative border-2 border-blue-500 rounded-lg overflow-hidden">
-                <video
-                  ref={videoRef}
-                  className="w-full h-64 object-cover"
-                  playsInline
-                  muted
-                />
-                <div className="absolute inset-0 border-4 border-red-500 border-opacity-50 m-8"></div>
-                <Button
-                  onClick={stopCamera}
-                  variant="outline"
-                  size="icon"
-                  className="absolute top-2 right-2 bg-white"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
               </div>
-              <div className="flex space-x-2">
-                <Button onClick={captureFrame} className="flex-1">
-                  <Scan className="w-4 h-4 mr-2" />
-                  Capture & Scan
-                </Button>
-                <Button onClick={stopCamera} variant="outline">
-                  Cancel
-                </Button>
-              </div>
-              <canvas ref={canvasRef} className="hidden" />
-            </div>
-          )}
-        </div>
-      </TabsContent>
-    </Tabs>
+            )}
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      {/* Camera Scanner Modal */}
+      {showScanner && (
+        <CameraScanner
+          onBarcodeScanned={handleBarcodeScanned}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
+    </div>
   );
 };
 
