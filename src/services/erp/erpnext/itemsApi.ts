@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, Item } from './types';
 
@@ -5,11 +6,11 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   /**
    * Search items by code or name using ERPNext's search_link endpoint
    */
-  async searchItems(query: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
+  async searchItems(query: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
     params.append('doctype', 'Item');
     params.append('txt', query);
-    params.append('page_length', String(limit));  // always numeric
+    params.append('page_length', String(limit));
     params.append('filters', JSON.stringify([
       ['Item', 'disabled', '=', 0],
       ['Item', 'is_stock_item', '=', 1],
@@ -33,6 +34,74 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     );
 
     return { data: items };
+  }
+
+  /**
+   * Get items with pagination support
+   */
+  async getItemsPaginated(
+    filters?: any,
+    fields?: string[],
+    company?: string,
+    limit: number = 20,
+    page: number = 1
+  ): Promise<ERPNextResponse<Item[]>> {
+    const conditions: any[] = [
+      ['is_stock_item', '=', 1],
+      ['disabled', '=', 0]
+    ];
+
+    // Apply extra filters
+    if (filters) {
+      for (const [field, value] of Object.entries(filters)) {
+        conditions.push([field, '=', value]);
+      }
+    }
+
+    // Apply company filter if provided
+    if (company) {
+      conditions.push(['company', '=', company]);
+    }
+
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(conditions));
+    params.append('fields', JSON.stringify(fields || [
+      'name',
+      'item_code',
+      'item_name',
+      'stock_uom',
+      'has_batch_no',
+      'has_serial_no'
+    ]));
+    params.append('limit_page_length', String(limit));
+    params.append('limit_start', String((page - 1) * limit));
+
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Item?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch items: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return { data: result.data || [] };
+  }
+
+  /**
+   * Search items by barcode
+   */
+  async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
+    try {
+      const itemResult = await this.getItemByBarcode(barcode);
+      if (itemResult.data && !Array.isArray(itemResult.data)) {
+        return { data: [itemResult.data] };
+      }
+      return { data: itemResult.data || [] };
+    } catch (error) {
+      console.error('Barcode search failed:', error);
+      return { data: [] };
+    }
   }
 
   /**
@@ -121,8 +190,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       'has_batch_no',
       'has_serial_no'
     ]));
-    params.append('limit_page_length', String(limit));  // always numeric
-    params.append('limit_start', String(offset));       // always numeric
+    params.append('limit_page_length', String(limit));
+    params.append('limit_start', String(offset));
 
     const response = await fetch(
       `${this.baseURL}/api/resource/Item?${params.toString()}`,

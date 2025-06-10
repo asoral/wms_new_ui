@@ -29,8 +29,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const [open, setOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [hasMore, setHasMore] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
 
   // Cleanup when component unmounts
   useEffect(() => {
@@ -43,10 +41,10 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const searchItems = useMemo(() => {
     let timeoutId: NodeJS.Timeout;
     
-    return (searchValue: string, isNewSearch: boolean = false) => {
+    return (searchValue: string) => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        fetchItems(searchValue, isNewSearch);
+        fetchItems(searchValue);
       }, 300);
     };
   }, []);
@@ -59,14 +57,14 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const loadInitialItems = async () => {
     try {
       // First try to load from cache
-      const cached = await offlineStorage.getCachedData('items_page_1');
+      const cached = await offlineStorage.getCachedData('items_initial');
       if (cached && Array.isArray(cached) && cached.length > 0) {
         setItems(cached);
         return;
       }
 
       // If no cache, fetch from API
-      await fetchItems("", true);
+      await fetchItems("");
     } catch (error) {
       console.error('Failed to load initial items:', error);
     }
@@ -74,7 +72,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
 
   const loadCachedItems = async () => {
     try {
-      const cached = await offlineStorage.getCachedData('items_page_1');
+      const cached = await offlineStorage.getCachedData('items_initial');
       if (cached && Array.isArray(cached)) {
         setItems(cached);
       }
@@ -83,8 +81,8 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     }
   };
 
-  // Fetch items with search and pagination
-  const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
+  // Fetch items with search
+  const fetchItems = async (search: string = "") => {
     setIsLoadingItems(true);
     
     try {
@@ -97,8 +95,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       }
 
       const defaultCompany = await getUserDefaultCompany();
-      const pageToFetch = isNewSearch ? 1 : currentPage;
-      const limit = 20;
+      const limit = 50;
       
       let result;
       if (search.trim()) {
@@ -121,43 +118,27 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
         }
       } else {
-        console.log('Fetching paginated items, page:', pageToFetch);
-        result = await erpnextAPI.getItemsPaginated(undefined, undefined, defaultCompany || undefined, limit, pageToFetch);
+        console.log('Fetching initial items');
+        result = await erpnextAPI.getItemsPaginated(undefined, undefined, defaultCompany || undefined, limit, 1);
       }
       
       console.log('API result:', result);
       
-      if (result.data) {
-        const itemData = result.data;
+      if (result.data && Array.isArray(result.data)) {
+        setItems(result.data);
         
-        if (isNewSearch) {
-          setItems(itemData);
-          setCurrentPage(1);
-          
-          // Cache the results
-          const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
-          await offlineStorage.cacheData(cacheKey, itemData, 300000); // 5 minutes
-        } else {
-          setItems(prev => [...prev, ...itemData]);
-        }
-        
-        // Check if there are more items
-        setHasMore(itemData.length === limit);
-        
-        if (!isNewSearch) {
-          setCurrentPage(prev => prev + 1);
-        }
+        // Cache the results
+        const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
+        await offlineStorage.cacheData(cacheKey, result.data, 300000); // 5 minutes
       } else {
-        if (isNewSearch) {
-          setItems([]);
-        }
+        setItems([]);
       }
     } catch (error) {
       console.error('Failed to fetch items:', error);
       
       // Try to load from cache on error
       try {
-        const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
+        const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
         const cached = await offlineStorage.getCachedData(cacheKey);
         if (cached && Array.isArray(cached)) {
           setItems(cached);
@@ -173,7 +154,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   // Handle search term changes
   useEffect(() => {
     if (searchTerm.trim()) {
-      searchItems(searchTerm, true);
+      searchItems(searchTerm);
     } else {
       loadInitialItems();
     }
@@ -183,12 +164,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     setSelectedItem(item);
     setOpen(false);
     onItemSelected(item.item_code);
-  };
-
-  const loadMoreItems = () => {
-    if (hasMore && !isLoadingItems) {
-      fetchItems(searchTerm, false);
-    }
   };
 
   return (
@@ -219,7 +194,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg" align="start">
+        <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-50" align="start">
           <Command>
             <CommandInput 
               placeholder="Search by item code, name or barcode..." 
@@ -255,17 +230,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                     </div>
                   </CommandItem>
                 ))}
-                {hasMore && (
-                  <CommandItem onSelect={loadMoreItems}>
-                    <div className="flex items-center justify-center w-full py-2">
-                      {isLoadingItems ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Load more items...</span>
-                      )}
-                    </div>
-                  </CommandItem>
-                )}
               </CommandGroup>
             </CommandList>
           </Command>
