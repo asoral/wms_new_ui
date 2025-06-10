@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, StockEntry } from './types';
 
@@ -123,9 +124,20 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       console.log('Stock Ageing report result:', result);
       
       // Transform the report data to match expected format
-      if (result && result.message && result.message.result) {
+      // The runReport method returns ERPNextResponse<any>, so we need to check the structure
+      if (result && typeof result === 'object' && 'message' in result) {
+        const message = result.message;
+        if (message && typeof message === 'object' && 'result' in message) {
+          return {
+            data: message.result || []
+          };
+        }
+      }
+      
+      // If result has data directly
+      if (result && typeof result === 'object' && 'data' in result) {
         return {
-          data: result.message.result
+          data: result.data || []
         };
       }
       
