@@ -40,7 +40,7 @@ export function useERPNextData<T>(
 
         let result;
         
-        // Dynamic method calling based on endpoint
+        // Dynamic method calling based on endpoint with corrected API calls
         switch (endpoint) {
           case 'items':
             result = await erpnextAPI.getItems(filters, undefined, defaultCompany || undefined);

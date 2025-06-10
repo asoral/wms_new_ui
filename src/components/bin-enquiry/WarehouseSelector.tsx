@@ -28,14 +28,12 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   const [selectedWarehouse, setSelectedWarehouse] = useState<WarehouseInfo | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
       setOpen(false);
     };
   }, []);
 
-  // Load initial warehouses
   useEffect(() => {
     loadInitialWarehouses();
   }, []);
@@ -45,7 +43,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     try {
       console.log('Loading initial warehouses...');
       
-      // First try to load from cache
       const cached = await offlineStorage.getCachedData('warehouses_page_1');
       if (cached && Array.isArray(cached) && cached.length > 0) {
         console.log('Loading warehouses from cache:', cached.length);
@@ -54,7 +51,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      // If no cache, fetch from API
       await fetchWarehouses("");
     } catch (error) {
       console.error('Failed to load initial warehouses:', error);
@@ -62,7 +58,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     }
   };
 
-  // Fetch warehouses with search
   const fetchWarehouses = async (search: string = "") => {
     setIsLoadingWarehouses(true);
     
@@ -71,7 +66,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         console.error('ERPNext API not configured');
-        // Try to load from cache if API is not available
         const cached = await offlineStorage.getCachedData('warehouses_page_1');
         if (cached && Array.isArray(cached)) {
           setWarehouses(cached);
@@ -80,8 +74,8 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      // Build search filters using correct Frappe format
-      let filters = [['disabled', '=', '0']];
+      // Build search filters using correct Frappe format (removed disabled filter, added search)
+      let filters = [['is_group', '=', '0']];
       
       if (search.trim()) {
         filters.push(['warehouse_name', 'like', `%${search}%`]);
@@ -93,10 +87,9 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       console.log('API result:', result);
       
       if (result && result.data) {
-        // Map Warehouse[] to WarehouseInfo[] by ensuring warehouse_name is present
         const warehouseData: WarehouseInfo[] = result.data.map(warehouse => ({
           name: warehouse.name,
-          warehouse_name: warehouse.warehouse_name || warehouse.name, // Use name as fallback
+          warehouse_name: warehouse.warehouse_name || warehouse.name,
           is_group: warehouse.is_group,
           company: (warehouse as any).company
         }));
@@ -104,9 +97,8 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         console.log('Setting warehouses:', warehouseData.length);
         setWarehouses(warehouseData);
         
-        // Cache the results only if it's the initial load (no search)
         if (!search.trim()) {
-          await offlineStorage.cacheData('warehouses_page_1', warehouseData, 300000); // 5 minutes
+          await offlineStorage.cacheData('warehouses_page_1', warehouseData, 300000);
         }
       } else {
         console.log('No warehouses found in API response');
@@ -115,7 +107,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     } catch (error) {
       console.error('Failed to fetch warehouses:', error);
       
-      // Try to load from cache on error
       try {
         const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_page_1';
         const cached = await offlineStorage.getCachedData(cacheKey);
@@ -131,7 +122,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
     }
   };
 
-  // Handle search with debouncing
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm !== undefined) {

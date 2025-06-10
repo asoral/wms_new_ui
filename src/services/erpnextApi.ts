@@ -30,6 +30,7 @@ interface StockBalance {
   item_code: string;
   warehouse: string;
   actual_qty: number;
+  valuation_rate?: number;
 }
 
 interface SalesOrder {
@@ -173,16 +174,13 @@ let erpnextConfig: ERPNextConfig | null = null;
 
 export const configureERPNextAPI = (config: ERPNextConfig) => {
   erpnextConfig = config;
-  // Also save to localStorage for persistence
   localStorage.setItem('erpnextBaseURL', config.baseURL);
   localStorage.setItem('erpnextApiKey', config.apiKey);
   localStorage.setItem('erpnextApiSecret', config.apiSecret);
 };
 
 export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
-  // Try to get config from global state first
   if (!erpnextConfig) {
-    // Fallback to localStorage
     const baseURL = localStorage.getItem('erpnextBaseURL');
     const apiKey = localStorage.getItem('erpnextApiKey');
     const apiSecret = localStorage.getItem('erpnextApiSecret');
@@ -200,7 +198,6 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
 
 export const getUserDefaultCompany = async (): Promise<string | null> => {
   try {
-    // First try localStorage
     const storedCompany = localStorage.getItem('erpnextDefaultCompany');
     if (storedCompany) {
       return storedCompany;
@@ -229,7 +226,7 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
 
 class ERPNextAPI {
   constructor(public baseURL: string, public apiKey: string, public apiSecret: string) {
-    this.baseURL = baseURL.replace(/\/+$/, ''); // Remove trailing slashes
+    this.baseURL = baseURL.replace(/\/+$/, '');
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
   }
@@ -247,13 +244,16 @@ class ERPNextAPI {
     if (!filters) return [];
     
     if (Array.isArray(filters)) {
-      // Already in correct format
-      return filters;
+      // Already in correct format, but remove any limit filters
+      return filters.filter(filter => filter[0] !== 'limit');
     }
     
     // Convert object format to Frappe array format
     const frappeFilters: string[][] = [];
     Object.entries(filters).forEach(([field, value]) => {
+      // Skip limit field as it should be a query parameter
+      if (field === 'limit') return;
+      
       if (Array.isArray(value) && value.length === 2) {
         // Handle operator format like ['<', 10]
         frappeFilters.push([field, value[0], value[1].toString()]);
@@ -264,6 +264,46 @@ class ERPNextAPI {
     });
     
     return frappeFilters;
+  }
+
+  // Helper method to extract limit from filters
+  private extractLimitFromFilters(filters: any): number | undefined {
+    if (!filters) return undefined;
+    
+    if (Array.isArray(filters)) {
+      const limitFilter = filters.find(filter => filter[0] === 'limit');
+      return limitFilter ? parseInt(limitFilter[2]) : undefined;
+    }
+    
+    if (typeof filters === 'object' && filters.limit) {
+      return Array.isArray(filters.limit) ? parseInt(filters.limit[1]) : parseInt(filters.limit);
+    }
+    
+    return undefined;
+  }
+
+  // Helper method to build query parameters
+  private buildQueryParams(filters?: any, fields?: string[], limit?: number): URLSearchParams {
+    const params = new URLSearchParams();
+    
+    const frappeFilters = this.convertToFrappeFilters(filters);
+    if (frappeFilters.length > 0) {
+      params.append('filters', JSON.stringify(frappeFilters));
+    }
+    
+    if (fields) {
+      params.append('fields', JSON.stringify(fields));
+    }
+    
+    // Extract limit from filters if not provided separately
+    const extractedLimit = this.extractLimitFromFilters(filters);
+    const finalLimit = limit || extractedLimit;
+    
+    if (finalLimit) {
+      params.append('limit_page_length', finalLimit.toString());
+    }
+    
+    return params;
   }
 
   private formatRelativeTime(dateString: string): string {
@@ -324,7 +364,8 @@ class ERPNextAPI {
   }
 
   async getCompanies(): Promise<ERPNextResponse<Company[]>> {
-    const response = await fetch(`${this.baseURL}/api/resource/Company?fields=["name","company_name"]`, {
+    const params = this.buildQueryParams(undefined, ["name","company_name"]);
+    const response = await fetch(`${this.baseURL}/api/resource/Company?${params}`, {
       headers: this.getHeaders(),
     });
 
@@ -337,25 +378,86 @@ class ERPNextAPI {
     return response.json();
   }
 
-  // Enhanced dashboard methods
+  // Updated Stock Balance method to use query report API
+  async getStockBalance(filters?: any, company?: string): Promise<ERPNextResponse<StockBalance[]>> {
+    try {
+      // Build filters object for query report
+      const reportFilters: any = {};
+      
+      if (company) {
+        reportFilters.company = company;
+      }
+      
+      // Handle specific filter conditions
+      if (filters) {
+        const frappeFilters = this.convertToFrappeFilters(filters);
+        frappeFilters.forEach(filter => {
+          const [field, operator, value] = filter;
+          if (field === 'actual_qty' && operator === '<') {
+            reportFilters.actual_qty = `<${value}`;
+          } else if (operator === '=') {
+            reportFilters[field] = value;
+          }
+        });
+      }
+      
+      const params = new URLSearchParams({
+        report_name: 'Stock Balance',
+        filters: JSON.stringify(reportFilters)
+      });
+      
+      // Add limit if specified
+      const limit = this.extractLimitFromFilters(filters);
+      if (limit) {
+        params.append('limit_page_length', limit.toString());
+      } else {
+        params.append('limit_page_length', '100'); // Default limit
+      }
+
+      const response = await fetch(`${this.baseURL}/api/method/frappe.desk.query_report.run?${params}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      // Transform query report result to match expected format
+      if (result.message && result.message.result) {
+        const stockData = result.message.result.map((row: any[]) => ({
+          item_code: row[0],
+          warehouse: row[1],
+          actual_qty: row[2] || 0,
+          valuation_rate: row[3] || 0
+        }));
+        
+        return { data: stockData };
+      }
+      
+      return { data: [] };
+    } catch (error) {
+      console.error('Error fetching stock balance:', error);
+      return { data: [] };
+    }
+  }
+
+  // Enhanced dashboard methods with corrected API calls
   async getDashboardMetrics(company?: string): Promise<DashboardMetrics> {
     try {
       const [itemsResponse, warehousesResponse, ordersResponse, stockBalanceResponse] = await Promise.all([
         this.getItems(undefined, undefined, company),
         this.getWarehouses(undefined, company),
         this.getSalesOrders([['status', '=', 'Draft']], company),
-        this.getStockBalance([['actual_qty', '<', '10']], company)
+        this.getStockBalance({ actual_qty: ['<', '10'] }, company)
       ]);
 
-      // Calculate total stock value using stock ledger entries
+      // Calculate total stock value using stock balance
       let totalStockValue = 0;
-      try {
-        const stockLedgerResponse = await this.getStockLedgerEntries(undefined, company);
-        totalStockValue = stockLedgerResponse.data?.reduce((sum: number, entry: any) => 
-          sum + ((entry.actual_qty || 0) * (entry.valuation_rate || 0)), 0) || 0;
-      } catch (error) {
-        console.warn('Could not fetch stock ledger for total value calculation:', error);
-        totalStockValue = 0;
+      if (stockBalanceResponse.data) {
+        totalStockValue = stockBalanceResponse.data.reduce((sum: number, entry: any) => 
+          sum + ((entry.actual_qty || 0) * (entry.valuation_rate || 0)), 0);
       }
 
       return {
@@ -364,7 +466,7 @@ class ERPNextAPI {
         pendingOrders: ordersResponse.data?.length || 0,
         totalWarehouses: warehousesResponse.data?.length || 0,
         totalStockValue,
-        recentActivitiesCount: 0 // Will be calculated separately
+        recentActivitiesCount: 0
       };
     } catch (error) {
       console.error('Error fetching dashboard metrics:', error);
@@ -387,10 +489,10 @@ class ERPNextAPI {
       const dateFilter = [['creation', '>', sevenDaysAgo.toISOString().split('T')[0]]];
 
       const [receipts, deliveries, stockEntries, materialRequests] = await Promise.all([
-        this.getPurchaseReceipts([...dateFilter, ['limit', '=', '5']], company),
-        this.getDeliveryNotes([...dateFilter, ['limit', '=', '5']], company),
-        this.getStockEntries([...dateFilter, ['limit', '=', '5']], company),
-        this.getMaterialRequests([...dateFilter, ['limit', '=', '5']], company)
+        this.getPurchaseReceipts(dateFilter, company, 5),
+        this.getDeliveryNotes(dateFilter, company, 5),
+        this.getStockEntries(dateFilter, company, 5),
+        this.getMaterialRequests(dateFilter, company, 5)
       ]);
 
       const activities: RecentActivity[] = [];
@@ -448,7 +550,6 @@ class ERPNextAPI {
         });
       });
 
-      // Sort by time and limit results
       return activities
         .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
         .slice(0, limit);
@@ -461,8 +562,6 @@ class ERPNextAPI {
 
   async getOperationalMetrics(company?: string): Promise<OperationalMetrics> {
     try {
-      // These would typically require custom reports or calculated fields
-      // For now, we'll return mock data that could be enhanced with real calculations
       return {
         pickAccuracy: 97.5,
         putawaySpeed: 85.2,
@@ -488,15 +587,14 @@ class ERPNextAPI {
     try {
       let totalStockValue = 0;
       try {
-        const stockLedgerResponse = await this.getStockLedgerEntries(undefined, company);
-        totalStockValue = stockLedgerResponse.data?.reduce((sum: number, entry: any) => 
+        const stockBalanceResponse = await this.getStockBalance(undefined, company);
+        totalStockValue = stockBalanceResponse.data?.reduce((sum: number, entry: any) => 
           sum + ((entry.actual_qty || 0) * (entry.valuation_rate || 0)), 0) || 0;
       } catch (error) {
-        console.warn('Could not fetch stock ledger for financial metrics:', error);
+        console.warn('Could not fetch stock balance for financial metrics:', error);
       }
 
-      // Calculate dead stock (items with no movement in 90+ days)
-      const deadStockValue = totalStockValue * 0.15; // Approximation
+      const deadStockValue = totalStockValue * 0.15;
 
       return {
         stockTurnoverRatio: 6.2,
@@ -525,16 +623,12 @@ class ERPNextAPI {
 
   // Fixed Stock Ledger Entry method
   async getStockLedgerEntries(filters?: any, company?: string): Promise<ERPNextResponse<any[]>> {
-    const params = new URLSearchParams();
-    
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
     }
     
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
+    const params = this.buildQueryParams(finalFilters);
 
     const response = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?${params}`, {
       headers: this.getHeaders(),
@@ -549,17 +643,15 @@ class ERPNextAPI {
 
   async getStockAgingReport(filters?: any): Promise<ERPNextResponse<any[]>> {
     try {
-      // Try to use a simpler approach by fetching stock balance with date filters
       const stockBalance = await this.getStockBalance(filters);
       
-      // Process the stock balance data to create aging information
       const agingData = stockBalance.data?.map((item: any) => ({
         item_code: item.item_code,
         warehouse: item.warehouse,
         actual_qty: item.actual_qty,
         valuation_rate: item.valuation_rate,
         value: (item.actual_qty || 0) * (item.valuation_rate || 0),
-        age: 30, // Default age - would need more complex calculation in real scenario
+        age: 30,
         posting_date: new Date().toISOString().split('T')[0]
       })) || [];
 
@@ -569,7 +661,6 @@ class ERPNextAPI {
       };
     } catch (error) {
       console.error('Error fetching stock aging report:', error);
-      // Return empty data instead of throwing error to prevent dashboard crash
       return {
         data: [],
         message: 'Stock aging report not available'
@@ -577,25 +668,223 @@ class ERPNextAPI {
     }
   }
 
-  // New methods for missing functionality
-  async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
-    const params = new URLSearchParams();
+  // Updated resource API methods with correct parameter handling
+  async getItems(filters?: any, searchTerm?: string, company?: string): Promise<ERPNextResponse<Item[]>> {
+    let finalFilters = [['is_stock_item', '=', '1']];
+    if (filters) {
+      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
+    }
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
     
+    const params = this.buildQueryParams(finalFilters);
+    
+    if (searchTerm) {
+      const orFilters = [
+        ['item_code', 'like', `%${searchTerm}%`],
+        ['item_name', 'like', `%${searchTerm}%`]
+      ];
+      params.append('or_filters', JSON.stringify(orFilters));
+    }
+
+    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch items: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getWarehouses(filters?: any, company?: string): Promise<ERPNextResponse<Warehouse[]>> {
+    let finalFilters = [['is_group', '=', '0']];
+    if (filters) {
+      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
+    }
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Warehouse?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch warehouses: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getSalesOrders(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<SalesOrder[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Sales Order?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sales orders: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getDeliveryNotes(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<DeliveryNote[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Delivery Note?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch delivery notes: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPurchaseOrders(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<PurchaseOrder[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase orders: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPurchaseReceipts(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<PurchaseReceipt[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase receipts: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getMaterialRequests(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<MaterialRequest[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch material requests: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getStockEntries(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<StockEntry[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock entries: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<number> {
+    let filters = [
+      ['item_code', '=', itemCode],
+      ['warehouse', '=', warehouse]
+    ];
+
+    if (batch) {
+      filters.push(['batch_no', '=', batch]);
+    }
+
+    if (serial) {
+      filters.push(['serial_no', '=', serial]);
+    }
+
+    const params = new URLSearchParams({
+      fields: '["actual_qty"]',
+      filters: JSON.stringify(filters)
+    });
+
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
+    }
+
+    const result = await response.json() as ERPNextResponse<StockBalance[]>;
+
+    if (Array.isArray(result.data) && result.data.length > 0) {
+      return result.data[0].actual_qty;
+    } else {
+      return 0;
+    }
+  }
+
+  async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
     let filters = [['is_stock_item', '=', '1']];
     
     if (company) {
       filters.push(['company', '=', company]);
     }
     
-    params.append('filters', JSON.stringify(filters));
+    const params = this.buildQueryParams(filters, undefined, limit);
     
-    // Use or_filters for search terms
     const orFilters = [
       ['item_code', 'like', `%${searchTerm}%`],
       ['item_name', 'like', `%${searchTerm}%`]
     ];
     params.append('or_filters', JSON.stringify(orFilters));
-    params.append('limit', limit.toString());
 
     const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
       headers: this.getHeaders(),
@@ -609,8 +898,6 @@ class ERPNextAPI {
   }
 
   async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit: number = 20, page: number = 1): Promise<ERPNextResponse<Item[]>> {
-    const params = new URLSearchParams();
-    
     let finalFilters = [['is_stock_item', '=', '1']];
     if (filters) {
       finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
@@ -619,13 +906,8 @@ class ERPNextAPI {
       finalFilters.push(['company', '=', company]);
     }
     
-    params.append('filters', JSON.stringify(finalFilters));
-    params.append('limit', limit.toString());
+    const params = this.buildQueryParams(finalFilters, fields, limit);
     params.append('start', ((page - 1) * limit).toString());
-    
-    if (fields) {
-      params.append('fields', JSON.stringify(fields));
-    }
 
     const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
       headers: this.getHeaders(),
@@ -639,9 +921,7 @@ class ERPNextAPI {
   }
 
   async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
-    const params = new URLSearchParams();
-    const filters = [['barcode', '=', barcode]];
-    params.append('filters', JSON.stringify(filters));
+    const params = this.buildQueryParams([['barcode', '=', barcode]]);
 
     const response = await fetch(`${this.baseURL}/api/resource/Item Barcode?${params}`, {
       headers: this.getHeaders(),
@@ -675,10 +955,7 @@ class ERPNextAPI {
 
   async validateBatch(batchNo: string, itemCode: string): Promise<boolean> {
     try {
-      // Check if batch exists
-      const params = new URLSearchParams();
-      const filters = [['name', '=', batchNo], ['item', '=', itemCode]];
-      params.append('filters', JSON.stringify(filters));
+      const params = this.buildQueryParams([['name', '=', batchNo], ['item', '=', itemCode]]);
 
       const response = await fetch(`${this.baseURL}/api/resource/Batch?${params}`, {
         headers: this.getHeaders(),
@@ -687,11 +964,10 @@ class ERPNextAPI {
       if (response.ok) {
         const result = await response.json();
         if (result.data && result.data.length > 0) {
-          return true; // Batch exists
+          return true;
         }
       }
 
-      // Create new batch if it doesn't exist
       const createResponse = await fetch(`${this.baseURL}/api/resource/Batch`, {
         method: 'POST',
         headers: this.getHeaders(),
@@ -710,10 +986,7 @@ class ERPNextAPI {
 
   async validateSerial(serialNo: string, itemCode: string, warehouse: string): Promise<boolean> {
     try {
-      // Check if serial exists
-      const params = new URLSearchParams();
-      const filters = [['name', '=', serialNo], ['item_code', '=', itemCode]];
-      params.append('filters', JSON.stringify(filters));
+      const params = this.buildQueryParams([['name', '=', serialNo], ['item_code', '=', itemCode]]);
 
       const response = await fetch(`${this.baseURL}/api/resource/Serial No?${params}`, {
         headers: this.getHeaders(),
@@ -722,11 +995,10 @@ class ERPNextAPI {
       if (response.ok) {
         const result = await response.json();
         if (result.data && result.data.length > 0) {
-          return true; // Serial exists
+          return true;
         }
       }
 
-      // Create new serial if it doesn't exist
       const createResponse = await fetch(`${this.baseURL}/api/resource/Serial No`, {
         method: 'POST',
         headers: this.getHeaders(),
@@ -810,270 +1082,13 @@ class ERPNextAPI {
     return response.json();
   }
 
-  async getItems(filters?: any, searchTerm?: string, company?: string): Promise<ERPNextResponse<Item[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = [['is_stock_item', '=', '1']];
-    if (filters) {
-      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
-    }
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    params.append('filters', JSON.stringify(finalFilters));
-    
-    if (searchTerm) {
-      const orFilters = [
-        ['item_code', 'like', `%${searchTerm}%`],
-        ['item_name', 'like', `%${searchTerm}%`]
-      ];
-      params.append('or_filters', JSON.stringify(orFilters));
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch items: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getWarehouses(filters?: any, company?: string): Promise<ERPNextResponse<Warehouse[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = [['is_group', '=', '0']];
-    if (filters) {
-      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
-    }
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    params.append('filters', JSON.stringify(finalFilters));
-
-    const response = await fetch(`${this.baseURL}/api/resource/Warehouse?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch warehouses: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<number> {
-    let filters = [
-      ['item_code', '=', itemCode],
-      ['warehouse', '=', warehouse]
-    ];
-
-    if (batch) {
-      filters.push(['batch_no', '=', batch]);
-    }
-
-    if (serial) {
-      filters.push(['serial_no', '=', serial]);
-    }
-
-    const params = new URLSearchParams({
-      fields: '["actual_qty"]',
-      filters: JSON.stringify(filters)
-    });
-
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
-    }
-
-    const result = await response.json() as ERPNextResponse<StockBalance[]>;
-
-    if (Array.isArray(result.data) && result.data.length > 0) {
-      return result.data[0].actual_qty;
-    } else {
-      return 0;
-    }
-  }
-
-  async getStockBalance(filters?: any, company?: string): Promise<ERPNextResponse<StockBalance[]>> {
-    const params = new URLSearchParams();
-    
+  async getPickLists(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<PickList[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
     }
     
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getSalesOrders(filters?: any, company?: string): Promise<ERPNextResponse<SalesOrder[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = this.convertToFrappeFilters(filters);
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Sales Order?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch sales orders: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getDeliveryNotes(filters?: any, company?: string): Promise<ERPNextResponse<DeliveryNote[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = this.convertToFrappeFilters(filters);
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Delivery Note?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch delivery notes: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getPurchaseOrders(filters?: any, company?: string): Promise<ERPNextResponse<PurchaseOrder[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = this.convertToFrappeFilters(filters);
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch purchase orders: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getPurchaseReceipts(filters?: any, company?: string): Promise<ERPNextResponse<PurchaseReceipt[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = this.convertToFrappeFilters(filters);
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch purchase receipts: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getMaterialRequests(filters?: any, company?: string): Promise<ERPNextResponse<MaterialRequest[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = this.convertToFrappeFilters(filters);
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Material Request?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch material requests: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getStockEntries(filters?: any, company?: string): Promise<ERPNextResponse<StockEntry[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = this.convertToFrappeFilters(filters);
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch stock entries: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getPickLists(filters?: any, company?: string): Promise<ERPNextResponse<PickList[]>> {
-    const params = new URLSearchParams();
-    
-    let finalFilters = this.convertToFrappeFilters(filters);
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
-    
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
 
     const response = await fetch(`${this.baseURL}/api/resource/Pick List?${params}`, {
       headers: this.getHeaders(),
@@ -1086,17 +1101,13 @@ class ERPNextAPI {
     return response.json();
   }
 
-  async getPackingSlips(filters?: any, company?: string): Promise<ERPNextResponse<PackingSlip[]>> {
-    const params = new URLSearchParams();
-    
+  async getPackingSlips(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<PackingSlip[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
     }
     
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
 
     const response = await fetch(`${this.baseURL}/api/resource/Packing Slip?${params}`, {
       headers: this.getHeaders(),
@@ -1109,17 +1120,13 @@ class ERPNextAPI {
     return response.json();
   }
 
-  async getQualityInspections(filters?: any, company?: string): Promise<ERPNextResponse<QualityInspection[]>> {
-    const params = new URLSearchParams();
-    
+  async getQualityInspections(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<QualityInspection[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
     }
     
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
 
     const response = await fetch(`${this.baseURL}/api/resource/Quality Inspection?${params}`, {
       headers: this.getHeaders(),
@@ -1132,17 +1139,13 @@ class ERPNextAPI {
     return response.json();
   }
 
-  async getProductBundles(filters?: any, company?: string): Promise<ERPNextResponse<ProductBundle[]>> {
-    const params = new URLSearchParams();
-    
+  async getProductBundles(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse<ProductBundle[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
     }
     
-    if (finalFilters.length > 0) {
-      params.append('filters', JSON.stringify(finalFilters));
-    }
+    const params = this.buildQueryParams(finalFilters, undefined, limit);
 
     const response = await fetch(`${this.baseURL}/api/resource/Product Bundle?${params}`, {
       headers: this.getHeaders(),

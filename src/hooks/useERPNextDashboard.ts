@@ -30,15 +30,13 @@ export const useERPNextDashboard = () => {
           return;
         }
 
-        // Fetch various data for dashboard
-        const [itemsResponse, warehousesResponse, ordersResponse] = await Promise.all([
+        // Fetch various data for dashboard using corrected API calls
+        const [itemsResponse, warehousesResponse, ordersResponse, stockBalanceResponse] = await Promise.all([
           erpnextAPI.getItems(),
           erpnextAPI.getWarehouses(),
-          erpnextAPI.getSalesOrders({ status: 'Draft' })
+          erpnextAPI.getSalesOrders([['status', '=', 'Draft']]),
+          erpnextAPI.getStockBalance({ actual_qty: ['<', 10] })
         ]);
-
-        // Fix: Convert filters to a single filter object instead of array
-        const stockBalanceResponse = await erpnextAPI.getStockBalance({ actual_qty: ['<', 10] });
 
         setStats({
           totalItems: itemsResponse.data?.length || 0,
