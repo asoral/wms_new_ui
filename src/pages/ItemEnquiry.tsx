@@ -6,8 +6,9 @@ import { Package, TrendingUp, DollarSign, Calendar, Loader2 } from "lucide-react
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { toast } from "sonner";
 import SearchCard from "@/components/shared/SearchCard";
+import { Item } from "@/services/erp/erpnext/types";
 
-interface ItemData {
+export interface ItemData {
   item_code: string;
   item_name: string;
   stock_uom: string;
@@ -21,6 +22,26 @@ interface ItemData {
     actual_qty: number;
     stock_value: number;
   }>;
+}
+
+export interface StockData {
+  itemCode: string;
+  itemName: string;
+  uom: string;
+  totalStock: number;
+  totalValuation: number;
+  averageAge: number;
+  warehouseStock: StockInfo[];
+}
+
+export interface StockInfo {
+  warehouse: string;
+  qty: number;
+  valuation: number;
+  age: number;
+  uom: string;
+  batch?: string;
+  serial?: string;
 }
 
 const ItemEnquiry = () => {
@@ -42,9 +63,18 @@ const ItemEnquiry = () => {
       const response = await erpnextAPI.searchItems(query);
       
       if (response.data && response.data.length > 0) {
-        setSearchResults(response.data);
+        // Convert Item[] to ItemData[] by mapping the type differences
+        const convertedResults: ItemData[] = response.data.map((item: Item) => ({
+          item_code: item.item_code,
+          item_name: item.item_name,
+          stock_uom: item.stock_uom,
+          has_batch_no: Boolean(item.has_batch_no),
+          has_serial_no: Boolean(item.has_serial_no),
+        }));
+        
+        setSearchResults(convertedResults);
         // Auto-select first result if exact match
-        const exactMatch = response.data.find(item => 
+        const exactMatch = convertedResults.find(item => 
           item.item_code.toLowerCase() === query.toLowerCase()
         );
         if (exactMatch) {
@@ -101,6 +131,8 @@ const ItemEnquiry = () => {
       const enrichedItem: ItemData = {
         ...item,
         ...(itemDetails.data || {}),
+        has_batch_no: Boolean(itemDetails.data?.has_batch_no),
+        has_serial_no: Boolean(itemDetails.data?.has_serial_no),
         total_stock_value: totalStockValue,
         total_qty: totalQty,
         turnover_ratio: totalStockValue > 0 ? (totalQty / totalStockValue) * 100 : 0,
