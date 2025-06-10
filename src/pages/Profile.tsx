@@ -40,29 +40,50 @@ const Profile = () => {
       setApiSecret(storedApiSecret);
       setSelectedCompany(storedCompany);
 
-      // Load companies if credentials exist
+      // Auto-test connection and load companies if all credentials exist
       if (storedBaseURL && storedApiKey && storedApiSecret) {
-        await loadCompanies();
+        console.log('Found existing credentials, testing connection...');
+        await testConnectionAndLoadCompanies(storedBaseURL, storedApiKey, storedApiSecret);
       }
     };
 
     loadConfiguration();
   }, []);
 
-  const loadCompanies = async () => {
-    if (!baseURL || !apiKey || !apiSecret) return;
-
-    setIsLoadingCompanies(true);
+  const testConnectionAndLoadCompanies = async (url: string, key: string, secret: string) => {
     try {
-      const testAPI = new ERPNextAPI(baseURL, apiKey, apiSecret);
-      const result = await testAPI.getCompanies();
-      setCompanies(result.data || []);
-      setConnectionStatus('connected');
+      const testAPI = new ERPNextAPI(url, key, secret);
+      const isConnected = await testAPI.testConnection();
+      
+      if (isConnected) {
+        console.log('Connection successful, loading companies...');
+        setConnectionStatus('connected');
+        
+        // Load companies
+        setIsLoadingCompanies(true);
+        const companiesResult = await testAPI.getCompanies();
+        console.log('Companies loaded:', companiesResult);
+        setCompanies(companiesResult.data || []);
+        setIsLoadingCompanies(false);
+        
+        // Configure the global API instance
+        configureERPNextAPI({
+          baseURL: url,
+          apiKey: key,
+          apiSecret: secret
+        });
+        
+        return true;
+      } else {
+        console.log('Connection failed');
+        setConnectionStatus('error');
+        return false;
+      }
     } catch (error) {
-      console.error('Failed to load companies:', error);
+      console.error('Error during connection test:', error);
       setConnectionStatus('error');
-    } finally {
       setIsLoadingCompanies(false);
+      return false;
     }
   };
 
@@ -76,25 +97,27 @@ const Profile = () => {
       return;
     }
 
+    // Clean the base URL (remove trailing slash if present)
+    const cleanBaseURL = baseURL.replace(/\/+$/, '');
+    
     setIsTestingConnection(true);
+    setConnectionStatus('idle');
+    
     try {
-      const testAPI = new ERPNextAPI(baseURL, apiKey, apiSecret);
-      const isConnected = await testAPI.testConnection();
+      console.log('Testing connection with:', { baseURL: cleanBaseURL, apiKey });
+      const success = await testConnectionAndLoadCompanies(cleanBaseURL, apiKey, apiSecret);
       
-      if (isConnected) {
+      if (success) {
         toast({
           title: "Success",
           description: "Successfully connected to ERPNext!",
         });
-        setConnectionStatus('connected');
-        await loadCompanies();
       } else {
         toast({
           title: "Connection Failed",
-          description: "Unable to connect to ERPNext. Please check your credentials.",
+          description: "Unable to connect to ERPNext. Please check your credentials and URL.",
           variant: "destructive",
         });
-        setConnectionStatus('error');
       }
     } catch (error) {
       console.error('Connection test failed:', error);
@@ -119,30 +142,33 @@ const Profile = () => {
       return;
     }
 
+    const cleanBaseURL = baseURL.replace(/\/+$/, '');
+    
     setIsSaving(true);
     try {
-      const testAPI = new ERPNextAPI(baseURL, apiKey, apiSecret);
-      await testAPI.getCompanies();
+      // Test connection first
+      const success = await testConnectionAndLoadCompanies(cleanBaseURL, apiKey, apiSecret);
       
-      configureERPNextAPI({
-        baseURL,
-        apiKey,
-        apiSecret
-      });
+      if (success) {
+        // Save to localStorage
+        localStorage.setItem('erpnextBaseURL', cleanBaseURL);
+        localStorage.setItem('erpnextApiKey', apiKey);
+        localStorage.setItem('erpnextApiSecret', apiSecret);
+        if (selectedCompany) {
+          localStorage.setItem('erpnextDefaultCompany', selectedCompany);
+        }
 
-      // Save to localStorage
-      localStorage.setItem('erpnextBaseURL', baseURL);
-      localStorage.setItem('erpnextApiKey', apiKey);
-      localStorage.setItem('erpnextApiSecret', apiSecret);
-      if (selectedCompany) {
-        localStorage.setItem('erpnextDefaultCompany', selectedCompany);
+        toast({
+          title: "Success",
+          description: "ERPNext configuration saved successfully!",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save configuration. Connection test failed.",
+          variant: "destructive",
+        });
       }
-
-      toast({
-        title: "Success",
-        description: "ERPNext configuration saved successfully!",
-      });
-      setConnectionStatus('connected');
     } catch (error) {
       console.error('Failed to save configuration:', error);
       toast({

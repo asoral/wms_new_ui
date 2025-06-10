@@ -1,6 +1,14 @@
 
 export const getAccessToken = async (): Promise<string | null> => {
-  // For now, return null as the authentication is handled differently in this app
-  // This is a placeholder to prevent the import error
+  // For ERPNext integration, we check if credentials are configured
+  const baseURL = localStorage.getItem('erpnextBaseURL');
+  const apiKey = localStorage.getItem('erpnextApiKey');
+  const apiSecret = localStorage.getItem('erpnextApiSecret');
+  
+  if (baseURL && apiKey && apiSecret) {
+    // Return a token that indicates ERPNext is configured
+    return `${apiKey}:${apiSecret}`;
+  }
+  
   return null;
 };

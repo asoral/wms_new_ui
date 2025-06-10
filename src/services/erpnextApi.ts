@@ -1,3 +1,4 @@
+
 import { getAccessToken } from './authService';
 import { offlineStorage } from './offlineStorage';
 
@@ -173,18 +174,26 @@ let erpnextConfig: ERPNextConfig | null = null;
 
 export const configureERPNextAPI = (config: ERPNextConfig) => {
   erpnextConfig = config;
+  // Also save to localStorage for persistence
+  localStorage.setItem('erpnextBaseURL', config.baseURL);
+  localStorage.setItem('erpnextApiKey', config.apiKey);
+  localStorage.setItem('erpnextApiSecret', config.apiSecret);
 };
 
 export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
+  // Try to get config from global state first
   if (!erpnextConfig) {
-    console.warn('ERPNext API not configured. Call configureERPNextAPI first.');
-    return null;
-  }
-
-  const accessToken = await getAccessToken();
-  if (!accessToken) {
-    console.warn('Access token not available. Ensure user is authenticated.');
-    return null;
+    // Fallback to localStorage
+    const baseURL = localStorage.getItem('erpnextBaseURL');
+    const apiKey = localStorage.getItem('erpnextApiKey');
+    const apiSecret = localStorage.getItem('erpnextApiSecret');
+    
+    if (baseURL && apiKey && apiSecret) {
+      erpnextConfig = { baseURL, apiKey, apiSecret };
+    } else {
+      console.warn('ERPNext API not configured. Configure credentials first.');
+      return null;
+    }
   }
 
   return new ERPNextAPI(erpnextConfig.baseURL, erpnextConfig.apiKey, erpnextConfig.apiSecret);
@@ -192,6 +201,12 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
 
 export const getUserDefaultCompany = async (): Promise<string | null> => {
   try {
+    // First try localStorage
+    const storedCompany = localStorage.getItem('erpnextDefaultCompany');
+    if (storedCompany) {
+      return storedCompany;
+    }
+
     const erpnextAPI = await createERPNextAPI();
     if (!erpnextAPI) {
       console.error('ERPNext API not configured');
@@ -200,7 +215,9 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
 
     const userDetails = await erpnextAPI.getLoggedInUserDetails();
     if (userDetails && userDetails.data && userDetails.data.defaults && userDetails.data.defaults.company) {
-      return userDetails.data.defaults.company;
+      const company = userDetails.data.defaults.company;
+      localStorage.setItem('erpnextDefaultCompany', company);
+      return company;
     } else {
       console.warn('Unable to retrieve default company from user details.');
       return null;
@@ -220,7 +237,7 @@ class ERPNextAPI {
 
   private getHeaders() {
     return {
-      'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+      'Authorization': `Token ${this.apiKey}:${this.apiSecret}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
@@ -247,22 +264,36 @@ class ERPNextAPI {
 
   async testConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseURL}/api/method/frappe.auth.get_logged_in_user_details`, {
+      console.log('Testing connection to:', this.baseURL);
+      const response = await fetch(`${this.baseURL}/api/method/frappe.auth.get_logged_user`, {
         headers: this.getHeaders(),
       });
-      return response.ok;
+      
+      console.log('Connection test response status:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Connection test result:', result);
+        return true;
+      } else {
+        const errorText = await response.text();
+        console.error('Connection test failed:', response.status, errorText);
+        return false;
+      }
     } catch (error) {
-      console.error('Connection test failed:', error);
+      console.error('Connection test failed with error:', error);
       return false;
     }
   }
 
   async getLoggedInUserDetails(): Promise<ERPNextResponse<any>> {
-    const response = await fetch(`${this.baseURL}/api/method/frappe.auth.get_logged_in_user_details`, {
+    const response = await fetch(`${this.baseURL}/api/method/frappe.auth.get_logged_user`, {
       headers: this.getHeaders(),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to fetch user details:', response.status, errorText);
       throw new Error(`Failed to fetch user details: ${response.statusText}`);
     }
 
@@ -270,11 +301,13 @@ class ERPNextAPI {
   }
 
   async getCompanies(): Promise<ERPNextResponse<Company[]>> {
-    const response = await fetch(`${this.baseURL}/api/resource/Company`, {
+    const response = await fetch(`${this.baseURL}/api/resource/Company?fields=["name","company_name"]`, {
       headers: this.getHeaders(),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to fetch companies:', response.status, errorText);
       throw new Error(`Failed to fetch companies: ${response.statusText}`);
     }
 
