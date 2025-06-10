@@ -1,3 +1,4 @@
+
 import { ERPNextConfig } from './types';
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -107,6 +108,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   getItemDetails(itemCode: string) {
     return this.itemsApi.getItemDetails(itemCode);
+  }
+
+  searchItemsByBarcode(barcode: string) {
+    return this.itemsApi.searchItemsByBarcode(barcode);
   }
 
   // Stock API methods
