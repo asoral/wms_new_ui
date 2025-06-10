@@ -78,6 +78,39 @@ export class ERPNextBaseAPI {
     }
   }
 
+  // Generic report runner method using the whitelisted endpoint
+  async runReport(reportName: string, filters?: any): Promise<ERPNextResponse<any>> {
+    try {
+      console.log(`Running report: ${reportName} with filters:`, filters);
+      
+      const requestBody = {
+        report_name: reportName,
+        filters: filters || {}
+      };
+
+      const response = await fetch(`${this.baseURL}/api/method/frappe.desk.query_report.run`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log(`Report ${reportName} response status:`, response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to run report ${reportName}:`, response.status, errorText);
+        throw new Error(`Failed to run report ${reportName}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`Report ${reportName} result:`, result);
+      return result;
+    } catch (error) {
+      console.error(`Error running report ${reportName}:`, error);
+      throw error;
+    }
+  }
+
   async testConnection(): Promise<boolean> {
     try {
       console.log('Testing connection to:', this.baseURL);

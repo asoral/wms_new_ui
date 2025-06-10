@@ -105,18 +105,60 @@ export const useEnhancedDashboard = () => {
 
       const defaultCompany = await getUserDefaultCompany();
       
-      // Fetch dashboard data without stock aging report (due to permission issues)
-      const [dashboardStats, operationalData, financialData] = await Promise.all([
+      // Fetch all dashboard data including stock aging report
+      const [dashboardStats, operationalData, financialData, stockAging] = await Promise.all([
         erpnextAPI.getDashboardMetrics(defaultCompany || undefined),
         erpnextAPI.getOperationalMetrics(defaultCompany || undefined),
-        erpnextAPI.getFinancialMetrics(defaultCompany || undefined)
+        erpnextAPI.getFinancialMetrics(defaultCompany || undefined),
+        erpnextAPI.getStockAgingReport(undefined, defaultCompany || undefined)
       ]);
 
       setStats(dashboardStats);
       setOperationalMetrics(operationalData);
       setFinancialMetrics(financialData);
 
-      // Set default stock aging data since the report is not accessible
+      // Process stock aging data
+      if (stockAging && stockAging.data && Array.isArray(stockAging.data)) {
+        console.log('Stock aging data received:', stockAging.data);
+        
+        // Process the report data based on ERPNext Stock Ageing report structure
+        const processedStockAging: StockAgingData = {
+          total_value: stockAging.data.reduce((sum: number, row: any) => {
+            // Stock Ageing report typically has a 'balance_value' or similar field
+            return sum + (parseFloat(row.balance_value || row.value || 0));
+          }, 0),
+          items_count: stockAging.data.length,
+          aged_30_days: stockAging.data.filter((row: any) => {
+            const age = parseInt(row.age_days || 0);
+            return age > 30;
+          }).length,
+          aged_60_days: stockAging.data.filter((row: any) => {
+            const age = parseInt(row.age_days || 0);
+            return age > 60;
+          }).length,
+          aged_90_days: stockAging.data.filter((row: any) => {
+            const age = parseInt(row.age_days || 0);
+            return age > 90;
+          }).length
+        };
+        
+        setStockAgingData(processedStockAging);
+      } else {
+        // Set default stock aging data if no data received
+        setStockAgingData({
+          total_value: 0,
+          items_count: 0,
+          aged_30_days: 0,
+          aged_60_days: 0,
+          aged_90_days: 0
+        });
+      }
+
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+      
+      // Set default values on error
       setStockAgingData({
         total_value: 0,
         items_count: 0,
@@ -124,10 +166,6 @@ export const useEnhancedDashboard = () => {
         aged_60_days: 0,
         aged_90_days: 0
       });
-
-    } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
     } finally {
       setIsLoading(false);
     }

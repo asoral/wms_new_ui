@@ -99,11 +99,47 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-  async getStockAgingReport(filters?: any): Promise<ERPNextResponse<any[]>> {
-    // This method is not accessible due to permission restrictions
-    // Return empty data with a warning
-    console.warn('Stock aging report is not accessible due to ERPNext permissions');
-    return { data: [] };
+  async getStockAgingReport(filters?: any, company?: string): Promise<ERPNextResponse<any[]>> {
+    try {
+      // Prepare filters for the Stock Ageing report
+      const reportFilters: any = {};
+      
+      if (company) {
+        reportFilters.company = company;
+      }
+      
+      // Set default date range if not provided
+      const today = new Date();
+      const fromDate = new Date(today.getFullYear(), 0, 1); // Start of current year
+      
+      reportFilters.from_date = fromDate.toISOString().split('T')[0];
+      reportFilters.to_date = today.toISOString().split('T')[0];
+      
+      // Add any additional filters
+      if (filters) {
+        Object.assign(reportFilters, filters);
+      }
+
+      console.log('Running Stock Ageing report with filters:', reportFilters);
+      
+      // Use the generic report runner
+      const result = await this.runReport('Stock Ageing', reportFilters);
+      
+      // Transform the report data to match expected format
+      if (result && result.message && result.message.result) {
+        return {
+          data: result.message.result,
+          columns: result.message.columns || []
+        };
+      }
+      
+      return { data: [] };
+      
+    } catch (error) {
+      console.error('Failed to fetch stock aging report:', error);
+      // Return empty data if there's an error instead of throwing
+      return { data: [] };
+    }
   }
 
   async getStockEntries(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<StockEntry[]>> {
