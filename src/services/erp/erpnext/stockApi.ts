@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance } from './types';
 
@@ -76,6 +77,30 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       return { data: [] };
     } catch (error) {
       console.error('Error fetching stock balance:', error);
+      return { data: [] };
+    }
+  }
+
+  async getBinSummary(itemCode: string, warehouse?: string): Promise<ERPNextResponse<any>> {
+    try {
+      const payload: any = { item_code: itemCode };
+      if (warehouse) {
+        payload.warehouse = warehouse;
+      }
+
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.get_bin_summary`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch bin summary: ${response.statusText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching bin summary:', error);
       return { data: [] };
     }
   }
@@ -160,28 +185,82 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
   async getStockAgingReport(filters?: any): Promise<ERPNextResponse<any[]>> {
     try {
-      const stockBalance = await this.getStockBalance(filters);
-      
-      const agingData = stockBalance.data?.map((item: any) => ({
-        item_code: item.item_code,
-        warehouse: item.warehouse,
-        actual_qty: item.actual_qty,
-        valuation_rate: item.valuation_rate,
-        value: (item.actual_qty || 0) * (item.valuation_rate || 0),
-        age: 30,
-        posting_date: new Date().toISOString().split('T')[0]
-      })) || [];
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          filters: filters || {}
+        })
+      });
 
-      return {
-        data: agingData,
-        message: 'Stock aging data processed from stock balance'
-      };
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stock aging report: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.message && result.message.result) {
+        return { data: result.message.result };
+      }
+      
+      return { data: [] };
     } catch (error) {
       console.error('Error fetching stock aging report:', error);
-      return {
-        data: [],
-        message: 'Stock aging report not available'
-      };
+      return { data: [] };
+    }
+  }
+
+  async getItemShortageReport(filters?: any): Promise<ERPNextResponse<any[]>> {
+    try {
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.item_shortage_report.item_shortage_report.execute`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          filters: filters || {}
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch item shortage report: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.message && result.message.result) {
+        return { data: result.message.result };
+      }
+      
+      return { data: [] };
+    } catch (error) {
+      console.error('Error fetching item shortage report:', error);
+      return { data: [] };
+    }
+  }
+
+  async getStockProjectedQtyReport(filters?: any): Promise<ERPNextResponse<any[]>> {
+    try {
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.stock_projected_qty.stock_projected_qty.execute`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          filters: filters || {}
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stock projected qty report: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.message && result.message.result) {
+        return { data: result.message.result };
+      }
+      
+      return { data: [] };
+    } catch (error) {
+      console.error('Error fetching stock projected qty report:', error);
+      return { data: [] };
     }
   }
 
@@ -199,6 +278,20 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to fetch stock entries: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createStockEntry(entryData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(entryData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create stock entry: ${response.statusText}`);
     }
 
     return response.json();
@@ -227,6 +320,22 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to update stock reconciliation: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async submitStockReconciliation(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation/${name}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        docstatus: 1
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to submit stock reconciliation: ${response.statusText}`);
     }
 
     return response.json();

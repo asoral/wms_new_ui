@@ -1,3 +1,4 @@
+
 import { ERPNextConfig } from './types';
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -114,6 +115,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockApi.getStockBalance(filters, company);
   }
 
+  getBinSummary(itemCode: string, warehouse?: string) {
+    return this.stockApi.getBinSummary(itemCode, warehouse);
+  }
+
   getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
     return this.stockApi.getCurrentStock(itemCode, warehouse, batch, serial);
   }
@@ -126,8 +131,20 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockApi.getStockAgingReport(filters);
   }
 
+  getItemShortageReport(filters?: any) {
+    return this.stockApi.getItemShortageReport(filters);
+  }
+
+  getStockProjectedQtyReport(filters?: any) {
+    return this.stockApi.getStockProjectedQtyReport(filters);
+  }
+
   getStockEntries(filters?: any, company?: string, limitPageLength?: number) {
     return this.stockApi.getStockEntries(filters, company, limitPageLength);
+  }
+
+  createStockEntry(entryData: any) {
+    return this.stockApi.createStockEntry(entryData);
   }
 
   createStockReconciliation(reconciliationData: any) {
@@ -136,6 +153,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   updateStockReconciliation(name: string, reconciliationData: any) {
     return this.stockApi.updateStockReconciliation(name, reconciliationData);
+  }
+
+  submitStockReconciliation(name: string) {
+    return this.stockApi.submitStockReconciliation(name);
   }
 
   // Warehouse API methods
@@ -156,6 +177,18 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.salesApi.getDeliveryNotes(filters, company, limitPageLength);
   }
 
+  createDeliveryNote(deliveryData: any) {
+    return this.salesApi.createDeliveryNote(deliveryData);
+  }
+
+  getPendingSalesOrders(company?: string) {
+    return this.salesApi.getPendingSalesOrders(company);
+  }
+
+  getDeliveryDrafts(company?: string) {
+    return this.salesApi.getDeliveryDrafts(company);
+  }
+
   // Purchase API methods
   getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
     return this.purchaseApi.getPurchaseOrders(filters, company, limitPageLength);
@@ -173,9 +206,29 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.purchaseApi.createPurchaseReceipt(receiptData);
   }
 
+  getPendingPurchaseOrders(company?: string) {
+    return this.purchaseApi.getPendingPurchaseOrders(company);
+  }
+
+  getReceiptDrafts(company?: string) {
+    return this.purchaseApi.getReceiptDrafts(company);
+  }
+
+  getQualityInspectionsPending(company?: string) {
+    return this.purchaseApi.getQualityInspectionsPending(company);
+  }
+
   // Material API methods
   getMaterialRequests(filters?: any, company?: string, limitPageLength?: number) {
     return this.materialApi.getMaterialRequests(filters, company, limitPageLength);
+  }
+
+  getMaterialRequest(mrNumber: string) {
+    return this.materialApi.getMaterialRequest(mrNumber);
+  }
+
+  createMaterialRequest(requestData: any) {
+    return this.materialApi.createMaterialRequest(requestData);
   }
 
   // Company API methods

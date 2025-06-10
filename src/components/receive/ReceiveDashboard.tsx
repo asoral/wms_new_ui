@@ -1,42 +1,23 @@
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
-import { Search, FileText, Package, CheckCircle, Clock, LucideIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Truck, Package, CheckCircle, FileText, Search } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
-import { useToast } from "@/hooks/use-toast";
-
-interface DashboardData {
-  pendingPOs: number;
-  receiptsThisWeek: number;
-  draftReceipts: number;
-  pendingQC: number;
-}
-
-interface Shortcut {
-  label: string;
-  icon: LucideIcon;
-  action: () => void;
-}
 
 interface ReceiveDashboardProps {
   onSelectPO: (poNumber: string) => void;
-  shortcuts: Shortcut[];
+  shortcuts: Array<{ label: string; icon: any; action: () => void }>;
 }
 
 const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
-  const [poNumber, setPONumber] = useState("");
-  const [data, setData] = useState<DashboardData>({
-    pendingPOs: 0,
-    receiptsThisWeek: 0,
-    draftReceipts: 0,
-    pendingQC: 0
-  });
+  const [poSearch, setPOSearch] = useState("");
+  const [pendingPOs, setPendingPOs] = useState<any[]>([]);
+  const [receiptDrafts, setReceiptDrafts] = useState<any[]>([]);
+  const [qcPending, setQCPending] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     loadDashboardData();
@@ -44,50 +25,33 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
 
   const loadDashboardData = async () => {
     try {
-      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
-          variant: "destructive"
-        });
-        return;
-      }
+      if (!erpnextAPI) return;
 
-      const defaultCompany = await getUserDefaultCompany();
+      const company = await getUserDefaultCompany();
 
-      // Fetch dashboard data from ERPNext
-      const [poResult, prResult] = await Promise.allSettled([
-        erpnextAPI.getPurchaseOrders([['status', '=', 'To Receive']], defaultCompany || undefined),
-        erpnextAPI.getPurchaseReceipts([['docstatus', '=', 0]], defaultCompany || undefined)
-      ]);
+      // Load pending purchase orders
+      const pendingResult = await erpnextAPI.getPendingPurchaseOrders(company || undefined);
+      setPendingPOs(pendingResult.data || []);
 
-      const pendingPOs = poResult.status === 'fulfilled' && poResult.value?.data ? poResult.value.data.length : 0;
-      const draftReceipts = prResult.status === 'fulfilled' && prResult.value?.data ? prResult.value.data.length : 0;
+      // Load draft receipts
+      const draftsResult = await erpnextAPI.getReceiptDrafts(company || undefined);
+      setReceiptDrafts(draftsResult.data || []);
 
-      setData({
-        pendingPOs,
-        receiptsThisWeek: 0, // Calculate this based on date filters
-        draftReceipts,
-        pendingQC: 0 // Calculate based on quality inspection status
-      });
+      // Load QC pending items
+      const qcResult = await erpnextAPI.getQualityInspectionsPending(company || undefined);
+      setQCPending(qcResult.data || []);
 
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data from ERPNext",
-        variant: "destructive"
-      });
     } finally {
       setLoading(false);
     }
   };
 
   const handlePOSearch = () => {
-    if (poNumber.trim()) {
-      onSelectPO(poNumber.trim());
+    if (poSearch.trim()) {
+      onSelectPO(poSearch.trim());
     }
   };
 
@@ -97,97 +61,96 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
     }
   };
 
-  const dashboardItems = [
-    {
-      title: "Pending POs (Today)",
-      value: data.pendingPOs,
-      icon: Clock,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
-      clickable: true
-    },
-    {
-      title: "Receipts This Week",
-      value: data.receiptsThisWeek,
-      icon: Package,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-      clickable: true
-    },
-    {
-      title: "Draft Receipts",
-      value: data.draftReceipts,
-      icon: FileText,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-      clickable: true
-    },
-    {
-      title: "Pending QC",
-      value: data.pendingQC,
-      icon: CheckCircle,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
-      clickable: true
-    }
-  ];
-
   return (
     <div className="space-y-6">
       {/* PO Search */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="w-5 h-5" />
-            <span>Select Purchase Order</span>
-          </CardTitle>
+          <CardTitle>Purchase Order Lookup</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex space-x-2">
-            <div className="flex-1">
-              <Label htmlFor="poNumber">Purchase Order Number</Label>
-              <Input
-                id="poNumber"
-                value={poNumber}
-                onChange={(e) => setPONumber(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter PO number..."
-              />
-            </div>
-            <div className="pt-6">
-              <Button onClick={handlePOSearch} disabled={!poNumber.trim()}>
-                <Search className="w-4 h-4 mr-2" />
-                Select PO
-              </Button>
-            </div>
+            <Input
+              placeholder="Enter PO Number (e.g., PUR-ORD-2024-00001)"
+              value={poSearch}
+              onChange={(e) => setPOSearch(e.target.value)}
+              onKeyPress={handleKeyPress}
+            />
+            <Button onClick={handlePOSearch} disabled={!poSearch.trim()}>
+              <Search className="w-4 h-4 mr-2" />
+              Search
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Dashboard Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {dashboardItems.map((item, index) => {
-          const Icon = item.icon;
-          return (
-            <Card 
-              key={index} 
-              className={`cursor-pointer hover:shadow-md transition-shadow ${item.bgColor}`}
-              onClick={() => item.clickable && console.log(`Clicked ${item.title}`)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{item.title}</p>
-                    <p className={`text-2xl font-bold ${item.color}`}>
-                      {loading ? "..." : item.value}
-                    </p>
-                  </div>
-                  <Icon className={`w-8 h-8 ${item.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Dashboard Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Pending POs */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => {}}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>Pending POs</span>
+              <Truck className="w-5 h-5 text-orange-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600 mb-2">
+              {loading ? '...' : pendingPOs.length}
+            </div>
+            <p className="text-sm text-gray-600">Orders awaiting receipt</p>
+            {pendingPOs.slice(0, 3).map((po, index) => (
+              <div key={index} className="mt-2 p-2 bg-orange-50 rounded text-xs">
+                <div className="font-medium">{po.name}</div>
+                <div className="text-gray-600">{po.supplier}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Draft Receipts */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => {}}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>Receipts</span>
+              <FileText className="w-5 h-5 text-blue-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600 mb-2">
+              {loading ? '...' : receiptDrafts.length}
+            </div>
+            <p className="text-sm text-gray-600">Draft receipts</p>
+            {receiptDrafts.slice(0, 3).map((receipt, index) => (
+              <div key={index} className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                <div className="font-medium">{receipt.name}</div>
+                <div className="text-gray-600">{receipt.supplier}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* QC Pending */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => {}}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>QC</span>
+              <CheckCircle className="w-5 h-5 text-green-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600 mb-2">
+              {loading ? '...' : qcPending.length}
+            </div>
+            <p className="text-sm text-gray-600">Quality checks pending</p>
+            {qcPending.slice(0, 3).map((qc, index) => (
+              <div key={index} className="mt-2 p-2 bg-green-50 rounded text-xs">
+                <div className="font-medium">{qc.name}</div>
+                <div className="text-gray-600">{qc.item_code}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Quick Actions */}
@@ -204,10 +167,10 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
                   key={index}
                   variant="outline"
                   onClick={shortcut.action}
-                  className="h-16 flex-col"
+                  className="h-16 flex flex-col items-center justify-center space-y-2"
                 >
-                  <Icon className="w-6 h-6 mb-2" />
-                  {shortcut.label}
+                  <Icon className="w-5 h-5" />
+                  <span className="text-sm">{shortcut.label}</span>
                 </Button>
               );
             })}

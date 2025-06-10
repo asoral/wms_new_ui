@@ -21,4 +21,30 @@ export class ERPNextMaterialAPI extends ERPNextBaseAPI {
 
     return response.json();
   }
+
+  async getMaterialRequest(mrNumber: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request/${mrNumber}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch material request: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createMaterialRequest(requestData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(requestData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create material request: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
