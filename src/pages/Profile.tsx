@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,8 +94,8 @@ const Profile = () => {
 
   const testConnectionAndLoadCompanies = async (url: string, key: string, secret: string) => {
     try {
-      const testAPI = new ERPNextAPI(url, key, secret);
-      const isConnected = await testAPI.testConnection();
+      const testAPI = new ERPNextAPI({ baseURL: url, apiKey: key, apiSecret: secret });
+      const isConnected = await testAPI.auth.testConnection();
       
       if (isConnected) {
         console.log('Connection successful, loading companies...');
@@ -110,11 +109,7 @@ const Profile = () => {
         setIsLoadingCompanies(false);
         
         // Configure the global API instance
-        configureERPNextAPI({
-          baseURL: url,
-          apiKey: key,
-          apiSecret: secret
-        });
+        const configuredAPI = await configureERPNextAPI(url, key, secret);
         
         return true;
       } else {
