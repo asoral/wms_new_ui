@@ -1,4 +1,3 @@
-
 import { ERPNextConfig } from './types';
 import { ERPNextAuthAPI } from './authApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -27,6 +26,7 @@ export class ERPNextAPI extends ERPNextBinAPI {
   public quality: ERPNextQualityAPI;
   public assets: ERPNextAssetsAPI;
   public support: ERPNextSupportAPI;
+  public bin: ERPNextBinAPI;
 
   constructor(config: ERPNextConfig) {
     super(config.baseURL, config.apiKey, config.apiSecret);
@@ -42,6 +42,7 @@ export class ERPNextAPI extends ERPNextBinAPI {
     this.quality = new ERPNextQualityAPI(config.baseURL, config.apiKey, config.apiSecret);
     this.assets = new ERPNextAssetsAPI(config.baseURL, config.apiKey, config.apiSecret);
     this.support = new ERPNextSupportAPI(config.baseURL, config.apiKey, config.apiSecret);
+    this.bin = new ERPNextBinAPI(config.baseURL, config.apiKey, config.apiSecret);
   }
 
   // Delegate methods to appropriate modules
