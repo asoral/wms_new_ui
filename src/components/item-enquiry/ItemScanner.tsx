@@ -1,13 +1,13 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Scan, Package, Wifi, WifiOff } from "lucide-react";
-import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
-import { offlineStorage } from '@/services/offlineStorage';
+import { Label } from "@/components/ui/label";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Package, Loader2, Check, ChevronsUpDown, Scan } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { offlineStorage } from "@/services/offlineStorage";
 import CameraScanner from './CameraScanner';
 
 export interface Item {
@@ -21,251 +21,261 @@ interface ItemScannerProps {
 }
 
 const ItemScanner = ({ onItemSelect }: ItemScannerProps) => {
-  const [searchQuery, setSearchQuery] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [open, setOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const [showScanner, setShowScanner] = useState(false);
 
+  // Cleanup when component unmounts
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      setOpen(false);
     };
   }, []);
 
-  useEffect(() => {
-    fetchItems("", true);
+  // Debounced search function
+  const searchItems = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    return (searchValue: string, isNewSearch: boolean = false) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        fetchItems(searchValue, isNewSearch);
+      }, 300);
+    };
   }, []);
 
+  // Load initial items and cached items
   useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
+    loadInitialItems();
+  }, []);
 
-    searchTimeoutRef.current = setTimeout(() => {
-      fetchItems(searchQuery, true);
-    }, 300);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
+  const loadInitialItems = async () => {
+    try {
+      // First try to load from cache
+      const cached = await offlineStorage.getCachedData('items_page_1');
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        setItems(cached);
+        return;
       }
-    };
-  }, [searchQuery]);
+
+      // If no cache, fetch from API
+      await fetchItems("", true);
+    } catch (error) {
+      console.error('Failed to load initial items:', error);
+    }
+  };
+
+  const loadCachedItems = async () => {
+    try {
+      const cached = await offlineStorage.getCachedData('items_page_1');
+      if (cached && Array.isArray(cached)) {
+        setItems(cached);
+      }
+    } catch (error) {
+      console.error('Failed to load cached items:', error);
+    }
+  };
 
   // Fetch items with search and pagination
   const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
     setIsLoadingItems(true);
+    
     try {
-      console.log('Fetching items, search:', search, 'isNewSearch:', isNewSearch);
+      const erpnextAPI = await createERPNextAPI();
       
-      // Try to get cached items first if offline
-      if (!isOnline) {
-        const cachedItems = await offlineStorage.getCachedData('items_list');
-        if (cachedItems) {
-          let filteredItems = cachedItems;
-          if (search.trim()) {
-            filteredItems = cachedItems.filter((item: Item) => 
-              item.item_code.toLowerCase().includes(search.toLowerCase()) ||
-              item.item_name.toLowerCase().includes(search.toLowerCase())
-            );
-          }
-          setItems(filteredItems.slice(0, 20));
-          setHasMore(filteredItems.length > 20);
-          return;
-        }
+      if (!erpnextAPI) {
+        console.error('ERPNext API not configured');
+        // Try to load from cache if API is not available
+        await loadCachedItems();
+        return;
       }
 
-      const erpnextAPI = await createERPNextAPI();
-      if (erpnextAPI) {
-        const defaultCompany = await getUserDefaultCompany();
-        const pageToFetch = isNewSearch ? 1 : currentPage;
+      const defaultCompany = await getUserDefaultCompany();
+      const pageToFetch = isNewSearch ? 1 : currentPage;
+      const limit = 20;
+      
+      let result;
+      if (search.trim()) {
+        console.log('Searching items with term:', search);
+        // Use search method for better performance
+        result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
+      } else {
+        console.log('Fetching paginated items, page:', pageToFetch);
+        // Use paginated method for initial load
+        result = await erpnextAPI.getItemsPaginated(undefined, ['item_code', 'item_name', 'stock_uom'], defaultCompany || undefined, limit, pageToFetch);
+      }
+      
+      console.log('API result:', result);
+      
+      if (result.data) {
+        const itemData = result.data;
         
-        let result;
-        if (search.trim()) {
-          console.log('Searching items with term:', search);
-          // Use the fixed searchItems method
-          result = await erpnextAPI.searchItems(search, defaultCompany || undefined, 20);
+        if (isNewSearch) {
+          setItems(itemData);
+          setCurrentPage(1);
+          
+          // Cache the results
+          const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
+          await offlineStorage.cacheData(cacheKey, itemData, 300000); // 5 minutes
         } else {
-          console.log('Fetching paginated items, page:', pageToFetch);
-          // Use the fixed getItemsPaginated method
-          result = await erpnextAPI.getItemsPaginated(
-            [['disabled', '=', '0']],
-            ['item_code', 'item_name', 'stock_uom'],
-            defaultCompany || undefined,
-            20,
-            pageToFetch
-          );
+          setItems(prev => [...prev, ...itemData]);
         }
         
-        console.log('API result:', result);
+        // Check if there are more items
+        setHasMore(itemData.length === limit);
         
-        if (result.data) {
-          if (isNewSearch) {
-            setItems(result.data);
-            setCurrentPage(1);
-            
-            if (!search.trim()) {
-              await offlineStorage.cacheData('items_list', result.data, 3600000);
-            }
-          } else {
-            setItems(prev => [...prev, ...result.data]);
-          }
-          
-          setHasMore(result.data.length === 20);
-          
-          if (!isNewSearch) {
-            setCurrentPage(prev => prev + 1);
-          }
+        if (!isNewSearch) {
+          setCurrentPage(prev => prev + 1);
+        }
+      } else {
+        if (isNewSearch) {
+          setItems([]);
         }
       }
     } catch (error) {
       console.error('Failed to fetch items:', error);
       
+      // Try to load from cache on error
       try {
-        const cachedItems = await offlineStorage.getCachedData('items_list');
-        if (cachedItems) {
-          let filteredItems = cachedItems;
-          if (search.trim()) {
-            filteredItems = cachedItems.filter((item: Item) => 
-              item.item_code.toLowerCase().includes(search.toLowerCase()) ||
-              item.item_name.toLowerCase().includes(search.toLowerCase())
-            );
-          }
-          setItems(filteredItems.slice(0, 20));
-          setHasMore(filteredItems.length > 20);
+        const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
+        const cached = await offlineStorage.getCachedData(cacheKey);
+        if (cached && Array.isArray(cached)) {
+          setItems(cached);
         }
       } catch (cacheError) {
-        console.error('Cache access failed:', cacheError);
+        console.error('Failed to load cached items:', cacheError);
       }
     } finally {
       setIsLoadingItems(false);
     }
   };
 
+  // Handle search term changes
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      searchItems(searchTerm, true);
+    } else {
+      loadInitialItems();
+    }
+  }, [searchTerm, searchItems]);
+
+  const handleItemSelect = (item: Item) => {
+    setSelectedItem(item);
+    setOpen(false);
+    onItemSelect(item.item_code);
+  };
+
   const handleBarcodeScanned = (barcode: string) => {
-    setSearchQuery(barcode);
+    setSearchTerm(barcode);
     setShowScanner(false);
     onItemSelect(barcode);
   };
 
-  const loadMore = () => {
-    if (!isLoadingItems && hasMore) {
-      fetchItems(searchQuery, false);
+  const loadMoreItems = () => {
+    if (hasMore && !isLoadingItems) {
+      fetchItems(searchTerm, false);
     }
   };
 
   return (
     <div className="space-y-4">
-      {/* Search Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Package className="w-5 h-5" />
-              <span>Select Item</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {isOnline ? (
-                <Wifi className="w-4 h-4 text-green-500" />
-              ) : (
-                <WifiOff className="w-4 h-4 text-red-500" />
-              )}
-              <Badge variant={isOnline ? "default" : "destructive"}>
-                {isOnline ? "Online" : "Offline"}
-              </Badge>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex space-x-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search by item code or name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => setShowScanner(true)}
-              className="flex items-center space-x-2"
-            >
-              <Scan className="w-4 h-4" />
-              <span>Scan</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Items List */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-64">
-            {isLoadingItems && items.length === 0 ? (
-              <div className="flex items-center justify-center p-8">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-sm text-gray-500 mt-2">Loading items...</p>
-                </div>
-              </div>
-            ) : items.length === 0 ? (
-              <div className="text-center p-8">
-                <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">No items found</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {items.map((item, index) => (
-                  <div
-                    key={`${item.item_code}-${index}`}
-                    onClick={() => onItemSelect(item.item_code)}
-                    className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.item_code}</p>
-                        <p className="text-gray-600 text-xs mt-1">{item.item_name}</p>
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {item.stock_uom}
-                      </Badge>
+      <div>
+        <Label htmlFor="item-search">Item Code / Name</Label>
+        <div className="flex space-x-2 mt-1">
+          <div className="flex-1 min-w-0">
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={open}
+                  className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
+                  disabled={isLoadingItems}
+                >
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="truncate">
+                      {selectedItem 
+                        ? selectedItem.item_code
+                        : "Search item by code or name..."
+                      }
                     </div>
+                    {selectedItem && (
+                      <div className="text-sm text-muted-foreground truncate">
+                        {selectedItem.item_name}
+                      </div>
+                    )}
                   </div>
-                ))}
-                
-                {hasMore && (
-                  <div className="text-center pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={loadMore}
-                      disabled={isLoadingItems}
-                      className="w-full"
-                    >
-                      {isLoadingItems ? "Loading..." : "Load More"}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </ScrollArea>
-        </CardContent>
-      </Card>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search items..." 
+                    value={searchTerm}
+                    onValueChange={setSearchTerm}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {isLoadingItems ? "Loading items..." : "No items found."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {items.map((item) => (
+                        <CommandItem
+                          key={item.item_code}
+                          value={`${item.item_code} ${item.item_name}`}
+                          onSelect={() => handleItemSelect(item)}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{item.item_name || item.item_code}</div>
+                              <div className="text-sm text-muted-foreground truncate">{item.item_code}</div>
+                              <span className="text-xs px-1 py-0.5 bg-gray-100 text-gray-600 rounded mt-1 inline-block">
+                                {item.stock_uom || 'Nos'}
+                              </span>
+                            </div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                      {hasMore && (
+                        <CommandItem onSelect={loadMoreItems}>
+                          <div className="flex items-center justify-center w-full py-2">
+                            {isLoadingItems ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Load more items...</span>
+                            )}
+                          </div>
+                        </CommandItem>
+                      )}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowScanner(true)}
+            className="flex items-center space-x-2"
+          >
+            <Scan className="w-4 h-4" />
+            <span>Scan</span>
+          </Button>
+        </div>
+      </div>
 
       {/* Camera Scanner Modal */}
       {showScanner && (

@@ -288,7 +288,7 @@ const ItemEnquiry = () => {
             {stockData && !isLoading && (
               <>
                 <StockSummary data={stockData} />
-                <WarehouseStockTable data={stockData.warehouseStock} />
+                <WarehouseStockTable warehouseStock={stockData.warehouseStock} />
               </>
             )}
 
