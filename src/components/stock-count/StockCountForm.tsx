@@ -70,7 +70,17 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       }
 
       console.log('Fetching current qty for:', { itemCode, warehouse, batch, serial });
-      const qty = await erpnextAPI.getCurrentStock(itemCode, warehouse, batch, serial);
+      const response = await erpnextAPI.getCurrentStock(itemCode, warehouse, batch, serial);
+      
+      // Extract quantity from the response data
+      let qty = 0;
+      if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
+        // Sum up all quantities from bins
+        qty = response.data.reduce((total: number, bin: any) => {
+          return total + (parseFloat(bin.actual_qty) || 0);
+        }, 0);
+      }
+      
       setCurrentQty(qty);
       console.log('Current quantity fetched:', qty);
     } catch (error) {
