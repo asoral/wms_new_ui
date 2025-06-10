@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package, TrendingUp, DollarSign, Calendar, Loader2 } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { toast } from "sonner";
-import SearchCard from "@/components/shared/SearchCard";
+import ItemSelector from "@/components/item-enquiry/ItemSelector";
 import { Item } from "@/services/erp/erpnext/types";
 
 export interface ItemData {
@@ -46,55 +46,9 @@ export interface StockInfo {
 
 const ItemEnquiry = () => {
   const [selectedItem, setSelectedItem] = useState<ItemData | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
   const [isLoadingStock, setIsLoadingStock] = useState(false);
-  const [searchResults, setSearchResults] = useState<ItemData[]>([]);
 
-  const handleSearch = async (query: string) => {
-    setIsSearching(true);
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        toast.error('ERPNext API not configured');
-        return;
-      }
-
-      console.log('Searching for items:', query);
-      const response = await erpnextAPI.searchItems(query);
-      
-      if (response.data && response.data.length > 0) {
-        // Convert Item[] to ItemData[] by mapping the type differences
-        const convertedResults: ItemData[] = response.data.map((item: Item) => ({
-          item_code: item.item_code,
-          item_name: item.item_name,
-          stock_uom: item.stock_uom,
-          has_batch_no: Boolean(item.has_batch_no),
-          has_serial_no: Boolean(item.has_serial_no),
-        }));
-        
-        setSearchResults(convertedResults);
-        // Auto-select first result if exact match
-        const exactMatch = convertedResults.find(item => 
-          item.item_code.toLowerCase() === query.toLowerCase()
-        );
-        if (exactMatch) {
-          handleItemSelect(exactMatch);
-        }
-      } else {
-        setSearchResults([]);
-        toast.info('No items found matching your search');
-      }
-    } catch (error) {
-      console.error('Error searching items:', error);
-      toast.error('Failed to search items');
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleItemSelect = async (item: ItemData) => {
-    setSelectedItem(item);
+  const handleItemSelect = async (itemCode: string) => {
     setIsLoadingStock(true);
     
     try {
@@ -104,13 +58,13 @@ const ItemEnquiry = () => {
         return;
       }
 
-      console.log('Fetching stock balance for:', item.item_code);
+      console.log('Fetching stock balance for:', itemCode);
       
       // Get detailed item info
-      const itemDetails = await erpnextAPI.getItemDetails(item.item_code);
+      const itemDetails = await erpnextAPI.getItemDetails(itemCode);
       
       // Get stock balance
-      const stockResponse = await erpnextAPI.getStockBalance({ item_code: item.item_code });
+      const stockResponse = await erpnextAPI.getStockBalance({ item_code: itemCode });
       
       let totalStockValue = 0;
       let totalQty = 0;
@@ -129,8 +83,9 @@ const ItemEnquiry = () => {
       }
 
       const enrichedItem: ItemData = {
-        ...item,
-        ...(itemDetails.data || {}),
+        item_code: itemCode,
+        item_name: itemDetails.data?.item_name || itemCode,
+        stock_uom: itemDetails.data?.stock_uom || 'Nos',
         has_batch_no: Boolean(itemDetails.data?.has_batch_no),
         has_serial_no: Boolean(itemDetails.data?.has_serial_no),
         total_stock_value: totalStockValue,
@@ -159,39 +114,17 @@ const ItemEnquiry = () => {
         </div>
 
         <div className="space-y-6">
-          <SearchCard
-            title="Search Items"
-            placeholder="Enter item code, name, or scan barcode"
-            onSearch={handleSearch}
-            isLoading={isSearching}
-            icon={<Package className="w-5 h-5" />}
-          />
-
-          {/* Search Results */}
-          {searchResults.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Search Results</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {searchResults.map((item, index) => (
-                    <div
-                      key={index}
-                      className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer flex justify-between items-center"
-                      onClick={() => handleItemSelect(item)}
-                    >
-                      <div>
-                        <p className="font-medium">{item.item_code}</p>
-                        <p className="text-sm text-gray-600">{item.item_name}</p>
-                      </div>
-                      <Badge variant="outline">{item.stock_uom || 'Nos'}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Search Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ItemSelector
+                onItemSelected={handleItemSelect}
+                isLoading={isLoadingStock}
+              />
+            </CardContent>
+          </Card>
 
           {/* Selected Item Details */}
           {selectedItem && (
