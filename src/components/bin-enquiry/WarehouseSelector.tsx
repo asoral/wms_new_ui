@@ -80,8 +80,8 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      // Build search filters - start with basic filter for enabled warehouses
-      let filters = [['disabled', '=', 0]];
+      // Build search filters using correct Frappe format
+      let filters = [['disabled', '=', '0']];
       
       if (search.trim()) {
         filters.push(['warehouse_name', 'like', `%${search}%`]);

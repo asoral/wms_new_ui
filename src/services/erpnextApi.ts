@@ -1,4 +1,3 @@
-
 import { getAccessToken } from './authService';
 import { offlineStorage } from './offlineStorage';
 
@@ -243,6 +242,30 @@ class ERPNextAPI {
     };
   }
 
+  // Helper method to convert filter objects to Frappe format
+  private convertToFrappeFilters(filters: any): string[][] {
+    if (!filters) return [];
+    
+    if (Array.isArray(filters)) {
+      // Already in correct format
+      return filters;
+    }
+    
+    // Convert object format to Frappe array format
+    const frappeFilters: string[][] = [];
+    Object.entries(filters).forEach(([field, value]) => {
+      if (Array.isArray(value) && value.length === 2) {
+        // Handle operator format like ['<', 10]
+        frappeFilters.push([field, value[0], value[1].toString()]);
+      } else {
+        // Simple equality filter
+        frappeFilters.push([field, '=', value?.toString() || '']);
+      }
+    });
+    
+    return frappeFilters;
+  }
+
   private formatRelativeTime(dateString: string): string {
     const date = new Date(dateString);
     const now = new Date();
@@ -320,8 +343,8 @@ class ERPNextAPI {
       const [itemsResponse, warehousesResponse, ordersResponse, stockBalanceResponse] = await Promise.all([
         this.getItems(undefined, undefined, company),
         this.getWarehouses(undefined, company),
-        this.getSalesOrders({ status: 'Draft' }, company),
-        this.getStockBalance({ actual_qty: ['<', 10] }, company)
+        this.getSalesOrders([['status', '=', 'Draft']], company),
+        this.getStockBalance([['actual_qty', '<', '10']], company)
       ]);
 
       // Calculate total stock value using stock ledger entries
@@ -361,15 +384,13 @@ class ERPNextAPI {
       const today = new Date();
       const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
       
-      const dateFilter = {
-        creation: ['>', sevenDaysAgo.toISOString().split('T')[0]]
-      };
+      const dateFilter = [['creation', '>', sevenDaysAgo.toISOString().split('T')[0]]];
 
       const [receipts, deliveries, stockEntries, materialRequests] = await Promise.all([
-        this.getPurchaseReceipts({ ...dateFilter, limit: 5 }, company),
-        this.getDeliveryNotes({ ...dateFilter, limit: 5 }, company),
-        this.getStockEntries({ ...dateFilter, limit: 5 }, company),
-        this.getMaterialRequests({ ...dateFilter, limit: 5 }, company)
+        this.getPurchaseReceipts([...dateFilter, ['limit', '=', '5']], company),
+        this.getDeliveryNotes([...dateFilter, ['limit', '=', '5']], company),
+        this.getStockEntries([...dateFilter, ['limit', '=', '5']], company),
+        this.getMaterialRequests([...dateFilter, ['limit', '=', '5']], company)
       ]);
 
       const activities: RecentActivity[] = [];
@@ -505,11 +526,14 @@ class ERPNextAPI {
   // Fixed Stock Ledger Entry method
   async getStockLedgerEntries(filters?: any, company?: string): Promise<ERPNextResponse<any[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('filters', JSON.stringify({ ...filters, company }));
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?${params}`, {
@@ -557,20 +581,21 @@ class ERPNextAPI {
   async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
     
-    const stockItemFilters = {
-      is_stock_item: 1
-    };
-    
-    params.append('filters', JSON.stringify(stockItemFilters));
-    params.append('or_filters', JSON.stringify([
-      { item_code: ['like', `%${searchTerm}%`] },
-      { item_name: ['like', `%${searchTerm}%`] }
-    ]));
-    params.append('limit', limit.toString());
+    let filters = [['is_stock_item', '=', '1']];
     
     if (company) {
-      params.append('company', company);
+      filters.push(['company', '=', company]);
     }
+    
+    params.append('filters', JSON.stringify(filters));
+    
+    // Use or_filters for search terms
+    const orFilters = [
+      ['item_code', 'like', `%${searchTerm}%`],
+      ['item_name', 'like', `%${searchTerm}%`]
+    ];
+    params.append('or_filters', JSON.stringify(orFilters));
+    params.append('limit', limit.toString());
 
     const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
       headers: this.getHeaders(),
@@ -586,21 +611,20 @@ class ERPNextAPI {
   async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit: number = 20, page: number = 1): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
     
-    const stockItemFilters = {
-      is_stock_item: 1,
-      ...filters
-    };
+    let finalFilters = [['is_stock_item', '=', '1']];
+    if (filters) {
+      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
+    }
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
     
-    params.append('filters', JSON.stringify(stockItemFilters));
+    params.append('filters', JSON.stringify(finalFilters));
     params.append('limit', limit.toString());
     params.append('start', ((page - 1) * limit).toString());
     
     if (fields) {
       params.append('fields', JSON.stringify(fields));
-    }
-    
-    if (company) {
-      params.append('company', company);
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
@@ -616,7 +640,8 @@ class ERPNextAPI {
 
   async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
-    params.append('filters', JSON.stringify({ barcode: barcode }));
+    const filters = [['barcode', '=', barcode]];
+    params.append('filters', JSON.stringify(filters));
 
     const response = await fetch(`${this.baseURL}/api/resource/Item Barcode?${params}`, {
       headers: this.getHeaders(),
@@ -630,7 +655,7 @@ class ERPNextAPI {
     
     if (barcodeResult.data && barcodeResult.data.length > 0) {
       const itemCode = barcodeResult.data[0].parent;
-      return this.getItems({ item_code: itemCode });
+      return this.getItems([['item_code', '=', itemCode]]);
     }
 
     return { data: [] };
@@ -652,7 +677,8 @@ class ERPNextAPI {
     try {
       // Check if batch exists
       const params = new URLSearchParams();
-      params.append('filters', JSON.stringify({ name: batchNo, item: itemCode }));
+      const filters = [['name', '=', batchNo], ['item', '=', itemCode]];
+      params.append('filters', JSON.stringify(filters));
 
       const response = await fetch(`${this.baseURL}/api/resource/Batch?${params}`, {
         headers: this.getHeaders(),
@@ -686,7 +712,8 @@ class ERPNextAPI {
     try {
       // Check if serial exists
       const params = new URLSearchParams();
-      params.append('filters', JSON.stringify({ name: serialNo, item_code: itemCode }));
+      const filters = [['name', '=', serialNo], ['item_code', '=', itemCode]];
+      params.append('filters', JSON.stringify(filters));
 
       const response = await fetch(`${this.baseURL}/api/resource/Serial No?${params}`, {
         headers: this.getHeaders(),
@@ -786,22 +813,22 @@ class ERPNextAPI {
   async getItems(filters?: any, searchTerm?: string, company?: string): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
     
-    const stockItemFilters = {
-      is_stock_item: 1,
-      ...filters
-    };
-    
-    if (stockItemFilters) {
-      params.append('filters', JSON.stringify(stockItemFilters));
-    }
-    if (searchTerm) {
-      params.append('or_filters', JSON.stringify([
-        { item_code: ['like', `%${searchTerm}%`] },
-        { item_name: ['like', `%${searchTerm}%`] }
-      ]));
+    let finalFilters = [['is_stock_item', '=', '1']];
+    if (filters) {
+      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
     }
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    params.append('filters', JSON.stringify(finalFilters));
+    
+    if (searchTerm) {
+      const orFilters = [
+        ['item_code', 'like', `%${searchTerm}%`],
+        ['item_name', 'like', `%${searchTerm}%`]
+      ];
+      params.append('or_filters', JSON.stringify(orFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
@@ -818,17 +845,15 @@ class ERPNextAPI {
   async getWarehouses(filters?: any, company?: string): Promise<ERPNextResponse<Warehouse[]>> {
     const params = new URLSearchParams();
     
-    const warehouseFilters = {
-      is_group: 0,
-      ...filters
-    };
-    
-    if (warehouseFilters) {
-      params.append('filters', JSON.stringify(warehouseFilters));
+    let finalFilters = [['is_group', '=', '0']];
+    if (filters) {
+      finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
     }
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
     }
+    
+    params.append('filters', JSON.stringify(finalFilters));
 
     const response = await fetch(`${this.baseURL}/api/resource/Warehouse?${params}`, {
       headers: this.getHeaders(),
@@ -842,17 +867,17 @@ class ERPNextAPI {
   }
 
   async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<number> {
-    let filters: any = {
-      item_code: itemCode,
-      warehouse: warehouse
-    };
+    let filters = [
+      ['item_code', '=', itemCode],
+      ['warehouse', '=', warehouse]
+    ];
 
     if (batch) {
-      filters.batch_no = batch;
+      filters.push(['batch_no', '=', batch]);
     }
 
     if (serial) {
-      filters.serial_no = serial;
+      filters.push(['serial_no', '=', serial]);
     }
 
     const params = new URLSearchParams({
@@ -879,11 +904,14 @@ class ERPNextAPI {
 
   async getStockBalance(filters?: any, company?: string): Promise<ERPNextResponse<StockBalance[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?${params}`, {
@@ -899,11 +927,14 @@ class ERPNextAPI {
 
   async getSalesOrders(filters?: any, company?: string): Promise<ERPNextResponse<SalesOrder[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Sales Order?${params}`, {
@@ -919,11 +950,14 @@ class ERPNextAPI {
 
   async getDeliveryNotes(filters?: any, company?: string): Promise<ERPNextResponse<DeliveryNote[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Delivery Note?${params}`, {
@@ -939,11 +973,14 @@ class ERPNextAPI {
 
   async getPurchaseOrders(filters?: any, company?: string): Promise<ERPNextResponse<PurchaseOrder[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Purchase Order?${params}`, {
@@ -959,11 +996,14 @@ class ERPNextAPI {
 
   async getPurchaseReceipts(filters?: any, company?: string): Promise<ERPNextResponse<PurchaseReceipt[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt?${params}`, {
@@ -979,11 +1019,14 @@ class ERPNextAPI {
 
   async getMaterialRequests(filters?: any, company?: string): Promise<ERPNextResponse<MaterialRequest[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Material Request?${params}`, {
@@ -999,11 +1042,14 @@ class ERPNextAPI {
 
   async getStockEntries(filters?: any, company?: string): Promise<ERPNextResponse<StockEntry[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Stock Entry?${params}`, {
@@ -1019,11 +1065,14 @@ class ERPNextAPI {
 
   async getPickLists(filters?: any, company?: string): Promise<ERPNextResponse<PickList[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Pick List?${params}`, {
@@ -1039,11 +1088,14 @@ class ERPNextAPI {
 
   async getPackingSlips(filters?: any, company?: string): Promise<ERPNextResponse<PackingSlip[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Packing Slip?${params}`, {
@@ -1059,11 +1111,14 @@ class ERPNextAPI {
 
   async getQualityInspections(filters?: any, company?: string): Promise<ERPNextResponse<QualityInspection[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Quality Inspection?${params}`, {
@@ -1079,11 +1134,14 @@ class ERPNextAPI {
 
   async getProductBundles(filters?: any, company?: string): Promise<ERPNextResponse<ProductBundle[]>> {
     const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
+    
+    let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
-      params.append('company', company);
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    if (finalFilters.length > 0) {
+      params.append('filters', JSON.stringify(finalFilters));
     }
 
     const response = await fetch(`${this.baseURL}/api/resource/Product Bundle?${params}`, {
