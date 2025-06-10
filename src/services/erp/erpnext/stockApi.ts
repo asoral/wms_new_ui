@@ -100,20 +100,10 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
   }
 
   async getStockAgingReport(filters?: any): Promise<ERPNextResponse<any[]>> {
-    const params = new URLSearchParams({
-      cmd: 'erpnext.stock.report.stock_ageing.stock_ageing.execute',
-      filters: JSON.stringify(filters || {})
-    });
-
-    const response = await fetch(`${this.baseURL}/api/method/frappe.desk.query_report.run?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch stock aging report: ${response.statusText}`);
-    }
-
-    return response.json();
+    // This method is not accessible due to permission restrictions
+    // Return empty data with a warning
+    console.warn('Stock aging report is not accessible due to ERPNext permissions');
+    return { data: [] };
   }
 
   async getStockEntries(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<StockEntry[]>> {
