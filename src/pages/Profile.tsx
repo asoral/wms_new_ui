@@ -12,6 +12,7 @@ import { Loader2, CheckCircle, XCircle, Settings, User, Building2, CreditCard, M
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthContext";
 import { ERPNextAPI, configureERPNextAPI, createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
+import { getERPNextConfig, saveERPNextConfig } from '@/services/authService';
 import SubscriptionStatus from '@/components/subscription/SubscriptionStatus';
 
 const Profile = () => {
@@ -23,32 +24,74 @@ const Profile = () => {
   const [companies, setCompanies] = useState<Array<{ name: string; company_name: string }>>([]);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "error">("idle");
   const { toast } = useToast();
 
   useEffect(() => {
     const loadConfiguration = async () => {
-      // Load from localStorage
-      const storedBaseURL = localStorage.getItem('erpnextBaseURL') || '';
-      const storedApiKey = localStorage.getItem('erpnextApiKey') || '';
-      const storedApiSecret = localStorage.getItem('erpnextApiSecret') || '';
-      const storedCompany = localStorage.getItem('erpnextDefaultCompany') || '';
+      if (!user) return;
       
-      setBaseURL(storedBaseURL);
-      setApiKey(storedApiKey);
-      setApiSecret(storedApiSecret);
-      setSelectedCompany(storedCompany);
+      setIsLoadingConfig(true);
+      try {
+        console.log('Loading ERPNext configuration from database...');
+        const config = await getERPNextConfig();
+        
+        if (config) {
+          console.log('Found ERPNext config in database:', config);
+          setBaseURL(config.erpnext_url || '');
+          setApiKey(config.erpnext_api_key || '');
+          setApiSecret(config.erpnext_api_secret || '');
+          setSelectedCompany(config.erpnext_default_company || '');
 
-      // Auto-test connection and load companies if all credentials exist
-      if (storedBaseURL && storedApiKey && storedApiSecret) {
-        console.log('Found existing credentials, testing connection...');
-        await testConnectionAndLoadCompanies(storedBaseURL, storedApiKey, storedApiSecret);
+          // Auto-test connection and load companies if all credentials exist
+          if (config.erpnext_url && config.erpnext_api_key && config.erpnext_api_secret) {
+            console.log('Found existing credentials, testing connection...');
+            await testConnectionAndLoadCompanies(config.erpnext_url, config.erpnext_api_key, config.erpnext_api_secret);
+          }
+        } else {
+          console.log('No ERPNext config found in database, checking localStorage...');
+          // Fallback to localStorage for migration
+          const storedBaseURL = localStorage.getItem('erpnextBaseURL') || '';
+          const storedApiKey = localStorage.getItem('erpnextApiKey') || '';
+          const storedApiSecret = localStorage.getItem('erpnextApiSecret') || '';
+          const storedCompany = localStorage.getItem('erpnextDefaultCompany') || '';
+          
+          if (storedBaseURL || storedApiKey || storedApiSecret) {
+            console.log('Found credentials in localStorage, migrating to database...');
+            setBaseURL(storedBaseURL);
+            setApiKey(storedApiKey);
+            setApiSecret(storedApiSecret);
+            setSelectedCompany(storedCompany);
+            
+            // Save to database
+            if (storedBaseURL && storedApiKey && storedApiSecret) {
+              await saveERPNextConfig({
+                erpnext_url: storedBaseURL,
+                erpnext_api_key: storedApiKey,
+                erpnext_api_secret: storedApiSecret,
+                erpnext_default_company: storedCompany
+              });
+              
+              await testConnectionAndLoadCompanies(storedBaseURL, storedApiKey, storedApiSecret);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading configuration:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load ERPNext configuration",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingConfig(false);
       }
     };
 
     loadConfiguration();
-  }, []);
+  }, [user]);
 
   const testConnectionAndLoadCompanies = async (url: string, key: string, secret: string) => {
     try {
@@ -150,18 +193,22 @@ const Profile = () => {
       const success = await testConnectionAndLoadCompanies(cleanBaseURL, apiKey, apiSecret);
       
       if (success) {
-        // Save to localStorage
-        localStorage.setItem('erpnextBaseURL', cleanBaseURL);
-        localStorage.setItem('erpnextApiKey', apiKey);
-        localStorage.setItem('erpnextApiSecret', apiSecret);
-        if (selectedCompany) {
-          localStorage.setItem('erpnextDefaultCompany', selectedCompany);
-        }
-
-        toast({
-          title: "Success",
-          description: "ERPNext configuration saved successfully!",
+        // Save to database
+        const result = await saveERPNextConfig({
+          erpnext_url: cleanBaseURL,
+          erpnext_api_key: apiKey,
+          erpnext_api_secret: apiSecret,
+          erpnext_default_company: selectedCompany
         });
+
+        if (result.success) {
+          toast({
+            title: "Success",
+            description: "ERPNext configuration saved successfully!",
+          });
+        } else {
+          throw new Error('Failed to save to database');
+        }
       } else {
         toast({
           title: "Error",
@@ -181,13 +228,32 @@ const Profile = () => {
     }
   };
 
-  const handleCompanyChange = (company: string) => {
+  const handleCompanyChange = async (company: string) => {
     setSelectedCompany(company);
-    localStorage.setItem('erpnextDefaultCompany', company);
-    toast({
-      title: "Company Updated",
-      description: `Default company set to ${company}`,
-    });
+    
+    // Save the updated company to database
+    if (baseURL && apiKey && apiSecret) {
+      try {
+        await saveERPNextConfig({
+          erpnext_url: baseURL,
+          erpnext_api_key: apiKey,
+          erpnext_api_secret: apiSecret,
+          erpnext_default_company: company
+        });
+        
+        toast({
+          title: "Company Updated",
+          description: `Default company set to ${company}`,
+        });
+      } catch (error) {
+        console.error('Failed to save company selection:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save company selection",
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   return (
@@ -237,103 +303,115 @@ const Profile = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="base-url">Base URL</Label>
-              <Input
-                id="base-url"
-                value={baseURL}
-                onChange={(e) => setBaseURL(e.target.value)}
-                placeholder="https://your-erpnext-site.com"
-              />
+          {isLoadingConfig ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              <span className="text-muted-foreground">Loading configuration...</span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="api-key">API Key</Label>
-              <Input
-                id="api-key"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="api-secret">API Secret</Label>
-            <Input
-              id="api-secret"
-              type="password"
-              value={apiSecret}
-              onChange={(e) => setApiSecret(e.target.value)}
-              placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-            />
-          </div>
-
-          {/* Company Selector */}
-          {connectionStatus === 'connected' && companies.length > 0 && (
+          ) : (
             <>
-              <Separator />
-              <div className="space-y-2">
-                <Label htmlFor="default-company">Default Company</Label>
-                <Select value={selectedCompany} onValueChange={handleCompanyChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a company" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map((company) => (
-                      <SelectItem key={company.name} value={company.name}>
-                        {company.company_name || company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedCompany && (
-                  <p className="text-sm text-muted-foreground">
-                    Selected: {companies.find(c => c.name === selectedCompany)?.company_name || selectedCompany}
-                  </p>
-                )}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="base-url">Base URL</Label>
+                  <Input
+                    id="base-url"
+                    value={baseURL}
+                    onChange={(e) => setBaseURL(e.target.value)}
+                    placeholder="https://your-erpnext-site.com"
+                    disabled={isSaving || isTestingConnection}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="api-key">API Key</Label>
+                  <Input
+                    id="api-key"
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    disabled={isSaving || isTestingConnection}
+                  />
+                </div>
               </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="api-secret">API Secret</Label>
+                <Input
+                  id="api-secret"
+                  type="password"
+                  value={apiSecret}
+                  onChange={(e) => setApiSecret(e.target.value)}
+                  placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  disabled={isSaving || isTestingConnection}
+                />
+              </div>
+
+              {/* Company Selector */}
+              {connectionStatus === 'connected' && companies.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label htmlFor="default-company">Default Company</Label>
+                    <Select value={selectedCompany} onValueChange={handleCompanyChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.name} value={company.name}>
+                            {company.company_name || company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedCompany && (
+                      <p className="text-sm text-muted-foreground">
+                        Selected: {companies.find(c => c.name === selectedCompany)?.company_name || selectedCompany}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={handleTestConnection} 
+                  disabled={isTestingConnection || isSaving || isLoadingCompanies}
+                  className="flex-1"
+                >
+                  {isTestingConnection ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Connection...
+                    </>
+                  ) : (
+                    "Test Connection"
+                  )}
+                </Button>
+                <Button 
+                  onClick={handleSaveConfiguration} 
+                  disabled={isTestingConnection || isSaving || isLoadingCompanies}
+                  className="flex-1"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Configuration"
+                  )}
+                </Button>
+              </div>
+
+              {isLoadingCompanies && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <span className="text-sm text-muted-foreground">Loading companies...</span>
+                </div>
+              )}
             </>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <Button 
-              variant="outline" 
-              onClick={handleTestConnection} 
-              disabled={isTestingConnection || isSaving || isLoadingCompanies}
-              className="flex-1"
-            >
-              {isTestingConnection ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Testing Connection...
-                </>
-              ) : (
-                "Test Connection"
-              )}
-            </Button>
-            <Button 
-              onClick={handleSaveConfiguration} 
-              disabled={isTestingConnection || isSaving || isLoadingCompanies}
-              className="flex-1"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Configuration"
-              )}
-            </Button>
-          </div>
-
-          {isLoadingCompanies && (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span className="text-sm text-muted-foreground">Loading companies...</span>
-            </div>
           )}
         </CardContent>
       </Card>
