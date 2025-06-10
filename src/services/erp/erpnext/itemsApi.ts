@@ -12,7 +12,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters);
+    const fields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
+    const params = this.buildQueryParams(finalFilters, fields);
     
     if (searchTerm) {
       const orFilters = [
@@ -40,7 +41,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       filters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(filters, undefined, limitPageLength);
+    const fields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
+    const params = this.buildQueryParams(filters, fields, limitPageLength);
     
     const orFilters = [
       ['item_code', 'like', `%${searchTerm}%`],
@@ -68,7 +70,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters, fields, limitPageLength);
+    const defaultFields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
+    const params = this.buildQueryParams(finalFilters, fields || defaultFields, limitPageLength);
     params.append('start', ((page - 1) * limitPageLength).toString());
 
     const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
@@ -115,5 +118,29 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
 
     const result = await response.json();
     return { data: result.data };
+  }
+
+  async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
+    // First try to find the item through Item Barcode doctype
+    try {
+      const barcodeParams = this.buildQueryParams([['barcode', '=', barcode]]);
+      const barcodeResponse = await fetch(`${this.baseURL}/api/resource/Item Barcode?${barcodeParams}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (barcodeResponse.ok) {
+        const barcodeResult = await barcodeResponse.json();
+        if (barcodeResult.data && barcodeResult.data.length > 0) {
+          const itemCode = barcodeResult.data[0].parent;
+          const itemDetails = await this.getItemDetails(itemCode);
+          return { data: itemDetails.data ? [itemDetails.data] : [] };
+        }
+      }
+    } catch (error) {
+      console.log('Barcode search failed, trying direct item search');
+    }
+
+    // If barcode search fails, try searching items directly
+    return this.searchItems(barcode);
   }
 }

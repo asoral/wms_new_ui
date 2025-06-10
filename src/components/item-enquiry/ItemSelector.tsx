@@ -10,9 +10,12 @@ import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { offlineStorage } from "@/services/offlineStorage";
 
 export interface Item {
+  name?: string;
   item_code: string;
   item_name: string;
   stock_uom: string;
+  has_batch_no?: boolean;
+  has_serial_no?: boolean;
 }
 
 interface ItemSelectorProps {
@@ -100,10 +103,26 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       let result;
       if (search.trim()) {
         console.log('Searching items with term:', search);
-        result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
+        // Check if search term looks like a barcode (numeric or alphanumeric)
+        if (/^[0-9]+$/.test(search) || search.length > 10) {
+          // Try barcode search first
+          try {
+            result = await erpnextAPI.searchItemsByBarcode(search);
+            if (!result.data || result.data.length === 0) {
+              // If barcode search fails, try regular search
+              result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
+            }
+          } catch (error) {
+            // Fallback to regular search
+            result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
+          }
+        } else {
+          // Regular text search
+          result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
+        }
       } else {
         console.log('Fetching paginated items, page:', pageToFetch);
-        result = await erpnextAPI.getItemsPaginated(undefined, ['item_code', 'item_name', 'stock_uom'], defaultCompany || undefined, limit, pageToFetch);
+        result = await erpnextAPI.getItemsPaginated(undefined, undefined, defaultCompany || undefined, limit, pageToFetch);
       }
       
       console.log('API result:', result);
@@ -188,7 +207,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
               <div className="truncate">
                 {selectedItem 
                   ? selectedItem.item_code
-                  : "Search item by code or name..."
+                  : "Search item by code, name or barcode..."
                 }
               </div>
               {selectedItem && (
@@ -203,7 +222,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
         <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg" align="start">
           <Command>
             <CommandInput 
-              placeholder="Search items..." 
+              placeholder="Search by item code, name or barcode..." 
               value={searchTerm}
               onValueChange={setSearchTerm}
             />
