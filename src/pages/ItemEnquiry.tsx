@@ -78,8 +78,8 @@ const ItemEnquiry = () => {
           if (barcodeSearchResult.data && barcodeSearchResult.data.length > 0) {
             itemResult = { data: barcodeSearchResult.data[0] };
           } else {
-            // If barcode search also fails, try general search
-            const searchResult = await erpnextAPI.searchItems(itemCode, defaultCompany || undefined, 10);
+            // If barcode search also fails, try general search without company filter
+            const searchResult = await erpnextAPI.searchItems(itemCode, undefined, 10);
             
             if (!searchResult.data || searchResult.data.length === 0) {
               setError(`Item "${itemCode}" not found. Please check the barcode or item code.`);
@@ -107,16 +107,28 @@ const ItemEnquiry = () => {
 
       console.log('Final item result:', itemResult);
 
-      // Use Bin doctype instead of Stock Balance report
+      // Get stock data using proper company filtering through warehouses
       const stockFilters = [
         ['item_code', '=', itemResult.data.item_code || itemCode]
       ];
 
+      // Get warehouses for the company first, then filter Bin by those warehouses
+      let binResult;
       if (defaultCompany) {
-        stockFilters.push(['company', '=', defaultCompany]);
+        try {
+          // First get warehouses for the company
+          const warehouseResult = await erpnextAPI.getWarehouses([['company', '=', defaultCompany]]);
+          
+          if (warehouseResult.data && warehouseResult.data.length > 0) {
+            const warehouseNames = warehouseResult.data.map((w: any) => w.name);
+            stockFilters.push(['warehouse', 'in', warehouseNames]);
+          }
+        } catch (warehouseErr) {
+          console.warn('Failed to get warehouses for company, fetching all stock:', warehouseErr);
+        }
       }
 
-      const binResult = await erpnextAPI.getBinStock(stockFilters);
+      binResult = await erpnextAPI.getBinStock(stockFilters);
 
       console.log('Bin Stock Result:', binResult);
 

@@ -8,9 +8,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     if (filters) {
       finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
     }
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
+    // Remove company filter from item search as it's not permitted
     
     const fields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
     const params = this.buildQueryParams(finalFilters, fields);
@@ -36,10 +34,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
 
   async searchItems(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<Item[]>> {
     let filters = [['is_stock_item', '=', '1']];
-    
-    if (company) {
-      filters.push(['company', '=', company]);
-    }
+    // Remove company filter from item search as it's not permitted
     
     const fields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
     const params = this.buildQueryParams(filters, fields, limitPageLength);
@@ -66,9 +61,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     if (filters) {
       finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
     }
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
+    // Remove company filter from item search as it's not permitted
     
     const defaultFields = ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'];
     const params = this.buildQueryParams(finalFilters, fields || defaultFields, limitPageLength);

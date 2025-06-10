@@ -5,8 +5,24 @@ import { ERPNextResponse, StockBalance, StockEntry } from './types';
 export class ERPNextStockAPI extends ERPNextBaseAPI {
   async getStockBalance(filters?: any, company?: string): Promise<ERPNextResponse<StockBalance[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
+    
+    // If company is specified, get warehouses for that company first
     if (company) {
-      finalFilters.push(['company', '=', company]);
+      try {
+        const warehouseResponse = await fetch(`${this.baseURL}/api/resource/Warehouse?filters=${JSON.stringify([['company', '=', company]])}&fields=["name"]&limit_page_length=1000`, {
+          headers: this.getHeaders(),
+        });
+        
+        if (warehouseResponse.ok) {
+          const warehouseData = await warehouseResponse.json();
+          if (warehouseData.data && warehouseData.data.length > 0) {
+            const warehouseNames = warehouseData.data.map((w: any) => w.name);
+            finalFilters.push(['warehouse', 'in', warehouseNames]);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch warehouses for company filter:', error);
+      }
     }
     
     const params = this.buildQueryParams(finalFilters, undefined, 1000);
