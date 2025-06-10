@@ -115,4 +115,62 @@ export class ERPNextBaseAPI {
 
     return response.json();
   }
+
+  // Generic document fetch method
+  async getDocument(doctype: string, name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/${doctype}/${name}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${doctype}: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Generic document creation method
+  async createDocument(doctype: string, data: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/${doctype}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create ${doctype}: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Generic document update method
+  async updateDocument(doctype: string, name: string, data: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/${doctype}/${name}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update ${doctype}: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Generic document list method
+  async getDocumentList(doctype: string, filters?: any, fields?: string[], limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    const params = this.buildQueryParams(filters, fields, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/${doctype}?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${doctype} list: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }

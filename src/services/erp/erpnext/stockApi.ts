@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance } from './types';
 
@@ -81,11 +80,11 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     }
   }
 
-  async getBinSummary(itemCode: string, warehouse?: string): Promise<ERPNextResponse<any>> {
+  async getBinSummary(warehouse: string, itemCode?: string): Promise<ERPNextResponse<any>> {
     try {
-      const payload: any = { item_code: itemCode };
-      if (warehouse) {
-        payload.warehouse = warehouse;
+      const payload: any = { warehouse: warehouse };
+      if (itemCode) {
+        payload.item_code = itemCode;
       }
 
       const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.get_bin_summary`, {
@@ -98,10 +97,17 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         throw new Error(`Failed to fetch bin summary: ${response.statusText}`);
       }
 
-      return response.json();
+      const result = await response.json();
+      
+      // The response should contain bin summary data
+      if (result.message) {
+        return { data: result.message };
+      }
+      
+      return { data: null };
     } catch (error) {
       console.error('Error fetching bin summary:', error);
-      return { data: [] };
+      return { data: null };
     }
   }
 

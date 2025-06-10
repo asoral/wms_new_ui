@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, Item } from './types';
 
@@ -6,26 +5,37 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   async searchItems(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<Item[]>> {
     try {
       // Use frappe search_link method for better search results
+      const filters = [
+        ["Item", "disabled", "=", "0"],
+        ["Item", "is_stock_item", "=", "1"]
+      ];
+      
+      if (company) {
+        filters.push(["Item", "company", "=", company]);
+      }
+
       const response = await fetch(`${this.baseURL}/api/method/frappe.desk.search.search_link`, {
-        method: 'POST',
+        method: 'GET',
         headers: this.getHeaders(),
-        body: JSON.stringify({
-          doctype: 'Item',
-          txt: searchTerm,
-          filters: {
-            is_stock_item: 1,
-            ...(company && { company: company })
-          },
-          page_len: limitPageLength
-        })
       });
 
-      if (!response.ok) {
+      const params = new URLSearchParams({
+        doctype: 'Item',
+        txt: searchTerm,
+        filters: JSON.stringify(filters),
+        page_len: limitPageLength.toString()
+      });
+
+      const searchResponse = await fetch(`${this.baseURL}/api/method/frappe.desk.search.search_link?${params}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (!searchResponse.ok) {
         // Fallback to resource API if search_link fails
         return this.getItems({ item_code: ['like', `%${searchTerm}%`] }, searchTerm, company);
       }
 
-      const result = await response.json();
+      const result = await searchResponse.json();
       
       if (result.message && Array.isArray(result.message)) {
         const items = result.message.map((item: any) => ({
@@ -46,7 +56,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   async getItems(filters?: any, searchTerm?: string, company?: string): Promise<ERPNextResponse<Item[]>> {
-    let finalFilters = [['is_stock_item', '=', '1']];
+    let finalFilters = [['is_stock_item', '=', '1'], ['disabled', '=', '0']];
     if (filters) {
       finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
     }
