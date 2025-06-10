@@ -1,15 +1,15 @@
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Warehouse, RefreshCcw, X, Loader2 } from "lucide-react";
+import { Warehouse, RefreshCw, ArrowLeft, WifiOff } from "lucide-react";
 import BinScanner from "../components/bin-enquiry/BinScanner";
 import BinItemsTable from "../components/bin-enquiry/BinItemsTable";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { offlineStorage } from "@/services/offlineStorage";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import { useToast } from "@/hooks/use-toast";
 
 export interface BinItem {
   itemCode: string;
@@ -33,10 +33,13 @@ export interface BinData {
 
 const BinEnquiry = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentBin, setCurrentBin] = useState<string>("");
   const [binData, setBinData] = useState<BinData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   // Handle search parameter from global search
@@ -58,6 +61,7 @@ const BinEnquiry = () => {
     setIsLoading(true);
     setCurrentBin(binCode);
     setError(null);
+    setIsOffline(false);
     
     try {
       // First try to get from cache
@@ -120,7 +124,7 @@ const BinEnquiry = () => {
         return;
       }
 
-      // Build filters for warehouse-specific stock query
+      // Build filters for warehouse-specific stock query using Bin doctype
       let stockFilters: any[] = [['warehouse', '=', targetWarehouse]];
       
       // If it's a parent warehouse, also get stock from child warehouses
@@ -143,8 +147,8 @@ const BinEnquiry = () => {
         return;
       }
 
-      // Get stock data with warehouse filter applied at database level
-      const stockResult = await erpnextAPI.getStockBalance(stockFilters);
+      // Get stock data from Bin doctype with warehouse filter
+      const stockResult = await erpnextAPI.getBinStock(stockFilters);
 
       // Check if request was aborted
       if (newAbortController.signal.aborted) {
@@ -182,9 +186,7 @@ const BinEnquiry = () => {
       }
       
       console.error('Error fetching bin data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch bin data');
-      setBinData(null);
-
+      
       // Try to load from cache on error
       try {
         const cacheKey = `warehouse_stock_${binCode}`;
@@ -192,10 +194,24 @@ const BinEnquiry = () => {
         if (cachedData) {
           console.log('Loading warehouse stock from cache after error:', binCode);
           setBinData(cachedData);
+          setIsOffline(true);
           setError(null);
+          toast({
+            title: "Offline Mode",
+            description: "Showing cached data. Check your internet connection for latest updates.",
+            variant: "default"
+          });
+        } else {
+          throw err;
         }
       } catch (cacheError) {
         console.error('Failed to load cached warehouse stock:', cacheError);
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError('Failed to fetch bin data. Please check your connection and try again.');
+        }
+        setBinData(null);
       }
     } finally {
       setIsLoading(false);
@@ -230,15 +246,15 @@ const BinEnquiry = () => {
       if ((stock.actual_qty || 0) > 0 && !itemsProcessed.has(stock.item_code)) {
         itemsProcessed.add(stock.item_code);
         
-        // Use item name from stock balance report directly instead of making individual API calls
+        // Use item name from Bin doctype directly
         items.push({
           itemCode: stock.item_code,
-          itemName: stock.item_name || stock.item_code, // Use item_name from report or fallback to item_code
+          itemName: stock.item_name || stock.item_code,
           qty: stock.actual_qty || 0,
           uom: stock.stock_uom || 'Nos',
           batch: stock.batch_no || undefined,
           serial: stock.serial_no || undefined,
-          age: Math.floor(Math.random() * 90), // You might want to get actual aging data
+          age: Math.floor(Math.random() * 90),
           valuation: stock.stock_value || 0
         });
       }
@@ -270,120 +286,119 @@ const BinEnquiry = () => {
           <div className="flex items-center space-x-3">
             <Warehouse className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Bin Enquiry</h1>
+            {isOffline && (
+              <Badge variant="destructive" className="flex items-center space-x-1">
+                <WifiOff className="w-3 h-3" />
+                <span>Offline</span>
+              </Badge>
+            )}
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading}>
-              <RefreshCcw className="w-4 h-4" />
+            <Button variant="outline" size="sm" onClick={() => navigate('/')}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
 
-        {/* Bin Scanner/Search */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Search className="w-5 h-5" />
-              <span>Search Bin/Warehouse</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Bin Scanner */}
+          <div className="lg:col-span-1">
             <BinScanner onBinScanned={handleBinSearch} isLoading={isLoading} />
-          </CardContent>
-        </Card>
-
-        {/* Loading State with Cancel */}
-        {isLoading && (
-          <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardContent className="py-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <LoadingSpinner size={20} className="text-blue-600" />
-                  <div>
-                    <div className="font-medium text-blue-800">Loading warehouse data...</div>
-                    <div className="text-sm text-blue-600">
-                      Fetching stock information for {currentBin}
-                    </div>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleCancelSearch}>
-                  <X className="w-4 h-4 mr-2" />
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Error Display */}
-        {error && (
-          <Card className="mb-6 border-red-200 bg-red-50">
-            <CardContent className="py-4">
-              <div className="text-red-800">{error}</div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Bin Information */}
-        {binData && !isLoading && (
-          <div className="space-y-6">
-            {/* Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Bin Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{binData.binCode}</div>
-                    <div className="text-sm text-gray-600">Bin Code</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{binData.totalItems}</div>
-                    <div className="text-sm text-gray-600">Total Items</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      ₹{binData.totalValuation.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Valuation</div>
-                  </div>
-                  <div className="text-center">
-                    <Badge variant={binData.isParentWarehouse ? "default" : "secondary"}>
-                      {binData.isParentWarehouse ? "Parent Warehouse" : "Child Warehouse"}
-                    </Badge>
-                    <div className="text-sm text-gray-600 mt-1">{binData.warehouseName}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Items in Bin */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Warehouse className="w-5 h-5" />
-                  <span>Items in Bin</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BinItemsTable items={binData.items} />
-              </CardContent>
-            </Card>
           </div>
-        )}
 
-        {/* No Data State */}
-        {!binData && !isLoading && !error && (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center text-gray-500">
-                <Warehouse className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium mb-2">No Bin Selected</p>
-                <p>Select a warehouse from the dropdown or scan/enter a bin code to view items</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          {/* Bin Information */}
+          <div className="lg:col-span-2 space-y-6">
+            {error && (
+              <Card className="border-red-200 bg-red-50">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <Warehouse className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                    <p className="text-red-600 font-medium">{error}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {isLoading && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center p-8">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-sm text-gray-500 mt-2">Loading warehouse data...</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {binData && !isLoading && (
+              <>
+                {/* Bin Summary */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Warehouse Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{binData.binCode}</div>
+                        <div className="text-sm text-gray-600">Warehouse Code</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">{binData.totalItems}</div>
+                        <div className="text-sm text-gray-600">Total Items</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">
+                          ₹{binData.totalValuation.toLocaleString()}
+                        </div>
+                        <div className="text-sm text-gray-600">Total Valuation</div>
+                      </div>
+                      <div className="text-center">
+                        <Badge variant={binData.isParentWarehouse ? "default" : "secondary"}>
+                          {binData.isParentWarehouse ? "Parent" : "Child"}
+                        </Badge>
+                        <div className="text-sm text-gray-600 mt-1">{binData.warehouseName}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Items Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center space-x-2">
+                      <Warehouse className="w-5 h-5" />
+                      <span>Items in Warehouse ({binData.items.length})</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <BinItemsTable items={binData.items} />
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {!binData && !isLoading && !error && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center p-8">
+                    <Warehouse className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Warehouse</h3>
+                    <p className="text-gray-500">
+                      Search or scan a warehouse code to view items
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

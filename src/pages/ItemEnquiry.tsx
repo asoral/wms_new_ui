@@ -107,14 +107,20 @@ const ItemEnquiry = () => {
 
       console.log('Final item result:', itemResult);
 
-      // Get stock balance using the Bin doctype
-      const stockResult = await erpnextAPI.getStockBalance([
+      // Use Bin doctype instead of Stock Balance report
+      const stockFilters = [
         ['item_code', '=', itemResult.data.item_code || itemCode]
-      ], defaultCompany || undefined);
+      ];
 
-      console.log('Stock Balance Result:', stockResult);
+      if (defaultCompany) {
+        stockFilters.push(['company', '=', defaultCompany]);
+      }
 
-      if (!stockResult.data || stockResult.data.length === 0) {
+      const binResult = await erpnextAPI.getBinStock(stockFilters);
+
+      console.log('Bin Stock Result:', binResult);
+
+      if (!binResult.data || binResult.data.length === 0) {
         const emptyStockData = {
           itemCode: itemResult.data.item_code || itemCode,
           itemName: itemResult.data.item_name || itemCode,
@@ -132,13 +138,13 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Process stock data with correct field names from Bin doctype
+      // Process stock data from Bin doctype
       const warehouseStockMap: { [key: string]: StockInfo } = {};
 
-      stockResult.data.forEach((stockEntry: any) => {
-        const warehouse = stockEntry.warehouse;
-        const qty = parseFloat(stockEntry.actual_qty) || 0;
-        const valuation = parseFloat(stockEntry.stock_value) || 0;
+      binResult.data.forEach((binEntry: any) => {
+        const warehouse = binEntry.warehouse;
+        const qty = parseFloat(binEntry.actual_qty) || 0;
+        const valuation = parseFloat(binEntry.stock_value) || 0;
 
         if (qty > 0 && warehouse) {
           if (warehouseStockMap[warehouse]) {
@@ -148,11 +154,11 @@ const ItemEnquiry = () => {
             warehouseStockMap[warehouse] = {
               warehouse,
               qty,
-              uom: stockEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
+              uom: binEntry.stock_uom || itemResult.data.stock_uom || 'Nos',
               valuation,
               age: Math.floor(Math.random() * 90),
-              batch: undefined,
-              serial: undefined
+              batch: binEntry.batch_no || undefined,
+              serial: binEntry.serial_no || undefined
             };
           }
         }

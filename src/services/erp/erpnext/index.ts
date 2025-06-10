@@ -114,6 +114,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockApi.getStockBalance(filters, company);
   }
 
+  getBinStock(filters?: any) {
+    return this.stockApi.getBinStock(filters);
+  }
+
   getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
     return this.stockApi.getCurrentStock(itemCode, warehouse, batch, serial);
   }
