@@ -1,3 +1,4 @@
+
 import { getAccessToken } from './authService';
 import { offlineStorage } from './offlineStorage';
 
@@ -550,6 +551,236 @@ class ERPNextAPI {
         message: 'Stock aging report not available'
       };
     }
+  }
+
+  // New methods for missing functionality
+  async searchItems(searchTerm: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
+    const params = new URLSearchParams();
+    
+    const stockItemFilters = {
+      is_stock_item: 1
+    };
+    
+    params.append('filters', JSON.stringify(stockItemFilters));
+    params.append('or_filters', JSON.stringify([
+      { item_code: ['like', `%${searchTerm}%`] },
+      { item_name: ['like', `%${searchTerm}%`] }
+    ]));
+    params.append('limit', limit.toString());
+    
+    if (company) {
+      params.append('company', company);
+    }
+
+    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search items: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit: number = 20, page: number = 1): Promise<ERPNextResponse<Item[]>> {
+    const params = new URLSearchParams();
+    
+    const stockItemFilters = {
+      is_stock_item: 1,
+      ...filters
+    };
+    
+    params.append('filters', JSON.stringify(stockItemFilters));
+    params.append('limit', limit.toString());
+    params.append('start', ((page - 1) * limit).toString());
+    
+    if (fields) {
+      params.append('fields', JSON.stringify(fields));
+    }
+    
+    if (company) {
+      params.append('company', company);
+    }
+
+    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch paginated items: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify({ barcode: barcode }));
+
+    const response = await fetch(`${this.baseURL}/api/resource/Item Barcode?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch item by barcode: ${response.statusText}`);
+    }
+
+    const barcodeResult = await response.json();
+    
+    if (barcodeResult.data && barcodeResult.data.length > 0) {
+      const itemCode = barcodeResult.data[0].parent;
+      return this.getItems({ item_code: itemCode });
+    }
+
+    return { data: [] };
+  }
+
+  async getItemDetails(itemCode: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Item/${itemCode}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch item details: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async validateBatch(batchNo: string, itemCode: string): Promise<boolean> {
+    try {
+      // Check if batch exists
+      const params = new URLSearchParams();
+      params.append('filters', JSON.stringify({ name: batchNo, item: itemCode }));
+
+      const response = await fetch(`${this.baseURL}/api/resource/Batch?${params}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data && result.data.length > 0) {
+          return true; // Batch exists
+        }
+      }
+
+      // Create new batch if it doesn't exist
+      const createResponse = await fetch(`${this.baseURL}/api/resource/Batch`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          batch_id: batchNo,
+          item: itemCode
+        })
+      });
+
+      return createResponse.ok;
+    } catch (error) {
+      console.error('Error validating batch:', error);
+      return false;
+    }
+  }
+
+  async validateSerial(serialNo: string, itemCode: string, warehouse: string): Promise<boolean> {
+    try {
+      // Check if serial exists
+      const params = new URLSearchParams();
+      params.append('filters', JSON.stringify({ name: serialNo, item_code: itemCode }));
+
+      const response = await fetch(`${this.baseURL}/api/resource/Serial No?${params}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data && result.data.length > 0) {
+          return true; // Serial exists
+        }
+      }
+
+      // Create new serial if it doesn't exist
+      const createResponse = await fetch(`${this.baseURL}/api/resource/Serial No`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          serial_no: serialNo,
+          item_code: itemCode,
+          warehouse: warehouse
+        })
+      });
+
+      return createResponse.ok;
+    } catch (error) {
+      console.error('Error validating serial:', error);
+      return false;
+    }
+  }
+
+  async getSalesOrder(soNumber: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Sales Order/${soNumber}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sales order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPurchaseOrder(poNumber: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order/${poNumber}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createPurchaseReceipt(receiptData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(receiptData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create purchase receipt: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createStockReconciliation(reconciliationData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(reconciliationData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create stock reconciliation: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async updateStockReconciliation(name: string, reconciliationData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation/${name}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(reconciliationData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update stock reconciliation: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
   async getItems(filters?: any, searchTerm?: string, company?: string): Promise<ERPNextResponse<Item[]>> {
