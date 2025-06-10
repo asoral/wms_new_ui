@@ -4,23 +4,40 @@ import { ERPNextResponse, StockBalance } from './types';
 export class ERPNextStockAPI extends ERPNextBaseAPI {
   async getStockBalance(filters?: any, company?: string): Promise<ERPNextResponse<StockBalance[]>> {
     try {
-      // Use Bin doctype instead of Stock Balance report for accurate data
-      let finalFilters = [];
+      // Use Stock Balance script report with POST request
+      const today = new Date().toISOString().split('T')[0];
+      
+      const reportFilters: any = {
+        from_date: today,
+        to_date: today,
+      };
       
       if (company) {
-        finalFilters.push(['company', '=', company]);
+        reportFilters.company = company;
       }
       
       // Handle specific filter conditions
       if (filters) {
-        const frappeFilters = this.convertToFrappeFilters(filters);
-        finalFilters = [...finalFilters, ...frappeFilters];
+        if (filters.item_code) {
+          reportFilters.item_code = filters.item_code;
+        }
+        if (filters.warehouse) {
+          reportFilters.warehouse = filters.warehouse;
+        }
+        // Handle other filters as needed
+        Object.keys(filters).forEach(key => {
+          if (!reportFilters[key] && filters[key]) {
+            reportFilters[key] = filters[key];
+          }
+        });
       }
-      
-      const params = this.buildQueryParams(finalFilters, ['item_code', 'warehouse', 'actual_qty', 'valuation_rate', 'stock_uom'], 100);
 
-      const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.stock_balance.stock_balance.execute`, {
+        method: 'POST',
         headers: this.getHeaders(),
+        body: JSON.stringify({
+          filters: reportFilters
+        })
       });
 
       if (!response.ok) {
@@ -29,16 +46,29 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
       const result = await response.json();
       
-      // Transform Bin data to match expected StockBalance format
-      if (result.data && Array.isArray(result.data)) {
-        const stockData = result.data.map((bin: any) => ({
-          item_code: bin.item_code,
-          warehouse: bin.warehouse,
-          actual_qty: parseFloat(bin.actual_qty) || 0,
-          valuation_rate: parseFloat(bin.valuation_rate) || 0,
-          stock_value: (parseFloat(bin.actual_qty) || 0) * (parseFloat(bin.valuation_rate) || 0),
-          stock_uom: bin.stock_uom || 'Nos'
-        }));
+      // Parse script report response format
+      if (result.message && result.message.result && Array.isArray(result.message.result)) {
+        const columns = result.message.columns || [];
+        const rows = result.message.result;
+        
+        // Map column names to indices for easier data extraction
+        const columnMap: { [key: string]: number } = {};
+        columns.forEach((col: any, index: number) => {
+          const fieldname = col.fieldname || col.label?.toLowerCase().replace(/\s+/g, '_');
+          if (fieldname) {
+            columnMap[fieldname] = index;
+          }
+        });
+        
+        // Transform script report data to match expected StockBalance format
+        const stockData = rows.map((row: any[]) => ({
+          item_code: row[columnMap.item_code] || row[0] || '',
+          warehouse: row[columnMap.warehouse] || row[columnMap.warehouse_name] || row[1] || '',
+          actual_qty: parseFloat(row[columnMap.bal_qty] || row[columnMap.actual_qty] || row[2] || '0') || 0,
+          valuation_rate: parseFloat(row[columnMap.val_rate] || row[columnMap.valuation_rate] || row[3] || '0') || 0,
+          stock_value: parseFloat(row[columnMap.bal_val] || row[columnMap.stock_value] || row[4] || '0') || 0,
+          stock_uom: row[columnMap.stock_uom] || row[columnMap.uom] || row[5] || 'Nos'
+        })).filter((item: any) => item.item_code); // Filter out empty rows
         
         return { data: stockData };
       }
@@ -51,37 +81,60 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
   }
 
   async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<number> {
-    let filters = [
-      ['item_code', '=', itemCode],
-      ['warehouse', '=', warehouse]
-    ];
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const reportFilters: any = {
+        from_date: today,
+        to_date: today,
+        item_code: itemCode,
+        warehouse: warehouse
+      };
 
-    if (batch) {
-      filters.push(['batch_no', '=', batch]);
-    }
+      if (batch) {
+        reportFilters.batch_no = batch;
+      }
 
-    if (serial) {
-      filters.push(['serial_no', '=', serial]);
-    }
+      if (serial) {
+        reportFilters.serial_no = serial;
+      }
 
-    const params = new URLSearchParams({
-      fields: '["actual_qty"]',
-      filters: JSON.stringify(filters)
-    });
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.report.stock_balance.stock_balance.execute`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          filters: reportFilters
+        })
+      });
 
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?${params}`, {
-      headers: this.getHeaders(),
-    });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
+      }
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
-    }
+      const result = await response.json();
 
-    const result = await response.json() as ERPNextResponse<StockBalance[]>;
+      if (result.message && result.message.result && Array.isArray(result.message.result)) {
+        const columns = result.message.columns || [];
+        const rows = result.message.result;
+        
+        // Find the balance quantity column
+        const columnMap: { [key: string]: number } = {};
+        columns.forEach((col: any, index: number) => {
+          const fieldname = col.fieldname || col.label?.toLowerCase().replace(/\s+/g, '_');
+          if (fieldname) {
+            columnMap[fieldname] = index;
+          }
+        });
 
-    if (Array.isArray(result.data) && result.data.length > 0) {
-      return result.data[0].actual_qty;
-    } else {
+        if (rows.length > 0) {
+          const row = rows[0];
+          return parseFloat(row[columnMap.bal_qty] || row[columnMap.actual_qty] || row[2] || '0') || 0;
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error('Error fetching current stock:', error);
       return 0;
     }
   }
