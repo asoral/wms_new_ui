@@ -3,9 +3,13 @@ import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, Item } from './types';
 
 export class ERPNextItemsAPI extends ERPNextBaseAPI {
+
   /**
-   * Search items by code or name using ERPNext's search_link endpoint
-   */
+ * Fetch Stock Balance report data for a specific item using prepared report mechanism
+ * @param itemCode Item code to fetch report for
+ * @param company Company name
+ * @param date (optional) Date string in YYYY-MM-DD format, defaults to today
+ */
   async searchItems(query: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
     params.append('doctype', 'Item');
@@ -15,27 +19,34 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       ['Item', 'disabled', '=', 0],
       ['Item', 'is_stock_item', '=', 1],
     ]));
-
+  
     const response = await fetch(
       `${this.baseURL}/api/method/frappe.desk.search.search_link?${params.toString()}`,
       { headers: this.getHeaders() }
     );
+  
     if (!response.ok) {
       throw new Error(`Failed to search items: ${response.status} ${response.statusText}`);
     }
-
+  
     const result = await response.json();
-    // result.message is [[name, label], ...]
+  
+    if (!Array.isArray(result.message)) {
+      throw new Error("Unexpected API response format");
+    }
+  
     const items: Item[] = await Promise.all(
-      result.message.slice(0, limit).map(async ([name]) => {
-        const details = await this.getItemDetails(name as string);
+      result.message.slice(0, limit).map(async (item) => {
+        if (!item.value) {
+          throw new Error("Invalid item data: Missing 'value'");
+        }
+        const details = await this.getItemDetails(item.value as string);
         return details.data;
       })
     );
-
+  
     return { data: items };
   }
-
   /**
    * Get items with pagination support
    */
