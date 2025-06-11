@@ -1,10 +1,11 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextItemsAPI } from './itemsApi';
 import { ERPNextStockAPI } from './stockApi';
 import { ERPNextWarehouseAPI } from './warehouseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
-import { ERPNextMaterialAPI from './materialApi';
+import { ERPNextMaterialAPI } from './materialApi';
 import { DashboardMetrics, RecentActivity, OperationalMetrics, FinancialMetrics } from './types';
 
 export class ERPNextDashboardAPI extends ERPNextBaseAPI {
