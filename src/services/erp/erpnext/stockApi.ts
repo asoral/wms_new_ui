@@ -1,5 +1,3 @@
-
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, StockEntry } from './types';
 
@@ -42,7 +40,21 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
   async getBinStock(filters?: any): Promise<ERPNextResponse<any[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     
-    const params = this.buildQueryParams(finalFilters, undefined, 1000);
+    // Define the fields we need for warehouse stock display
+    const fields = [
+      'name',
+      'item_code', 
+      'warehouse',
+      'actual_qty',
+      'stock_value',
+      'stock_uom',
+      'batch_no',
+      'serial_no'
+    ];
+    
+    const params = this.buildQueryParams(finalFilters, fields, 1000);
+
+    console.log('Fetching bin stock with params:', params);
 
     const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
       headers: this.getHeaders(),
@@ -52,7 +64,10 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       throw new Error(`Failed to fetch bin stock: ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log('Bin stock API response:', result);
+    
+    return result;
   }
 
   async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<ERPNextResponse<any>> {
@@ -198,4 +213,3 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 }
-
