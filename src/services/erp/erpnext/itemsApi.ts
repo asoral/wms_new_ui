@@ -27,8 +27,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     const result = await response.json();
     // result.message is [[name, label], ...]
     const items: Item[] = await Promise.all(
-      result.message.slice(0, limit).map(async ([name]) => {
-        const details = await this.getItemDetails(name as string);
+      result.message.slice(0, limit).map(async ([name]: [string]) => {
+        const details = await this.getItemDetails(name);
         return details.data;
       })
     );
@@ -94,10 +94,10 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
     try {
       const itemResult = await this.getItemByBarcode(barcode);
-      if (itemResult.data && !Array.isArray(itemResult.data)) {
+      if (itemResult.data) {
         return { data: [itemResult.data] };
       }
-      return { data: itemResult.data || [] };
+      return { data: [] };
     } catch (error) {
       console.error('Barcode search failed:', error);
       return { data: [] };
@@ -150,7 +150,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
 
     const result = await response.json();
     if (!result.data || result.data.length === 0) {
-      return { data: [] };
+      throw new Error('Item not found for barcode');
     }
 
     // Parent field contains the Item code
