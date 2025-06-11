@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,8 +107,8 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       }
 
       const itemByBarcode = await erpnextAPI.getItemByBarcode(barcode);
-      if (itemByBarcode && itemByBarcode.data && itemByBarcode.data.length > 0) {
-        const item = itemByBarcode.data[0];
+      if (itemByBarcode && itemByBarcode.data) {
+        const item = itemByBarcode.data;
         const itemInfo: ItemInfo = {
           item_code: item.item_code,
           item_name: item.item_name,
