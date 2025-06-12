@@ -31,8 +31,6 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     }
   
     const items: Item[] = await Promise.all(
-      result.message.slice(0, limit).map(async ([name]: [string]) => {
-        const details = await this.getItemDetails(name);
       result.message.slice(0, limit).map(async (item) => {
         if (!item.value) {
           throw new Error("Invalid item data: Missing 'value'");
