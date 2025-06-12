@@ -1,6 +1,7 @@
 
 import { createERPNextAPI, getUserDefaultCompany } from './erpnextApi';
 
+
 export interface SerialBatchBundleEntry {
   batch_no?: string;
   serial_no?: string;

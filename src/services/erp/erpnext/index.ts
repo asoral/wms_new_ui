@@ -38,6 +38,9 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
 };
 
 export const getUserDefaultCompany = async (): Promise<string | null> => {
+  // company set difault
+
+
   try {
     const storedCompany = localStorage.getItem('erpnextDefaultCompany');
     if (storedCompany) {
