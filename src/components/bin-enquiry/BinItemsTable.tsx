@@ -98,7 +98,7 @@ const BinItemsTable = ({ items }: BinItemsTableProps) => {
             <TableHead>Item Name</TableHead>
             <TableHead className="text-right">Quantity</TableHead>
             <TableHead>UOM</TableHead>
-            <TableHead>Batch/Serial</TableHead>
+            {/* <TableHead>Batch/Serial</TableHead> */}
             <TableHead className="text-right">Age (Days)</TableHead>
             <TableHead className="text-right">Valuation</TableHead>
           </TableRow>
@@ -110,7 +110,7 @@ const BinItemsTable = ({ items }: BinItemsTableProps) => {
               <TableCell>{item.itemName}</TableCell>
               <TableCell className="text-right font-semibold">{item.qty}</TableCell>
               <TableCell>{item.uom}</TableCell>
-              <TableCell>
+              {/* <TableCell>
                 {item.batch && (
                   <Badge variant="outline" className="mr-1">
                     Batch: {item.batch}
@@ -124,7 +124,7 @@ const BinItemsTable = ({ items }: BinItemsTableProps) => {
                 {!item.batch && !item.serial && (
                   <span className="text-gray-400">-</span>
                 )}
-              </TableCell>
+              </TableCell> */}
               <TableCell className="text-right">
                 <Badge className={getAgeColor(item.age)}>
                   {item.age} days
