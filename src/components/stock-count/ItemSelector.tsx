@@ -98,8 +98,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       const limit = 20;
       
       let result;
-      
-      console.log("Search:", search.trim());
       if (search.trim()) {
         // Use search method for better performance
         result = await erpnextAPI.searchItems(search, undefined, limit);
@@ -109,15 +107,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       }
       
       if (result.data) {
-        // const itemData = result.data;
-        const itemData = Array.isArray(result.data) ? result.data : [];
-        if (!Array.isArray(result.data)) {
-          console.error("Invalid data format:", result.data);
-          return;
-        }
-        
-
-        console.log("item data:----->",itemData)
+        const itemData = result.data;
         
         if (isNewSearch) {
           setItems(itemData);
