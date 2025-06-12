@@ -95,6 +95,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       }
 
       const defaultCompany = await getUserDefaultCompany();
+      console.log("default company:----->",defaultCompany)
       const limit = 50;
       
       let result;
