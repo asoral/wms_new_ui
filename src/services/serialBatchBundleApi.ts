@@ -1,7 +1,6 @@
 
-// import { createERPNextAPI } from './erpnextApi';
-// import { getUserDefaultCompany } from '@/services/erpnextApi'
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from './erpnextApi';
+
 export interface SerialBatchBundleEntry {
   batch_no?: string;
   serial_no?: string;
@@ -97,9 +96,7 @@ export const createSerialBatchBundleFromTraditionalEntry = async (
   serialNo?: string
 ): Promise<string | null> => {
   try {
-    localStorage.removeItem('erpnextDefaultCompany');
     const company = await getUserDefaultCompany();
-    console.log("company found:----->",company)
     
     const bundleEntry: SerialBatchBundleEntry = {
       qty: qty,
