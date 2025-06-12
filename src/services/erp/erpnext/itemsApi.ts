@@ -31,6 +31,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     }
   
     const items: Item[] = await Promise.all(
+      result.message.slice(0, limit).map(async ([name]: [string]) => {
+        const details = await this.getItemDetails(name);
       result.message.slice(0, limit).map(async (item) => {
         if (!item.value) {
           throw new Error("Invalid item data: Missing 'value'");
@@ -101,10 +103,10 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
     try {
       const itemResult = await this.getItemByBarcode(barcode);
-      if (itemResult.data && !Array.isArray(itemResult.data)) {
+      if (itemResult.data) {
         return { data: [itemResult.data] };
       }
-      return { data: itemResult.data || [] };
+      return { data: [] };
     } catch (error) {
       console.error('Barcode search failed:', error);
       return { data: [] };

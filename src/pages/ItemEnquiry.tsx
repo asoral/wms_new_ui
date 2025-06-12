@@ -73,7 +73,7 @@ const ItemEnquiry = () => {
         console.log('Direct item lookup failed, trying barcode search:', err);
         // If direct lookup fails, try barcode search
         try {
-          const barcodeSearchResult = await erpnextAPI.getItemByBarcode(itemCode);
+          const barcodeSearchResult = await erpnextAPI.searchItemsByBarcode(itemCode);
           
           if (barcodeSearchResult.data && barcodeSearchResult.data.length > 0) {
             itemResult = { data: barcodeSearchResult.data[0] };

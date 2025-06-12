@@ -29,7 +29,7 @@ export class ERPNextDashboardAPI extends ERPNextBaseAPI {
   async getDashboardMetrics(company?: string): Promise<DashboardMetrics> {
     try {
       const [itemsResponse, warehousesResponse, ordersResponse, stockBalanceResponse] = await Promise.all([
-        this.itemsApi.getItems(undefined, undefined, company),
+        this.itemsApi.getItems(undefined, undefined, 20),
         this.warehouseApi.getWarehouses(undefined, company),
         this.salesApi.getSalesOrders([['status', '=', 'Draft']], company),
         this.stockApi.getStockBalance({ actual_qty: ['<', '10'] }, company)
