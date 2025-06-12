@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Loader2, AlertCircle, CheckCircle } from "lucide-react";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useNotification } from "@/hooks/useNotification";
 import { toast } from "sonner";
 import ItemSelector from "./ItemSelector";
@@ -91,7 +91,6 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       setIsLoadingQty(false);
     }
   };
-
   const handleBarcodeDetected = async (barcode: string) => {
     console.log('Barcode detected in StockCountForm:', barcode);
     setShowCamera(false);
@@ -104,17 +103,23 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         showError('ERPNext API not configured');
         return;
       }
-
+  
       const itemByBarcode = await erpnextAPI.getItemByBarcode(barcode);
-      if (itemByBarcode && itemByBarcode.data && itemByBarcode.data.length > 0) {
-        const item = itemByBarcode.data[0];
+      console.log("itemByBarcode:--->", itemByBarcode);
+  
+      // Check if itemByBarcode.data exists and is not null/undefined
+      if (itemByBarcode && itemByBarcode.data) {
+        const item = itemByBarcode.data;
+        console.log("got item:----->", item);
+  
         const itemInfo: ItemInfo = {
           item_code: item.item_code,
           item_name: item.item_name,
           stock_uom: item.stock_uom,
           has_batch_no: item.has_batch_no || 0,
-          has_serial_no: item.has_serial_no || 0
+          has_serial_no: item.has_serial_no || 0,
         };
+  
         await handleItemSelected(itemInfo);
         showSuccess('Item found by barcode!');
       } else {
@@ -127,6 +132,45 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       dismiss(loadingToast);
     }
   };
+  
+
+  // const handleBarcodeDetected = async (barcode: string) => {
+  //   console.log('Barcode detected in StockCountForm:', barcode);
+  //   setShowCamera(false);
+    
+  //   const loadingToast = showLoading('Looking up item by barcode...');
+    
+  //   try {
+  //     const erpnextAPI = await createERPNextAPI();
+  //     if (!erpnextAPI) {
+  //       showError('ERPNext API not configured');
+  //       return;
+  //     }
+
+  //     const itemByBarcode = await erpnextAPI.getItemByBarcode(barcode);
+  //     console.log("itemByBarcode:--->",itemByBarcode)
+  //     if (itemByBarcode && itemByBarcode.data && itemByBarcode.data.length > 0) {
+  //       const item = itemByBarcode.data[0];
+  //       console.log("got item:----->",item)
+  //       const itemInfo: ItemInfo = {
+  //         item_code: item.item_code,
+  //         item_name: item.item_name,
+  //         stock_uom: item.stock_uom,
+  //         has_batch_no: item.has_batch_no || 0,
+  //         has_serial_no: item.has_serial_no || 0
+  //       };
+  //       await handleItemSelected(itemInfo);
+  //       showSuccess('Item found by barcode!');
+  //     } else {
+  //       showError('No item found with this barcode');
+  //     }
+  //   } catch (error) {
+  //     console.error('Failed to lookup item by barcode:', error);
+  //     showError('Failed to lookup item by barcode');
+  //   } finally {
+  //     dismiss(loadingToast);
+  //   }
+  // };
 
   const handleItemSelected = async (item: ItemInfo) => {
     console.log('Item selected, setting item data:', item);

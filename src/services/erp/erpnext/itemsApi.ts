@@ -15,7 +15,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       ['Item', 'disabled', '=', 0],
       ['Item', 'is_stock_item', '=', 1],
     ]));
-
+  
     const response = await fetch(
       `${this.baseURL}/api/method/frappe.desk.search.search_link?${params.toString()}`,
       { headers: this.getHeaders() }
@@ -23,16 +23,23 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     if (!response.ok) {
       throw new Error(`Failed to search items: ${response.status} ${response.statusText}`);
     }
-
+  
     const result = await response.json();
-    // result.message is [[name, label], ...]
+  
+    if (!Array.isArray(result.message)) {
+      throw new Error("Unexpected API response format");
+    }
+  
     const items: Item[] = await Promise.all(
-      result.message.slice(0, limit).map(async ([name]) => {
-        const details = await this.getItemDetails(name as string);
+      result.message.slice(0, limit).map(async (item) => {
+        if (!item.value) {
+          throw new Error("Invalid item data: Missing 'value'");
+        }
+        const details = await this.getItemDetails(item.value as string);
         return details.data;
       })
     );
-
+  
     return { data: items };
   }
 
@@ -135,27 +142,65 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   /**
    * Lookup an item by barcode through the Item Barcode doctype
    */
-  async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item>> {
-    const params = new URLSearchParams();
-    params.append('fields', JSON.stringify(['parent']));
-    params.append('filters', JSON.stringify([['barcode', '=', barcode]]));
+  // async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item>> {
+  //   const params = new URLSearchParams();
+  //   params.append('fields', JSON.stringify(['parent']));
+  //   params.append('filters', JSON.stringify([['barcode', '=', barcode]]));
 
-    const response = await fetch(
-      `${this.baseURL}/api/resource/Item Barcode?${params.toString()}`,
-      { headers: this.getHeaders() }
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to fetch barcode record: ${response.statusText}`);
+  //   const response = await fetch(
+  //     `${this.baseURL}/api/resource/Item Barcode?${params.toString()}`,
+  //     { headers: this.getHeaders() }
+  //   );
+  //   if (!response.ok) {
+  //     throw new Error(`Failed to fetch barcode record: ${response.statusText}`);
+  //   }
+
+  //   const result = await response.json();
+  //   if (!result.data || result.data.length === 0) {
+  //     return { data: [] };
+  //   }
+
+  //   // Parent field contains the Item code
+  //   return this.getItemDetails(result.data[0].parent);
+  // }
+  async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item | undefined>> {
+    console.log('Fetching item by barcode:', barcode);
+    try {
+      const params = new URLSearchParams({
+        fields: JSON.stringify([
+          'name',
+          'item_code',
+          'item_name',
+          'stock_uom',
+          'has_batch_no',
+          'has_serial_no',
+          'barcodes'
+        ]),
+      });
+  
+      const response = await fetch(
+        `${this.baseURL}/api/resource/Item/${encodeURIComponent(barcode)}?${params.toString()}`,
+        { headers: this.getHeaders() }
+      );
+      console.log('API response status:', response.status);
+  
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('Item not found for barcode:', barcode);
+          return { data: undefined };
+        }
+        throw new Error(`Failed to fetch item by barcode: ${response.statusText}`);
+      }
+  
+      const result = await response.json();
+      console.log('API response data:', result);
+      return { data: result.data|| undefined };
+    } catch (error) {
+      console.error('Error in getItemByBarcode:', error);
+      throw error;
     }
-
-    const result = await response.json();
-    if (!result.data || result.data.length === 0) {
-      return { data: [] };
-    }
-
-    // Parent field contains the Item code
-    return this.getItemDetails(result.data[0].parent);
   }
+  
 
   /**
    * Fetch items with filters, pagination, and optional text search
