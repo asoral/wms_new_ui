@@ -93,8 +93,8 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Items API methods
-  getItems(filters?: any, searchTerm?: string, company?: string) {
-    return this.itemsApi.getItems(filters, searchTerm, company);
+  getItems(filters?: any, searchTerm?: string, limit: number = 20) {
+    return this.itemsApi.getItems(filters, searchTerm, limit);
   }
 
   searchItems(searchTerm: string, company?: string, limitPageLength?: number) {

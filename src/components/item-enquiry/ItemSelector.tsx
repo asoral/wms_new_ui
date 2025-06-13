@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -29,7 +29,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const [open, setOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-
+  const timeoutRef = useRef<NodeJS.Timeout>();
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
@@ -38,16 +38,14 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   }, []);
 
   // Debounced search function
-  const searchItems = useMemo(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    return (searchValue: string) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        fetchItems(searchValue);
-      }, 300);
-    };
-  }, []);
+
+const searchItems = useCallback((searchValue: string) => {
+  if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  timeoutRef.current = setTimeout(() => {
+    fetchItems(searchValue);
+  }, 300);
+}, []);
+
 
   // Load initial items and cached items
   useEffect(() => {
@@ -95,6 +93,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       }
 
       const defaultCompany = await getUserDefaultCompany();
+      console.log("default company:----->",defaultCompany)
       const limit = 50;
       
       let result;
@@ -125,7 +124,10 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       console.log('API result:', result);
       
       if (result.data && Array.isArray(result.data)) {
-        setItems(result.data);
+        if (JSON.stringify(result.data) !== JSON.stringify(items)) {
+          setItems(result.data);
+        }
+
         
         // Cache the results
         const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';

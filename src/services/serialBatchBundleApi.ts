@@ -98,6 +98,7 @@ export const createSerialBatchBundleFromTraditionalEntry = async (
 ): Promise<string | null> => {
   try {
     const company = await getUserDefaultCompany();
+    console.log("company found:----->",company)
     
     const bundleEntry: SerialBatchBundleEntry = {
       qty: qty,
