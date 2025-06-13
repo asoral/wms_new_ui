@@ -85,16 +85,29 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
     loadParameterTemplate(itemCode);
   };
 
-  const updateParameterReading = (id: string, reading: string) => {
-    setParameters(prev => prev.map(param => {
+const updateParameterReading = (id: string, reading: string) => {
+  setParameters(prev =>
+    prev.map(param => {
       if (param.id === id) {
-        // Simple validation logic - you can make this more sophisticated
-        const status = reading ? (Math.random() > 0.3 ? "Accepted" : "Rejected") : "Pending";
+        const value = parseFloat(reading);
+        let status: QualityParameter["status"] = "Pending";
+
+        const match = param.acceptanceCriteria.match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
+        if (match && !isNaN(value)) {
+          const min = parseFloat(match[1]);
+          const max = parseFloat(match[2]);
+          status = value >= min && value <= max ? "Accepted" : "Rejected";
+        } else {
+          status = reading ? "Accepted" : "Pending"; // fallback
+        }
+
         return { ...param, reading, value: reading, status };
       }
       return param;
-    }));
-  };
+    })
+  );
+};
+
 
   const addCustomParameter = () => {
     const newParameter: QualityParameter = {
