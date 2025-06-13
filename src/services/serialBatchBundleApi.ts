@@ -97,7 +97,6 @@ export const createSerialBatchBundleFromTraditionalEntry = async (
   serialNo?: string
 ): Promise<string | null> => {
   try {
-    localStorage.removeItem('erpnextDefaultCompany');
     const company = await getUserDefaultCompany();
     console.log("company found:----->",company)
     
