@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,11 +20,14 @@ const Profile = () => {
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
   const [selectedCompany, setSelectedCompany] = useState('');
+  const [selectedPalletTemplate, setSelectedPalletTemplate] = useState('');
   const [companies, setCompanies] = useState<Array<{ name: string; company_name: string }>>([]);
+  const [palletTemplateItems, setPalletTemplateItems] = useState<Array<{ name: string; item_name: string }>>([]);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+  const [isLoadingTemplateItems, setIsLoadingTemplateItems] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "error">("idle");
   const { toast } = useToast();
 
@@ -44,6 +46,7 @@ const Profile = () => {
           setApiKey(config.erpnext_api_key || '');
           setApiSecret(config.erpnext_api_secret || '');
           setSelectedCompany(config.erpnext_default_company || '');
+          setSelectedPalletTemplate(config.erpnext_pallet_template_item || '');
 
           // Auto-test connection and load companies if all credentials exist
           if (config.erpnext_url && config.erpnext_api_key && config.erpnext_api_secret) {
@@ -130,6 +133,40 @@ const Profile = () => {
     }
   };
 
+  const loadPalletTemplateItems = async () => {
+    if (!baseURL || !apiKey || !apiSecret) return;
+
+    setIsLoadingTemplateItems(true);
+    try {
+      const testAPI = new ERPNextAPI(baseURL, apiKey, apiSecret);
+      
+      // Fetch items with maintain_stock=1 and is_template=1
+      const result = await testAPI.getItems({
+        maintain_stock: 1,
+        is_template: 1
+      });
+      
+      console.log('Pallet template items loaded:', result);
+      setPalletTemplateItems(result.data || []);
+    } catch (error) {
+      console.error('Error loading pallet template items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load pallet template items",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingTemplateItems(false);
+    }
+  };
+
+  // Load template items when company is selected and connection is established
+  useEffect(() => {
+    if (selectedCompany && connectionStatus === 'connected') {
+      loadPalletTemplateItems();
+    }
+  }, [selectedCompany, connectionStatus]);
+
   const handleTestConnection = async () => {
     if (!baseURL || !apiKey || !apiSecret) {
       toast({
@@ -198,7 +235,8 @@ const Profile = () => {
           erpnext_url: cleanBaseURL,
           erpnext_api_key: apiKey,
           erpnext_api_secret: apiSecret,
-          erpnext_default_company: selectedCompany
+          erpnext_default_company: selectedCompany,
+          erpnext_pallet_template_item: selectedPalletTemplate
         });
 
         if (result.success) {
@@ -230,6 +268,7 @@ const Profile = () => {
 
   const handleCompanyChange = async (company: string) => {
     setSelectedCompany(company);
+    setSelectedPalletTemplate(''); // Reset pallet template when company changes
     
     // Save the updated company to database
     if (baseURL && apiKey && apiSecret) {
@@ -238,7 +277,8 @@ const Profile = () => {
           erpnext_url: baseURL,
           erpnext_api_key: apiKey,
           erpnext_api_secret: apiSecret,
-          erpnext_default_company: company
+          erpnext_default_company: company,
+          erpnext_pallet_template_item: ''
         });
         
         toast({
@@ -250,6 +290,35 @@ const Profile = () => {
         toast({
           title: "Error",
           description: "Failed to save company selection",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handlePalletTemplateChange = async (templateItem: string) => {
+    setSelectedPalletTemplate(templateItem);
+    
+    // Save the updated pallet template to database
+    if (baseURL && apiKey && apiSecret) {
+      try {
+        await saveERPNextConfig({
+          erpnext_url: baseURL,
+          erpnext_api_key: apiKey,
+          erpnext_api_secret: apiSecret,
+          erpnext_default_company: selectedCompany,
+          erpnext_pallet_template_item: templateItem
+        });
+        
+        toast({
+          title: "Pallet Template Updated",
+          description: `Pallet template item set to ${palletTemplateItems.find(item => item.name === templateItem)?.item_name || templateItem}`,
+        });
+      } catch (error) {
+        console.error('Failed to save pallet template selection:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save pallet template selection",
           variant: "destructive",
         });
       }
@@ -370,6 +439,40 @@ const Profile = () => {
                       </p>
                     )}
                   </div>
+
+                  {/* Pallet Template Item Selector - Only show when company is selected */}
+                  {selectedCompany && (
+                    <div className="space-y-2">
+                      <Label htmlFor="pallet-template-item">Pallet Template Item</Label>
+                      <Select 
+                        value={selectedPalletTemplate} 
+                        onValueChange={handlePalletTemplateChange}
+                        disabled={isLoadingTemplateItems}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoadingTemplateItems ? "Loading template items..." : "Select a pallet template item"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {palletTemplateItems.map((item) => (
+                            <SelectItem key={item.name} value={item.name}>
+                              {item.item_name || item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {isLoadingTemplateItems && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Loading template items...
+                        </div>
+                      )}
+                      {selectedPalletTemplate && (
+                        <p className="text-sm text-muted-foreground">
+                          Selected: {palletTemplateItems.find(item => item.name === selectedPalletTemplate)?.item_name || selectedPalletTemplate}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
