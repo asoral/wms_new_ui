@@ -3,13 +3,17 @@ import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, Warehouse } from './types';
 
 export class ERPNextWarehouseAPI extends ERPNextBaseAPI {
-  async getWarehouses(filters?: any, company?: string): Promise<ERPNextResponse<Warehouse[]>> {
+  async getWarehouses(filters?: any, company?: string, includeDisabled = false): Promise<ERPNextResponse<Warehouse[]>> {
     let finalFilters = [['is_group', '=', '0']];
     if (filters) {
       finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
     }
     if (company) {
       finalFilters.push(['company', '=', company]);
+    }
+
+    if (!includeDisabled) {
+      finalFilters.push(['disabled', '=', '0']);
     }
     
     const params = this.buildQueryParams(finalFilters);
