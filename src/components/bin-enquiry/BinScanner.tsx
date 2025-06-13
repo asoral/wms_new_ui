@@ -78,8 +78,7 @@ const BinScanner = ({ onBinScanned, isLoading }: BinScannerProps) => {
             </div>
           ) : (
             <CameraScanner
-              onBarcodeDetected={handleBarcodeDetected}
-              isActive={showCamera}
+              onBarcodeScanned={handleBarcodeDetected}
               onClose={stopScanning}
             />
           )}
