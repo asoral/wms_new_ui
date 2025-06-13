@@ -154,9 +154,10 @@ const BinEnquiry = () => {
       if (newAbortController.signal.aborted) {
         return;
       }
-
+      console.log("target warehoydigdidfgyudfuydfyudfa=======",stockResult.data.length)
       let processedData;
       if (!stockResult.data || stockResult.data.length === 0) {
+        console.log("gfuguyfyufyuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuueueueueueuu------------------------",targetWarehouse, warehouseInfo, stockResult.data, newAbortController)
         processedData = {
           binCode: targetWarehouse,
           warehouseName: warehouseInfo.warehouse_name || targetWarehouse,
@@ -166,6 +167,7 @@ const BinEnquiry = () => {
           items: []
         };
       } else {
+        console.log("99999999999999999999999999999999999999999999999999999",targetWarehouse, warehouseInfo, stockResult.data, newAbortController)
         processedData = await processBinData(targetWarehouse, warehouseInfo, stockResult.data, newAbortController);
       }
 
@@ -236,8 +238,10 @@ const BinEnquiry = () => {
   ): Promise<BinData> => {
     const items: BinItem[] = [];
     const itemsProcessed = new Set<string>();
+    console.log("vchjcvjgvcjdjdjsjddjsdjgjfhjfhjjjjjgf7777777777777777777777",binCode)
 
     for (const stock of stockData) {
+      console.log("stock hjbhsfvbjfdsvkfdh yuuuuuuuuuuuuuuuuuuuuuuyuy",stock.name)
       // Check if request was aborted
       if (abortController.signal.aborted) {
         throw new Error('Request cancelled');
@@ -245,6 +249,7 @@ const BinEnquiry = () => {
 
       if ((stock.actual_qty || 0) > 0 && !itemsProcessed.has(stock.item_code)) {
         itemsProcessed.add(stock.item_code);
+        
         
         // Use item name from Bin doctype directly
         items.push({
@@ -259,6 +264,7 @@ const BinEnquiry = () => {
         });
       }
     }
+  
 
     const totalValuation = items.reduce((sum, item) => sum + item.valuation, 0);
 

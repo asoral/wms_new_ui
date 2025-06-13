@@ -1,7 +1,7 @@
 
-// import { createERPNextAPI } from './erpnextApi';
-// import { getUserDefaultCompany } from '@/services/erpnextApi'
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from './erpnextApi';
+
+
 export interface SerialBatchBundleEntry {
   batch_no?: string;
   serial_no?: string;
@@ -126,7 +126,8 @@ export const createSerialBatchBundleFromTraditionalEntry = async (
       total_amount: 0,
       posting_date: new Date().toISOString().split('T')[0],
       posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
-      entries: [bundleEntry]
+      entries: [bundleEntry],
+      voucher_type:"Stock Reconciliation"
     };
 
     const result = await createSerialBatchBundle(bundleData);

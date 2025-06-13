@@ -37,38 +37,41 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
+// bin code ----------------- fetch data 
   async getBinStock(filters?: any): Promise<ERPNextResponse<any[]>> {
-    let finalFilters = this.convertToFrappeFilters(filters);
-    
-    // Define the fields we need for warehouse stock display
-    const fields = [
-      'name',
-      'item_code', 
-      'warehouse',
-      'actual_qty',
-      'stock_value',
-      'stock_uom',
-      'batch_no',
-      'serial_no'
-    ];
-    
-    const params = this.buildQueryParams(finalFilters, fields, 1000);
+  const finalFilters = this.convertToFrappeFilters(filters);
 
-    console.log('Fetching bin stock with params:', params);
+  const filtersParam = `filters=${encodeURIComponent(JSON.stringify(finalFilters))}`;
+  
+  const fields = [
+    "name",
+    "actual_qty",
+    "item_code",
+    "warehouse",
+    "valuation_rate",
+    "stock_value" // ✅ Added valid field
+  ];
+  const fieldsParam = `fields=${encodeURIComponent(JSON.stringify(fields))}`;
+  const limitParam = `limit_page_length=1000`;
 
-    const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
-      headers: this.getHeaders(),
-    });
+  const url = `${this.baseURL}/api/resource/Bin?${filtersParam}&${fieldsParam}&${limitParam}`;
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch bin stock: ${response.statusText}`);
-    }
+  const response = await fetch(url, {
+    method: "GET",
+    headers: this.getHeaders(),
+  });
 
-    const result = await response.json();
-    console.log('Bin stock API response:', result);
-    
-    return result;
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Failed to fetch bin stock: ${response.status} ${response.statusText} - ${errorText}`
+    );
   }
+
+  return response.json();
+}
+
+
 
   async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<ERPNextResponse<any>> {
     const filters = [
