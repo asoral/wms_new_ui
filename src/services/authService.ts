@@ -33,7 +33,7 @@ export const getERPNextConfig = async () => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('erpnext_url, erpnext_api_key, erpnext_api_secret, erpnext_default_company')
+      .select('erpnext_url, erpnext_api_key, erpnext_api_secret, erpnext_default_company, erpnext_pallet_template_item')
       .eq('id', user.id)
       .single();
 
@@ -49,6 +49,7 @@ export const saveERPNextConfig = async (config: {
   erpnext_api_key: string;
   erpnext_api_secret: string;
   erpnext_default_company?: string;
+  erpnext_pallet_template_item?: string;
 }) => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -63,6 +64,7 @@ export const saveERPNextConfig = async (config: {
         erpnext_api_key: config.erpnext_api_key,
         erpnext_api_secret: config.erpnext_api_secret,
         erpnext_default_company: config.erpnext_default_company,
+        erpnext_pallet_template_item: config.erpnext_pallet_template_item,
         updated_at: new Date().toISOString()
       });
 
@@ -74,6 +76,9 @@ export const saveERPNextConfig = async (config: {
     localStorage.setItem('erpnextApiSecret', config.erpnext_api_secret);
     if (config.erpnext_default_company) {
       localStorage.setItem('erpnextDefaultCompany', config.erpnext_default_company);
+    }
+    if (config.erpnext_pallet_template_item) {
+      localStorage.setItem('erpnextPalletTemplateItem', config.erpnext_pallet_template_item);
     }
 
     return { success: true };

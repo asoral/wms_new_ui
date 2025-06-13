@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -472,8 +471,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                 </div>
               ) : (
                 <CameraScanner
-                  onBarcodeDetected={handleBarcodeDetected}
-                  isActive={showCamera}
+                  onBarcodeScanned={handleBarcodeDetected}
                   onClose={() => setShowCamera(false)}
                 />
               )}
