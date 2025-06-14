@@ -13,9 +13,10 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { ERPNextAPI, configureERPNextAPI, createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
 import { getERPNextConfig, saveERPNextConfig } from '@/services/authService';
 import SubscriptionStatus from '@/components/subscription/SubscriptionStatus';
+import { supabase } from "@/integrations/supabase/client";
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, signIn } = useAuth();
   const [baseURL, setBaseURL] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
@@ -30,6 +31,13 @@ const Profile = () => {
   const [isLoadingTemplateItems, setIsLoadingTemplateItems] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "error">("idle");
   const { toast } = useToast();
+
+  // Password change state
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     const loadConfiguration = async () => {
@@ -325,6 +333,72 @@ const Profile = () => {
     }
   };
 
+  // Handler for password change
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Reset error state
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      toast({
+        title: "Error",
+        description: "All fields are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setChangingPassword(true);
+
+    // Validate old password by trying to sign in
+    const email = user?.email;
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "User email not found.",
+        variant: "destructive",
+      });
+      setChangingPassword(false);
+      return;
+    }
+    // Attempt sign in to verify current credentials
+    const { error } = await signIn(email, oldPassword);
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Incorrect old password.",
+        variant: "destructive",
+      });
+      setChangingPassword(false);
+      return;
+    }
+    // Change password via Supabase
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) {
+      toast({
+        title: "Error",
+        description: updateError.message || "Failed to change password.",
+        variant: "destructive",
+      });
+      setChangingPassword(false);
+      return;
+    }
+    toast({
+      title: "Success",
+      description: "Your password has been updated.",
+    });
+    setShowChangePassword(false);
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setChangingPassword(false);
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center space-x-3 mb-6">
@@ -355,6 +429,80 @@ const Profile = () => {
                 <Label className="text-sm text-muted-foreground">User ID</Label>
                 <p className="font-mono text-sm">{user?.id || 'Not available'}</p>
               </div>
+            </div>
+            {/* Change Password Section */}
+            <div className="mt-4">
+              {!showChangePassword ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowChangePassword(true)}
+                  className="w-full"
+                >
+                  Change Password
+                </Button>
+              ) : (
+                <form className="space-y-3" onSubmit={handleChangePassword}>
+                  <div>
+                    <Label htmlFor="old-password">Old Password</Label>
+                    <Input
+                      id="old-password"
+                      type="password"
+                      value={oldPassword}
+                      autoComplete="current-password"
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      disabled={changingPassword}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={newPassword}
+                      autoComplete="new-password"
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={changingPassword}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={confirmPassword}
+                      autoComplete="new-password"
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={changingPassword}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      type="submit"
+                      className="flex-1"
+                      disabled={changingPassword}
+                    >
+                      {changingPassword ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Update Password
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowChangePassword(false);
+                        setOldPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                      }}
+                      disabled={changingPassword}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
             </div>
           </CardContent>
         </Card>
