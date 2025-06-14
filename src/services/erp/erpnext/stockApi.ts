@@ -144,9 +144,9 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       
       // Transform the report data to match expected format
       // The runReport method returns ERPNextResponse<any>, so we need to check the structure
-      if (result && typeof result === 'object' && 'message' in result && result.message !== null && result.message !== undefined) {
+      if (result && typeof result === 'object' && result.message !== null && result.message !== undefined) {
         const message = result.message;
-        if (message && typeof message === 'object' && 'result' in message && message !== null && message !== undefined) {
+        if (message && typeof message === 'object' && 'result' in message && message.result !== null && message.result !== undefined) {
           return {
             data: message.result || []
           };

@@ -48,17 +48,20 @@ const Profile = () => {
         console.log('Loading ERPNext configuration from database...');
         const config = await getERPNextConfig();
         
-        if (config) {
-          console.log('Found ERPNext config in database:', config);
-          setBaseURL(config.erpnext_url || '');
-          setApiKey(config.erpnext_api_key || '');
-          setApiSecret(config.erpnext_api_secret || '');
-          setSelectedCompany(config.erpnext_default_company || '');
-          setSelectedPalletTemplate(config.erpnext_pallet_template_item || '');
+        // Add type guard to check if config is not an error
+        if (config && typeof config === "object" &&
+          'erpnext_url' in config &&
+          'erpnext_api_key' in config &&
+          'erpnext_api_secret' in config &&
+          'erpnext_default_company' in config
+        ) {
+          setBaseURL((config.erpnext_url as string) || '');
+          setApiKey((config.erpnext_api_key as string) || '');
+          setApiSecret((config.erpnext_api_secret as string) || '');
+          setSelectedCompany((config.erpnext_default_company as string) || '');
+          setSelectedPalletTemplate((config.erpnext_pallet_template_item as string) || '');
 
-          // Auto-test connection and load companies if all credentials exist
           if (config.erpnext_url && config.erpnext_api_key && config.erpnext_api_secret) {
-            console.log('Found existing credentials, testing connection...');
             await testConnectionAndLoadCompanies(config.erpnext_url, config.erpnext_api_key, config.erpnext_api_secret);
           }
         } else {
@@ -153,9 +156,18 @@ const Profile = () => {
         maintain_stock: 1,
         is_template: 1
       });
-      
-      console.log('Pallet template items loaded:', result);
-      setPalletTemplateItems(result.data || []);
+
+      // Map items to correct shape for selector (ERPNext might return item_code instead of name)
+      const mapped =
+        result.data && Array.isArray(result.data)
+          ? result.data
+              .filter((item: any) => item.name && item.item_name)
+              .map((item: any) => ({
+                name: item.name,
+                item_name: item.item_name,
+              }))
+          : [];
+      setPalletTemplateItems(mapped);
     } catch (error) {
       console.error('Error loading pallet template items:', error);
       toast({

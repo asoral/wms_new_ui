@@ -471,8 +471,9 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                 </div>
               ) : (
                 <CameraScanner
-                  onBarcodeScanned={handleBarcodeDetected}
+                  onBarcodeDetected={handleBarcodeDetected}
                   onClose={() => setShowCamera(false)}
+                  isActive={true}
                 />
               )}
             </TabsContent>

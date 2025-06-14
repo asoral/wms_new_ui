@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -78,8 +77,9 @@ const BinScanner = ({ onBinScanned, isLoading }: BinScannerProps) => {
             </div>
           ) : (
             <CameraScanner
-              onBarcodeScanned={handleBarcodeDetected}
+              onBarcodeDetected={handleBarcodeDetected}
               onClose={stopScanning}
+              isActive={true}
             />
           )}
         </TabsContent>
