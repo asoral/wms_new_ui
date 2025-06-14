@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Warehouse, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import OnboardingCarousel from '@/components/onboarding/OnboardingCarousel';
+// Add dialog
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 const AuthForm = () => {
   const navigate = useNavigate();
@@ -22,6 +24,12 @@ const AuthForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
+
+  // Password reset state
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetMessage, setResetMessage] = useState<{error?: string; success?: string} | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
     email: '',
@@ -109,6 +117,44 @@ const AuthForm = () => {
 
   const handleSignupClick = () => {
     setShowOnboarding(true);
+  };
+
+  // Password reset logic
+  const handleOpenResetDialog = () => {
+    setShowResetDialog(true);
+    setResetEmail('');
+    setResetMessage(null);
+  };
+
+  const handleCloseResetDialog = () => {
+    setShowResetDialog(false);
+    setResetEmail('');
+    setResetMessage(null);
+    setResetLoading(false);
+  };
+
+  const handleSendReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetMessage(null);
+    setResetLoading(true);
+    if (!resetEmail) {
+      setResetMessage({ error: 'Please enter your email.' });
+      setResetLoading(false);
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: window.location.origin + "/auth"
+      });
+      if (error) {
+        setResetMessage({ error: error.message || 'Failed to send reset email.' });
+      } else {
+        setResetMessage({ success: "Reset link sent. Please check your email." });
+      }
+    } catch (err: any) {
+      setResetMessage({ error: err?.message || 'An error occurred.' });
+    }
+    setResetLoading(false);
   };
 
   // Show onboarding when requested
@@ -342,6 +388,15 @@ const AuthForm = () => {
                     {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     Sign In
                   </Button>
+                  <div className="flex justify-end mt-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenResetDialog}
+                      className="text-sm text-blue-600 hover:underline focus:outline-none"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                 </form>
               </TabsContent>
 
@@ -371,6 +426,52 @@ const AuthForm = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Password Reset</DialogTitle>
+            <DialogDescription>
+              Enter your email address to receive a password reset link.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSendReset} className="space-y-4 mt-2">
+            <div>
+              <Label htmlFor="reset-email">Email</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                autoComplete="username"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={resetLoading}>
+              {resetLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              Send Reset Link
+            </Button>
+            {resetMessage?.error && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertDescription className="text-red-800">{resetMessage.error}</AlertDescription>
+              </Alert>
+            )}
+            {resetMessage?.success && (
+              <Alert className="border-green-200 bg-green-50">
+                <AlertDescription className="text-green-800">{resetMessage.success}</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex justify-end">
+              <Button type="button" variant="ghost" onClick={handleCloseResetDialog}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
