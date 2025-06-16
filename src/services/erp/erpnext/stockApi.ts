@@ -1,4 +1,6 @@
-import { BaseAPI, APIResponse } from "../../baseApi";
+
+import { ERPNextBaseAPI } from './baseApi';
+import { APIResponse } from './types';
 
 export interface BinStockItem {
   item_code: string;
@@ -37,7 +39,7 @@ export interface WarehouseStockItem {
   stock_value: number;
 }
 
-export class StockAPI extends BaseAPI {
+export class ERPNextStockAPI extends ERPNextBaseAPI {
   async getBinStock(itemCode: string, warehouse: string): Promise<APIResponse<BinStockItem[]>> {
     try {
       const endpoint = this.getEndpoint('/api/resource/Bin', {
@@ -155,3 +157,6 @@ export class StockAPI extends BaseAPI {
     }
   }
 }
+
+// Legacy export for backward compatibility
+export class StockAPI extends ERPNextStockAPI {}

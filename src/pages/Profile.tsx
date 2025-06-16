@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,7 @@ interface Item {
 const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const authContext = useAuth();
   const [user, setUser] = useState<any>(null);
   const [formData, setFormData] = useState({
     erpnextUrl: '',
@@ -96,7 +97,7 @@ const Profile = () => {
         });
 
         const hasConfig = profile.erpnext_url && profile.erpnext_api_key && profile.erpnext_api_secret;
-        setIsConfigured(hasConfig);
+        setIsConfigured(!!hasConfig);
         if (hasConfig) {
           await testConnection(profile.erpnext_url, profile.erpnext_api_key, profile.erpnext_api_secret);
         }
@@ -110,7 +111,7 @@ const Profile = () => {
     setTesting(true);
     setMessage(null);
     try {
-      const erpnextAPI = await createERPNextAPI(url, apiKey, apiSecret);
+      const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         setConnectionStatus('disconnected');
         setMessage({ type: 'error', content: 'Failed to create ERPNext API instance.' });
@@ -118,12 +119,13 @@ const Profile = () => {
       }
       
       // Test with a simple API call, e.g., fetching company info
-      const company = await erpnextAPI.getCompany('default');
-      if (company.success && company.data) {
+      const companies = await erpnextAPI.getCompanies();
+      if (companies.success && companies.data && companies.data.length > 0) {
+        const company = companies.data[0];
         setCompanyInfo({
-          companyName: company.data.company_name,
-          abbr: company.data.abbr,
-          currency: company.data.default_currency
+          companyName: company.company_name,
+          abbr: company.abbr,
+          currency: company.default_currency
         });
         setConnectionStatus('connected');
         setMessage({ type: 'success', content: 'Connection successful!' });
@@ -211,13 +213,15 @@ const Profile = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/auth');
+    if (authContext?.signOut) {
+      await authContext.signOut();
+      navigate('/auth');
+    }
   };
 
   const loadItems = async () => {
     try {
-      const erpnextAPI = await createERPNextAPI(formData.erpnextUrl, formData.erpnextApiKey, formData.erpnextApiSecret);
+      const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
           title: "ERPNext Not Configured",
@@ -228,7 +232,7 @@ const Profile = () => {
       }
 
       // Fetch items from ERPNext
-      const itemsResult = await erpnextAPI.getAllItems();
+      const itemsResult = await erpnextAPI.getItems();
       if (itemsResult.data) {
         setItems(itemsResult.data.map((item: any) => ({
           itemCode: item.item_code,
