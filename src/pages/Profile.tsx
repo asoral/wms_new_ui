@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -120,7 +119,7 @@ const Profile = () => {
       
       // Test with a simple API call, e.g., fetching company info
       const companies = await erpnextAPI.getCompanies();
-      if (companies.success && companies.data && companies.data.length > 0) {
+      if (companies.data && companies.data.length > 0) {
         const company = companies.data[0];
         setCompanyInfo({
           companyName: company.company_name,

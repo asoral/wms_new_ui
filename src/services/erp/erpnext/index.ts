@@ -1,4 +1,3 @@
-
 import { ERPNextConfig } from './types';
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -38,9 +37,6 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
 };
 
 export const getUserDefaultCompany = async (): Promise<string | null> => {
-  // company set difault
-
-
   try {
     const storedCompany = localStorage.getItem('erpnextDefaultCompany');
     if (storedCompany) {
@@ -118,12 +114,14 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Stock API methods
-  getStockBalance(filters?: any, company?: string) {
-    return this.stockApi.getStockBalance(filters, company);
+  getStockBalance(itemCode: string, warehouses: string[]): Promise<any>;
+  getStockBalance(filters?: any, company?: string): Promise<any>;
+  getStockBalance(filterOrItemCode?: any, warehousesOrCompany?: string[] | string) {
+    return this.stockApi.getStockBalance(filterOrItemCode, warehousesOrCompany);
   }
 
-  getBinStock(filters?: any) {
-    return this.stockApi.getBinStock(filters);
+  getBinStock(itemCode: string, warehouse: string) {
+    return this.stockApi.getBinStock(itemCode, warehouse);
   }
 
   getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {

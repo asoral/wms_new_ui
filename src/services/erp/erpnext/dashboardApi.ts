@@ -32,7 +32,7 @@ export class ERPNextDashboardAPI extends ERPNextBaseAPI {
         this.itemsApi.getItems(undefined, undefined, 20),
         this.warehouseApi.getWarehouses(undefined, company),
         this.salesApi.getSalesOrders([['status', '=', 'Draft']], company),
-        this.stockApi.getStockBalance({ actual_qty: ['<', '10'] }, company)
+        this.stockApi.getStockBalance({ actual_qty: ['<', 10] }, company)
       ]);
 
       // Calculate total stock value using stock balance
