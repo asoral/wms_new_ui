@@ -13,9 +13,10 @@ import { POItem, ReceiveEntry } from "../../pages/Receive";
 interface ReceiveFormProps {
   poItems: POItem[];
   onAddEntry: (entry: ReceiveEntry) => void;
+  defaultWarehouse?: string;
 }
 
-const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
+const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps) => {
   const [formData, setFormData] = useState({
     selectedItem: '',
     receivedQty: 0,
@@ -36,7 +37,7 @@ const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
       setFormData(prev => ({ 
         ...prev, 
         selectedItem: scannedItem,
-        warehouse: poItems[0]?.warehouse || ''
+        warehouse: defaultWarehouse || poItems[0]?.warehouse || ''
       }));
       setIsScanning(false);
     }, 2000);
@@ -51,7 +52,7 @@ const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
       itemCode: selectedItemData.itemCode,
       itemName: selectedItemData.itemName,
       receivedQty: formData.receivedQty,
-      warehouse: formData.warehouse,
+      warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
       batch: formData.batch || undefined,
       serial: formData.serial || undefined,
       uom: selectedItemData.uom,
@@ -62,7 +63,7 @@ const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
     setFormData({
       selectedItem: '',
       receivedQty: 0,
-      warehouse: '',
+      warehouse: defaultWarehouse || '',
       batch: '',
       serial: ''
     });
@@ -127,7 +128,7 @@ const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
                     setFormData(prev => ({ 
                       ...prev, 
                       selectedItem: value,
-                      warehouse: item?.warehouse || ''
+                      warehouse: defaultWarehouse || item?.warehouse || ''
                     }));
                   }}
                 >
@@ -188,7 +189,7 @@ const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
                 </div>
                 <div>
                   <Label>Warehouse</Label>
-                  <p className="font-medium">{selectedItemData.warehouse}</p>
+                  <p className="font-medium">{defaultWarehouse || selectedItemData.warehouse}</p>
                 </div>
               </div>
             </div>

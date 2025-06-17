@@ -12,6 +12,7 @@ import ReceiveDashboard from "../components/receive/ReceiveDashboard";
 import ReceiveForm from "../components/receive/ReceiveForm";
 import ReceiveTable from "../components/receive/ReceiveTable";
 import POItemsDisplay from "../components/receive/POItemsDisplay";
+import WarehouseSelector from "../components/bin-enquiry/WarehouseSelector";
 
 export interface PurchaseOrder {
   poNumber: string;
@@ -48,6 +49,7 @@ const Receive = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [receiveEntries, setReceiveEntries] = useState<ReceiveEntry[]>([]);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [poNumber, setPONumber] = useState("");
@@ -120,8 +122,17 @@ const Receive = () => {
     }
   };
 
+  const handleWarehouseSelected = (warehouseCode: string) => {
+    setSelectedWarehouse(warehouseCode);
+  };
+
   const addReceiveEntry = (entry: ReceiveEntry) => {
-    setReceiveEntries(prev => [...prev, entry]);
+    // Override warehouse with selected warehouse if one is chosen
+    const entryWithWarehouse = {
+      ...entry,
+      warehouse: selectedWarehouse || entry.warehouse
+    };
+    setReceiveEntries(prev => [...prev, entryWithWarehouse]);
   };
 
   const submitReceipt = async () => {
@@ -163,6 +174,7 @@ const Receive = () => {
       // Reset form
       setReceiveEntries([]);
       setSelectedPO(null);
+      setSelectedWarehouse("");
       setActiveTab("dashboard");
       
     } catch (error) {
@@ -257,6 +269,29 @@ const Receive = () => {
                   </CardContent>
                 </Card>
 
+                {/* Warehouse Selection */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Select Receiving Warehouse</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <WarehouseSelector 
+                      onWarehouseSelected={handleWarehouseSelected}
+                      isLoading={loading}
+                    />
+                    {selectedWarehouse && (
+                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                        <p className="text-sm text-green-800">
+                          <strong>Selected Warehouse:</strong> {selectedWarehouse}
+                        </p>
+                        <p className="text-xs text-green-600 mt-1">
+                          All items will be received in this warehouse unless overridden individually.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Receive Form */}
                 <Card>
                   <CardHeader>
@@ -266,17 +301,8 @@ const Receive = () => {
                     <ReceiveForm 
                       poItems={selectedPO.items} 
                       onAddEntry={addReceiveEntry}
+                      defaultWarehouse={selectedWarehouse}
                     />
-                  </CardContent>
-                </Card>
-
-                {/* PO Items */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Purchase Order Items</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <POItemsDisplay items={selectedPO.items} />
                   </CardContent>
                 </Card>
               </div>
