@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -178,47 +177,8 @@ const Receive = () => {
       } else {
         // Add item to existing Purchase Receipt
         try {
-          // First get the current receipt data
-          const currentReceiptResponse = await fetch(
-            `${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`,
-            { headers: erpnextAPI.getHeaders() }
-          );
-          
-          if (!currentReceiptResponse.ok) {
-            throw new Error('Failed to fetch current receipt');
-          }
-          
-          const currentReceipt = await currentReceiptResponse.json();
-          
-          // Add new item to the items array
-          const newItem = {
-            item_code: entryWithWarehouse.itemCode,
-            qty: entryWithWarehouse.receivedQty,
-            warehouse: entryWithWarehouse.warehouse,
-            rate: entryWithWarehouse.rate,
-            uom: entryWithWarehouse.uom,
-            batch_no: entryWithWarehouse.batch,
-            serial_no: entryWithWarehouse.serial
-          };
-          
-          currentReceipt.data.items.push(newItem);
-          
-          // Update the Purchase Receipt
-          const updateResponse = await fetch(
-            `${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`,
-            {
-              method: 'PUT',
-              headers: {
-                ...erpnextAPI.getHeaders(),
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(currentReceipt.data)
-            }
-          );
-          
-          if (!updateResponse.ok) {
-            throw new Error('Failed to update receipt');
-          }
+          // Use a custom method to update the purchase receipt with new items
+          await updatePurchaseReceiptWithItem(erpnextAPI, currentPurchaseReceipt, entryWithWarehouse);
           
           toast({
             title: "Item Added",
@@ -247,6 +207,41 @@ const Receive = () => {
     }
   };
 
+  // Helper function to update purchase receipt with new item
+  const updatePurchaseReceiptWithItem = async (erpnextAPI: any, receiptName: string, item: ReceiveEntry) => {
+    // Create a new receipt item entry using ERPNext API pattern
+    const itemData = {
+      doctype: "Purchase Receipt Item",
+      parent: receiptName,
+      parenttype: "Purchase Receipt",
+      parentfield: "items",
+      item_code: item.itemCode,
+      qty: item.receivedQty,
+      warehouse: item.warehouse,
+      rate: item.rate,
+      uom: item.uom,
+      batch_no: item.batch,
+      serial_no: item.serial
+    };
+
+    // Use a direct API call to add the item
+    const response = await fetch(`${erpnextAPI.baseURL}/api/method/frappe.client.insert`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ doc: itemData }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to add item to receipt');
+    }
+
+    return response.json();
+  };
+
   const submitReceipt = async () => {
     if (!currentPurchaseReceipt) {
       toast({
@@ -268,20 +263,19 @@ const Receive = () => {
         return;
       }
 
-      // Submit the Purchase Receipt in ERPNext
-      const submitResponse = await fetch(
-        `${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`,
-        {
-          method: 'PUT',
-          headers: {
-            ...erpnextAPI.getHeaders(),
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            docstatus: 1  // Submit the document
-          })
-        }
-      );
+      // Submit the Purchase Receipt using a proper API method
+      const submitResponse = await fetch(`${erpnextAPI.baseURL}/api/method/frappe.client.submit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          doctype: 'Purchase Receipt',
+          name: currentPurchaseReceipt
+        }),
+      });
 
       if (!submitResponse.ok) {
         throw new Error('Failed to submit receipt');
