@@ -185,11 +185,17 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-  async createStockReconciliation(reconciliationData: any): Promise<ERPNextResponse<any>> {
+  async createStockReconciliation(reconciliationData: any, company?: string): Promise<ERPNextResponse<any>> {
+    // Add company to reconciliation data if provided
+    const finalData = { ...reconciliationData };
+    if (company) {
+      finalData.company = company;
+    }
+
     const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify(reconciliationData),
+      body: JSON.stringify(finalData),
     });
 
     if (!response.ok) {
