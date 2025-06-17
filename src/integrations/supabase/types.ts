@@ -43,6 +43,7 @@ export type Database = {
           erpnext_api_key: string | null
           erpnext_api_secret: string | null
           erpnext_default_company: string | null
+          erpnext_pallet_template_item: string | null
           erpnext_url: string | null
           full_name: string | null
           id: string
@@ -54,6 +55,7 @@ export type Database = {
           erpnext_api_key?: string | null
           erpnext_api_secret?: string | null
           erpnext_default_company?: string | null
+          erpnext_pallet_template_item?: string | null
           erpnext_url?: string | null
           full_name?: string | null
           id: string
@@ -65,6 +67,7 @@ export type Database = {
           erpnext_api_key?: string | null
           erpnext_api_secret?: string | null
           erpnext_default_company?: string | null
+          erpnext_pallet_template_item?: string | null
           erpnext_url?: string | null
           full_name?: string | null
           id?: string

@@ -2,12 +2,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { Search, FileText, Package, CheckCircle, Clock, LucideIcon } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import POSelector from "./POSelector";
 
 interface DashboardData {
   pendingPOs: number;
@@ -28,7 +27,6 @@ interface ReceiveDashboardProps {
 }
 
 const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
-  const [poNumber, setPONumber] = useState("");
   const [data, setData] = useState<DashboardData>({
     pendingPOs: 0,
     receiptsThisWeek: 0,
@@ -59,7 +57,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
 
       // Fetch dashboard data from ERPNext
       const [poResult, prResult] = await Promise.allSettled([
-        erpnextAPI.getPurchaseOrders([['status', '=', 'To Receive']], defaultCompany || undefined),
+        erpnextAPI.getPurchaseOrders([['status', 'in', ['To Receive', 'To Receive and Bill']]], defaultCompany || undefined),
         erpnextAPI.getPurchaseReceipts([['docstatus', '=', 0]], defaultCompany || undefined)
       ]);
 
@@ -82,18 +80,6 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handlePOSearch = () => {
-    if (poNumber.trim()) {
-      onSelectPO(poNumber.trim());
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handlePOSearch();
     }
   };
 
@@ -134,7 +120,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
 
   return (
     <div className="space-y-6">
-      {/* PO Search */}
+      {/* PO Selector */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -143,24 +129,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex space-x-2">
-            <div className="flex-1">
-              <Label htmlFor="poNumber">Purchase Order Number</Label>
-              <Input
-                id="poNumber"
-                value={poNumber}
-                onChange={(e) => setPONumber(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter PO number..."
-              />
-            </div>
-            <div className="pt-6">
-              <Button onClick={handlePOSearch} disabled={!poNumber.trim()}>
-                <Search className="w-4 h-4 mr-2" />
-                Select PO
-              </Button>
-            </div>
-          </div>
+          <POSelector onSelectPO={onSelectPO} />
         </CardContent>
       </Card>
 
