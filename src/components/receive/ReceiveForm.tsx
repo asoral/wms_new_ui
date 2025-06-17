@@ -69,6 +69,70 @@ const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Item Selection */}
+      <Card>
+        <CardContent className="pt-6">
+          <Tabs defaultValue="manual" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="manual">Select Item</TabsTrigger>
+              <TabsTrigger value="scan">Scan Item</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="manual" className="space-y-4">
+              <div>
+                <Label htmlFor="itemSelect">Select Item from PO</Label>
+                <Select 
+                  value={formData.selectedItem} 
+                  onValueChange={(value) => {
+                    const item = poItems.find(i => i.itemCode === value);
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      selectedItem: value,
+                      warehouse: item?.warehouse || ''
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an item to receive..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {poItems.filter(item => item.pendingQty > 0).map((item) => (
+                      <SelectItem key={item.itemCode} value={item.itemCode}>
+                        {item.itemCode} - {item.itemName} (Pending: {item.pendingQty} {item.uom})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="scan" className="space-y-4">
+              <div className="text-center">
+                <Button 
+                  type="button"
+                  onClick={handleItemScan} 
+                  disabled={isScanning}
+                  size="lg"
+                  className="w-full"
+                >
+                  {isScanning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Scanning...
+                    </>
+                  ) : (
+                    <>
+                      <Scan className="w-4 h-4 mr-2" />
+                      Scan Item
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
       {/* PO Items Table */}
       <Card>
         <CardContent className="pt-6">
@@ -107,70 +171,6 @@ const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
 
       {/* Receive Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Item Selection */}
-        <Card>
-          <CardContent className="pt-6">
-            <Tabs defaultValue="manual" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="manual">Select Item</TabsTrigger>
-                <TabsTrigger value="scan">Scan Item</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="manual" className="space-y-4">
-                <div>
-                  <Label htmlFor="itemSelect">Select Item from PO</Label>
-                  <Select 
-                    value={formData.selectedItem} 
-                    onValueChange={(value) => {
-                      const item = poItems.find(i => i.itemCode === value);
-                      setFormData(prev => ({ 
-                        ...prev, 
-                        selectedItem: value,
-                        warehouse: item?.warehouse || ''
-                      }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an item to receive..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {poItems.filter(item => item.pendingQty > 0).map((item) => (
-                        <SelectItem key={item.itemCode} value={item.itemCode}>
-                          {item.itemCode} - {item.itemName} (Pending: {item.pendingQty} {item.uom})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="scan" className="space-y-4">
-                <div className="text-center">
-                  <Button 
-                    type="button"
-                    onClick={handleItemScan} 
-                    disabled={isScanning}
-                    size="lg"
-                    className="w-full"
-                  >
-                    {isScanning ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Scanning...
-                      </>
-                    ) : (
-                      <>
-                        <Scan className="w-4 h-4 mr-2" />
-                        Scan Item
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-
         {/* Item Details & Receive Quantity */}
         {selectedItemData && (
           <Card className="bg-blue-50">
