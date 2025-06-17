@@ -16,7 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Search, ChevronDown, Calendar, User, FileText } from "lucide-react";
+import { Search, ChevronDown, Calendar, User, FileText, IndianRupee } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { PurchaseOrder } from "@/services/erp/erpnext/types";
@@ -29,9 +29,12 @@ interface POOption {
   value: string;
   label: string;
   supplier: string;
+  supplierName: string;
+  poDate: string;
   expectedDate: string;
   totalAmount: number;
   status: string;
+  grandTotal: string;
 }
 
 const POSelector = ({ onSelectPO }: POSelectorProps) => {
@@ -72,10 +75,13 @@ const POSelector = ({ onSelectPO }: POSelectorProps) => {
         const options: POOption[] = poResult.data.map((po: PurchaseOrder) => ({
           value: po.name || '',
           label: `${po.name || ''} - ${po.supplier_name || po.supplier || ''}`,
-          supplier: po.supplier_name || po.supplier || '',
+          supplier: po.supplier || '',
+          supplierName: po.supplier_name || po.supplier || '',
+          poDate: po.transaction_date || '',
           expectedDate: po.schedule_date || po.transaction_date || '',
           totalAmount: po.grand_total || po.base_grand_total || 0,
-          status: po.status || 'To Receive'
+          status: po.status || 'To Receive',
+          grandTotal: po.grand_total ? `₹ ${po.grand_total.toLocaleString()}` : `₹ ${(po.base_grand_total || 0).toLocaleString()}`
         }));
         
         setPOOptions(options);
@@ -96,9 +102,10 @@ const POSelector = ({ onSelectPO }: POSelectorProps) => {
   const filteredOptions = poOptions.filter(option => {
     const searchLower = searchValue.toLowerCase();
     return (
-      (option.label || '').toLowerCase().includes(searchLower) ||
+      (option.value || '').toLowerCase().includes(searchLower) ||
       (option.supplier || '').toLowerCase().includes(searchLower) ||
-      (option.value || '').toLowerCase().includes(searchLower)
+      (option.supplierName || '').toLowerCase().includes(searchLower) ||
+      (option.poDate || '').toLowerCase().includes(searchLower)
     );
   });
 
@@ -143,26 +150,41 @@ const POSelector = ({ onSelectPO }: POSelectorProps) => {
                     key={option.value}
                     value={option.value}
                     onSelect={() => handleSelect(option.value)}
-                    className="flex flex-col items-start py-3"
+                    className="flex flex-col items-start py-4 px-3 border-b border-gray-100 last:border-b-0"
                   >
-                    <div className="flex items-center justify-between w-full">
+                    {/* First Row: PO Number and Grand Total */}
+                    <div className="flex items-center justify-between w-full mb-2">
                       <div className="flex items-center space-x-2">
                         <FileText className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium">{option.value}</span>
+                        <span className="font-semibold text-blue-700">{option.value}</span>
                       </div>
-                      <span className="text-sm text-gray-500">₹{option.totalAmount.toLocaleString()}</span>
+                      <div className="flex items-center space-x-1 text-green-700 font-semibold">
+                        <IndianRupee className="h-4 w-4" />
+                        <span>{option.grandTotal}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                      <div className="flex items-center space-x-1">
-                        <User className="h-3 w-3" />
-                        <span>{option.supplier}</span>
+                    
+                    {/* Second Row: Supplier Name */}
+                    <div className="flex items-center space-x-2 w-full mb-1">
+                      <User className="h-3 w-3 text-gray-500" />
+                      <span className="text-sm text-gray-700 font-medium">{option.supplierName}</span>
+                    </div>
+                    
+                    {/* Third Row: PO Date and Status */}
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="h-3 w-3 text-gray-500" />
+                        <span className="text-xs text-gray-600">
+                          {option.poDate ? new Date(option.poDate).toLocaleDateString() : 'No Date'}
+                        </span>
                       </div>
-                      {option.expectedDate && (
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{new Date(option.expectedDate).toLocaleDateString()}</span>
-                        </div>
-                      )}
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        option.status === 'To Receive' 
+                          ? 'bg-orange-100 text-orange-700' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {option.status}
+                      </span>
                     </div>
                   </CommandItem>
                 ))}
