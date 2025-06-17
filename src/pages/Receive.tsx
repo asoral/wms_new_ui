@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -267,16 +266,6 @@ const Receive = () => {
                       poItems={selectedPO.items} 
                       onAddEntry={addReceiveEntry}
                     />
-                  </CardContent>
-                </Card>
-
-                {/* PO Items */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Purchase Order Items</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <POItemsDisplay items={selectedPO.items} />
                   </CardContent>
                 </Card>
               </div>
