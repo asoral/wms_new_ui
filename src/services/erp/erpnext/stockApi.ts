@@ -143,17 +143,17 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       // Transform the report data to match expected format with proper null checks
       if (result && typeof result === 'object') {
         const message = result.message;
-        if (message && typeof message === 'object' && 'result' in message && Array.isArray(message.result)) {
+        if (message && typeof message === 'object' && 'result' in message && Array.isArray((message as any).result)) {
           return {
-            data: message.result
+            data: (message as any).result
           };
         }
       }
       
       // If result has data directly
-      if (result && typeof result === 'object' && 'data' in result && Array.isArray(result.data)) {
+      if (result && typeof result === 'object' && 'data' in result && Array.isArray((result as any).data)) {
         return {
-          data: result.data
+          data: (result as any).data
         };
       }
       
@@ -185,11 +185,17 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-  async createStockReconciliation(reconciliationData: any): Promise<ERPNextResponse<any>> {
+  async createStockReconciliation(reconciliationData: any, company?: string): Promise<ERPNextResponse<any>> {
+    // Add company to reconciliation data if provided
+    const finalData = { ...reconciliationData };
+    if (company) {
+      finalData.company = company;
+    }
+
     const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify(reconciliationData),
+      body: JSON.stringify(finalData),
     });
 
     if (!response.ok) {

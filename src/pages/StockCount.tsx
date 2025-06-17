@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,7 +111,7 @@ const StockCount = () => {
 
       const company = await getUserDefaultCompany();
       
-      // Prepare Stock Reconciliation data - always use Serial and Batch Bundle
+      // Prepare Stock Reconciliation data with company filter from user profile
       const stockReconciliationData = {
         purpose: session?.purpose === 'reconciliation' ? 'Stock Reconciliation' : 'Opening Stock',
         set_warehouse: firstEntry.warehouse,
