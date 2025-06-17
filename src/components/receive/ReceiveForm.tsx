@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,11 +9,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Scan, Plus, Loader2 } from "lucide-react";
 import { POItem, ReceiveEntry } from "../../pages/Receive";
+import { createERPNextAPI } from "@/services/erpnextApi";
 
 interface ReceiveFormProps {
   poItems: POItem[];
   onAddEntry: (entry: ReceiveEntry) => void;
   defaultWarehouse?: string;
+}
+
+interface ItemDetails {
+  has_batch_no?: number;
+  has_serial_no?: number;
 }
 
 const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps) => {
@@ -26,8 +32,34 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
   });
   const [isScanning, setIsScanning] = useState(false);
   const [inputMethod, setInputMethod] = useState<'traditional' | 'bundle'>('traditional');
+  const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
+  const [loadingItemDetails, setLoadingItemDetails] = useState(false);
 
   const selectedItemData = poItems.find(item => item.itemCode === formData.selectedItem);
+
+  // Fetch item details when selected item changes
+  useEffect(() => {
+    if (formData.selectedItem) {
+      fetchItemDetails(formData.selectedItem);
+    }
+  }, [formData.selectedItem]);
+
+  const fetchItemDetails = async (itemCode: string) => {
+    setLoadingItemDetails(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (erpnextAPI) {
+        const result = await erpnextAPI.getItemDetails(itemCode);
+        setItemDetails(result.data);
+        console.log('Item details:', result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch item details:', error);
+      setItemDetails(null);
+    } finally {
+      setLoadingItemDetails(false);
+    }
+  };
 
   const handleItemScan = () => {
     setIsScanning(true);
@@ -48,6 +80,20 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     
     if (!selectedItemData || formData.receivedQty <= 0) return;
 
+    // Validate required fields based on item tracking
+    const hasBatch = itemDetails?.has_batch_no === 1;
+    const hasSerial = itemDetails?.has_serial_no === 1;
+
+    if (hasBatch && !formData.batch.trim()) {
+      alert('Batch number is required for this item');
+      return;
+    }
+
+    if (hasSerial && !formData.serial.trim()) {
+      alert('Serial number is required for this item');
+      return;
+    }
+
     onAddEntry({
       itemCode: selectedItemData.itemCode,
       itemName: selectedItemData.itemName,
@@ -67,7 +113,11 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
       batch: '',
       serial: ''
     });
+    setItemDetails(null);
   };
+
+  const hasBatchTracking = itemDetails?.has_batch_no === 1;
+  const hasSerialTracking = itemDetails?.has_serial_no === 1;
 
   return (
     <div className="space-y-6">
@@ -92,7 +142,9 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                     setFormData(prev => ({ 
                       ...prev, 
                       selectedItem: value,
-                      warehouse: defaultWarehouse || item?.warehouse || ''
+                      warehouse: defaultWarehouse || item?.warehouse || '',
+                      batch: '',
+                      serial: ''
                     }));
                   }}
                 >
@@ -156,13 +208,35 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                   <p className="font-medium">{defaultWarehouse || selectedItemData.warehouse}</p>
                 </div>
               </div>
+              
+              {/* Show tracking information */}
+              {loadingItemDetails && (
+                <div className="flex items-center mt-2 text-sm text-gray-600">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading item tracking details...
+                </div>
+              )}
+              
+              {itemDetails && (
+                <div className="flex gap-2 mt-2">
+                  {hasBatchTracking && (
+                    <Badge variant="secondary">Batch Tracked</Badge>
+                  )}
+                  {hasSerialTracking && (
+                    <Badge variant="secondary">Serial Tracked</Badge>
+                  )}
+                  {!hasBatchTracking && !hasSerialTracking && (
+                    <Badge variant="outline">No Tracking Required</Badge>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Serial/Batch Input Method */}
-      {selectedItemData && (
+      {selectedItemData && itemDetails && (hasBatchTracking || hasSerialTracking) && (
         <Card>
           <CardContent className="pt-6">
             <h3 className="text-lg font-semibold mb-4">Serial/Batch Input Method</h3>
@@ -188,16 +262,18 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="batch">Batch Number *</Label>
-                  <Input
-                    id="batch"
-                    value={formData.batch}
-                    onChange={(e) => setFormData(prev => ({ ...prev, batch: e.target.value }))}
-                    placeholder="Enter batch number..."
-                    required
-                  />
-                </div>
+                {hasBatchTracking && (
+                  <div>
+                    <Label htmlFor="batch">Batch Number *</Label>
+                    <Input
+                      id="batch"
+                      value={formData.batch}
+                      onChange={(e) => setFormData(prev => ({ ...prev, batch: e.target.value }))}
+                      placeholder="Enter batch number..."
+                      required
+                    />
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="receivedQty">Actual Quantity *</Label>
                   <Input
@@ -213,14 +289,15 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                 </div>
               </div>
 
-              {inputMethod === 'traditional' && (
+              {hasSerialTracking && inputMethod === 'traditional' && (
                 <div>
-                  <Label htmlFor="serial">Serial Number (Optional)</Label>
+                  <Label htmlFor="serial">Serial Number {hasSerialTracking ? '*' : '(Optional)'}</Label>
                   <Input
                     id="serial"
                     value={formData.serial}
                     onChange={(e) => setFormData(prev => ({ ...prev, serial: e.target.value }))}
                     placeholder="Enter serial number..."
+                    required={hasSerialTracking}
                   />
                 </div>
               )}
@@ -228,7 +305,45 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={!formData.batch || formData.receivedQty <= 0}
+                disabled={
+                  formData.receivedQty <= 0 || 
+                  (hasBatchTracking && !formData.batch.trim()) ||
+                  (hasSerialTracking && !formData.serial.trim())
+                }
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add to Count
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Simple quantity entry for non-tracked items */}
+      {selectedItemData && itemDetails && !hasBatchTracking && !hasSerialTracking && (
+        <Card>
+          <CardContent className="pt-6">
+            <h3 className="text-lg font-semibold mb-4">Quantity Entry</h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="receivedQty">Actual Quantity *</Label>
+                <Input
+                  id="receivedQty"
+                  type="number"
+                  value={formData.receivedQty}
+                  onChange={(e) => setFormData(prev => ({ ...prev, receivedQty: Number(e.target.value) }))}
+                  placeholder="0"
+                  max={selectedItemData.pendingQty}
+                  min="1"
+                  required
+                />
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={formData.receivedQty <= 0}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add to Count
