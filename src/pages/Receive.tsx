@@ -54,6 +54,7 @@ const Receive = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [poNumber, setPONumber] = useState("");
   const [loading, setLoading] = useState(false);
+  const [currentPurchaseReceipt, setCurrentPurchaseReceipt] = useState<string | null>(null);
 
   const selectPO = async (poNumber: string) => {
     setLoading(true);
@@ -126,17 +127,135 @@ const Receive = () => {
     setSelectedWarehouse(warehouseCode);
   };
 
-  const addReceiveEntry = (entry: ReceiveEntry) => {
-    // Override warehouse with selected warehouse if one is chosen
-    const entryWithWarehouse = {
-      ...entry,
-      warehouse: selectedWarehouse || entry.warehouse
-    };
-    setReceiveEntries(prev => [...prev, entryWithWarehouse]);
+  const addReceiveEntry = async (entry: ReceiveEntry) => {
+    if (!selectedPO) return;
+
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Override warehouse with selected warehouse if one is chosen
+      const entryWithWarehouse = {
+        ...entry,
+        warehouse: selectedWarehouse || entry.warehouse
+      };
+
+      // If this is the first item, create a new Purchase Receipt
+      if (!currentPurchaseReceipt) {
+        const receiptData = {
+          doctype: "Purchase Receipt",
+          supplier: selectedPO.supplier,
+          posting_date: new Date().toISOString().split('T')[0],
+          purchase_order: selectedPO.poNumber,
+          items: [{
+            item_code: entryWithWarehouse.itemCode,
+            qty: entryWithWarehouse.receivedQty,
+            warehouse: entryWithWarehouse.warehouse,
+            rate: entryWithWarehouse.rate,
+            uom: entryWithWarehouse.uom,
+            batch_no: entryWithWarehouse.batch,
+            serial_no: entryWithWarehouse.serial
+          }]
+        };
+
+        console.log('Creating new Purchase Receipt:', receiptData);
+        const result = await erpnextAPI.createPurchaseReceipt(receiptData);
+        
+        if (result.data?.name) {
+          setCurrentPurchaseReceipt(result.data.name);
+          toast({
+            title: "Purchase Receipt Created",
+            description: `Purchase Receipt ${result.data.name} created with item ${entryWithWarehouse.itemCode}`,
+          });
+        }
+      } else {
+        // Add item to existing Purchase Receipt
+        try {
+          // First get the current receipt data
+          const currentReceiptResponse = await fetch(
+            `${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`,
+            { headers: erpnextAPI.getHeaders() }
+          );
+          
+          if (!currentReceiptResponse.ok) {
+            throw new Error('Failed to fetch current receipt');
+          }
+          
+          const currentReceipt = await currentReceiptResponse.json();
+          
+          // Add new item to the items array
+          const newItem = {
+            item_code: entryWithWarehouse.itemCode,
+            qty: entryWithWarehouse.receivedQty,
+            warehouse: entryWithWarehouse.warehouse,
+            rate: entryWithWarehouse.rate,
+            uom: entryWithWarehouse.uom,
+            batch_no: entryWithWarehouse.batch,
+            serial_no: entryWithWarehouse.serial
+          };
+          
+          currentReceipt.data.items.push(newItem);
+          
+          // Update the Purchase Receipt
+          const updateResponse = await fetch(
+            `${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`,
+            {
+              method: 'PUT',
+              headers: {
+                ...erpnextAPI.getHeaders(),
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(currentReceipt.data)
+            }
+          );
+          
+          if (!updateResponse.ok) {
+            throw new Error('Failed to update receipt');
+          }
+          
+          toast({
+            title: "Item Added",
+            description: `Item ${entryWithWarehouse.itemCode} added to Purchase Receipt ${currentPurchaseReceipt}`,
+          });
+        } catch (error) {
+          console.error('Error updating receipt:', error);
+          toast({
+            title: "Error",
+            description: "Failed to add item to existing receipt",
+            variant: "destructive"
+          });
+        }
+      }
+
+      // Add to local state
+      setReceiveEntries(prev => [...prev, entryWithWarehouse]);
+      
+    } catch (error) {
+      console.error('Error creating/updating receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create/update purchase receipt",
+        variant: "destructive"
+      });
+    }
   };
 
   const submitReceipt = async () => {
-    if (!selectedPO || receiveEntries.length === 0) return;
+    if (!currentPurchaseReceipt) {
+      toast({
+        title: "No Receipt to Submit",
+        description: "Please add items first to create a purchase receipt.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       const erpnextAPI = await createERPNextAPI();
@@ -149,39 +268,42 @@ const Receive = () => {
         return;
       }
 
-      // Create Purchase Receipt in ERPNext
-      const receiptData = {
-        supplier: selectedPO.supplier,
-        posting_date: new Date().toISOString().split('T')[0],
-        items: receiveEntries.map(entry => ({
-          item_code: entry.itemCode,
-          qty: entry.receivedQty,
-          warehouse: entry.warehouse,
-          rate: entry.rate,
-          uom: entry.uom,
-          batch_no: entry.batch,
-          serial_no: entry.serial
-        }))
-      };
+      // Submit the Purchase Receipt in ERPNext
+      const submitResponse = await fetch(
+        `${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`,
+        {
+          method: 'PUT',
+          headers: {
+            ...erpnextAPI.getHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            docstatus: 1  // Submit the document
+          })
+        }
+      );
 
-      await erpnextAPI.createPurchaseReceipt(receiptData);
+      if (!submitResponse.ok) {
+        throw new Error('Failed to submit receipt');
+      }
       
       toast({
         title: "Success",
-        description: "Purchase receipt created successfully!",
+        description: `Purchase receipt ${currentPurchaseReceipt} submitted successfully!`,
       });
       
       // Reset form
       setReceiveEntries([]);
       setSelectedPO(null);
       setSelectedWarehouse("");
+      setCurrentPurchaseReceipt(null);
       setActiveTab("dashboard");
       
     } catch (error) {
-      console.error('Error creating receipt:', error);
+      console.error('Error submitting receipt:', error);
       toast({
         title: "Error",
-        description: "Failed to create purchase receipt",
+        description: "Failed to submit purchase receipt",
         variant: "destructive"
       });
     }
@@ -205,9 +327,12 @@ const Receive = () => {
           {selectedPO && (
             <div className="flex items-center space-x-2">
               <Badge variant="outline">{selectedPO.poNumber}</Badge>
-              <Button onClick={submitReceipt} disabled={receiveEntries.length === 0 || loading}>
+              {currentPurchaseReceipt && (
+                <Badge variant="secondary">PR: {currentPurchaseReceipt}</Badge>
+              )}
+              <Button onClick={submitReceipt} disabled={!currentPurchaseReceipt || loading}>
                 <Package className="w-4 h-4 mr-2" />
-                Create Receipt
+                Submit Receipt
               </Button>
             </div>
           )}
@@ -293,18 +418,11 @@ const Receive = () => {
                 </Card>
 
                 {/* Receive Form */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Scan/Select Items to Receive</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ReceiveForm 
-                      poItems={selectedPO.items} 
-                      onAddEntry={addReceiveEntry}
-                      defaultWarehouse={selectedWarehouse}
-                    />
-                  </CardContent>
-                </Card>
+                <ReceiveForm 
+                  poItems={selectedPO.items} 
+                  onAddEntry={addReceiveEntry}
+                  defaultWarehouse={selectedWarehouse}
+                />
               </div>
             )}
           </TabsContent>

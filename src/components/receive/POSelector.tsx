@@ -57,17 +57,8 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
         ['status', 'in', ['To Receive', 'To Receive and Bill']]
       ];
 
-      // Get additional fields we need for display
-      const fields = [
-        'name',
-        'supplier',
-        'supplier_name', 
-        'schedule_date',
-        'grand_total',
-        'status'
-      ];
-
-      const result = await erpnextAPI.getPurchaseOrders(filters, defaultCompany || undefined, 100, fields);
+      // Fix the API call to use proper parameters
+      const result = await erpnextAPI.getPurchaseOrders(filters, defaultCompany || undefined, 100);
       
       if (result?.data) {
         // Transform the data to match our interface, handling undefined values
@@ -115,73 +106,46 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
   return (
     <div className="space-y-4">
       <div>
-        <Label htmlFor="poSearch">Purchase Order Number</Label>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-full justify-between"
-              disabled={loading}
-            >
-              {value
-                ? selectedPO
-                  ? `${selectedPO.name} - ${selectedPO.supplier_name}`
-                  : value
-                : "Select purchase order..."}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-full p-0" align="start">
-            <Command>
-              <CommandInput 
-                placeholder="Search purchase orders..." 
-                value={searchValue}
-                onValueChange={setSearchValue}
-              />
-              <CommandList>
-                {isLoading ? (
-                  <div className="flex items-center justify-center p-4">
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Loading...
+        <Label htmlFor="poSearch">Search Purchase Order</Label>
+        <div className="relative">
+          <Input
+            id="poSearch"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onFocus={() => setOpen(true)}
+            placeholder="Type PO number, supplier name, or amount..."
+            className="w-full"
+            disabled={loading || isLoading}
+          />
+          {searchValue && filteredPOs.length > 0 && open && (
+            <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {filteredPOs.map((po) => (
+                <div
+                  key={po.name}
+                  onClick={() => handleSelect(po.name)}
+                  className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{po.name}</div>
+                      <div className="text-xs text-gray-600">
+                        {po.supplier_name} • {po.schedule_date} • ₹{po.grand_total?.toLocaleString() || '0'}
+                      </div>
+                    </div>
+                    {value === po.name && (
+                      <Check className="h-4 w-4 text-green-600" />
+                    )}
                   </div>
-                ) : (
-                  <>
-                    <CommandEmpty>
-                      {searchValue ? `No purchase orders found matching "${searchValue}".` : "No purchase orders found."}
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {filteredPOs.map((po) => (
-                        <CommandItem
-                          key={po.name}
-                          value={po.name}
-                          onSelect={() => handleSelect(po.name)}
-                          className="flex flex-col items-start p-3"
-                        >
-                          <div className="flex items-center w-full">
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                value === po.name ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium">{po.name}</div>
-                              <div className="text-sm text-gray-600">
-                                {po.supplier_name} • {po.schedule_date} • ₹{po.grand_total.toLocaleString()}
-                              </div>
-                            </div>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </>
-                )}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+                </div>
+              ))}
+            </div>
+          )}
+          {isLoading && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
+          )}
+        </div>
         
         {selectedPO && (
           <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
@@ -189,7 +153,7 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
               <p><strong>PO:</strong> {selectedPO.name}</p>
               <p><strong>Supplier:</strong> {selectedPO.supplier_name}</p>
               <p><strong>Date:</strong> {selectedPO.schedule_date}</p>
-              <p><strong>Total:</strong> ₹{selectedPO.grand_total.toLocaleString()}</p>
+              <p><strong>Total:</strong> ₹{selectedPO.grand_total?.toLocaleString() || '0'}</p>
               <p><strong>Status:</strong> {selectedPO.status}</p>
             </div>
           </div>
