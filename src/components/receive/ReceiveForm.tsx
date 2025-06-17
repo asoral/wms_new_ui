@@ -71,43 +71,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
 
   return (
     <div className="space-y-6">
-      {/* PO Items Table */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Item Code</th>
-                  <th className="text-left p-2">Item Name</th>
-                  <th className="text-right p-2">Ordered</th>
-                  <th className="text-right p-2">Received</th>
-                  <th className="text-right p-2">Pending</th>
-                  <th className="text-left p-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {poItems.map((item, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="p-2 font-medium">{item.itemCode}</td>
-                    <td className="p-2">{item.itemName}</td>
-                    <td className="p-2 text-right">{item.orderedQty} {item.uom}</td>
-                    <td className="p-2 text-right">{item.receivedQty} {item.uom}</td>
-                    <td className="p-2 text-right font-medium">{item.pendingQty} {item.uom}</td>
-                    <td className="p-2">
-                      <Badge variant={item.pendingQty === 0 ? "default" : "secondary"}>
-                        {item.pendingQty === 0 ? "Completed" : "Pending"}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Scan Items Section */}
+      {/* Scan Items Section - Moved above the PO Items Table */}
       <Card>
         <CardContent className="pt-6">
           <h3 className="text-lg font-semibold mb-4">Scan Items</h3>
@@ -180,8 +144,8 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                   <p className="font-medium">{selectedItemData.itemName}</p>
                 </div>
                 <div>
-                  <Label>Current Stock</Label>
-                  <p className="font-medium text-green-600">✓ {selectedItemData.pendingQty} {selectedItemData.uom}</p>
+                  <Label>Pending Qty</Label>
+                  <p className="font-medium text-orange-600">{selectedItemData.pendingQty} {selectedItemData.uom}</p>
                 </div>
                 <div>
                   <Label>Rate</Label>
@@ -273,6 +237,43 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
           </CardContent>
         </Card>
       )}
+
+      {/* PO Items Table - Moved below scan section */}
+      <Card>
+        <CardContent className="pt-6">
+          <h3 className="text-lg font-semibold mb-4">Purchase Order Items</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Item Code</th>
+                  <th className="text-left p-2">Item Name</th>
+                  <th className="text-right p-2">Ordered</th>
+                  <th className="text-right p-2">Received</th>
+                  <th className="text-right p-2">Pending</th>
+                  <th className="text-left p-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {poItems.map((item, index) => (
+                  <tr key={index} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{item.itemCode}</td>
+                    <td className="p-2">{item.itemName}</td>
+                    <td className="p-2 text-right">{item.orderedQty} {item.uom}</td>
+                    <td className="p-2 text-right">{item.receivedQty} {item.uom}</td>
+                    <td className="p-2 text-right font-medium">{item.pendingQty} {item.uom}</td>
+                    <td className="p-2">
+                      <Badge variant={item.pendingQty === 0 ? "default" : "secondary"}>
+                        {item.pendingQty === 0 ? "Completed" : "Pending"}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
