@@ -8,6 +8,8 @@ export class ERPNextWarehouseAPI extends ERPNextBaseAPI {
     if (filters) {
       finalFilters = [...finalFilters, ...this.convertToFrappeFilters(filters)];
     }
+    
+    // Always apply company filter if provided
     if (company) {
       finalFilters.push(['company', '=', company]);
     }

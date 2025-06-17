@@ -52,20 +52,22 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
 
       const defaultCompany = await getUserDefaultCompany();
       
-      // Fetch submitted POs with broader status criteria to include more POs
-      const filters = [
+      // Fetch submitted POs with broader status criteria and company filter
+      let filters = [
         ['docstatus', '=', 1],
         ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']]
       ];
+
+      // Apply company filter from user's default company
+      if (defaultCompany) {
+        filters.push(['company', '=', defaultCompany]);
+      }
 
       console.log('Fetching POs with filters:', filters);
 
       // Fetch POs with explicit field selection to ensure we get all required data
       const params = new URLSearchParams();
       params.append('filters', JSON.stringify(filters));
-      if (defaultCompany) {
-        params.append('filters', JSON.stringify([...filters, ['company', '=', defaultCompany]]));
-      }
       
       // Explicitly request the fields we need
       const fields = [
@@ -114,7 +116,7 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
         if (transformedOrders.length === 0) {
           toast({
             title: "No Purchase Orders Found",
-            description: "No purchase orders with 'To Receive' status found.",
+            description: `No purchase orders found for company: ${defaultCompany || 'default'}`,
             variant: "destructive"
           });
         }
@@ -211,7 +213,7 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
         {!isLoading && purchaseOrders.length === 0 && (
           <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
             <p className="text-sm text-yellow-800">
-              No purchase orders found. Make sure there are submitted POs with status "To Receive" or "To Receive and Bill".
+              No purchase orders found for your default company. Make sure there are submitted POs with status "To Receive" or "To Receive and Bill".
             </p>
           </div>
         )}
