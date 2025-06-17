@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Scan, Plus, Loader2 } from "lucide-react";
 import { POItem, ReceiveEntry } from "../../pages/Receive";
 
@@ -68,6 +69,42 @@ const ReceiveForm = ({ poItems, onAddEntry }: ReceiveFormProps) => {
 
   return (
     <div className="space-y-6">
+      {/* PO Items Table */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Item Code</th>
+                  <th className="text-left p-2">Item Name</th>
+                  <th className="text-right p-2">Ordered</th>
+                  <th className="text-right p-2">Received</th>
+                  <th className="text-right p-2">Pending</th>
+                  <th className="text-left p-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {poItems.map((item, index) => (
+                  <tr key={index} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{item.itemCode}</td>
+                    <td className="p-2">{item.itemName}</td>
+                    <td className="p-2 text-right">{item.orderedQty} {item.uom}</td>
+                    <td className="p-2 text-right">{item.receivedQty} {item.uom}</td>
+                    <td className="p-2 text-right font-medium">{item.pendingQty} {item.uom}</td>
+                    <td className="p-2">
+                      <Badge variant={item.pendingQty === 0 ? "default" : "secondary"}>
+                        {item.pendingQty === 0 ? "Completed" : "Pending"}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Receive Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Item Selection */}

@@ -1,3 +1,4 @@
+
 import { ERPNextConfig } from './types';
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -9,7 +10,6 @@ import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextCompanyAPI } from './companyApi';
 import { ERPNextOtherAPIs } from './otherApis';
 import { ERPNextDashboardAPI } from './dashboardApi';
-import { APIResponse, StockBalanceItem } from './types';
 
 let erpnextConfig: ERPNextConfig | null = null;
 
@@ -38,6 +38,9 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
 };
 
 export const getUserDefaultCompany = async (): Promise<string | null> => {
+  // company set difault
+
+
   try {
     const storedCompany = localStorage.getItem('erpnextDefaultCompany');
     if (storedCompany) {
@@ -115,14 +118,12 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Stock API methods
-  getStockBalance(itemCode: string, warehouses: string[]): Promise<APIResponse<StockBalanceItem[]>>;
-  getStockBalance(filters?: any, company?: string): Promise<APIResponse<StockBalanceItem[]>>;
-  getStockBalance(filterOrItemCode?: any, warehousesOrCompany?: string[] | string): Promise<APIResponse<StockBalanceItem[]>> {
-    return this.stockApi.getStockBalance(filterOrItemCode, warehousesOrCompany);
+  getStockBalance(filters?: any, company?: string) {
+    return this.stockApi.getStockBalance(filters, company);
   }
 
-  getBinStock(itemCode: string, warehouse: string) {
-    return this.stockApi.getBinStock(itemCode, warehouse);
+  getBinStock(filters?: any) {
+    return this.stockApi.getBinStock(filters);
   }
 
   getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {

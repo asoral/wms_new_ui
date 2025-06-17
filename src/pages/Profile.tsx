@@ -1,538 +1,700 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { 
-  User, 
-  Settings, 
-  Database, 
-  Eye, 
-  EyeOff, 
-  Save, 
-  TestTube, 
-  CheckCircle, 
-  XCircle, 
-  Loader2,
-  LogOut,
-  Key
-} from 'lucide-react';
-import { useAuth } from '@/components/auth/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { createERPNextAPI } from '@/services/erpnextApi';
-
-interface CompanyInfo {
-  companyName: string;
-  abbr: string;
-  currency: string;
-}
-
-interface Item {
-  itemCode: string;
-  itemName: string;
-  qty: number;
-}
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, CheckCircle, XCircle, Settings, User, Building2, CreditCard, Mail } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthContext";
+import { ERPNextAPI, configureERPNextAPI, createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
+import { getERPNextConfig, saveERPNextConfig } from '@/services/authService';
+import SubscriptionStatus from '@/components/subscription/SubscriptionStatus';
+import { supabase } from "@/integrations/supabase/client";
 
 const Profile = () => {
-  const navigate = useNavigate();
+  const { user, signIn } = useAuth();
+  const [baseURL, setBaseURL] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [apiSecret, setApiSecret] = useState('');
+  const [selectedCompany, setSelectedCompany] = useState('');
+  const [selectedPalletTemplate, setSelectedPalletTemplate] = useState('');
+  const [companies, setCompanies] = useState<Array<{ name: string; company_name: string }>>([]);
+  const [palletTemplateItems, setPalletTemplateItems] = useState<Array<{ name: string; item_name: string }>>([]);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+  const [isLoadingTemplateItems, setIsLoadingTemplateItems] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "error">("idle");
   const { toast } = useToast();
-  const authContext = useAuth();
-  const [user, setUser] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    erpnextUrl: '',
-    erpnextApiKey: '',
-    erpnextApiSecret: '',
-    erpnextDefaultCompany: '',
-    erpnextPalletTemplateItem: ''
-  });
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [isConfigured, setIsConfigured] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'unknown'>('unknown');
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; content: string } | null>(null);
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
-  const [showApiSecret, setShowApiSecret] = useState(false);
+
+  // Password change state
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+    const loadConfiguration = async () => {
       if (!user) return;
+      
+      setIsLoadingConfig(true);
+      try {
+        console.log('Loading ERPNext configuration from database...');
+        const config = await getERPNextConfig();
+        
+        // Add type guard to check if config is not an error
+        if (config && typeof config === "object" &&
+          'erpnext_url' in config &&
+          'erpnext_api_key' in config &&
+          'erpnext_api_secret' in config &&
+          'erpnext_default_company' in config
+        ) {
+          setBaseURL((config.erpnext_url as string) || '');
+          setApiKey((config.erpnext_api_key as string) || '');
+          setApiSecret((config.erpnext_api_secret as string) || '');
+          setSelectedCompany((config.erpnext_default_company as string) || '');
+          setSelectedPalletTemplate((config.erpnext_pallet_template_item as string) || '');
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-
-      // Type guard to ensure profile data exists
-      if (profile) {
-        setFormData({
-          erpnextUrl: profile.erpnext_url || '',
-          erpnextApiKey: profile.erpnext_api_key || '',
-          erpnextApiSecret: profile.erpnext_api_secret || '',
-          erpnextDefaultCompany: profile.erpnext_default_company || '',
-          erpnextPalletTemplateItem: profile.erpnext_pallet_template_item || ''
-        });
-
-        const hasConfig = profile.erpnext_url && profile.erpnext_api_key && profile.erpnext_api_secret;
-        setIsConfigured(!!hasConfig);
-        if (hasConfig) {
-          await testConnection(profile.erpnext_url, profile.erpnext_api_key, profile.erpnext_api_secret);
+          if (config.erpnext_url && config.erpnext_api_key && config.erpnext_api_secret) {
+            await testConnectionAndLoadCompanies(config.erpnext_url, config.erpnext_api_key, config.erpnext_api_secret);
+          }
+        } else {
+          console.log('No ERPNext config found in database, checking localStorage...');
+          // Fallback to localStorage for migration
+          const storedBaseURL = localStorage.getItem('erpnextBaseURL') || '';
+          const storedApiKey = localStorage.getItem('erpnextApiKey') || '';
+          const storedApiSecret = localStorage.getItem('erpnextApiSecret') || '';
+          const storedCompany = localStorage.getItem('erpnextDefaultCompany') || '';
+          
+          if (storedBaseURL || storedApiKey || storedApiSecret) {
+            console.log('Found credentials in localStorage, migrating to database...');
+            setBaseURL(storedBaseURL);
+            setApiKey(storedApiKey);
+            setApiSecret(storedApiSecret);
+            setSelectedCompany(storedCompany);
+            
+            // Save to database
+            if (storedBaseURL && storedApiKey && storedApiSecret) {
+              await saveERPNextConfig({
+                erpnext_url: storedBaseURL,
+                erpnext_api_key: storedApiKey,
+                erpnext_api_secret: storedApiSecret,
+                erpnext_default_company: storedCompany
+              });
+              
+              await testConnectionAndLoadCompanies(storedBaseURL, storedApiKey, storedApiSecret);
+            }
+          }
         }
+      } catch (error) {
+        console.error('Error loading configuration:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load ERPNext configuration",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingConfig(false);
+      }
+    };
+
+    loadConfiguration();
+  }, [user]);
+
+  const testConnectionAndLoadCompanies = async (url: string, key: string, secret: string) => {
+    try {
+      const testAPI = new ERPNextAPI(url, key, secret);
+      const isConnected = await testAPI.testConnection();
+      
+      if (isConnected) {
+        console.log('Connection successful, loading companies...');
+        setConnectionStatus('connected');
+        
+        // Load companies
+        setIsLoadingCompanies(true);
+        const companiesResult = await testAPI.getCompanies();
+        console.log('Companies loaded:', companiesResult);
+        setCompanies(companiesResult.data || []);
+        setIsLoadingCompanies(false);
+        
+        // Configure the global API instance
+        configureERPNextAPI({
+          baseURL: url,
+          apiKey: key,
+          apiSecret: secret
+        });
+        
+        return true;
+      } else {
+        console.log('Connection failed');
+        setConnectionStatus('error');
+        return false;
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error during connection test:', error);
+      setConnectionStatus('error');
+      setIsLoadingCompanies(false);
+      return false;
     }
   };
 
-  const testConnection = async (url: string, apiKey: string, apiSecret: string) => {
-    setTesting(true);
-    setMessage(null);
+  const loadPalletTemplateItems = async () => {
+    if (!baseURL || !apiKey || !apiSecret) return;
+
+    setIsLoadingTemplateItems(true);
     try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        setConnectionStatus('disconnected');
-        setMessage({ type: 'error', content: 'Failed to create ERPNext API instance.' });
-        return;
-      }
+      const testAPI = new ERPNextAPI(baseURL, apiKey, apiSecret);
       
-      // Test with a simple API call, e.g., fetching company info
-      const companies = await erpnextAPI.getCompanies();
-      if (companies.success && companies.data && companies.data.length > 0) {
-        const company = companies.data[0];
-        setCompanyInfo({
-          companyName: company.company_name,
-          abbr: company.abbr,
-          currency: company.default_currency
-        });
-        setConnectionStatus('connected');
-        setMessage({ type: 'success', content: 'Connection successful!' });
-      } else {
-        setConnectionStatus('disconnected');
-        setMessage({ type: 'error', content: 'Failed to fetch company information. Check your credentials.' });
-      }
-    } catch (error: any) {
-      console.error('Connection test error:', error);
-      setConnectionStatus('disconnected');
-      setMessage({ type: 'error', content: error.message || 'An error occurred during the connection test.' });
+      // Fetch items with maintain_stock=1 and is_template=1
+      const result = await testAPI.getItems({
+        maintain_stock: 1,
+        is_template: 1
+      });
+
+      // Map items to correct shape for selector (ERPNext might return item_code instead of name)
+      const mapped =
+        result.data && Array.isArray(result.data)
+          ? result.data
+              .filter((item: any) => item.name && item.item_name)
+              .map((item: any) => ({
+                name: item.name,
+                item_name: item.item_name,
+              }))
+          : [];
+      setPalletTemplateItems(mapped);
+    } catch (error) {
+      console.error('Error loading pallet template items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load pallet template items",
+        variant: "destructive",
+      });
     } finally {
-      setTesting(false);
+      setIsLoadingTemplateItems(false);
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setMessage(null);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          erpnext_url: formData.erpnextUrl,
-          erpnext_api_key: formData.erpnextApiKey,
-          erpnext_api_secret: formData.erpnextApiSecret,
-          erpnext_default_company: formData.erpnextDefaultCompany,
-          erpnext_pallet_template_item: formData.erpnextPalletTemplateItem
-        })
-        .eq('id', user.id);
-
-      if (error) {
-        console.error('Update error:', error);
-        setMessage({ type: 'error', content: 'Failed to update profile.' });
-      } else {
-        setMessage({ type: 'success', content: 'Profile updated successfully!' });
-        setIsConfigured(true);
-        await testConnection(formData.erpnextUrl, formData.erpnextApiKey, formData.erpnextApiSecret);
-      }
-    } catch (error: any) {
-      console.error('Error during save:', error);
-      setMessage({ type: 'error', content: error.message || 'An unexpected error occurred.' });
-    } finally {
-      setSaving(false);
+  // Load template items when company is selected and connection is established
+  useEffect(() => {
+    if (selectedCompany && connectionStatus === 'connected') {
+      loadPalletTemplateItems();
     }
-  };
+  }, [selectedCompany, connectionStatus]);
 
   const handleTestConnection = async () => {
-    await testConnection(formData.erpnextUrl, formData.erpnextApiKey, formData.erpnextApiSecret);
-  };
-
-  const handlePasswordChange = async () => {
-    setPasswordLoading(true);
-    setMessage(null);
-
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setMessage({ type: 'error', content: 'New passwords do not match.' });
-      setPasswordLoading(false);
+    if (!baseURL || !apiKey || !apiSecret) {
+      toast({
+        title: "Error",
+        description: "Please fill in all ERPNext configuration fields",
+        variant: "destructive",
+      });
       return;
     }
 
+    // Clean the base URL (remove trailing slash if present)
+    const cleanBaseURL = baseURL.replace(/\/+$/, '');
+    
+    setIsTestingConnection(true);
+    setConnectionStatus('idle');
+    
     try {
-      const { data, error } = await supabase.auth.updateUser({
-        password: passwordForm.newPassword,
-      })
-
-      if (error) {
-        console.error('Password update error:', error);
-        setMessage({ type: 'error', content: error.message || 'Failed to update password.' });
-      } else {
-        setMessage({ type: 'success', content: 'Password updated successfully!' });
-        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      }
-    } catch (error: any) {
-      console.error('Unexpected error during password update:', error);
-      setMessage({ type: 'error', content: error.message || 'An unexpected error occurred.' });
-    } finally {
-      setPasswordLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    if (authContext?.signOut) {
-      await authContext.signOut();
-      navigate('/auth');
-    }
-  };
-
-  const loadItems = async () => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
+      console.log('Testing connection with:', { baseURL: cleanBaseURL, apiKey });
+      const success = await testConnectionAndLoadCompanies(cleanBaseURL, apiKey, apiSecret);
+      
+      if (success) {
         toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings.",
-          variant: "destructive"
+          title: "Success",
+          description: "Successfully connected to ERPNext!",
         });
-        return;
-      }
-
-      // Fetch items from ERPNext
-      const itemsResult = await erpnextAPI.getItems();
-      if (itemsResult.data) {
-        setItems(itemsResult.data.map((item: any) => ({
-          itemCode: item.item_code,
-          itemName: item.item_name,
-          qty: item.qty || 1
-        })));
       } else {
         toast({
-          title: "Error",
-          description: "Failed to fetch items from ERPNext",
-          variant: "destructive"
+          title: "Connection Failed",
+          description: "Unable to connect to ERPNext. Please check your credentials and URL.",
+          variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Error fetching items:', error);
+      console.error('Connection test failed:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch items from ERPNext",
-        variant: "destructive"
+        title: "Connection Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
       });
+      setConnectionStatus('error');
+    } finally {
+      setIsTestingConnection(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <User className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Profile & Settings</h1>
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={handleLogout}
-            className="flex items-center space-x-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Logout</span>
-          </Button>
-        </div>
+  const handleSaveConfiguration = async () => {
+    if (!baseURL || !apiKey || !apiSecret) {
+      toast({
+        title: "Error",
+        description: "Please fill in all ERPNext configuration fields",
+        variant: "destructive",
+      });
+      return;
+    }
 
-        {/* Account Information */}
+    const cleanBaseURL = baseURL.replace(/\/+$/, '');
+    
+    setIsSaving(true);
+    try {
+      // Test connection first
+      const success = await testConnectionAndLoadCompanies(cleanBaseURL, apiKey, apiSecret);
+      
+      if (success) {
+        // Save to database
+        const result = await saveERPNextConfig({
+          erpnext_url: cleanBaseURL,
+          erpnext_api_key: apiKey,
+          erpnext_api_secret: apiSecret,
+          erpnext_default_company: selectedCompany,
+          erpnext_pallet_template_item: selectedPalletTemplate
+        });
+
+        if (result.success) {
+          toast({
+            title: "Success",
+            description: "ERPNext configuration saved successfully!",
+          });
+        } else {
+          throw new Error('Failed to save to database');
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save configuration. Connection test failed.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save configuration:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save configuration. Please check your settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCompanyChange = async (company: string) => {
+    setSelectedCompany(company);
+    setSelectedPalletTemplate(''); // Reset pallet template when company changes
+    
+    // Save the updated company to database
+    if (baseURL && apiKey && apiSecret) {
+      try {
+        await saveERPNextConfig({
+          erpnext_url: baseURL,
+          erpnext_api_key: apiKey,
+          erpnext_api_secret: apiSecret,
+          erpnext_default_company: company,
+          erpnext_pallet_template_item: ''
+        });
+        
+        toast({
+          title: "Company Updated",
+          description: `Default company set to ${company}`,
+        });
+      } catch (error) {
+        console.error('Failed to save company selection:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save company selection",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handlePalletTemplateChange = async (templateItem: string) => {
+    setSelectedPalletTemplate(templateItem);
+    
+    // Save the updated pallet template to database
+    if (baseURL && apiKey && apiSecret) {
+      try {
+        await saveERPNextConfig({
+          erpnext_url: baseURL,
+          erpnext_api_key: apiKey,
+          erpnext_api_secret: apiSecret,
+          erpnext_default_company: selectedCompany,
+          erpnext_pallet_template_item: templateItem
+        });
+        
+        toast({
+          title: "Pallet Template Updated",
+          description: `Pallet template item set to ${palletTemplateItems.find(item => item.name === templateItem)?.item_name || templateItem}`,
+        });
+      } catch (error) {
+        console.error('Failed to save pallet template selection:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save pallet template selection",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Handler for password change
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Reset error state
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      toast({
+        title: "Error",
+        description: "All fields are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setChangingPassword(true);
+
+    // Validate old password by trying to sign in
+    const email = user?.email;
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "User email not found.",
+        variant: "destructive",
+      });
+      setChangingPassword(false);
+      return;
+    }
+    // Attempt sign in to verify current credentials
+    const { error } = await signIn(email, oldPassword);
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Incorrect old password.",
+        variant: "destructive",
+      });
+      setChangingPassword(false);
+      return;
+    }
+    // Change password via Supabase
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) {
+      toast({
+        title: "Error",
+        description: updateError.message || "Failed to change password.",
+        variant: "destructive",
+      });
+      setChangingPassword(false);
+      return;
+    }
+    toast({
+      title: "Success",
+      description: "Your password has been updated.",
+    });
+    setShowChangePassword(false);
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setChangingPassword(false);
+  };
+
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center space-x-3 mb-6">
+        <User className="h-8 w-8 text-primary" />
+        <h1 className="text-3xl font-bold">Profile Settings</h1>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* User Information Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <User className="w-5 h-5" />
+              <User className="h-5 w-5" />
               <span>Account Information</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label>Email</Label>
-              <Input 
-                value={user?.email || ''} 
-                disabled 
-                className="bg-gray-100"
-              />
+            <div className="flex items-center space-x-3">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <Label className="text-sm text-muted-foreground">Email</Label>
+                <p className="font-medium">{user?.email || 'Not available'}</p>
+              </div>
             </div>
-            
-            <Separator />
-            
-            <div>
-              <h4 className="text-sm font-medium mb-3 flex items-center space-x-2">
-                <Key className="w-4 h-4" />
-                <span>Change Password</span>
-              </h4>
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input
-                    id="current-password"
-                    type="password"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                    placeholder="Enter current password"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                    placeholder="Enter new password"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    placeholder="Confirm new password"
-                  />
-                </div>
-                <Button 
-                  onClick={handlePasswordChange} 
-                  disabled={passwordLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+            <div className="flex items-center space-x-3">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <Label className="text-sm text-muted-foreground">User ID</Label>
+                <p className="font-mono text-sm">{user?.id || 'Not available'}</p>
+              </div>
+            </div>
+            {/* Change Password Section */}
+            <div className="mt-4">
+              {!showChangePassword ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowChangePassword(true)}
                   className="w-full"
                 >
-                  {passwordLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Change Password
                 </Button>
-              </div>
+              ) : (
+                <form className="space-y-3" onSubmit={handleChangePassword}>
+                  <div>
+                    <Label htmlFor="old-password">Old Password</Label>
+                    <Input
+                      id="old-password"
+                      type="password"
+                      value={oldPassword}
+                      autoComplete="current-password"
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      disabled={changingPassword}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={newPassword}
+                      autoComplete="new-password"
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={changingPassword}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={confirmPassword}
+                      autoComplete="new-password"
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={changingPassword}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      type="submit"
+                      className="flex-1"
+                      disabled={changingPassword}
+                    >
+                      {changingPassword ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Update Password
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowChangePassword(false);
+                        setOldPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                      }}
+                      disabled={changingPassword}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* ERPNext Configuration */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Database className="w-5 h-5" />
-                <span>ERPNext Configuration</span>
-              </div>
-              {isConfigured && (
-                <Badge variant={connectionStatus === 'connected' ? 'default' : 'destructive'}>
-                  {connectionStatus === 'connected' ? (
-                    <>
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Connected
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="w-3 h-3 mr-1" />
-                      Not Connected
-                    </>
-                  )}
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <Label htmlFor="erpnext-url">ERPNext URL</Label>
-                <Input
-                  id="erpnext-url"
-                  type="url"
-                  placeholder="https://your-domain.erpnext.com"
-                  value={formData.erpnextUrl}
-                  onChange={(e) => setFormData({ ...formData, erpnextUrl: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="erpnext-api-key">ERPNext API Key</Label>
-                <Input
-                  id="erpnext-api-key"
-                  type="text"
-                  placeholder="Your ERPNext API Key"
-                  value={formData.erpnextApiKey}
-                  onChange={(e) => setFormData({ ...formData, erpnextApiKey: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="erpnext-api-secret">ERPNext API Secret</Label>
-                <div className="relative">
+        {/* Subscription Status Card */}
+        <SubscriptionStatus />
+      </div>
+
+      {/* ERPNext Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Building2 className="h-5 w-5" />
+            <span>ERPNext Configuration</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoadingConfig ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              <span className="text-muted-foreground">Loading configuration...</span>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="base-url">Base URL</Label>
                   <Input
-                    id="erpnext-api-secret"
-                    type={showApiSecret ? "text" : "password"}
-                    placeholder="Your ERPNext API Secret"
-                    value={formData.erpnextApiSecret}
-                    onChange={(e) => setFormData({ ...formData, erpnextApiSecret: e.target.value })}
-                    required
+                    id="base-url"
+                    value={baseURL}
+                    onChange={(e) => setBaseURL(e.target.value)}
+                    placeholder="https://your-erpnext-site.com"
+                    disabled={isSaving || isTestingConnection}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
-                    onClick={() => setShowApiSecret(!showApiSecret)}
-                  >
-                    {showApiSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="erpnext-default-company">Default Company</Label>
-                <Input
-                  id="erpnext-default-company"
-                  type="text"
-                  placeholder="Your Default Company Name"
-                  value={formData.erpnextDefaultCompany}
-                  onChange={(e) => setFormData({ ...formData, erpnextDefaultCompany: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="erpnext-pallet-template-item">Pallet Template Item</Label>
-                <Input
-                  id="erpnext-pallet-template-item"
-                  type="text"
-                  placeholder="Pallet Template Item"
-                  value={formData.erpnextPalletTemplateItem}
-                  onChange={(e) => setFormData({ ...formData, erpnextPalletTemplateItem: e.target.value })}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="api-key">API Key</Label>
+                  <Input
+                    id="api-key"
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    disabled={isSaving || isTestingConnection}
+                  />
+                </div>
               </div>
               
-              <div className="flex space-x-3">
-                <Button type="submit" disabled={saving} className="flex-1">
-                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Configuration
-                </Button>
-                
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={handleTestConnection}
-                  disabled={testing || !formData.erpnextUrl || !formData.erpnextApiKey || !formData.erpnextApiSecret}
-                >
-                  {testing ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <TestTube className="w-4 h-4 mr-2" />
+              <div className="space-y-2">
+                <Label htmlFor="api-secret">API Secret</Label>
+                <Input
+                  id="api-secret"
+                  type="password"
+                  value={apiSecret}
+                  onChange={(e) => setApiSecret(e.target.value)}
+                  placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  disabled={isSaving || isTestingConnection}
+                />
+              </div>
+
+              {/* Company Selector */}
+              {connectionStatus === 'connected' && companies.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label htmlFor="default-company">Default Company</Label>
+                    <Select value={selectedCompany} onValueChange={handleCompanyChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.name} value={company.name}>
+                            {company.company_name || company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedCompany && (
+                      <p className="text-sm text-muted-foreground">
+                        Selected: {companies.find(c => c.name === selectedCompany)?.company_name || selectedCompany}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Pallet Template Item Selector - Only show when company is selected */}
+                  {selectedCompany && (
+                    <div className="space-y-2">
+                      <Label htmlFor="pallet-template-item">Pallet Template Item</Label>
+                      <Select 
+                        value={selectedPalletTemplate} 
+                        onValueChange={handlePalletTemplateChange}
+                        disabled={isLoadingTemplateItems}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoadingTemplateItems ? "Loading template items..." : "Select a pallet template item"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {palletTemplateItems.map((item) => (
+                            <SelectItem key={item.name} value={item.name}>
+                              {item.item_name || item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {isLoadingTemplateItems && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Loading template items...
+                        </div>
+                      )}
+                      {selectedPalletTemplate && (
+                        <p className="text-sm text-muted-foreground">
+                          Selected: {palletTemplateItems.find(item => item.name === selectedPalletTemplate)?.item_name || selectedPalletTemplate}
+                        </p>
+                      )}
+                    </div>
                   )}
-                  Test Connection
+                </>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={handleTestConnection} 
+                  disabled={isTestingConnection || isSaving || isLoadingCompanies}
+                  className="flex-1"
+                >
+                  {isTestingConnection ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Connection...
+                    </>
+                  ) : (
+                    "Test Connection"
+                  )}
+                </Button>
+                <Button 
+                  onClick={handleSaveConfiguration} 
+                  disabled={isTestingConnection || isSaving || isLoadingCompanies}
+                  className="flex-1"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Configuration"
+                  )}
                 </Button>
               </div>
-            </form>
 
-            {message && (
-              <Alert className={`mt-4 ${message.type === 'error' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}`}>
-                <AlertDescription className={message.type === 'error' ? 'text-red-800' : 'text-green-800'}>
-                  {message.content}
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Company & Items Information */}
-        {(companyInfo || items.length > 0) && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
-                <span>System Information</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {companyInfo && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Company Information</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div>
-                      <Label>Company Name</Label>
-                      <p className="font-medium">{companyInfo.companyName}</p>
-                    </div>
-                    <div>
-                      <Label>Abbreviation</Label>
-                      <p className="font-medium">{companyInfo.abbr}</p>
-                    </div>
-                    <div>
-                      <Label>Currency</Label>
-                      <p className="font-medium">{companyInfo.currency}</p>
-                    </div>
-                  </div>
+              {isLoadingCompanies && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <span className="text-sm text-muted-foreground">Loading companies...</span>
                 </div>
               )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
-              {items.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Items</h4>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2">Item Code</th>
-                          <th className="text-left p-2">Item Name</th>
-                          <th className="text-right p-2">Quantity</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((item) => (
-                          <tr key={item.itemCode} className="border-b hover:bg-gray-50">
-                            <td className="p-2 font-medium">{item.itemCode}</td>
-                            <td className="p-2">{item.itemName}</td>
-                            <td className="p-2 text-right">{item.qty}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {!companyInfo && items.length === 0 && (
-                <div className="text-center py-4 text-gray-500">
-                  No system information available. Test your ERPNext connection to load data.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {/* Connection Status Alert */}
+      {connectionStatus !== "idle" && (
+        <Alert variant={connectionStatus === "connected" ? "default" : "destructive"}>
+          {connectionStatus === "connected" ? (
+            <CheckCircle className="h-4 w-4" />
+          ) : (
+            <XCircle className="h-4 w-4" />
+          )}
+          <AlertDescription>
+            {connectionStatus === "connected" 
+              ? "Successfully connected to ERPNext!" 
+              : "Failed to connect to ERPNext. Please check your settings."
+            }
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 };

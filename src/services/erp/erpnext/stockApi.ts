@@ -1,307 +1,218 @@
-
 import { ERPNextBaseAPI } from './baseApi';
-import { APIResponse } from './types';
-
-export interface BinStockItem {
-  item_code: string;
-  warehouse: string;
-  actual_qty: number;
-  reserved_qty: number;
-  available_qty: number;
-  valuation_rate: number;
-  stock_value: number;
-}
-
-export interface BinInfo {
-  item_code: string;
-  item_name: string;
-  warehouse: string;
-  actual_qty: number;
-  reserved_qty: number;
-  available_qty: number;
-  valuation_rate: number;
-  stock_value: number;
-}
-
-export interface StockBalanceItem {
-  item_code: string;
-  warehouse: string;
-  projected_qty: number;
-  actual_qty?: number;
-  valuation_rate?: number;
-}
-
-export interface WarehouseStockItem {
-  item_code: string;
-  warehouse: string;
-  actual_qty: number;
-  reserved_qty: number;
-  available_qty: number;
-  valuation_rate: number;
-  stock_value: number;
-}
-
-export interface StockLedgerEntry {
-  name: string;
-  item_code: string;
-  warehouse: string;
-  posting_date: string;
-  qty_change: number;
-  valuation_rate: number;
-  stock_value: number;
-}
-
-export interface StockEntry {
-  name: string;
-  posting_date: string;
-  purpose: string;
-  status: string;
-  from_warehouse?: string;
-  to_warehouse?: string;
-}
+import { ERPNextResponse, StockBalance, StockEntry } from './types';
 
 export class ERPNextStockAPI extends ERPNextBaseAPI {
-  async getBinStock(itemCode: string, warehouse: string): Promise<APIResponse<BinStockItem[]>> {
-    try {
-      const endpoint = this.getEndpoint('/api/resource/Bin', {
-        fields: '["item_code", "warehouse", "actual_qty", "reserved_qty", "available_qty", "valuation_rate", "stock_value"]',
-        item_code: itemCode,
-        warehouse: warehouse,
-        actual_qty: [">", 0]
-      });
-      const response = await this.makeRequest(endpoint);
-      return {
-        success: true,
-        data: response.data.data as BinStockItem[]
-      };
-    } catch (error) {
-      return this.handleError('getBinStock', error);
-    }
-  }
-
-  async getBinInfo(itemCode: string, warehouse: string): Promise<APIResponse<BinInfo>> {
-    try {
-      const endpoint = this.getEndpoint('/api/resource/Bin', {
-        fields: '["item_code", "item_name", "warehouse", "actual_qty", "reserved_qty", "available_qty", "valuation_rate", "stock_value"]',
-        item_code: itemCode,
-        warehouse: warehouse
-      });
-      const response = await this.makeRequest(endpoint);
-      return {
-        success: true,
-        data: response.data.data as BinInfo
-      };
-    } catch (error) {
-      return this.handleError('getBinInfo', error);
-    }
-  }
-
-  async getStockBalance(itemCode: string, warehouses: string[]): Promise<APIResponse<StockBalanceItem[]>>;
-  async getStockBalance(filters?: any, company?: string): Promise<APIResponse<StockBalanceItem[]>>;
-  async getStockBalance(filterOrItemCode?: any, warehousesOrCompany?: string[] | string): Promise<APIResponse<StockBalanceItem[]>> {
-    try {
-      let filters: any = {};
-      
-      if (typeof filterOrItemCode === 'string') {
-        // First overload: itemCode and warehouses
-        filters = {
-          item_code: filterOrItemCode,
-          warehouse: ["in", warehousesOrCompany as string[]]
-        };
-      } else {
-        // Second overload: filters and company
-        filters = filterOrItemCode || {};
-        if (warehousesOrCompany && typeof warehousesOrCompany === 'string') {
-          filters.company = warehousesOrCompany;
-        }
-      }
-
-      const endpoint = this.getEndpoint('/api/resource/Stock Balance', filters);
-      const response = await this.makeRequest(endpoint);
-
-      if (response.data?.data) {
-        return {
-          success: true,
-          data: response.data.data as StockBalanceItem[]
-        };
-      }
-
-      return {
-        success: true,
-        data: []
-      };
-    } catch (error) {
-      return this.handleError('getStockBalance', error);
-    }
-  }
-
-  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<APIResponse<any>> {
-    try {
-      const filters: any = {
-        item_code: itemCode,
-        warehouse: warehouse
-      };
-      
-      if (batch) filters.batch_no = batch;
-      if (serial) filters.serial_no = serial;
-
-      const endpoint = this.getEndpoint('/api/resource/Bin', filters);
-      const response = await this.makeRequest(endpoint);
-      
-      return {
-        success: true,
-        data: response.data.data
-      };
-    } catch (error) {
-      return this.handleError('getCurrentStock', error);
-    }
-  }
-
-  async getStockLedgerEntries(filters?: any, company?: string): Promise<APIResponse<StockLedgerEntry[]>> {
-    try {
-      const queryFilters = filters || {};
-      if (company) {
-        queryFilters.company = company;
-      }
-
-      const endpoint = this.getEndpoint('/api/resource/Stock Ledger Entry', queryFilters);
-      const response = await this.makeRequest(endpoint);
-      
-      return {
-        success: true,
-        data: response.data.data as StockLedgerEntry[]
-      };
-    } catch (error) {
-      return this.handleError('getStockLedgerEntries', error);
-    }
-  }
-
-  async getStockAgingReport(filters?: any): Promise<APIResponse<any[]>> {
-    try {
-      const endpoint = this.getEndpoint('/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute', filters);
-      const response = await this.makeRequest(endpoint);
-      
-      return {
-        success: true,
-        data: response.data.message || []
-      };
-    } catch (error) {
-      return this.handleError('getStockAgingReport', error);
-    }
-  }
-
-  async getStockEntries(filters?: any, company?: string, limitPageLength?: number): Promise<APIResponse<StockEntry[]>> {
-    try {
-      const queryFilters = filters || {};
-      if (company) {
-        queryFilters.company = company;
-      }
-      if (limitPageLength) {
-        queryFilters.limit_page_length = limitPageLength;
-      }
-
-      const endpoint = this.getEndpoint('/api/resource/Stock Entry', queryFilters);
-      const response = await this.makeRequest(endpoint);
-      
-      return {
-        success: true,
-        data: response.data.data as StockEntry[]
-      };
-    } catch (error) {
-      return this.handleError('getStockEntries', error);
-    }
-  }
-
-  async createStockReconciliation(reconciliationData: any): Promise<APIResponse<any>> {
-    try {
-      const endpoint = this.getEndpoint('/api/resource/Stock Reconciliation');
-      const response = await this.makeRequest(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(reconciliationData)
-      });
-      
-      return {
-        success: true,
-        data: response.data.data
-      };
-    } catch (error) {
-      return this.handleError('createStockReconciliation', error);
-    }
-  }
-
-  async updateStockReconciliation(name: string, reconciliationData: any): Promise<APIResponse<any>> {
-    try {
-      const endpoint = this.getEndpoint(`/api/resource/Stock Reconciliation/${name}`);
-      const response = await this.makeRequest(endpoint, {
-        method: 'PUT',
-        body: JSON.stringify(reconciliationData)
-      });
-      
-      return {
-        success: true,
-        data: response.data.data
-      };
-    } catch (error) {
-      return this.handleError('updateStockReconciliation', error);
-    }
-  }
-
-  async getWarehouseStockBalance(warehouse: string, item?: string): Promise<APIResponse<WarehouseStockItem[]>> {
-    try {
-      const filters: Record<string, any> = {
-        warehouse: warehouse
-      };
-      
-      if (item) {
-        filters.item_code = item;
-      }
-
-      const endpoint = this.getEndpoint('/api/resource/Bin', filters);
-      const response = await this.makeRequest(endpoint);
-      
-      if (response.data?.message) {
-        const bins = Array.isArray(response.data.message) ? response.data.message : [];
-        
-        // Group by item and sum quantities
-        const stockMap = new Map<string, WarehouseStockItem>();
-        
-        bins.forEach((bin: any) => {
-          if (bin.actual_qty > 0) {
-            const key = bin.item_code;
-            if (stockMap.has(key)) {
-              const existing = stockMap.get(key)!;
-              existing.actual_qty += bin.actual_qty;
-              existing.reserved_qty += bin.reserved_qty || 0;
-              existing.available_qty = existing.actual_qty - existing.reserved_qty;
-            } else {
-              stockMap.set(key, {
-                item_code: bin.item_code,
-                warehouse: bin.warehouse,
-                actual_qty: bin.actual_qty,
-                reserved_qty: bin.reserved_qty || 0,
-                available_qty: bin.actual_qty - (bin.reserved_qty || 0),
-                valuation_rate: bin.valuation_rate || 0,
-                stock_value: (bin.actual_qty || 0) * (bin.valuation_rate || 0)
-              });
-            }
-          }
+  async getStockBalance(filters?: any, company?: string): Promise<ERPNextResponse<StockBalance[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    
+    // If company is specified, get warehouses for that company first
+    if (company) {
+      try {
+        const warehouseResponse = await fetch(`${this.baseURL}/api/resource/Warehouse?filters=${JSON.stringify([['company', '=', company]])}&fields=["name"]&limit_page_length=1000`, {
+          headers: this.getHeaders(),
         });
-
-        return {
-          success: true,
-          data: Array.from(stockMap.values())
-        };
+        
+        if (warehouseResponse.ok) {
+          const warehouseData = await warehouseResponse.json();
+          if (warehouseData.data && warehouseData.data.length > 0) {
+            const warehouseNames = warehouseData.data.map((w: any) => w.name);
+            finalFilters.push(['warehouse', 'in', warehouseNames]);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch warehouses for company filter:', error);
       }
-
-      return {
-        success: true,
-        data: []
-      };
-    } catch (error) {
-      return this.handleError('getWarehouseStockBalance', error);
     }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, 1000);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
+    }
+
+    return response.json();
   }
+
+// bin code ----------------- fetch data 
+  async getBinStock(filters?: any): Promise<ERPNextResponse<any[]>> {
+  const finalFilters = this.convertToFrappeFilters(filters);
+
+  const filtersParam = `filters=${encodeURIComponent(JSON.stringify(finalFilters))}`;
+  
+  const fields = [
+    "name",
+    "actual_qty",
+    "item_code",
+    "warehouse",
+    "valuation_rate",
+    "stock_value" // ✅ Added valid field
+  ];
+  const fieldsParam = `fields=${encodeURIComponent(JSON.stringify(fields))}`;
+  const limitParam = `limit_page_length=1000`;
+
+  const url = `${this.baseURL}/api/resource/Bin?${filtersParam}&${fieldsParam}&${limitParam}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: this.getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Failed to fetch bin stock: ${response.status} ${response.statusText} - ${errorText}`
+    );
+  }
+
+  return response.json();
 }
 
-// Legacy export for backward compatibility
-export class StockAPI extends ERPNextStockAPI {}
+
+
+  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<ERPNextResponse<any>> {
+    const filters = [
+      ['item_code', '=', itemCode],
+      ['warehouse', '=', warehouse]
+    ];
+
+    if (batch) {
+      filters.push(['batch_no', '=', batch]);
+    }
+    if (serial) {
+      filters.push(['serial_no', '=', serial]);
+    }
+
+    const params = this.buildQueryParams(filters);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch current stock: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getStockLedgerEntries(filters?: any, company?: string): Promise<ERPNextResponse<any[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock ledger entries: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getStockAgingReport(filters?: any): Promise<ERPNextResponse<any[]>> {
+    try {
+      // Prepare filters for the Stock Ageing report
+      const reportFilters: any = {};
+      
+      // Set default date range if not provided
+      const today = new Date();
+      const fromDate = new Date(today.getFullYear(), 0, 1); // Start of current year
+      
+      reportFilters.from_date = fromDate.toISOString().split('T')[0];
+      reportFilters.to_date = today.toISOString().split('T')[0];
+      
+      // Add any additional filters
+      if (filters) {
+        Object.assign(reportFilters, filters);
+      }
+
+      console.log('Running Stock Ageing report with filters:', reportFilters);
+      
+      // Use the generic report runner
+      const result = await this.runReport('Stock Ageing', reportFilters);
+      
+      console.log('Stock Ageing report result:', result);
+      
+      // Transform the report data to match expected format
+      // The runReport method returns ERPNextResponse<any>, so we need to check the structure
+      if (result && typeof result === 'object' && result.message !== null && result.message !== undefined) {
+        const message = result.message;
+        if (message && typeof message === 'object' && 'result' in message && message.result !== null && message.result !== undefined) {
+          return {
+            data: message.result || []
+          };
+        }
+      }
+      
+      // If result has data directly
+      if (result && typeof result === 'object' && 'data' in result) {
+        return {
+          data: result.data || []
+        };
+      }
+      
+      return { data: [] };
+      
+    } catch (error) {
+      console.error('Failed to fetch stock aging report:', error);
+      // Return empty data if there's an error instead of throwing
+      return { data: [] };
+    }
+  }
+
+  async getStockEntries(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<StockEntry[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock entries: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createStockReconciliation(reconciliationData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(reconciliationData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create stock reconciliation: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async updateStockReconciliation(name: string, reconciliationData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation/${name}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(reconciliationData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update stock reconciliation: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+}
