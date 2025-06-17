@@ -85,6 +85,7 @@ const POSelector = ({ onSelectPO }: POSelectorProps) => {
         }));
         
         setPOOptions(options);
+        console.log('Loaded POs:', options); // Debug log
       }
 
     } catch (error) {

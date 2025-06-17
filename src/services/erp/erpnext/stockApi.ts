@@ -50,36 +50,18 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
    * Get stock balance for multiple items in specific warehouses
    */
   async getStockBalance(
-    itemCode: string,
-    warehouses: string[]
-  ): Promise<APIResponse<StockBalanceItem[]>>;
-  async getStockBalance(
     filters?: any,
     company?: string
-  ): Promise<APIResponse<StockBalanceItem[]>>;
-  async getStockBalance(
-    itemCodeOrFilters?: string | any,
-    warehousesOrCompany?: string[] | string
   ): Promise<APIResponse<StockBalanceItem[]>> {
     try {
       let endpoint = `${this.baseURL}/api/resource/Stock Ledger Entry`;
       const params = new URLSearchParams();
 
-      if (typeof itemCodeOrFilters === 'string' && Array.isArray(warehousesOrCompany)) {
-        // First overload: specific item and warehouses
-        const filters = [
-          ['item_code', '=', itemCodeOrFilters],
-          ['warehouse', 'in', warehousesOrCompany]
-        ];
+      if (filters) {
         params.append('filters', JSON.stringify(filters));
-      } else {
-        // Second overload: general filters
-        if (itemCodeOrFilters) {
-          params.append('filters', JSON.stringify(itemCodeOrFilters));
-        }
-        if (typeof warehousesOrCompany === 'string') {
-          params.append('company', warehousesOrCompany);
-        }
+      }
+      if (company) {
+        params.append('company', company);
       }
 
       const response = await fetch(`${endpoint}?${params.toString()}`, {

@@ -1,4 +1,3 @@
-
 import { ERPNextConfig } from './types';
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -38,9 +37,6 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
 };
 
 export const getUserDefaultCompany = async (): Promise<string | null> => {
-  // company set difault
-
-
   try {
     const storedCompany = localStorage.getItem('erpnextDefaultCompany');
     if (storedCompany) {
@@ -122,32 +118,28 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockApi.getStockBalance(filters, company);
   }
 
-  getBinStock(filters?: any) {
-    return this.stockApi.getBinStock(filters);
+  getBinStock(itemCode: string, warehouse: string) {
+    return this.stockApi.getBinStock(itemCode, warehouse);
   }
 
-  getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string) {
-    return this.stockApi.getCurrentStock(itemCode, warehouse, batch, serial);
+  getCurrentStock(itemCode: string, warehouse?: string) {
+    return this.stockApi.getCurrentStock(itemCode, warehouse);
   }
 
-  getStockLedgerEntries(filters?: any, company?: string) {
-    return this.stockApi.getStockLedgerEntries(filters, company);
+  getStockLedgerEntries(filters?: any, limit?: number, offset?: number) {
+    return this.stockApi.getStockLedgerEntries(filters, limit, offset);
   }
 
-  getStockAgingReport(filters?: any) {
-    return this.stockApi.getStockAgingReport(filters);
+  createStockEntry(entryData: any) {
+    return this.stockApi.createStockEntry(entryData);
   }
 
-  getStockEntries(filters?: any, company?: string, limitPageLength?: number) {
-    return this.stockApi.getStockEntries(filters, company, limitPageLength);
+  getAvailableStock(itemCode: string, warehouse: string, posting_date?: string) {
+    return this.stockApi.getAvailableStock(itemCode, warehouse, posting_date);
   }
 
-  createStockReconciliation(reconciliationData: any) {
-    return this.stockApi.createStockReconciliation(reconciliationData);
-  }
-
-  updateStockReconciliation(name: string, reconciliationData: any) {
-    return this.stockApi.updateStockReconciliation(name, reconciliationData);
+  getStockSummary(company?: string, warehouse?: string, item_group?: string) {
+    return this.stockApi.getStockSummary(company, warehouse, item_group);
   }
 
   // Warehouse API methods
