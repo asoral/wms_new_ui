@@ -57,7 +57,17 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
       const result = await erpnextAPI.getPurchaseOrders(filters, defaultCompany || undefined, 100);
       
       if (result?.data) {
-        setPurchaseOrders(result.data);
+        // Transform the data to match our interface, handling undefined values
+        const transformedOrders: PurchaseOrderOption[] = result.data.map((po: any) => ({
+          name: po.name || '',
+          supplier: po.supplier || '',
+          supplier_name: po.supplier_name || po.supplier || '',
+          schedule_date: po.schedule_date || po.transaction_date || '',
+          grand_total: po.grand_total || 0,
+          status: po.status || ''
+        }));
+        
+        setPurchaseOrders(transformedOrders);
       }
     } catch (error) {
       console.error('Failed to load purchase orders:', error);
@@ -148,11 +158,16 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
                     <div className="flex flex-col">
                       <div className="font-medium">{po.name}</div>
                       <div className="text-sm text-gray-600">
-                        {po.supplier_name} • {po.schedule_date} • ₹{po.grand_total.toLocaleString()}
+                        {po.supplier_name} • {po.schedule_date} • ₹{(po.grand_total || 0).toLocaleString()}
                       </div>
                     </div>
                   </SelectItem>
                 ))}
+                {filteredPOs.length === 0 && (
+                  <SelectItem value="no-orders" disabled>
+                    No purchase orders found
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
           )}

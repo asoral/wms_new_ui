@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, StockEntry } from './types';
 
@@ -37,39 +38,38 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-// bin code ----------------- fetch data 
   async getBinStock(filters?: any): Promise<ERPNextResponse<any[]>> {
-  const finalFilters = this.convertToFrappeFilters(filters);
+    const finalFilters = this.convertToFrappeFilters(filters);
 
-  const filtersParam = `filters=${encodeURIComponent(JSON.stringify(finalFilters))}`;
-  
-  const fields = [
-    "name",
-    "actual_qty",
-    "item_code",
-    "warehouse",
-    "valuation_rate",
-    "stock_value" // ✅ Added valid field
-  ];
-  const fieldsParam = `fields=${encodeURIComponent(JSON.stringify(fields))}`;
-  const limitParam = `limit_page_length=1000`;
+    const filtersParam = `filters=${encodeURIComponent(JSON.stringify(finalFilters))}`;
+    
+    const fields = [
+      "name",
+      "actual_qty",
+      "item_code",
+      "warehouse",
+      "valuation_rate",
+      "stock_value"
+    ];
+    const fieldsParam = `fields=${encodeURIComponent(JSON.stringify(fields))}`;
+    const limitParam = `limit_page_length=1000`;
 
-  const url = `${this.baseURL}/api/resource/Bin?${filtersParam}&${fieldsParam}&${limitParam}`;
+    const url = `${this.baseURL}/api/resource/Bin?${filtersParam}&${fieldsParam}&${limitParam}`;
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: this.getHeaders(),
-  });
+    const response = await fetch(url, {
+      method: "GET",
+      headers: this.getHeaders(),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Failed to fetch bin stock: ${response.status} ${response.statusText} - ${errorText}`
-    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to fetch bin stock: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    return response.json();
   }
-
-  return response.json();
-}
 
   async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<ERPNextResponse<any>> {
     const filters = [
@@ -145,7 +145,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         const message = result.message;
         if (message && typeof message === 'object' && 'result' in message && message.result !== null && message.result !== undefined) {
           return {
-            data: message.result || []
+            data: Array.isArray(message.result) ? message.result : []
           };
         }
       }
@@ -153,7 +153,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       // If result has data directly
       if (result && typeof result === 'object' && 'data' in result) {
         return {
-          data: result.data || []
+          data: Array.isArray(result.data) ? result.data : []
         };
       }
       
