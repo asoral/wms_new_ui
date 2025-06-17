@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, StockEntry } from './types';
 
@@ -72,8 +71,6 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
   return response.json();
 }
 
-
-
   async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<ERPNextResponse<any>> {
     const filters = [
       ['item_code', '=', itemCode],
@@ -143,8 +140,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       
       console.log('Stock Ageing report result:', result);
       
-      // Transform the report data to match expected format
-      // The runReport method returns ERPNextResponse<any>, so we need to check the structure
+      // Transform the report data to match expected format with proper null checks
       if (result && typeof result === 'object' && result.message !== null && result.message !== undefined) {
         const message = result.message;
         if (message && typeof message === 'object' && 'result' in message && message.result !== null && message.result !== undefined) {

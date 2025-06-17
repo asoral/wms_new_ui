@@ -8,6 +8,8 @@ import { useState, useEffect } from "react";
 import { Search, FileText, Package, CheckCircle, Clock, LucideIcon } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
+import POSelector from "./POSelector";
 
 interface DashboardData {
   pendingPOs: number;
@@ -28,7 +30,7 @@ interface ReceiveDashboardProps {
 }
 
 const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
-  const [poNumber, setPONumber] = useState("");
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData>({
     pendingPOs: 0,
     receiptsThisWeek: 0,
@@ -56,21 +58,52 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
       }
 
       const defaultCompany = await getUserDefaultCompany();
+      
+      // Get today's date
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Get start and end of current week
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - dayOfWeek);
+      const endOfWeek = new Date(now);
+      endOfWeek.setDate(now.getDate() + (6 - dayOfWeek));
 
-      // Fetch dashboard data from ERPNext
-      const [poResult, prResult] = await Promise.allSettled([
-        erpnextAPI.getPurchaseOrders([['status', '=', 'To Receive']], defaultCompany || undefined),
-        erpnextAPI.getPurchaseReceipts([['docstatus', '=', 0]], defaultCompany || undefined)
+      const [poResult, prResult, draftPRResult, qcResult] = await Promise.allSettled([
+        // Pending POs today
+        erpnextAPI.getPurchaseOrders([
+          ['docstatus', '=', 1],
+          ['status', 'in', ['To Receive', 'To Receive and Bill']],
+          ['schedule_date', '=', today]
+        ], defaultCompany || undefined),
+        
+        // Receipts this week
+        erpnextAPI.getPurchaseReceipts([
+          ['docstatus', '=', 1],
+          ['posting_date', 'between', [startOfWeek.toISOString().split('T')[0], endOfWeek.toISOString().split('T')[0]]]
+        ], defaultCompany || undefined),
+        
+        // Draft receipts
+        erpnextAPI.getPurchaseReceipts([['docstatus', '=', 0]], defaultCompany || undefined),
+        
+        // Pending QC (Quality Inspections)
+        erpnextAPI.getQualityInspections([
+          ['docstatus', '=', 0],
+          ['inspection_type', '=', 'Incoming']
+        ], defaultCompany || undefined)
       ]);
 
       const pendingPOs = poResult.status === 'fulfilled' && poResult.value?.data ? poResult.value.data.length : 0;
-      const draftReceipts = prResult.status === 'fulfilled' && prResult.value?.data ? prResult.value.data.length : 0;
+      const receiptsThisWeek = prResult.status === 'fulfilled' && prResult.value?.data ? prResult.value.data.length : 0;
+      const draftReceipts = draftPRResult.status === 'fulfilled' && draftPRResult.value?.data ? draftPRResult.value.data.length : 0;
+      const pendingQC = qcResult.status === 'fulfilled' && qcResult.value?.data ? qcResult.value.data.length : 0;
 
       setData({
         pendingPOs,
-        receiptsThisWeek: 0, // Calculate this based on date filters
+        receiptsThisWeek,
         draftReceipts,
-        pendingQC: 0 // Calculate based on quality inspection status
+        pendingQC
       });
 
     } catch (error) {
@@ -85,15 +118,28 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
     }
   };
 
-  const handlePOSearch = () => {
-    if (poNumber.trim()) {
-      onSelectPO(poNumber.trim());
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handlePOSearch();
+  const handleCardClick = (type: string) => {
+    // Navigate to respective screens based on card type
+    switch (type) {
+      case 'pendingPOs':
+        // Show filtered POs - could navigate to a filtered view
+        toast({
+          title: "Pending POs",
+          description: `${data.pendingPOs} purchase orders pending for today`,
+        });
+        break;
+      case 'receiptsThisWeek':
+        // Navigate to purchase receipts list
+        navigate('/reports'); // Or create a specific receipts view
+        break;
+      case 'draftReceipts':
+        // Navigate to draft purchase receipts
+        navigate('/reports'); // Or create a specific draft receipts view
+        break;
+      case 'pendingQC':
+        // Navigate to quality check page
+        navigate('/quality-check');
+        break;
     }
   };
 
@@ -104,7 +150,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
       icon: Clock,
       color: "text-orange-600",
       bgColor: "bg-orange-50",
-      clickable: true
+      type: "pendingPOs"
     },
     {
       title: "Receipts This Week",
@@ -112,7 +158,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
       icon: Package,
       color: "text-green-600",
       bgColor: "bg-green-50",
-      clickable: true
+      type: "receiptsThisWeek"
     },
     {
       title: "Draft Receipts",
@@ -120,7 +166,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
       icon: FileText,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
-      clickable: true
+      type: "draftReceipts"
     },
     {
       title: "Pending QC",
@@ -128,7 +174,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
       icon: CheckCircle,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
-      clickable: true
+      type: "pendingQC"
     }
   ];
 
@@ -143,24 +189,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex space-x-2">
-            <div className="flex-1">
-              <Label htmlFor="poNumber">Purchase Order Number</Label>
-              <Input
-                id="poNumber"
-                value={poNumber}
-                onChange={(e) => setPONumber(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter PO number..."
-              />
-            </div>
-            <div className="pt-6">
-              <Button onClick={handlePOSearch} disabled={!poNumber.trim()}>
-                <Search className="w-4 h-4 mr-2" />
-                Select PO
-              </Button>
-            </div>
-          </div>
+          <POSelector onSelectPO={onSelectPO} loading={loading} />
         </CardContent>
       </Card>
 
@@ -172,7 +201,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
             <Card 
               key={index} 
               className={`cursor-pointer hover:shadow-md transition-shadow ${item.bgColor}`}
-              onClick={() => item.clickable && console.log(`Clicked ${item.title}`)}
+              onClick={() => handleCardClick(item.type)}
             >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
