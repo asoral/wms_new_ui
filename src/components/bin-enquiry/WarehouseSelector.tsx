@@ -6,7 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Warehouse, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { offlineStorage } from "@/services/offlineStorage";
 
 interface WarehouseInfo {
@@ -79,6 +79,11 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       
       if (search.trim()) {
         filters.push(['warehouse_name', 'like', `%${search}%`]);
+      }
+
+      const defaultCompany = await getUserDefaultCompany();
+      if (defaultCompany) {
+        filters.push(['company', "=", defaultCompany])
       }
       
       console.log('API filters:', filters);
