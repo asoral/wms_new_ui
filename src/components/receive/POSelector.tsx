@@ -70,9 +70,9 @@ const POSelector = ({ onSelectPO }: POSelectorProps) => {
       
       if (poResult?.data) {
         const options: POOption[] = poResult.data.map((po: PurchaseOrder) => ({
-          value: po.name,
-          label: `${po.name} - ${po.supplier_name || po.supplier}`,
-          supplier: po.supplier_name || po.supplier,
+          value: po.name || '',
+          label: `${po.name || ''} - ${po.supplier_name || po.supplier || ''}`,
+          supplier: po.supplier_name || po.supplier || '',
           expectedDate: po.schedule_date || po.transaction_date || '',
           totalAmount: po.grand_total || po.base_grand_total || 0,
           status: po.status || 'To Receive'
@@ -93,11 +93,14 @@ const POSelector = ({ onSelectPO }: POSelectorProps) => {
     }
   };
 
-  const filteredOptions = poOptions.filter(option =>
-    option.label.toLowerCase().includes(searchValue.toLowerCase()) ||
-    option.supplier.toLowerCase().includes(searchValue.toLowerCase()) ||
-    option.value.toLowerCase().includes(searchValue.toLowerCase())
-  );
+  const filteredOptions = poOptions.filter(option => {
+    const searchLower = searchValue.toLowerCase();
+    return (
+      (option.label || '').toLowerCase().includes(searchLower) ||
+      (option.supplier || '').toLowerCase().includes(searchLower) ||
+      (option.value || '').toLowerCase().includes(searchLower)
+    );
+  });
 
   const handleSelect = (selectedValue: string) => {
     setValue(selectedValue);
