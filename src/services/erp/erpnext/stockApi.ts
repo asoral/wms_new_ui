@@ -143,7 +143,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       // Transform the report data to match expected format with proper null checks
       if (result && typeof result === 'object') {
         const message = result.message;
-        if (message && typeof message === 'object' && 'result' in message && Array.isArray(message.result)) {
+        if (message !== null && message !== undefined && typeof message === 'object' && 'result' in message && Array.isArray(message.result)) {
           return {
             data: message.result
           };
