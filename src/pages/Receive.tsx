@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import ReceiveDashboard from "../components/receive/ReceiveDashboard";
 import ReceiveForm from "../components/receive/ReceiveForm";
 import ReceiveTable from "../components/receive/ReceiveTable";
+import POItemsDisplay from "../components/receive/POItemsDisplay";
 
 export interface PurchaseOrder {
   poNumber: string;
@@ -256,7 +257,7 @@ const Receive = () => {
                   </CardContent>
                 </Card>
 
-                {/* Receive Form with Item Selection and PO Items Table */}
+                {/* Receive Form */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Scan/Select Items to Receive</CardTitle>
@@ -266,6 +267,16 @@ const Receive = () => {
                       poItems={selectedPO.items} 
                       onAddEntry={addReceiveEntry}
                     />
+                  </CardContent>
+                </Card>
+
+                {/* PO Items */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Purchase Order Items</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <POItemsDisplay items={selectedPO.items} />
                   </CardContent>
                 </Card>
               </div>
