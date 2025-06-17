@@ -3,10 +3,12 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2 } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface PurchaseOrderOption {
   name: string;
@@ -23,8 +25,9 @@ interface POSelectorProps {
 }
 
 const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
-  const [poNumber, setPONumber] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [searchValue, setSearchValue] = useState("");
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -81,97 +84,115 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
     }
   };
 
-  const handlePOSearch = () => {
-    if (poNumber.trim()) {
-      onSelectPO(poNumber.trim());
-    }
+  const handleSelect = (selectedValue: string) => {
+    setValue(selectedValue);
+    setSearchValue(selectedValue);
+    setOpen(false);
+    onSelectPO(selectedValue);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handlePOSearch();
+    if (e.key === 'Enter' && searchValue.trim()) {
+      // If user types a PO number and presses Enter, select it directly
+      handleSelect(searchValue.trim());
     }
   };
 
   const filteredPOs = purchaseOrders.filter(po => 
-    po.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    po.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    po.supplier_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    po.schedule_date.includes(searchTerm) ||
-    po.grand_total.toString().includes(searchTerm)
+    po.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+    po.supplier.toLowerCase().includes(searchValue.toLowerCase()) ||
+    po.supplier_name.toLowerCase().includes(searchValue.toLowerCase()) ||
+    po.schedule_date.includes(searchValue) ||
+    po.grand_total.toString().includes(searchValue)
   );
 
   return (
     <div className="space-y-4">
-      {/* Manual PO Entry */}
       <div>
-        <Label htmlFor="poNumber">Enter Purchase Order Number</Label>
-        <div className="flex space-x-2">
-          <Input
-            id="poNumber"
-            value={poNumber}
-            onChange={(e) => setPONumber(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Enter PO number manually..."
-          />
-          <Button onClick={handlePOSearch} disabled={!poNumber.trim() || loading}>
-            <Search className="w-4 h-4 mr-2" />
-            Select
-          </Button>
-        </div>
-      </div>
-
-      <div className="text-center text-gray-500">OR</div>
-
-      {/* Purchase Order Dropdown */}
-      <div>
-        <Label htmlFor="searchPO">Search and Select Purchase Order</Label>
-        <div className="space-y-2">
-          <Input
-            id="searchPO"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by PO number, supplier, date, or amount..."
-            className="mb-2"
-          />
-          
-          {isLoading ? (
-            <div className="flex items-center justify-center p-4">
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Loading purchase orders...
+        <Label htmlFor="poSearch">Purchase Order Number</Label>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <div className="relative">
+              <Input
+                id="poSearch"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type PO number or search..."
+                className="pr-10"
+                disabled={loading}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3"
+                onClick={() => setOpen(!open)}
+                disabled={loading}
+              >
+                <ChevronsUpDown className="h-4 w-4" />
+              </Button>
             </div>
-          ) : (
-            <Select 
-              value={poNumber} 
-              onValueChange={(value) => {
-                setPONumber(value);
-                onSelectPO(value);
-              }}
-              disabled={loading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a purchase order..." />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredPOs.map((po) => (
-                  <SelectItem key={po.name} value={po.name}>
-                    <div className="flex flex-col">
-                      <div className="font-medium">{po.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {po.supplier_name} • {po.schedule_date} • ₹{(po.grand_total || 0).toLocaleString()}
-                      </div>
-                    </div>
-                  </SelectItem>
-                ))}
-                {filteredPOs.length === 0 && (
-                  <SelectItem value="no-orders" disabled>
-                    No purchase orders found
-                  </SelectItem>
+          </PopoverTrigger>
+          <PopoverContent className="w-[400px] p-0" align="start">
+            <Command>
+              <CommandInput 
+                placeholder="Search purchase orders..." 
+                value={searchValue}
+                onValueChange={setSearchValue}
+              />
+              <CommandList>
+                {isLoading ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Loading...
+                  </div>
+                ) : (
+                  <>
+                    <CommandEmpty>No purchase orders found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredPOs.map((po) => (
+                        <CommandItem
+                          key={po.name}
+                          value={po.name}
+                          onSelect={() => handleSelect(po.name)}
+                          className="flex flex-col items-start p-3"
+                        >
+                          <div className="flex items-center w-full">
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                value === po.name ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium">{po.name}</div>
+                              <div className="text-sm text-gray-600">
+                                {po.supplier_name} • {po.schedule_date} • ₹{(po.grand_total || 0).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </>
                 )}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        
+        {searchValue && (
+          <div className="mt-2">
+            <Button 
+              onClick={() => handleSelect(searchValue)} 
+              disabled={!searchValue.trim() || loading}
+              className="w-full"
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Select "{searchValue}"
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
