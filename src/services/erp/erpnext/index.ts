@@ -9,6 +9,7 @@ import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextCompanyAPI } from './companyApi';
 import { ERPNextOtherAPIs } from './otherApis';
 import { ERPNextDashboardAPI } from './dashboardApi';
+import { APIResponse, StockBalanceItem } from './types';
 
 let erpnextConfig: ERPNextConfig | null = null;
 
@@ -114,9 +115,9 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Stock API methods
-  getStockBalance(itemCode: string, warehouses: string[]): Promise<any>;
-  getStockBalance(filters?: any, company?: string): Promise<any>;
-  getStockBalance(filterOrItemCode?: any, warehousesOrCompany?: string[] | string) {
+  getStockBalance(itemCode: string, warehouses: string[]): Promise<APIResponse<StockBalanceItem[]>>;
+  getStockBalance(filters?: any, company?: string): Promise<APIResponse<StockBalanceItem[]>>;
+  getStockBalance(filterOrItemCode?: any, warehousesOrCompany?: string[] | string): Promise<APIResponse<StockBalanceItem[]>> {
     return this.stockApi.getStockBalance(filterOrItemCode, warehousesOrCompany);
   }
 
