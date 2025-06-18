@@ -134,16 +134,15 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
    */
   async submitPurchaseReceipt(receiptName: string): Promise<ERPNextResponse<any>> {
     const response = await fetch(
-      `${this.baseURL}/api/method/frappe.client.submit`,
+      `${this.baseURL}/api/resource/Purchase Receipt/${encodeURIComponent(receiptName)}`,
       {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           ...this.getHeaders(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          doctype: 'Purchase Receipt',
-          name: receiptName
+          docstatus: 1 // Set to 1 to submit the document
         })
       }
     );
