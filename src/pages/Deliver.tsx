@@ -171,7 +171,6 @@ const Deliver = () => {
         }));
         
         setSalesOrders(transformedOrders);
-        setActiveTab("search");
       }
       
     } catch (error) {
@@ -234,6 +233,7 @@ const Deliver = () => {
       };
 
       setSelectedSO(transformedSO);
+      setActiveTab("deliver");
       
     } catch (error) {
       console.error('Error fetching SO:', error);
@@ -274,6 +274,16 @@ const Deliver = () => {
     }
   };
 
+  const tabsList = selectedSO 
+    ? ["dashboard", "deliver", "review"] 
+    : ["dashboard"];
+
+  const tabsLabels = {
+    dashboard: "Dashboard",
+    deliver: "Deliver Items", 
+    review: "Review & Submit"
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
@@ -288,106 +298,124 @@ const Deliver = () => {
           )}
         </div>
 
-        {!selectedSO ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="search">Search Sales Orders</TabsTrigger>
-            </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className={`grid w-full ${selectedSO ? 'grid-cols-3' : 'grid-cols-1'}`}>
+            {tabsList.map((tab) => (
+              <TabsTrigger key={tab} value={tab} disabled={tab !== "dashboard" && !selectedSO}>
+                {tabsLabels[tab as keyof typeof tabsLabels]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-            <TabsContent value="dashboard">
-              <DeliverDashboard 
-                data={dashboardData}
-                shortcuts={shortcuts}
-                onViewOrders={() => setActiveTab("search")}
-              />
-            </TabsContent>
-
-            <TabsContent value="search" className="space-y-6">
-              {/* Search Sales Orders */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Search className="w-5 h-5" />
-                    <span>Search Sales Orders</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex space-x-2">
-                    <div className="flex-1">
-                      <Label htmlFor="searchSO">Sales Order Number or Customer Name</Label>
+          <TabsContent value="dashboard" className="space-y-6">
+            <DeliverDashboard 
+              data={dashboardData}
+              shortcuts={shortcuts}
+              onViewOrders={() => {}} // No separate search tab
+            />
+            
+            {/* Search Sales Orders in Dashboard */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Search className="w-5 h-5" />
+                  <span>Select Sales Order</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="searchSO">Search Sales Order</Label>
+                    <div className="flex space-x-2">
                       <Input
                         id="searchSO"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Type at least 2 characters to search SO number, supplier name..."
+                        placeholder="Type at least 2 characters to search SO number, customer name..."
                         onKeyPress={(e) => e.key === 'Enter' && searchSalesOrders()}
                       />
+                      <Button onClick={searchSalesOrders} disabled={loading}>
+                        {loading ? 'Searching...' : 'Search'}
+                      </Button>
                     </div>
-                    <Button onClick={searchSalesOrders} disabled={loading} className="mt-6">
-                      {loading ? 'Searching...' : 'Search'}
-                    </Button>
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* Sales Orders List */}
-              {salesOrders.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {salesOrders.map((order) => (
-                    <Card key={order.number} className="hover:shadow-md transition-shadow">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg">{order.number}</CardTitle>
-                          <Badge className={getStatusColor(order.status)}>
-                            {order.status}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-600">Customer:</span>
-                            <p className="font-medium">{order.customer}</p>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Delivery Date:</span>
-                            <p>{new Date(order.deliveryDate).toLocaleDateString()}</p>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Items:</span>
-                            <p>{order.totalItems} items</p>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Total Value:</span>
-                            <p>{formatCurrency(order.totalValue)}</p>
-                          </div>
-                        </div>
+                  {/* Sales Orders List */}
+                  {salesOrders.length > 0 && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {salesOrders.map((order) => (
+                        <Card key={order.number} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => selectSalesOrder(order.number)}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-lg">{order.number}</CardTitle>
+                              <Badge className={getStatusColor(order.status)}>
+                                {order.status}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-600">Customer:</span>
+                                <p className="font-medium">{order.customer}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Delivery Date:</span>
+                                <p>{new Date(order.deliveryDate).toLocaleDateString()}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Items:</span>
+                                <p>{order.totalItems} items</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Total Value:</span>
+                                <p>{formatCurrency(order.totalValue)}</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
 
-                        <div className="flex justify-end">
-                          <Button onClick={() => selectSalesOrder(order.number)}>
-                            Create Delivery
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {salesOrders.length === 0 && searchTerm && !loading && (
+                    <div className="text-center py-8 text-gray-500">
+                      No sales orders found matching your search criteria.
+                    </div>
+                  )}
                 </div>
-              )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              {salesOrders.length === 0 && searchTerm && !loading && (
-                <div className="text-center py-8 text-gray-500">
-                  No sales orders found matching your search criteria.
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <DeliveryProcess 
-            salesOrder={selectedSO}
-            onBack={() => setSelectedSO(null)}
-          />
-        )}
+          {selectedSO && (
+            <>
+              <TabsContent value="deliver" className="space-y-6">
+                <DeliveryProcess 
+                  salesOrder={selectedSO}
+                  onBack={() => {
+                    setSelectedSO(null);
+                    setActiveTab("dashboard");
+                  }}
+                  onNext={() => setActiveTab("review")}
+                />
+              </TabsContent>
+
+              <TabsContent value="review" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Review & Submit Delivery Note</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8 text-gray-500">
+                      Review and submit functionality coming soon...
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </>
+          )}
+        </Tabs>
       </div>
     </div>
   );

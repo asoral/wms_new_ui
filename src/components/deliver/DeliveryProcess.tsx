@@ -3,17 +3,16 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SalesOrder, DeliveryEntry } from "../../pages/Deliver";
 import DeliveryForm from "./DeliveryForm";
-import DeliveryTable from "./DeliveryTable";
 
 interface DeliveryProcessProps {
   salesOrder: SalesOrder;
   onBack: () => void;
+  onNext: () => void;
 }
 
-const DeliveryProcess = ({ salesOrder, onBack }: DeliveryProcessProps) => {
+const DeliveryProcess = ({ salesOrder, onBack, onNext }: DeliveryProcessProps) => {
   const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
 
   const formatCurrency = (amount: number) => {
@@ -26,11 +25,6 @@ const DeliveryProcess = ({ salesOrder, onBack }: DeliveryProcessProps) => {
 
   const handleAddEntry = (entry: DeliveryEntry) => {
     setDeliveryEntries([...deliveryEntries, entry]);
-  };
-
-  const handleSubmitDelivery = () => {
-    console.log("Submitting delivery note with entries:", deliveryEntries);
-    // Here you would call the API to create the delivery note
   };
 
   return (
@@ -65,32 +59,18 @@ const DeliveryProcess = ({ salesOrder, onBack }: DeliveryProcessProps) => {
         </CardContent>
       </Card>
 
-      {/* Delivery Process */}
-      <Tabs defaultValue="scan" className="space-y-4">
-        <TabsList className="grid grid-cols-2 w-full max-w-md mx-auto">
-          <TabsTrigger value="scan">Scan Items</TabsTrigger>
-          <TabsTrigger value="review">Review & Submit</TabsTrigger>
-        </TabsList>
+      {/* Delivery Items Form */}
+      <DeliveryForm onAddEntry={handleAddEntry} />
 
-        <TabsContent value="scan" className="space-y-4">
-          <DeliveryForm onAddEntry={handleAddEntry} />
-        </TabsContent>
-
-        <TabsContent value="review" className="space-y-4">
-          <DeliveryTable entries={deliveryEntries} />
-          
-          {deliveryEntries.length > 0 && (
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-              <Button variant="outline" onClick={onBack} className="order-2 sm:order-1">
-                Cancel
-              </Button>
-              <Button onClick={handleSubmitDelivery} size="lg" className="order-1 sm:order-2">
-                Submit Delivery Note
-              </Button>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+      {/* Navigation */}
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+        <Button variant="outline" onClick={onBack} className="order-2 sm:order-1">
+          Back to Dashboard
+        </Button>
+        <Button onClick={onNext} size="lg" className="order-1 sm:order-2" disabled={deliveryEntries.length === 0}>
+          Review & Submit ({deliveryEntries.length} items)
+        </Button>
+      </div>
     </div>
   );
 };
