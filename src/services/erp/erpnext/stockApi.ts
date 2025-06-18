@@ -18,7 +18,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       // If company is provided but no specific warehouse, get all warehouses for that company first
       if (company && !warehouse) {
         // Get warehouses for the company first
-        const warehouseResponse = await this.get('/api/resource/Warehouse', {
+        const warehouseResponse = await this.baseApi.get('/api/resource/Warehouse', {
           filters: JSON.stringify([['company', '=', company], ['disabled', '=', 0]]),
           fields: JSON.stringify(['name'])
         });
@@ -29,7 +29,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         }
       }
 
-      const result = await this.get('/api/resource/Stock Balance', {
+      const result = await this.baseApi.get('/api/resource/Stock Balance', {
         filters: JSON.stringify(filters),
         fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'stock_value'])
       });
@@ -46,7 +46,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
   async getCurrentStock(itemCode: string, warehouse: string) {
     try {
-      const result = await this.get('/api/method/erpnext.stock.utils.get_item_current_stock', {
+      const result = await this.baseApi.get('/api/method/erpnext.stock.utils.get_item_current_stock', {
         item_code: itemCode,
         warehouse: warehouse
       });
@@ -72,7 +72,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         filters.push(['warehouse', '=', warehouse]);
       }
 
-      const result = await this.get('/api/resource/Batch', {
+      const result = await this.baseApi.get('/api/resource/Batch', {
         filters: JSON.stringify(filters),
         fields: JSON.stringify(['name', 'batch_id', 'batch_qty', 'expiry_date'])
       });
@@ -98,7 +98,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         filters.push(['warehouse', '=', warehouse]);
       }
 
-      const result = await this.get('/api/resource/Serial No', {
+      const result = await this.baseApi.get('/api/resource/Serial No', {
         filters: JSON.stringify(filters),
         fields: JSON.stringify(['name', 'serial_no', 'warehouse'])
       });
@@ -129,7 +129,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         filters.push(['posting_date', '<=', toDate]);
       }
 
-      const result = await this.get('/api/resource/Stock Ledger Entry', {
+      const result = await this.baseApi.get('/api/resource/Stock Ledger Entry', {
         filters: JSON.stringify(filters),
         fields: JSON.stringify([
           'posting_date', 'voucher_type', 'voucher_no', 
@@ -213,7 +213,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     
     // If company is provided, get warehouses for that company first
     if (company && !warehouse) {
-      const warehouseResponse = await this.get('/api/resource/Warehouse', {
+      const warehouseResponse = await this.baseApi.get('/api/resource/Warehouse', {
         filters: JSON.stringify([['company', '=', company], ['disabled', '=', 0]]),
         fields: JSON.stringify(['name'])
       });

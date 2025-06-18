@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
 import { offlineStorage } from '@/services/offlineStorage';
@@ -44,7 +43,7 @@ export function useERPNextData<T>(
         // Dynamic method calling based on endpoint with corrected API calls
         switch (endpoint) {
           case 'items':
-            result = await erpnextAPI.getItems(filters, defaultCompany || undefined, 20);
+            result = await erpnextAPI.getItems(filters, 20);
             break;
           case 'warehouses':
             result = await erpnextAPI.getWarehouses(filters, defaultCompany || undefined);

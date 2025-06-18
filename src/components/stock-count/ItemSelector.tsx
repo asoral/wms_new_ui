@@ -102,10 +102,10 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       console.log("Search:", search.trim());
       if (search.trim()) {
         // Use search method for better performance
-        result = await erpnextAPI.searchItems(search, undefined, limit);
+        result = await erpnextAPI.searchItems(search, limit);
       } else {
         // Use paginated method for initial load
-        result = await erpnextAPI.getItemsPaginated(undefined, ['item_code', 'item_name', 'stock_uom'], undefined, limit, pageToFetch);
+        result = await erpnextAPI.getItemsPaginated(undefined, ['item_code', 'item_name', 'stock_uom'], limit, pageToFetch);
       }
       
       if (result.data) {
