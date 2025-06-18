@@ -13,6 +13,7 @@ import POSelector from "./POSelector";
 
 interface DashboardData {
   pendingPOs: number;
+  pendingPOsToday: number;
   receiptsThisWeek: number;
   draftReceipts: number;
   pendingQC: number;
@@ -33,6 +34,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData>({
     pendingPOs: 0,
+    pendingPOsToday: 0,
     receiptsThisWeek: 0,
     draftReceipts: 0,
     pendingQC: 0
@@ -59,10 +61,8 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
 
       const defaultCompany = await getUserDefaultCompany();
       
-      // Get today's date
+      // Get today's date and week boundaries
       const today = new Date().toISOString().split('T')[0];
-      
-      // Get start and end of current week
       const now = new Date();
       const dayOfWeek = now.getDay();
       const startOfWeek = new Date(now);
@@ -70,38 +70,49 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
       const endOfWeek = new Date(now);
       endOfWeek.setDate(now.getDate() + (6 - dayOfWeek));
 
-      const [poResult, prResult, draftPRResult, qcResult] = await Promise.allSettled([
-        // Pending POs today
+      const [allPendingPOs, pendingPOsToday, receiptsThisWeek, draftPRResult, qcResult] = await Promise.allSettled([
+        // All Pending POs (To Receive, To Receive and Bill)
+        erpnextAPI.getPurchaseOrders([
+          ['docstatus', '=', 1],
+          ['status', 'in', ['To Receive', 'To Receive and Bill']]
+        ], defaultCompany || undefined),
+        
+        // Pending POs with schedule_date = today
         erpnextAPI.getPurchaseOrders([
           ['docstatus', '=', 1],
           ['status', 'in', ['To Receive', 'To Receive and Bill']],
           ['schedule_date', '=', today]
         ], defaultCompany || undefined),
         
-        // Receipts this week
-        erpnextAPI.getPurchaseReceipts([
+        // POs to be received this week (schedule_date in this week)
+        erpnextAPI.getPurchaseOrders([
           ['docstatus', '=', 1],
-          ['posting_date', 'between', [startOfWeek.toISOString().split('T')[0], endOfWeek.toISOString().split('T')[0]]]
+          ['status', 'in', ['To Receive', 'To Receive and Bill']],
+          ['schedule_date', 'between', [startOfWeek.toISOString().split('T')[0], endOfWeek.toISOString().split('T')[0]]]
         ], defaultCompany || undefined),
         
-        // Draft receipts
+        // Draft Purchase Receipts
         erpnextAPI.getPurchaseReceipts([['docstatus', '=', 0]], defaultCompany || undefined),
         
-        // Pending QC (Quality Inspections)
-        erpnextAPI.getQualityInspections([
-          ['docstatus', '=', 0],
-          ['inspection_type', '=', 'Incoming']
-        ], defaultCompany || undefined)
+        // Pending QC (Quality Inspections with type=incoming and docstatus=0)
+        fetch(`${erpnextAPI.baseURL}/api/resource/Quality Inspection?filters=${JSON.stringify([
+          ['inspection_type', '=', 'Incoming'],
+          ['docstatus', '=', 0]
+        ])}&limit_page_length=1000`, {
+          headers: erpnextAPI.getHeaders()
+        }).then(res => res.json())
       ]);
 
-      const pendingPOs = poResult.status === 'fulfilled' && poResult.value?.data ? poResult.value.data.length : 0;
-      const receiptsThisWeek = prResult.status === 'fulfilled' && prResult.value?.data ? prResult.value.data.length : 0;
+      const pendingPOs = allPendingPOs.status === 'fulfilled' && allPendingPOs.value?.data ? allPendingPOs.value.data.length : 0;
+      const pendingPOsTodayCount = pendingPOsToday.status === 'fulfilled' && pendingPOsToday.value?.data ? pendingPOsToday.value.data.length : 0;
+      const receiptsThisWeekCount = receiptsThisWeek.status === 'fulfilled' && receiptsThisWeek.value?.data ? receiptsThisWeek.value.data.length : 0;
       const draftReceipts = draftPRResult.status === 'fulfilled' && draftPRResult.value?.data ? draftPRResult.value.data.length : 0;
       const pendingQC = qcResult.status === 'fulfilled' && qcResult.value?.data ? qcResult.value.data.length : 0;
 
       setData({
         pendingPOs,
-        receiptsThisWeek,
+        pendingPOsToday: pendingPOsTodayCount,
+        receiptsThisWeek: receiptsThisWeekCount,
         draftReceipts,
         pendingQC
       });
@@ -119,25 +130,24 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
   };
 
   const handleCardClick = (type: string) => {
-    // Navigate to respective screens based on card type
     switch (type) {
       case 'pendingPOs':
-        // Show filtered POs - could navigate to a filtered view
         toast({
           title: "Pending POs",
-          description: `${data.pendingPOs} purchase orders pending for today`,
+          description: `${data.pendingPOs} total pending POs (${data.pendingPOsToday} due today)`,
         });
         break;
       case 'receiptsThisWeek':
-        // Navigate to purchase receipts list
-        navigate('/reports'); // Or create a specific receipts view
+        toast({
+          title: "Receipts This Week",
+          description: `${data.receiptsThisWeek} purchase orders to be received this week`,
+        });
         break;
       case 'draftReceipts':
-        // Navigate to draft purchase receipts
-        navigate('/reports'); // Or create a specific draft receipts view
+        // Navigate to draft receipts list
+        navigate('/receive/drafts');
         break;
       case 'pendingQC':
-        // Navigate to quality check page
         navigate('/quality-check');
         break;
     }
@@ -145,8 +155,8 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
 
   const dashboardItems = [
     {
-      title: "Pending POs (Today)",
-      value: data.pendingPOs,
+      title: "Pending POs",
+      value: `${data.pendingPOs} (${data.pendingPOsToday})`,
       icon: Clock,
       color: "text-orange-600",
       bgColor: "bg-orange-50",

@@ -81,6 +81,22 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
   }
 
   /**
+   * Fetch a single Purchase Receipt by name/ID
+   */
+  async getPurchaseReceipt(
+    receiptNumber: string
+  ): Promise<ERPNextResponse<PurchaseReceipt>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Purchase Receipt/${encodeURIComponent(receiptNumber)}`,
+      { headers: this.getHeaders() }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase receipt: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
    * Create or get existing batch
    */
   async ensureBatchExists(batchNo: string, itemCode: string): Promise<boolean> {
@@ -139,6 +155,7 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
       inter_company_delivery_reference: null,
       inter_company_invoice_reference: null,
       inter_company_reference: null,
+      is_return: 0,
       // Ensure these fields are not passed if empty
       ...(receiptData.purchase_order && { purchase_order: receiptData.purchase_order }),
     };
