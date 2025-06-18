@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Warehouse, Search, TrendingUp, AlertTriangle } from "lucide-react";
+import { Package, Warehouse, Search, TrendingUp, AlertTriangle, Calendar, DollarSign } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import BinScanner from "../components/bin-enquiry/BinScanner";
@@ -127,7 +127,7 @@ const BinEnquiry = () => {
 
       {selectedBin && (
         <>
-          {/* Summary Cards */}
+          {/* Summary Cards - Colorful like Deliver Screen */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -137,18 +137,41 @@ const BinEnquiry = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">{totalItems}</div>
-                  <div className="text-sm text-gray-600">Total Items</div>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">{totalQty}</div>
-                  <div className="text-sm text-gray-600">Total Quantity</div>
-                </div>
-                <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-600">{formatCurrency(totalValuation)}</div>
-                  <div className="text-sm text-gray-600">Total Value</div>
-                </div>
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-blue-600 mb-1">Total Items</p>
+                        <p className="text-2xl font-bold text-blue-600">{totalItems}</p>
+                      </div>
+                      <Calendar className="w-8 h-8 text-blue-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-600 mb-1">Total Quantity</p>
+                        <p className="text-2xl font-bold text-green-600">{totalQty}</p>
+                      </div>
+                      <Package className="w-8 h-8 text-green-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-yellow-50 border-yellow-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-yellow-600 mb-1">Total Value</p>
+                        <p className="text-2xl font-bold text-yellow-600">{formatCurrency(totalValuation)}</p>
+                      </div>
+                      <DollarSign className="w-8 h-8 text-yellow-600" />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </CardContent>
           </Card>

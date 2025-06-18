@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Package, Warehouse, TrendingUp, AlertTriangle, Search, Camera, QrCode } from "lucide-react";
+import { Package, Warehouse, TrendingUp, AlertTriangle, Search, Camera, QrCode, Calendar, DollarSign, Clock } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "../components/item-enquiry/ItemSelector";
@@ -262,7 +261,7 @@ const ItemEnquiry = () => {
             </CardContent>
           </Card>
 
-          {/* Stock Summary */}
+          {/* Stock Summary - Colorful Cards like Deliver Screen */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -271,23 +270,54 @@ const ItemEnquiry = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">{totalStock}</div>
-                  <div className="text-sm text-gray-600">Total Stock</div>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">{availableStock}</div>
-                  <div className="text-sm text-gray-600">Available</div>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">{totalWarehouses}</div>
-                  <div className="text-sm text-gray-600">Warehouses</div>
-                </div>
-                <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-600">{formatCurrency(totalValuation)}</div>
-                  <div className="text-sm text-gray-600">Total Value</div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-blue-600 mb-1">Total Stock</p>
+                        <p className="text-2xl font-bold text-blue-600">{totalStock}</p>
+                      </div>
+                      <Calendar className="w-8 h-8 text-blue-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-600 mb-1">Available</p>
+                        <p className="text-2xl font-bold text-green-600">{availableStock}</p>
+                      </div>
+                      <Package className="w-8 h-8 text-green-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-purple-50 border-purple-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-purple-600 mb-1">Warehouses</p>
+                        <p className="text-2xl font-bold text-purple-600">{totalWarehouses}</p>
+                      </div>
+                      <Warehouse className="w-8 h-8 text-purple-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-yellow-50 border-yellow-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-yellow-600 mb-1">Total Value</p>
+                        <p className="text-2xl font-bold text-yellow-600">{formatCurrency(totalValuation)}</p>
+                      </div>
+                      <DollarSign className="w-8 h-8 text-yellow-600" />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </CardContent>
           </Card>
