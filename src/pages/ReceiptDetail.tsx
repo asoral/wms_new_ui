@@ -62,7 +62,20 @@ const ReceiptDetail = () => {
         return;
       }
 
-      const result = await erpnextAPI.purchase.getPurchaseReceipt(decodeURIComponent(receiptName));
+      // Get Purchase Receipt details directly from ERPNext API
+      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${encodeURIComponent(decodeURIComponent(receiptName))}`, {
+        headers: {
+          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch receipt: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       
       if (result?.data) {
         const receiptData = result.data;
@@ -117,7 +130,22 @@ const ReceiptDetail = () => {
         return;
       }
 
-      await erpnextAPI.purchase.submitPurchaseReceipt(receipt.name);
+      // Submit the Purchase Receipt
+      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${receipt.name}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          docstatus: 1
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit receipt: ${response.statusText}`);
+      }
       
       toast({
         title: "Success",
