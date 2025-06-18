@@ -1,11 +1,38 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import WMSNavigation from '@/components/WMSNavigation';
+import TopBar from '@/components/TopBar';
+import BottomNavigation from '@/components/BottomNavigation';
 
 const Index = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Redirect to home page since this is the main entry point
+    navigate('/home');
+  }, [navigate]);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="flex h-screen bg-gray-50">
+      {/* Desktop Sidebar */}
+      <WMSNavigation />
+      
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Bar */}
+        <TopBar />
+        
+        {/* Content */}
+        <div className="flex-1 container mx-auto py-6 px-4 md:px-6 space-y-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-4">Welcome to WMS</h1>
+            <p className="text-xl text-gray-600">Warehouse Management System</p>
+          </div>
+        </div>
+        
+        {/* Mobile Bottom Navigation */}
+        <BottomNavigation />
       </div>
     </div>
   );

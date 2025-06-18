@@ -27,6 +27,7 @@ import SubscriptionGuard from "./components/subscription/SubscriptionGuard";
 import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import DraftReceipts from "./pages/DraftReceipts";
 import ReceiptDetail from "./pages/ReceiptDetail";
+import Layout from "./components/Layout";
 
 function App() {
   return (
@@ -52,126 +53,162 @@ function App() {
             <Route path="/bin-enquiry" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <BinEnquiry />
+                  <Layout>
+                    <BinEnquiry />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/item-enquiry" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <ItemEnquiry />
+                  <Layout>
+                    <ItemEnquiry />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/stock-count" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <StockCount />
+                  <Layout>
+                    <StockCount />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/pick-list" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <PickList />
+                  <Layout>
+                    <PickList />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/packing" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <Packing />
+                  <Layout>
+                    <Packing />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/deliver" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <Deliver />
+                  <Layout>
+                    <Deliver />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/receive" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <Receive />
+                  <Layout>
+                    <Receive />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/receive/drafts" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <DraftReceipts />
+                  <Layout>
+                    <DraftReceipts />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/receive/receipt/:receiptName" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <ReceiptDetail />
+                  <Layout>
+                    <ReceiptDetail />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/stock-entry" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <StockEntry />
+                  <Layout>
+                    <StockEntry />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/material-request" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <MaterialRequest />
+                  <Layout>
+                    <MaterialRequest />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/quality-check" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <QualityCheck />
+                  <Layout>
+                    <QualityCheck />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/print-label" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <PrintLabel />
+                  <Layout>
+                    <PrintLabel />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/pallet" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <Pallet />
+                  <Layout>
+                    <Pallet />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/reports" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <Reports />
+                  <Layout>
+                    <Reports />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/sync" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <Sync />
+                  <Layout>
+                    <Sync />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/notifications" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <Notifications />
+                  <Layout>
+                    <Notifications />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
             <Route path="/profile" element={
               <ProtectedRoute>
                 <SubscriptionGuard>
-                  <Profile />
+                  <Layout>
+                    <Profile />
+                  </Layout>
                 </SubscriptionGuard>
               </ProtectedRoute>
             } />
