@@ -14,6 +14,14 @@ export interface BinItem {
   valuation_rate: number;
   warehouse: string;
   bin: string;
+  itemCode?: string;
+  itemName?: string;
+  qty?: number;
+  uom?: string;
+  age?: number;
+  valuation?: number;
+  batch?: string;
+  serial?: string;
 }
 
 const BinEnquiry = () => {

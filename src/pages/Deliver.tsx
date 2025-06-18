@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +11,7 @@ import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import DeliveryProcess from "../components/deliver/DeliveryProcess";
+import SalesOrderList from "../components/deliver/SalesOrderList";
 
 export interface SalesOrder {
   number: string;
@@ -55,8 +55,6 @@ const Deliver = () => {
   const { toast } = useToast();
   const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [dashboardData, setDashboardData] = useState({
     todaysDelivery: 0,
@@ -93,16 +91,22 @@ const Deliver = () => {
       );
 
       // Fetch stock balance to calculate FG stock value (simplified)
-      const stockResult = await erpnextAPI.stock.getStockBalance(
-        undefined, 
-        defaultCompany || undefined
-      );
+      let stockValue = 0;
+      try {
+        const stockResult = await erpnextAPI.stock.getStockBalance(
+          undefined, 
+          defaultCompany || undefined
+        );
+        stockValue = stockResult.data ? 
+          stockResult.data.reduce((sum: number, item: any) => sum + (item.stock_value || 0), 0) : 0;
+      } catch (error) {
+        console.warn('Could not fetch stock balance:', error);
+      }
 
       setDashboardData({
         todaysDelivery: deliveryNotesResult.data ? deliveryNotesResult.data.length : 0,
         totalDeliveries: allDeliveryNotesResult.data ? allDeliveryNotesResult.data.length : 0,
-        fgStockValue: stockResult.data ? 
-          stockResult.data.reduce((sum: number, item: any) => sum + (item.stock_value || 0), 0) : 0,
+        fgStockValue: stockValue,
         averageAge: 15 // Placeholder - would need custom calculation
       });
 
@@ -111,81 +115,7 @@ const Deliver = () => {
     }
   };
 
-  const searchSalesOrders = async () => {
-    if (!searchTerm.trim()) {
-      toast({
-        title: "Search Required",
-        description: "Please enter a sales order number or customer name to search.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const defaultCompany = await getUserDefaultCompany();
-      
-      // Search for Sales Orders with delivery-related statuses
-      const filters = [
-        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']],
-        '|',
-        ['name', 'like', `%${searchTerm}%`],
-        ['customer', 'like', `%${searchTerm}%`]
-      ];
-
-      const salesOrdersResult = await erpnextAPI.sales.getSalesOrders(
-        filters,
-        defaultCompany || undefined,
-        20
-      );
-      
-      if (salesOrdersResult.data) {
-        const transformedOrders: SalesOrder[] = salesOrdersResult.data.map((so: any) => ({
-          number: so.name,
-          customer: so.customer_name || so.customer,
-          status: so.status,
-          deliveryDate: so.delivery_date || so.transaction_date,
-          totalItems: so.items ? so.items.length : 0,
-          totalValue: so.grand_total || 0,
-          items: so.items ? so.items.map((item: any) => ({
-            itemCode: item.item_code,
-            itemName: item.item_name,
-            orderedQty: item.qty || 0,
-            deliveredQty: item.delivered_qty || 0,
-            pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
-            rate: item.rate || 0,
-            uom: item.stock_uom || item.uom,
-            warehouse: item.warehouse || 'Main Store',
-            qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
-          })) : []
-        }));
-        
-        setSalesOrders(transformedOrders);
-      }
-      
-    } catch (error) {
-      console.error('Error searching sales orders:', error);
-      toast({
-        title: "Error",
-        description: "Failed to search sales orders from ERPNext",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectSalesOrder = async (soNumber: string) => {
+  const selectSalesOrder = async (order: SalesOrder) => {
     setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
@@ -199,11 +129,11 @@ const Deliver = () => {
       }
 
       // Fetch SO data from ERPNext
-      const soResult = await erpnextAPI.sales.getSalesOrder(soNumber);
+      const soResult = await erpnextAPI.sales.getSalesOrder(order.number);
       if (!soResult.data) {
         toast({
           title: "Sales Order Not Found",
-          description: `SO ${soNumber} could not be found in ERPNext.`,
+          description: `SO ${order.number} could not be found in ERPNext.`,
           variant: "destructive"
         });
         return;
@@ -253,33 +183,13 @@ const Deliver = () => {
     { label: 'Stock Transfer', icon: ArrowRight, action: () => navigate('/stock-entry') }
   ];
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "To Deliver":
-        return "bg-blue-100 text-blue-800";
-      case "To Deliver and Bill":
-        return "bg-green-100 text-green-800";
-      case "Partially Delivered":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   const tabsList = selectedSO 
-    ? ["dashboard", "deliver", "review"] 
-    : ["dashboard"];
+    ? ["dashboard", "search", "deliver", "review"] 
+    : ["dashboard", "search"];
 
   const tabsLabels = {
     dashboard: "Dashboard",
+    search: "Search Orders",
     deliver: "Deliver Items", 
     review: "Review & Submit"
   };
@@ -299,9 +209,9 @@ const Deliver = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${selectedSO ? 'grid-cols-3' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-full ${selectedSO ? 'grid-cols-4' : 'grid-cols-2'}`}>
             {tabsList.map((tab) => (
-              <TabsTrigger key={tab} value={tab} disabled={tab !== "dashboard" && !selectedSO}>
+              <TabsTrigger key={tab} value={tab} disabled={tab !== "dashboard" && tab !== "search" && !selectedSO}>
                 {tabsLabels[tab as keyof typeof tabsLabels]}
               </TabsTrigger>
             ))}
@@ -311,81 +221,12 @@ const Deliver = () => {
             <DeliverDashboard 
               data={dashboardData}
               shortcuts={shortcuts}
-              onViewOrders={() => {}} // No separate search tab
+              onViewOrders={() => setActiveTab("search")}
             />
-            
-            {/* Search Sales Orders in Dashboard */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Search className="w-5 h-5" />
-                  <span>Select Sales Order</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="searchSO">Search Sales Order</Label>
-                    <div className="flex space-x-2">
-                      <Input
-                        id="searchSO"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Type at least 2 characters to search SO number, customer name..."
-                        onKeyPress={(e) => e.key === 'Enter' && searchSalesOrders()}
-                      />
-                      <Button onClick={searchSalesOrders} disabled={loading}>
-                        {loading ? 'Searching...' : 'Search'}
-                      </Button>
-                    </div>
-                  </div>
+          </TabsContent>
 
-                  {/* Sales Orders List */}
-                  {salesOrders.length > 0 && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {salesOrders.map((order) => (
-                        <Card key={order.number} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => selectSalesOrder(order.number)}>
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-lg">{order.number}</CardTitle>
-                              <Badge className={getStatusColor(order.status)}>
-                                {order.status}
-                              </Badge>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-600">Customer:</span>
-                                <p className="font-medium">{order.customer}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">Delivery Date:</span>
-                                <p>{new Date(order.deliveryDate).toLocaleDateString()}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">Items:</span>
-                                <p>{order.totalItems} items</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">Total Value:</span>
-                                <p>{formatCurrency(order.totalValue)}</p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-
-                  {salesOrders.length === 0 && searchTerm && !loading && (
-                    <div className="text-center py-8 text-gray-500">
-                      No sales orders found matching your search criteria.
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="search" className="space-y-6">
+            <SalesOrderList onSelectOrder={selectSalesOrder} />
           </TabsContent>
 
           {selectedSO && (
@@ -395,7 +236,7 @@ const Deliver = () => {
                   salesOrder={selectedSO}
                   onBack={() => {
                     setSelectedSO(null);
-                    setActiveTab("dashboard");
+                    setActiveTab("search");
                   }}
                   onNext={() => setActiveTab("review")}
                 />

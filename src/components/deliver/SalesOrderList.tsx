@@ -1,12 +1,21 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Search, Calendar, User, Package, DollarSign } from "lucide-react";
 import { SalesOrder } from "../../pages/Deliver";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface SalesOrderListProps {
   onSelectOrder: (order: SalesOrder) => void;
@@ -14,6 +23,12 @@ interface SalesOrderListProps {
 
 const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState<string[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const { toast } = useToast();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -23,61 +38,106 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
     }).format(amount);
   };
 
-  const mockOrders: SalesOrder[] = [
-    {
-      id: "1",
-      number: "SO-2024-001",
-      customer: "ABC Electronics Ltd",
-      totalItems: 15,
-      totalValue: 125000,
-      deliveryDate: "2024-01-15",
-      expectedDelivery: "2024-01-15",
-      status: "To Deliver",
-      percentDelivered: 0,
-      items: [
-        {
-          itemCode: "ITM-001",
-          itemName: "Laptop Dell Inspiron",
-          warehouse: "Main Store",
-          orderedQty: 5,
-          deliveredQty: 0,
-          pendingQty: 5,
-          qtyToDeliver: 5,
-          rate: 25000,
-          uom: "Nos"
-        }
-      ]
-    },
-    {
-      id: "2",
-      number: "SO-2024-002",
-      customer: "XYZ Corporation",
-      totalItems: 8,
-      totalValue: 89000,
-      deliveryDate: "2024-01-16",
-      expectedDelivery: "2024-01-16",
-      status: "To Deliver and Bill",
-      percentDelivered: 25,
-      items: []
-    },
-    {
-      id: "3",
-      number: "SO-2024-003",
-      customer: "Tech Solutions Inc",
-      totalItems: 22,
-      totalValue: 156000,
-      deliveryDate: "2024-01-17",
-      expectedDelivery: "2024-01-17",
-      status: "To Deliver",
-      percentDelivered: 50,
-      items: []
-    }
-  ];
+  useEffect(() => {
+    loadCustomers();
+  }, []);
 
-  const filteredOrders = mockOrders.filter(order =>
-    order.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customer.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const loadCustomers = async () => {
+    try {
+      const api = await createERPNextAPI();
+      if (!api) return;
+
+      // This would load customers from ERPNext - for now using mock data
+      setCustomers(['ABC Electronics Ltd', 'XYZ Corporation', 'Tech Solutions Inc']);
+    } catch (error) {
+      console.error('Error loading customers:', error);
+    }
+  };
+
+  const searchSalesOrders = async () => {
+    if (!searchTerm.trim() && !selectedCustomer && !selectedStatus) {
+      toast({
+        title: "Search Required",
+        description: "Please enter search criteria or select filters.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const api = await createERPNextAPI();
+      if (!api) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const company = await getUserDefaultCompany();
+      
+      // Build filters
+      const filters: any[] = [
+        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+      ];
+
+      if (searchTerm.trim()) {
+        filters.push('|');
+        filters.push(['name', 'like', `%${searchTerm}%`]);
+        filters.push(['customer', 'like', `%${searchTerm}%`]);
+      }
+
+      if (selectedCustomer) {
+        filters.push(['customer', '=', selectedCustomer]);
+      }
+
+      if (selectedStatus) {
+        filters.push(['status', '=', selectedStatus]);
+      }
+
+      const salesOrdersResult = await api.sales.getSalesOrders(
+        filters,
+        company || undefined,
+        20
+      );
+      
+      if (salesOrdersResult.data) {
+        const transformedOrders: SalesOrder[] = salesOrdersResult.data.map((so: any) => ({
+          number: so.name,
+          customer: so.customer_name || so.customer,
+          status: so.status,
+          deliveryDate: so.delivery_date || so.transaction_date,
+          totalItems: so.items ? so.items.length : 0,
+          totalValue: so.grand_total || 0,
+          items: so.items ? so.items.map((item: any) => ({
+            itemCode: item.item_code,
+            itemName: item.item_name,
+            orderedQty: item.qty || 0,
+            deliveredQty: item.delivered_qty || 0,
+            pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
+            rate: item.rate || 0,
+            uom: item.stock_uom || item.uom,
+            warehouse: item.warehouse || 'Main Store',
+            qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
+          })) : []
+        }));
+        
+        setSalesOrders(transformedOrders);
+      }
+      
+    } catch (error) {
+      console.error('Error searching sales orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search sales orders from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -85,6 +145,8 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
         return "bg-blue-100 text-blue-800";
       case "To Deliver and Bill":
         return "bg-green-100 text-green-800";
+      case "Partially Delivered":
+        return "bg-yellow-100 text-yellow-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -98,7 +160,7 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Search */}
+      {/* Search and Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -107,15 +169,53 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex space-x-2">
-            <div className="flex-1">
-              <Label htmlFor="searchOrder">Sales Order Number or Customer</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div>
+              <Label htmlFor="searchOrder">Sales Order / Customer</Label>
               <Input
                 id="searchOrder"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Enter sales order number or customer name..."
+                placeholder="Enter SO number or customer..."
               />
+            </div>
+            
+            <div>
+              <Label htmlFor="customerFilter">Customer</Label>
+              <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg z-[100]">
+                  <SelectItem value="">All Customers</SelectItem>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer} value={customer}>
+                      {customer}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="statusFilter">Status</Label>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg z-[100]">
+                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="To Deliver">To Deliver</SelectItem>
+                  <SelectItem value="To Deliver and Bill">To Deliver and Bill</SelectItem>
+                  <SelectItem value="Partially Delivered">Partially Delivered</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end">
+              <Button onClick={searchSalesOrders} disabled={loading} className="w-full">
+                {loading ? 'Searching...' : 'Search'}
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -123,7 +223,7 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
 
       {/* Orders List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filteredOrders.map((order) => (
+        {salesOrders.map((order) => (
           <Card key={order.id || order.number} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -169,9 +269,9 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
         ))}
       </div>
 
-      {filteredOrders.length === 0 && (
+      {salesOrders.length === 0 && !loading && (
         <div className="text-center py-8 text-gray-500">
-          No sales orders found matching your search criteria.
+          No sales orders found. Use the search filters above to find orders.
         </div>
       )}
     </div>
