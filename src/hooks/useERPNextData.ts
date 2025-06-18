@@ -37,13 +37,14 @@ export function useERPNextData<T>(
 
         // Get user's default company
         const defaultCompany = await getUserDefaultCompany();
+        console.log('Using company for API call:', defaultCompany);
 
         let result;
         
         // Dynamic method calling based on endpoint with corrected API calls
         switch (endpoint) {
           case 'items':
-            result = await erpnextAPI.getItems(filters, undefined, 20);
+            result = await erpnextAPI.getItems(filters, defaultCompany || undefined, 20);
             break;
           case 'warehouses':
             result = await erpnextAPI.getWarehouses(filters, defaultCompany || undefined);

@@ -5,6 +5,7 @@ import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextWarehouseAPI } from './warehouseApi';
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
+import { getERPNextConfig } from '../../authService';
 
 export class ERPNextAPI {
   public baseURL: string;
@@ -43,12 +44,15 @@ export class ERPNextAPI {
   }
 
   async getItems(filters?: any, company?: string, limitPageLength?: number) {
-    return this.stock.getItems(filters || {}, company, limitPageLength);
+    // Use user's default company if no company specified
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.stock.getItems(filters || {}, effectiveCompany, limitPageLength);
   }
 
   // Item methods
   async searchItems(search: string, company?: string, limit?: number) {
-    return this.stock.searchItems(search, company, limit);
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.stock.searchItems(search, effectiveCompany, limit);
   }
 
   async searchItemsByBarcode(barcode: string) {
@@ -56,7 +60,8 @@ export class ERPNextAPI {
   }
 
   async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit?: number, page?: number) {
-    return this.stock.getItemsPaginated(filters, fields, company, limit, page);
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.stock.getItemsPaginated(filters, fields, effectiveCompany, limit, page);
   }
 
   async getItemDetails(itemCode: string) {
@@ -69,7 +74,8 @@ export class ERPNextAPI {
 
   // Warehouse methods
   async getWarehouses(filters?: any, company?: string) {
-    return this.warehouse.getWarehouses(filters || {}, company);
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.warehouse.getWarehouses(filters || {}, effectiveCompany);
   }
 
   // Stock methods
@@ -87,7 +93,8 @@ export class ERPNextAPI {
 
   // Sales methods
   async getSalesOrders(filters?: any, company?: string, limitPageLength?: number) {
-    return this.sales.getSalesOrders(filters || {}, company, limitPageLength);
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.sales.getSalesOrders(filters || {}, effectiveCompany, limitPageLength);
   }
 
   async getSalesOrder(soNumber: string) {
@@ -95,7 +102,8 @@ export class ERPNextAPI {
   }
 
   async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
-    return this.sales.getDeliveryNotes(filters || {}, company, limitPageLength);
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.sales.getDeliveryNotes(filters || {}, effectiveCompany, limitPageLength);
   }
 
   async createDeliveryNote(deliveryData: any) {
@@ -108,7 +116,8 @@ export class ERPNextAPI {
 
   // Purchase methods - forward to purchase API
   async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchase.getPurchaseOrders(filters || {}, company, limitPageLength);
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.purchase.getPurchaseOrders(filters || {}, effectiveCompany, limitPageLength);
   }
 
   async getPurchaseOrder(poNumber: string) {
@@ -116,11 +125,23 @@ export class ERPNextAPI {
   }
 
   async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchase.getPurchaseReceipts(filters || {}, company, limitPageLength);
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.purchase.getPurchaseReceipts(filters || {}, effectiveCompany, limitPageLength);
   }
 
   async getPurchaseReceipt(receiptNumber: string) {
     return this.purchase.getPurchaseReceipt(receiptNumber);
+  }
+
+  // Helper method to get user's default company
+  private async getUserDefaultCompany(): Promise<string | undefined> {
+    try {
+      const config = await getERPNextConfig();
+      return config?.erpnext_default_company || undefined;
+    } catch (error) {
+      console.error('Failed to get user default company:', error);
+      return undefined;
+    }
   }
 
   // Placeholder methods for other missing functionality
@@ -129,7 +150,8 @@ export class ERPNextAPI {
   }
 
   async getStockEntries(filters?: any, company?: string) {
-    return this.stock.getStockEntries(filters || {}, company);
+    const effectiveCompany = company || await this.getUserDefaultCompany();
+    return this.stock.getStockEntries(filters || {}, effectiveCompany);
   }
 
   async getPickLists(filters?: any, company?: string) {
@@ -289,12 +311,20 @@ export async function createERPNextAPI(): Promise<ERPNextAPI | null> {
 }
 
 export async function getUserDefaultCompany(): Promise<string | null> {
-  const api = await createERPNextAPI();
-  if (!api) return null;
-
   try {
+    const config = await getERPNextConfig();
+    if (config?.erpnext_default_company) {
+      console.log('Using user default company:', config.erpnext_default_company);
+      return config.erpnext_default_company;
+    }
+
+    // Fallback to first company if no default is set
+    const api = await createERPNextAPI();
+    if (!api) return null;
+
     const companiesResult = await api.getCompanies();
     if (companiesResult.data && companiesResult.data.length > 0) {
+      console.log('Using first available company:', companiesResult.data[0].name);
       return companiesResult.data[0].name;
     }
   } catch (error) {
