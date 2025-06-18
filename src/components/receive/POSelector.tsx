@@ -57,16 +57,12 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
 
         const defaultCompany = await getUserDefaultCompany();
         
-        // Build filters for search
+        // Build filters for search with company filter
         let filters = [
           ['docstatus', '=', 1],
-          ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']]
+          ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']],
+          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
         ];
-
-        // Apply company filter from user's default company
-        if (defaultCompany) {
-          filters.push(['company', '=', defaultCompany]);
-        }
 
         // Add search filters - search in name, supplier, and supplier_name
         const searchFilters = [

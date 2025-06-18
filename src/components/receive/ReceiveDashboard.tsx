@@ -71,35 +71,46 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
       endOfWeek.setDate(now.getDate() + (6 - dayOfWeek));
 
       const [allPendingPOs, pendingPOsToday, receiptsThisWeek, draftPRResult, qcResult] = await Promise.allSettled([
-        // All Pending POs (To Receive, To Receive and Bill)
-        erpnextAPI.getPurchaseOrders([
-          ['docstatus', '=', 1],
-          ['status', 'in', ['To Receive', 'To Receive and Bill']]
-        ], defaultCompany || undefined),
-        
-        // Pending POs with schedule_date = today
-        erpnextAPI.getPurchaseOrders([
+        // All Pending POs (To Receive, To Receive and Bill) with company filter
+        erpnextAPI.purchase.getPurchaseOrders([
           ['docstatus', '=', 1],
           ['status', 'in', ['To Receive', 'To Receive and Bill']],
-          ['schedule_date', '=', today]
-        ], defaultCompany || undefined),
+          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
+        ]),
         
-        // POs to be received this week (schedule_date in this week)
-        erpnextAPI.getPurchaseOrders([
+        // Pending POs with schedule_date = today with company filter
+        erpnextAPI.purchase.getPurchaseOrders([
           ['docstatus', '=', 1],
           ['status', 'in', ['To Receive', 'To Receive and Bill']],
-          ['schedule_date', 'between', [startOfWeek.toISOString().split('T')[0], endOfWeek.toISOString().split('T')[0]]]
-        ], defaultCompany || undefined),
+          ['schedule_date', '=', today],
+          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
+        ]),
         
-        // Draft Purchase Receipts
-        erpnextAPI.getPurchaseReceipts([['docstatus', '=', 0]], defaultCompany || undefined),
+        // POs to be received this week (schedule_date in this week) with company filter
+        erpnextAPI.purchase.getPurchaseOrders([
+          ['docstatus', '=', 1],
+          ['status', 'in', ['To Receive', 'To Receive and Bill']],
+          ['schedule_date', 'between', [startOfWeek.toISOString().split('T')[0], endOfWeek.toISOString().split('T')[0]]],
+          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
+        ]),
         
-        // Pending QC (Quality Inspections with type=incoming and docstatus=0)
+        // Draft Purchase Receipts with company filter
+        erpnextAPI.purchase.getPurchaseReceipts([
+          ['docstatus', '=', 0],
+          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
+        ]),
+        
+        // Pending QC (Quality Inspections with type=incoming and docstatus=0) with company filter
         fetch(`${erpnextAPI.baseURL}/api/resource/Quality Inspection?filters=${JSON.stringify([
           ['inspection_type', '=', 'Incoming'],
-          ['docstatus', '=', 0]
+          ['docstatus', '=', 0],
+          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
         ])}&limit_page_length=1000`, {
-          headers: erpnextAPI.getHeaders()
+          headers: {
+            'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          }
         }).then(res => res.json())
       ]);
 

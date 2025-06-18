@@ -44,35 +44,11 @@ const DraftReceipts = () => {
 
       const defaultCompany = await getUserDefaultCompany();
       
-      // Fetch draft Purchase Receipts with detailed fields
-      const params = new URLSearchParams();
-      params.append('filters', JSON.stringify([
+      // Fetch draft Purchase Receipts with company filter
+      const result = await erpnextAPI.purchase.getPurchaseReceipts([
         ['docstatus', '=', 0],
         ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
-      ]));
-      
-      const fields = [
-        'name',
-        'supplier',
-        'supplier_name',
-        'posting_date',
-        'grand_total',
-        'status',
-        'purchase_order',
-        'company'
-      ];
-      params.append('fields', JSON.stringify(fields));
-      params.append('limit_page_length', '100');
-
-      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Receipt?${params.toString()}`, {
-        headers: erpnextAPI.getHeaders()
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch draft receipts: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      ]);
       
       if (result?.data) {
         const transformedReceipts: DraftReceipt[] = result.data.map((receipt: any) => ({
