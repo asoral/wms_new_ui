@@ -32,6 +32,7 @@ export interface POItem {
   uom: string;
   rate: number;
   warehouse: string;
+  name?: string; // PO Item ID for linking
 }
 
 export interface ReceiveEntry {
@@ -43,6 +44,7 @@ export interface ReceiveEntry {
   serial?: string;
   uom: string;
   rate: number;
+  purchaseOrderItem?: string; // Reference to PO item
 }
 
 const Receive = () => {
@@ -98,7 +100,8 @@ const Receive = () => {
           pendingQty: (item.qty || 0) - (item.received_qty || 0),
           uom: item.stock_uom || item.uom,
           rate: item.rate || 0,
-          warehouse: item.warehouse || 'Main Store'
+          warehouse: item.warehouse || 'Main Store',
+          name: item.name // Store the PO item ID for linking
         })) : []
       };
 
@@ -152,13 +155,26 @@ const Receive = () => {
         return;
       }
 
+      // Find the corresponding PO item to get the PO item ID
+      const poItem = selectedPO.items.find(item => item.itemCode === entry.itemCode);
+      if (!poItem || !poItem.name) {
+        console.error('PO item not found or missing ID:', entry.itemCode);
+        toast({
+          title: "Error",
+          description: "Purchase Order item reference not found",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Override warehouse with selected warehouse if one is chosen
       const entryWithWarehouse = {
         ...entry,
-        warehouse: selectedWarehouse || entry.warehouse
+        warehouse: selectedWarehouse || entry.warehouse,
+        purchaseOrderItem: poItem.name // Add PO item reference
       };
 
-      console.log('Processing entry with warehouse:', entryWithWarehouse);
+      console.log('Processing entry with warehouse and PO item reference:', entryWithWarehouse);
 
       // Get the company from the PO
       const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
@@ -180,6 +196,8 @@ const Receive = () => {
             warehouse: entryWithWarehouse.warehouse,
             rate: entryWithWarehouse.rate,
             uom: entryWithWarehouse.uom,
+            purchase_order: selectedPO.poNumber,
+            purchase_order_item: entryWithWarehouse.purchaseOrderItem, // Link to PO item
             ...(entryWithWarehouse.batch && { batch_no: entryWithWarehouse.batch }),
             ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
           }]
@@ -231,6 +249,8 @@ const Receive = () => {
           warehouse: entryWithWarehouse.warehouse,
           rate: entryWithWarehouse.rate,
           uom: entryWithWarehouse.uom,
+          purchase_order: selectedPO.poNumber,
+          purchase_order_item: entryWithWarehouse.purchaseOrderItem, // Link to PO item
           ...(entryWithWarehouse.batch && { batch_no: entryWithWarehouse.batch }),
           ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
         };
