@@ -1,4 +1,3 @@
-
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
 import { ERPNextCompanyAPI } from './companyApi';
@@ -17,7 +16,7 @@ export class ERPNextAPI {
   public company: ERPNextCompanyAPI;
   public material: ERPNextMaterialAPI;
   public warehouse: ERPNextWarehouseAPI;
-  public purchase: ERPNextPurchaseAPI; // Use proper PurchaseAPI
+  public purchase: ERPNextPurchaseAPI;
   private baseApi: ERPNextBaseAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
@@ -30,7 +29,7 @@ export class ERPNextAPI {
     this.company = new ERPNextCompanyAPI(baseURL, apiKey, apiSecret);
     this.material = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
     this.warehouse = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
-    this.purchase = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret); // Use proper PurchaseAPI
+    this.purchase = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
     this.baseApi = new ERPNextBaseAPI(baseURL, apiKey, apiSecret);
   }
 
@@ -44,7 +43,7 @@ export class ERPNextAPI {
   }
 
   async getItems(filters?: any, company?: string, limitPageLength?: number) {
-    return this.stock.getItems(filters, company, limitPageLength);
+    return this.stock.getItems(filters || {}, company, limitPageLength);
   }
 
   // Item methods
@@ -70,7 +69,7 @@ export class ERPNextAPI {
 
   // Warehouse methods
   async getWarehouses(filters?: any, company?: string) {
-    return this.warehouse.getWarehouses(filters, company);
+    return this.warehouse.getWarehouses(filters || {}, company);
   }
 
   // Stock methods
@@ -79,7 +78,7 @@ export class ERPNextAPI {
   }
 
   async getCurrentStock(itemCode: string, warehouse?: string, batch?: string, serial?: string) {
-    return this.stock.getCurrentStock(itemCode, warehouse, batch, serial);
+    return this.stock.getCurrentStock(itemCode, warehouse || '', batch, serial);
   }
 
   async getBinStock(itemCode?: string, warehouse?: string) {
@@ -88,7 +87,7 @@ export class ERPNextAPI {
 
   // Sales methods
   async getSalesOrders(filters?: any, company?: string, limitPageLength?: number) {
-    return this.sales.getSalesOrders(filters, company, limitPageLength);
+    return this.sales.getSalesOrders(filters || {}, company, limitPageLength);
   }
 
   async getSalesOrder(soNumber: string) {
@@ -96,7 +95,7 @@ export class ERPNextAPI {
   }
 
   async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
-    return this.sales.getDeliveryNotes(filters, company, limitPageLength);
+    return this.sales.getDeliveryNotes(filters || {}, company, limitPageLength);
   }
 
   async createDeliveryNote(deliveryData: any) {
@@ -109,7 +108,7 @@ export class ERPNextAPI {
 
   // Purchase methods - forward to purchase API
   async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchase.getPurchaseOrders(filters, company, limitPageLength);
+    return this.purchase.getPurchaseOrders(filters || {}, company, limitPageLength);
   }
 
   async getPurchaseOrder(poNumber: string) {
@@ -117,7 +116,7 @@ export class ERPNextAPI {
   }
 
   async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchase.getPurchaseReceipts(filters, company, limitPageLength);
+    return this.purchase.getPurchaseReceipts(filters || {}, company, limitPageLength);
   }
 
   async getPurchaseReceipt(receiptNumber: string) {
@@ -130,7 +129,7 @@ export class ERPNextAPI {
   }
 
   async getStockEntries(filters?: any, company?: string) {
-    return { data: [] };
+    return this.stock.getStockEntries(filters || {}, company);
   }
 
   async getPickLists(filters?: any, company?: string) {
@@ -162,7 +161,7 @@ export class ERPNextAPI {
   }
 
   async getStockAgingReport() {
-    return { data: [] };
+    return this.stock.getStockAgingReport();
   }
 
   async getRecentActivities() {
@@ -171,39 +170,11 @@ export class ERPNextAPI {
 
   // Stock reconciliation methods
   async createStockReconciliation(reconciliationData: any) {
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(reconciliationData)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to create stock reconciliation: ${response.statusText}`);
-    }
-
-    return response.json();
+    return this.stock.createStockReconciliation(reconciliationData);
   }
 
   async updateStockReconciliation(name: string, reconciliationData: any) {
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation/${encodeURIComponent(name)}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(reconciliationData)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to update stock reconciliation: ${response.statusText}`);
-    }
-
-    return response.json();
+    return this.stock.updateStockReconciliation(name, reconciliationData);
   }
 
   // Validation methods

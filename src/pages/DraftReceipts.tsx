@@ -11,7 +11,7 @@ interface DraftReceipt {
   name: string;
   supplier: string;
   supplier_name?: string;
-  posting_date: string;
+  posting_date?: string;
   grand_total: number;
   status: string;
   items: any[];
@@ -50,7 +50,18 @@ const DraftReceipts = () => {
       console.log('Draft receipts response:', response);
       
       if (response?.data) {
-        setDraftReceipts(response.data);
+        // Transform the data to match our DraftReceipt interface
+        const transformedReceipts: DraftReceipt[] = response.data.map((receipt: any) => ({
+          name: receipt.name,
+          supplier: receipt.supplier,
+          supplier_name: receipt.supplier_name,
+          posting_date: receipt.posting_date || new Date().toISOString().split('T')[0],
+          grand_total: receipt.grand_total,
+          status: receipt.status,
+          items: receipt.items || []
+        }));
+        
+        setDraftReceipts(transformedReceipts);
       } else {
         setDraftReceipts([]);
       }
@@ -79,7 +90,8 @@ const DraftReceipts = () => {
     }).format(amount);
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-GB', {
       day: '2-digit',

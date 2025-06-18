@@ -22,6 +22,12 @@ export interface OperationalMetrics {
   openDeliveries: number;
   purchasesThisMonth: number;
   openPurchases: number;
+  pickAccuracy: number;
+  putawaySpeed: number;
+  cycleCountAccuracy: number;
+  orderFulfillmentRate: number;
+  warehouseUtilization: number;
+  averageProcessingTime: number;
 }
 
 export interface FinancialMetrics {
@@ -29,6 +35,14 @@ export interface FinancialMetrics {
   grossProfitMargin: number;
   outstandingAmount: number;
   averageCollectionPeriod: number;
+  stockTurnoverRatio: number;
+  carryingCostPercentage: number;
+  deadStockValue: number;
+  abcAnalysis: {
+    classA: number;
+    classB: number;
+    classC: number;
+  };
 }
 
 export interface RecentActivity {
@@ -60,6 +74,12 @@ export function useEnhancedDashboard() {
     openDeliveries: 0,
     purchasesThisMonth: 0,
     openPurchases: 0,
+    pickAccuracy: 0,
+    putawaySpeed: 0,
+    cycleCountAccuracy: 0,
+    orderFulfillmentRate: 0,
+    warehouseUtilization: 0,
+    averageProcessingTime: 0,
   });
 
   const [financialMetrics, setFinancialMetrics] = useState<FinancialMetrics>({
@@ -67,12 +87,26 @@ export function useEnhancedDashboard() {
     grossProfitMargin: 0,
     outstandingAmount: 0,
     averageCollectionPeriod: 0,
+    stockTurnoverRatio: 0,
+    carryingCostPercentage: 0,
+    deadStockValue: 0,
+    abcAnalysis: {
+      classA: 0,
+      classB: 0,
+      classC: 0,
+    },
   });
 
   const [activities, setActivities] = useState<RecentActivity[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Additional properties needed by Home.tsx
+  const [stats, setStats] = useState(dashboardStats);
+  const [recentActivities, setRecentActivities] = useState(activities);
+  const [stockAgingData, setStockAgingData] = useState<any[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
   const { toast } = useToast();
 
@@ -92,7 +126,6 @@ export function useEnhancedDashboard() {
         const company = await getUserDefaultCompany();
 
         // Mock data for dashboard stats - these would normally come from API calls
-        // In a real implementation, replace these with actual API calls
         const dashboardResult = {
           data: {
             totalSales: 5678900,
@@ -113,7 +146,13 @@ export function useEnhancedDashboard() {
             deliveriesThisMonth: 98,
             openDeliveries: 26,
             purchasesThisMonth: 654200,
-            openPurchases: 14
+            openPurchases: 14,
+            pickAccuracy: 98.5,
+            putawaySpeed: 45.2,
+            cycleCountAccuracy: 99.1,
+            orderFulfillmentRate: 96.8,
+            warehouseUtilization: 78.3,
+            averageProcessingTime: 24.5
           }
         };
         
@@ -122,19 +161,22 @@ export function useEnhancedDashboard() {
             grossProfit: 1998600,
             grossProfitMargin: 35.2,
             outstandingAmount: 876500,
-            averageCollectionPeriod: 28.4
+            averageCollectionPeriod: 28.4,
+            stockTurnoverRatio: 4.2,
+            carryingCostPercentage: 12.5,
+            deadStockValue: 145600,
+            abcAnalysis: {
+              classA: 65,
+              classB: 25,
+              classC: 10
+            }
           }
         };
 
-        // In a real implementation, these would be API calls
-        // For now, we're just using mock data
-        // api.getDashboardMetrics()
-        // api.getOperationalMetrics()
-        // api.getFinancialMetrics()
-        
         setDashboardStats(dashboardResult.data as DashboardStats);
         setOperationalMetrics(operationalResult.data as OperationalMetrics);
         setFinancialMetrics(financialResult.data as FinancialMetrics);
+        setStats(dashboardResult.data as DashboardStats);
 
         // Load recent activities
         await loadRecentActivities();
@@ -158,6 +200,7 @@ export function useEnhancedDashboard() {
 
   const loadRecentActivities = async () => {
     try {
+      setIsLoadingActivities(true);
       const api = await createERPNextAPI();
       if (!api) return;
 
@@ -212,14 +255,19 @@ export function useEnhancedDashboard() {
         ]
       };
 
-      // In a real implementation, this would be an API call
-      // const activitiesResult = await api.getRecentActivities();
-      
       setActivities(activitiesResult.data as RecentActivity[]);
+      setRecentActivities(activitiesResult.data as RecentActivity[]);
       
     } catch (error) {
       console.error('Error fetching recent activities:', error);
+    } finally {
+      setIsLoadingActivities(false);
     }
+  };
+
+  const refreshData = async () => {
+    // Refresh all data
+    window.location.reload();
   };
 
   return {
@@ -228,7 +276,13 @@ export function useEnhancedDashboard() {
     financialMetrics,
     activities,
     isLoading,
-    error,
+    error: error || '',
     loadRecentActivities,
+    // Additional properties for Home.tsx compatibility
+    stats,
+    recentActivities,
+    stockAgingData,
+    isLoadingActivities,
+    refreshData,
   };
 }

@@ -45,7 +45,7 @@ export function useERPNextDashboard() {
         const [warehousesRes, salesOrdersRes, stockBalanceRes] = await Promise.all([
           api.warehouse.getWarehouses({}, company),
           api.sales.getSalesOrders({}, company),
-          api.stock.getStockBalance('', '') // Empty string parameters for getting all stock
+          api.stock.getStockBalance() // No parameters needed for getting all stock
         ]);
 
         // Calculate dashboard metrics
@@ -58,7 +58,7 @@ export function useERPNextDashboard() {
         
         if (stockBalanceRes?.data) {
           for (const item of stockBalanceRes.data) {
-            const qty = parseFloat(item.actual_qty || '0');
+            const qty = parseFloat(String(item.actual_qty || 0));
             totalStock += qty;
             if (qty <= 0) outOfStockCount++;
           }
