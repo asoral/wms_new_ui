@@ -1,3 +1,4 @@
+
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
 import { ERPNextCompanyAPI } from './companyApi';
@@ -80,11 +81,11 @@ export class ERPNextAPI {
 
   // Stock methods
   async getStockBalance(itemCode?: string, warehouse?: string) {
-    return this.stock.getStockBalance(itemCode, warehouse);
+    return this.stock.getStockBalance(itemCode, undefined, warehouse);
   }
 
-  async getCurrentStock(itemCode: string, warehouse?: string, batch?: string, serial?: string) {
-    return this.stock.getCurrentStock(itemCode, warehouse || '', batch, serial);
+  async getCurrentStock(itemCode: string, warehouse?: string) {
+    return this.stock.getCurrentStock(itemCode, warehouse || '');
   }
 
   async getBinStock(itemCode?: string, warehouse?: string) {
