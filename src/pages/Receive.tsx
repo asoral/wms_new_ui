@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -129,60 +130,6 @@ const Receive = () => {
     setSelectedWarehouse(warehouseCode);
   };
 
-  const createSerialBatchBundleForItem = async (
-    erpnextAPI: any,
-    company: string,
-    itemCode: string,
-    itemName: string,
-    warehouse: string,
-    qty: number,
-    batchNo?: string,
-    serialNo?: string
-  ): Promise<string | null> => {
-    try {
-      // Get item details to check if it requires batch/serial tracking
-      const itemDetails = await erpnextAPI.getItemDetails(itemCode);
-      const hasBatch = itemDetails.data.has_batch_no === 1;
-      const hasSerial = itemDetails.data.has_serial_no === 1;
-
-      if (!hasBatch && !hasSerial) {
-        return null; // No bundle needed for non-tracked items
-      }
-
-      // If batch is required but doesn't exist, create it
-      if (hasBatch && batchNo) {
-        await erpnextAPI.purchase.ensureBatchExists(batchNo, itemCode);
-      }
-
-      const bundleData = {
-        company: company,
-        item_code: itemCode,
-        item_name: itemName,
-        has_serial_no: hasSerial ? 1 : 0,
-        has_batch_no: hasBatch ? 1 : 0,
-        warehouse: warehouse,
-        type_of_transaction: 'Inward',
-        total_qty: qty,
-        posting_date: new Date().toISOString().split('T')[0],
-        posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
-        entries: [{
-          qty: qty,
-          warehouse: warehouse,
-          incoming_rate: 0,
-          ...(hasBatch && batchNo && { batch_no: batchNo }),
-          ...(hasSerial && serialNo && { serial_no: serialNo })
-        }]
-      };
-
-      console.log('Creating Serial and Batch Bundle:', bundleData);
-      const bundleResult = await erpnextAPI.purchase.createSerialBatchBundle(bundleData);
-      return bundleResult.data?.name || null;
-    } catch (error) {
-      console.error('Error creating serial batch bundle:', error);
-      throw error;
-    }
-  };
-
   const addReceiveEntry = async (entry: ReceiveEntry) => {
     console.log('addReceiveEntry called with:', entry);
     
@@ -233,41 +180,42 @@ const Receive = () => {
       const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
       const company = poDetails.data.company;
 
-      // Create serial/batch bundle if needed
-      let serialBatchBundle = null;
-      if (entryWithWarehouse.batch || entryWithWarehouse.serial) {
-        serialBatchBundle = await createSerialBatchBundleForItem(
-          erpnextAPI,
-          company,
-          entryWithWarehouse.itemCode,
-          entryWithWarehouse.itemName,
-          entryWithWarehouse.warehouse,
-          entryWithWarehouse.receivedQty,
-          entryWithWarehouse.batch,
-          entryWithWarehouse.serial
-        );
+      // Ensure batch exists if batch tracking is used
+      if (entryWithWarehouse.batch) {
+        const batchExists = await erpnextAPI.purchase.ensureBatchExists(entryWithWarehouse.batch, entryWithWarehouse.itemCode);
+        if (!batchExists) {
+          toast({
+            title: "Error",
+            description: "Failed to create or find batch number",
+            variant: "destructive"
+          });
+          return;
+        }
       }
 
       // If this is the first item, create a new Purchase Receipt
       if (!currentPurchaseReceipt) {
         console.log('Creating new Purchase Receipt...');
         
+        const receiptItem = {
+          item_code: entryWithWarehouse.itemCode,
+          qty: entryWithWarehouse.receivedQty,
+          warehouse: entryWithWarehouse.warehouse,
+          rate: entryWithWarehouse.rate,
+          uom: entryWithWarehouse.uom,
+          purchase_order: selectedPO.poNumber,
+          purchase_order_item: entryWithWarehouse.purchaseOrderItem,
+          ...(entryWithWarehouse.batch && { batch_no: entryWithWarehouse.batch }),
+          ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
+        };
+
         const receiptData = {
           supplier: selectedPO.supplier,
           company: company,
           posting_date: new Date().toISOString().split('T')[0],
           purchase_order: selectedPO.poNumber,
           set_posting_time: 1,
-          items: [{
-            item_code: entryWithWarehouse.itemCode,
-            qty: entryWithWarehouse.receivedQty,
-            warehouse: entryWithWarehouse.warehouse,
-            rate: entryWithWarehouse.rate,
-            uom: entryWithWarehouse.uom,
-            purchase_order: selectedPO.poNumber,
-            purchase_order_item: entryWithWarehouse.purchaseOrderItem,
-            ...(serialBatchBundle && { serial_and_batch_bundle: serialBatchBundle })
-          }]
+          items: [receiptItem]
         };
 
         console.log('Creating new Purchase Receipt with data:', receiptData);
@@ -318,7 +266,8 @@ const Receive = () => {
           uom: entryWithWarehouse.uom,
           purchase_order: selectedPO.poNumber,
           purchase_order_item: entryWithWarehouse.purchaseOrderItem,
-          ...(serialBatchBundle && { serial_and_batch_bundle: serialBatchBundle })
+          ...(entryWithWarehouse.batch && { batch_no: entryWithWarehouse.batch }),
+          ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
         };
         
         const updatedItems = [...(currentReceiptData.data.items || []), newItem];

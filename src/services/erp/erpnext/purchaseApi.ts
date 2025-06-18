@@ -81,28 +81,6 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Create a Serial and Batch Bundle for batch/serial tracked items
-   */
-  async createSerialBatchBundle(bundleData: any): Promise<ERPNextResponse<any>> {
-    const response = await fetch(
-      `${this.baseURL}/api/resource/Serial and Batch Bundle`,
-      {
-        method: 'POST',
-        headers: {
-          ...this.getHeaders(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(bundleData)
-      }
-    );
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create serial batch bundle: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-    return response.json();
-  }
-
-  /**
    * Create or get existing batch
    */
   async ensureBatchExists(batchNo: string, itemCode: string): Promise<boolean> {
