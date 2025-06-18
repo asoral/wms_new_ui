@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, Item } from './types';
 
@@ -91,9 +92,8 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         ['disabled', '=', 0]
       ];
       
-      if (warehouse) {
-        filters.push(['warehouse', '=', warehouse]);
-      }
+      // Don't filter by warehouse directly since batches are not warehouse-specific
+      // Instead, we'll get all batches for the item and then check stock ledger entries if needed
 
       const response = await fetch(`${this.baseURL}/api/resource/Batch?${new URLSearchParams({
         filters: JSON.stringify(filters),
@@ -107,6 +107,41 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       }
 
       const result = await response.json();
+      
+      // If warehouse is specified, we can optionally filter batches that have stock in that warehouse
+      if (warehouse && result.data && result.data.length > 0) {
+        // Get stock ledger entries to check which batches have stock in the specified warehouse
+        try {
+          const stockLedgerFilters = [
+            ['item_code', '=', itemCode],
+            ['warehouse', '=', warehouse],
+            ['actual_qty', '>', 0]
+          ];
+          
+          const stockLedgerResponse = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
+            filters: JSON.stringify(stockLedgerFilters),
+            fields: JSON.stringify(['batch_no']),
+            group_by: 'batch_no'
+          })}`, {
+            headers: this.getHeaders(),
+          });
+          
+          if (stockLedgerResponse.ok) {
+            const stockLedgerResult = await stockLedgerResponse.json();
+            if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
+              const batchesWithStock = stockLedgerResult.data.map((entry: any) => entry.batch_no).filter(Boolean);
+              // Filter batches to only include those with stock in the warehouse
+              result.data = result.data.filter((batch: any) => 
+                batchesWithStock.includes(batch.batch_id || batch.name)
+              );
+            }
+          }
+        } catch (error) {
+          console.warn('Could not filter batches by warehouse stock:', error);
+          // Continue with all batches if warehouse filtering fails
+        }
+      }
+      
       return {
         data: result.data || [],
         message: result.message || 'Batches fetched successfully'
