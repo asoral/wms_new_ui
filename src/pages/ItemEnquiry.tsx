@@ -1,49 +1,53 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, X, Package, Camera } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import ItemScanner from "../components/item-enquiry/ItemScanner";
+import CameraScanner from "../components/item-enquiry/CameraScanner";
+import StockSummary from "../components/item-enquiry/StockSummary";
+import WarehouseStockTable from "../components/item-enquiry/WarehouseStockTable";
+
+export interface ItemDetails {
+  itemCode: string;
+  itemName: string;
+  itemGroup: string;
+  stockUom: string;
+  description?: string;
+}
+
+export interface ItemStock {
+  warehouse: string;
+  actualQty: number;
+  reservedQty: number;
+  availableQty: number;
+  valuationRate: number;
+}
 
 export interface StockData {
   totalStock: number;
-  uom: string;
-  totalValuation: number;
-  averageAge: number;
-  warehouseStock: number;
-  itemName: string;
-  itemCode: string;
+  availableStock: number;
+  reservedStock: number;
+  warehouses: ItemStock[];
 }
 
-export interface StockInfo {
-  warehouse: string;
-  actual_qty: number;
-  valuation_rate: number;
-  batch?: string;
-  serial?: string;
-  age?: number;
-  qty?: number;
-  uom?: string;
-  valuation?: number;
-}
+export interface StockInfo extends ItemStock {}
 
 const ItemEnquiry = () => {
   const [itemCode, setItemCode] = useState("");
-  const [stockData, setStockData] = useState<StockData | null>(null);
-  const [stockInfo, setStockInfo] = useState<StockInfo[]>([]);
+  const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
+  const [stockInfo, setStockInfo] = useState<ItemStock[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("search");
+  const [showCamera, setShowCamera] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Optional: Load item details if an item code is already present
-    if (itemCode) {
-      loadItemDetails(itemCode);
-    }
-  }, []);
-
-  const loadItemDetails = async (item: string) => {
+  const loadItemDetails = async (code: string) => {
     try {
       setLoading(true);
       const erpnextAPI = await createERPNextAPI();
@@ -56,44 +60,40 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Fetch item details
-      const itemDetails = await erpnextAPI.stock.getItemDetails(item);
-      console.log('Item details response:', itemDetails);
+      // Get item details using the stock API
+      const itemResult = await erpnextAPI.stock.getItems([
+        ['item_code', '=', code]
+      ], undefined, 1);
 
-      if (itemDetails?.data) {
-        // Fetch stock balance for all warehouses
-        const stockBalance = await erpnextAPI.stock.getStockBalance(item);
-        console.log('Stock balance response:', stockBalance);
-
-        // Transform the data to match our StockData and StockInfo interfaces
-        const totalStock = stockBalance?.data?.reduce((sum, item) => sum + (item.actual_qty || 0), 0) || 0;
-        const totalValuation = stockBalance?.data?.reduce((sum, item) => sum + ((item.actual_qty || 0) * (item.valuation_rate || 0)), 0) || 0;
-
-        setStockData({
-          totalStock: totalStock,
-          uom: itemDetails.data.stock_uom || itemDetails.data.uom,
-          totalValuation: totalValuation,
-          averageAge: 30, // Mock data
-          warehouseStock: stockBalance?.data?.length || 0,
-          itemName: itemDetails.data.item_name,
-          itemCode: itemDetails.data.item_code
+      if (itemResult.data && itemResult.data.length > 0) {
+        const item = itemResult.data[0];
+        setItemDetails({
+          itemCode: item.item_code || item.name,
+          itemName: item.item_name,
+          itemGroup: item.item_group,
+          stockUom: item.stock_uom || 'Nos',
+          description: item.description
         });
 
-        // Transform stock balance data to StockInfo
-        const transformedStockInfo: StockInfo[] = stockBalance?.data?.map((item: any) => ({
-          warehouse: item.warehouse,
-          actual_qty: item.actual_qty,
-          valuation_rate: item.valuation_rate,
-          batch: item.batch_no,
-          serial: item.serial_no,
-          age: 30, // Mock data
-          qty: item.actual_qty,
-          uom: itemDetails.data.stock_uom || itemDetails.data.uom,
-          valuation: item.valuation_rate * item.actual_qty
-        })) || [];
-        setStockInfo(transformedStockInfo);
+        // Get stock balance for this item
+        const stockResult = await erpnextAPI.stock.getStockBalance(code);
+        if (stockResult.data) {
+          const stockData: ItemStock[] = stockResult.data.map((stock: any) => ({
+            warehouse: stock.warehouse,
+            actualQty: stock.actual_qty || 0,
+            reservedQty: stock.reserved_qty || 0,
+            availableQty: (stock.actual_qty || 0) - (stock.reserved_qty || 0),
+            valuationRate: stock.valuation_rate || 0
+          }));
+          setStockInfo(stockData);
+        }
       } else {
-        setStockData(null);
+        toast({
+          title: "Item Not Found",
+          description: `Item ${code} could not be found in ERPNext.`,
+          variant: "destructive"
+        });
+        setItemDetails(null);
         setStockInfo([]);
       }
 
@@ -109,9 +109,30 @@ const ItemEnquiry = () => {
     }
   };
 
+  const handleBarcodeScanned = async (barcode: string) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      // Try to find item by barcode first
+      const barcodeResult = await erpnextAPI.stock.searchItems(barcode);
+      if (barcodeResult.data && barcodeResult.data.length > 0) {
+        const item = barcodeResult.data[0];
+        setItemCode(item.item_code || item.name);
+        await loadItemDetails(item.item_code || item.name);
+      } else {
+        // If not found by barcode, try direct search
+        await loadItemDetails(barcode);
+      }
+    } catch (error) {
+      console.error('Error searching by barcode:', error);
+      await loadItemDetails(barcode);
+    }
+  };
+
   const handleSearch = () => {
-    if (itemCode) {
-      loadItemDetails(itemCode);
+    if (itemCode.trim()) {
+      loadItemDetails(itemCode.trim());
     } else {
       toast({
         title: "Validation Error",
@@ -123,131 +144,121 @@ const ItemEnquiry = () => {
 
   const handleClear = () => {
     setItemCode("");
-    setStockData(null);
+    setItemDetails(null);
     setStockInfo([]);
+  };
+
+  // Create stock data for summary
+  const stockData: StockData = {
+    totalStock: stockInfo.reduce((sum, stock) => sum + stock.actualQty, 0),
+    availableStock: stockInfo.reduce((sum, stock) => sum + stock.availableQty, 0),
+    reservedStock: stockInfo.reduce((sum, stock) => sum + stock.reservedQty, 0),
+    warehouses: stockInfo
   };
 
   return (
     <div className="container mx-auto py-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Item Enquiry</h1>
-        <p className="text-gray-500">Check the stock details of a specific item.</p>
+        <p className="text-gray-500">Search for item details and stock information.</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Enter Item Code</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="itemCode" className="text-right">
-                Item Code
-              </Label>
-              <Input
-                type="text"
-                id="itemCode"
-                value={itemCode}
-                onChange={(e) => setItemCode(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleClear}
-              >
-                Clear
-              </Button>
-              <Button
-                type="submit"
-                className="gap-2"
-                onClick={handleSearch}
-                disabled={loading}
-              >
-                <Search className="h-4 w-4" />
-                {loading ? "Loading..." : "Search"}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="search">Search</TabsTrigger>
+          <TabsTrigger value="barcode">Barcode</TabsTrigger>
+          <TabsTrigger value="camera">Camera</TabsTrigger>
+        </TabsList>
 
-      {stockData && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Item Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Item Name</Label>
-                <p className="font-semibold">{stockData.itemName}</p>
+        <TabsContent value="search">
+          <Card>
+            <CardHeader>
+              <CardTitle>Search by Item Code</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="itemCode" className="text-right">
+                    Item Code
+                  </Label>
+                  <Input
+                    type="text"
+                    id="itemCode"
+                    value={itemCode}
+                    onChange={(e) => setItemCode(e.target.value)}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="gap-2"
+                    onClick={handleClear}
+                  >
+                    <X className="h-4 w-4" />
+                    Clear
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="gap-2"
+                    onClick={handleSearch}
+                    disabled={loading}
+                  >
+                    <Search className="h-4 w-4" />
+                    {loading ? "Loading..." : "Search"}
+                  </Button>
+                </div>
               </div>
-              <div>
-                <Label>Item Code</Label>
-                <p className="font-semibold">{stockData.itemCode}</p>
-              </div>
-              <div>
-                <Label>Total Stock</Label>
-                <p className="font-semibold">{stockData.totalStock} {stockData.uom}</p>
-              </div>
-              <div>
-                <Label>Total Valuation</Label>
-                <p className="font-semibold">{stockData.totalValuation}</p>
-              </div>
-              <div>
-                <Label>Average Age</Label>
-                <p className="font-semibold">{stockData.averageAge} days</p>
-              </div>
-              <div>
-                <Label>Warehouse Stock</Label>
-                <p className="font-semibold">{stockData.warehouseStock} warehouses</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="barcode">
+          <ItemScanner 
+            onBarcodeScanned={handleBarcodeScanned}
+            isLoading={loading}
+          />
+        </TabsContent>
+
+        <TabsContent value="camera">
+          {showCamera ? (
+            <CameraScanner 
+              onBarcodeScanned={handleBarcodeScanned}
+              onClose={() => setShowCamera(false)}
+            />
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Button onClick={() => setShowCamera(true)}>
+                  <Camera className="w-4 h-4 mr-2" />
+                  Open Camera Scanner
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Display Results */}
+      {itemDetails && (
+        <div className="mt-6 space-y-6">
+          <StockSummary 
+            stockData={stockData}
+            isLoading={loading}
+          />
+
+          <WarehouseStockTable 
+            stockInfo={stockInfo}
+            isLoading={loading}
+          />
+        </div>
       )}
 
-      {stockInfo.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Stock Information by Warehouse</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Warehouse</th>
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Quantity</th>
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Valuation Rate</th>
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Batch</th>
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Serial</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stockInfo.map((item) => (
-                    <tr key={item.warehouse} className="border-b hover:bg-gray-50">
-                      <td className="py-4 px-4">{item.warehouse}</td>
-                      <td className="py-4 px-4">{item.actual_qty} {stockData?.uom}</td>
-                      <td className="py-4 px-4">{item.valuation_rate}</td>
-                      <td className="py-4 px-4">{item.batch || '-'}</td>
-                      <td className="py-4 px-4">{item.serial || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!loading && itemCode && !stockData && (
+      {!loading && itemCode && !itemDetails && (
         <Card className="mt-6">
           <CardContent className="text-center py-8">
-            <p className="text-gray-500">No stock information found for item "{itemCode}".</p>
+            <p className="text-gray-500">No item found with code "{itemCode}".</p>
           </CardContent>
         </Card>
       )}

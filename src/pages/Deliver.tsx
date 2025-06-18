@@ -1,17 +1,18 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Truck, Package, Search, CheckCircle, Printer, ArrowRight } from "lucide-react";
+import { Truck, Package, CheckCircle, Printer, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import DeliveryProcess from "../components/deliver/DeliveryProcess";
 import SalesOrderList from "../components/deliver/SalesOrderList";
+import SalesOrderSearch from "../components/deliver/SalesOrderSearch";
+import DraftDeliveryNotes from "../components/deliver/DraftDeliveryNotes";
 
 export interface SalesOrder {
   number: string;
@@ -56,6 +57,8 @@ const Deliver = () => {
   const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [currentDeliveryNote, setCurrentDeliveryNote] = useState<string | null>(null);
+  const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
   const [dashboardData, setDashboardData] = useState({
     todaysDelivery: 0,
     totalDeliveries: 0,
@@ -115,65 +118,95 @@ const Deliver = () => {
     }
   };
 
-  const selectSalesOrder = async (order: SalesOrder) => {
-    setLoading(true);
+  const selectSalesOrder = (order: SalesOrder) => {
+    setSelectedSO(order);
+    setActiveTab("deliver");
+  };
+
+  const handleDraftSelected = (draftName: string) => {
+    setCurrentDeliveryNote(draftName);
+    // TODO: Load draft data and continue from where left off
+    toast({
+      title: "Draft Loaded",
+      description: `Draft delivery note ${draftName} loaded.`,
+    });
+  };
+
+  const addDeliveryEntry = (entry: DeliveryEntry) => {
+    setDeliveryEntries(prev => [...prev, entry]);
+  };
+
+  const submitDeliveryNote = async () => {
+    if (!selectedSO || deliveryEntries.length === 0) {
+      toast({
+        title: "No Items to Deliver",
+        description: "Please add items to deliver first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
           title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
+          description: "Please configure your ERPNext settings.",
           variant: "destructive"
         });
         return;
       }
 
-      // Fetch SO data from ERPNext
-      const soResult = await erpnextAPI.sales.getSalesOrder(order.number);
-      if (!soResult.data) {
-        toast({
-          title: "Sales Order Not Found",
-          description: `SO ${order.number} could not be found in ERPNext.`,
-          variant: "destructive"
-        });
-        return;
-      }
+      const company = await getUserDefaultCompany();
 
-      const so = soResult.data;
-      
-      // Transform ERPNext SO data to our interface
-      const transformedSO: SalesOrder = {
-        number: so.name,
-        customer: so.customer_name || so.customer,
-        status: so.status,
-        deliveryDate: so.delivery_date || so.transaction_date,
-        totalItems: so.items ? so.items.length : 0,
-        totalValue: so.grand_total || 0,
-        items: so.items ? so.items.map((item: any) => ({
-          itemCode: item.item_code,
-          itemName: item.item_name,
-          orderedQty: item.qty || 0,
-          deliveredQty: item.delivered_qty || 0,
-          pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
-          rate: item.rate || 0,
-          uom: item.stock_uom || item.uom,
-          warehouse: item.warehouse || 'Main Store',
-          qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
-        })) : []
+      // Create delivery note data
+      const deliveryData = {
+        customer: selectedSO.customer,
+        company: company,
+        posting_date: new Date().toISOString().split('T')[0],
+        against_sales_order: selectedSO.number,
+        set_posting_time: 1,
+        items: deliveryEntries.map(entry => ({
+          item_code: entry.itemCode,
+          qty: entry.qtyToDeliver,
+          warehouse: entry.warehouse,
+          rate: entry.rate,
+          uom: entry.uom,
+          against_sales_order: selectedSO.number,
+          ...(entry.batch && { batch_no: entry.batch }),
+          ...(entry.serial && { serial_no: entry.serial })
+        }))
       };
 
-      setSelectedSO(transformedSO);
-      setActiveTab("deliver");
+      if (currentDeliveryNote) {
+        // Update existing delivery note
+        await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, deliveryData);
+        toast({
+          title: "Success",
+          description: `Delivery note ${currentDeliveryNote} updated successfully!`,
+        });
+      } else {
+        // Create new delivery note
+        const result = await erpnextAPI.sales.createDeliveryNote(deliveryData);
+        toast({
+          title: "Success",
+          description: `Delivery note ${result.data?.name} created successfully!`,
+        });
+      }
+      
+      // Reset form
+      setDeliveryEntries([]);
+      setSelectedSO(null);
+      setCurrentDeliveryNote(null);
+      setActiveTab("dashboard");
       
     } catch (error) {
-      console.error('Error fetching SO:', error);
+      console.error('Error submitting delivery note:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch Sales Order from ERPNext",
+        description: `Failed to create delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -184,12 +217,11 @@ const Deliver = () => {
   ];
 
   const tabsList = selectedSO 
-    ? ["dashboard", "search", "deliver", "review"] 
-    : ["dashboard", "search"];
+    ? ["dashboard", "deliver", "review"] 
+    : ["dashboard"];
 
   const tabsLabels = {
     dashboard: "Dashboard",
-    search: "Search Orders",
     deliver: "Deliver Items", 
     review: "Review & Submit"
   };
@@ -204,29 +236,50 @@ const Deliver = () => {
             <h1 className="text-2xl font-bold text-gray-900">Deliver</h1>
           </div>
           {selectedSO && (
-            <Badge variant="outline">{selectedSO.number}</Badge>
+            <div className="flex items-center space-x-2">
+              <Badge variant="outline">{selectedSO.number}</Badge>
+              {currentDeliveryNote && (
+                <Badge variant="secondary">DN: {currentDeliveryNote}</Badge>
+              )}
+              <Button onClick={submitDeliveryNote} disabled={!selectedSO || loading}>
+                <Package className="w-4 h-4 mr-2" />
+                Submit Delivery Note
+              </Button>
+            </div>
           )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${selectedSO ? 'grid-cols-4' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${selectedSO ? 'grid-cols-3' : 'grid-cols-1'}`}>
             {tabsList.map((tab) => (
-              <TabsTrigger key={tab} value={tab} disabled={tab !== "dashboard" && tab !== "search" && !selectedSO}>
+              <TabsTrigger key={tab} value={tab} disabled={tab !== "dashboard" && !selectedSO}>
                 {tabsLabels[tab as keyof typeof tabsLabels]}
               </TabsTrigger>
             ))}
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
+            {/* Sales Order Search */}
+            <SalesOrderSearch 
+              onOrderSelected={selectSalesOrder}
+              loading={loading}
+            />
+
+            {/* Dashboard Content */}
             <DeliverDashboard 
               data={dashboardData}
               shortcuts={shortcuts}
-              onViewOrders={() => setActiveTab("search")}
+              onViewOrders={() => {
+                // Show sales order list modal or navigate to search
+                toast({
+                  title: "Feature Coming Soon",
+                  description: "Advanced sales order search will be available soon.",
+                });
+              }}
             />
-          </TabsContent>
 
-          <TabsContent value="search" className="space-y-6">
-            <SalesOrderList onSelectOrder={selectSalesOrder} />
+            {/* Draft Delivery Notes */}
+            <DraftDeliveryNotes onSelectDraft={handleDraftSelected} />
           </TabsContent>
 
           {selectedSO && (
@@ -236,9 +289,10 @@ const Deliver = () => {
                   salesOrder={selectedSO}
                   onBack={() => {
                     setSelectedSO(null);
-                    setActiveTab("search");
+                    setActiveTab("dashboard");
                   }}
                   onNext={() => setActiveTab("review")}
+                  onAddEntry={addDeliveryEntry}
                 />
               </TabsContent>
 
@@ -248,9 +302,51 @@ const Deliver = () => {
                     <CardTitle>Review & Submit Delivery Note</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8 text-gray-500">
-                      Review and submit functionality coming soon...
-                    </div>
+                    {deliveryEntries.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No items added for delivery. Go back to add items.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-gray-50">
+                                <th className="text-left p-3 border">Item Code</th>
+                                <th className="text-left p-3 border">Item Name</th>
+                                <th className="text-left p-3 border">Quantity</th>
+                                <th className="text-left p-3 border">Warehouse</th>
+                                <th className="text-left p-3 border">Rate</th>
+                                <th className="text-left p-3 border">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {deliveryEntries.map((entry, index) => (
+                                <tr key={index} className="border-b">
+                                  <td className="p-3 border">{entry.itemCode}</td>
+                                  <td className="p-3 border">{entry.itemName}</td>
+                                  <td className="p-3 border">{entry.qtyToDeliver} {entry.uom}</td>
+                                  <td className="p-3 border">{entry.warehouse}</td>
+                                  <td className="p-3 border">₹{entry.rate}</td>
+                                  <td className="p-3 border">₹{(entry.qtyToDeliver * entry.rate).toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="flex justify-between items-center pt-4">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setActiveTab("deliver")}
+                          >
+                            Back to Add Items
+                          </Button>
+                          <Button onClick={submitDeliveryNote} disabled={loading}>
+                            {loading ? 'Submitting...' : 'Submit Delivery Note'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

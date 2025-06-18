@@ -1,95 +1,69 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Clock, DollarSign, TrendingUp } from "lucide-react";
+import { Package, Warehouse, TrendingUp, AlertTriangle } from "lucide-react";
 import { StockData } from "../../pages/ItemEnquiry";
 
 interface StockSummaryProps {
-  data: StockData;
+  stockData: StockData;
+  isLoading: boolean;
 }
 
-const StockSummary = ({ data }: StockSummaryProps) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
+const StockSummary = ({ stockData, isLoading }: StockSummaryProps) => {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">Loading stock summary...</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  const summaryCards = [
-    {
-      title: "Total Stock",
-      value: `${data.totalStock} ${data.uom}`,
-      icon: Package,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50"
-    },
-    {
-      title: "Total Valuation",
-      value: formatCurrency(data.totalValuation),
-      icon: DollarSign,
-      color: "text-green-600",
-      bgColor: "bg-green-50"
-    },
-    {
-      title: "Average Age",
-      value: `${data.averageAge} days`,
-      icon: Clock,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50"
-    },
-    {
-      title: "Warehouses",
-      value: `${data.warehouseStock.length}`,
-      icon: TrendingUp,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50"
-    }
-  ];
+  if (!stockData) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-500">No stock data available</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalWarehouses = Array.isArray(stockData.warehouses) ? stockData.warehouses.length : 0;
+  const totalStock = stockData.totalStock || 0;
+  const reservedStock = stockData.reservedStock || 0;
+  const availableStock = stockData.availableStock || 0;
 
   return (
-    <div className="space-y-4">
-      {/* Item Information */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">{data.itemName}</CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
-                Item Code: <Badge variant="outline">{data.itemCode}</Badge>
-                <span className="ml-4">
-                  UOM: <Badge variant="secondary">{data.uom}</Badge>
-                </span>
-              </p>
-            </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <Package className="w-5 h-5" />
+          <span>Stock Summary</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center p-3 bg-blue-50 rounded-lg">
+            <div className="text-2xl font-bold text-blue-600">{totalStock}</div>
+            <div className="text-sm text-gray-600">Total Stock</div>
           </div>
-        </CardHeader>
-      </Card>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map((card, index) => {
-          const Icon = card.icon;
-          return (
-            <Card key={index}>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                    <Icon className={`w-5 h-5 ${card.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">{card.title}</p>
-                    <p className="text-lg font-semibold text-gray-900">{card.value}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-    </div>
+          <div className="text-center p-3 bg-green-50 rounded-lg">
+            <div className="text-2xl font-bold text-green-600">{availableStock}</div>
+            <div className="text-sm text-gray-600">Available</div>
+          </div>
+          <div className="text-center p-3 bg-yellow-50 rounded-lg">
+            <div className="text-2xl font-bold text-yellow-600">{reservedStock}</div>
+            <div className="text-sm text-gray-600">Reserved</div>
+          </div>
+          <div className="text-center p-3 bg-purple-50 rounded-lg">
+            <div className="text-2xl font-bold text-purple-600">{totalWarehouses}</div>
+            <div className="text-sm text-gray-600">Warehouses</div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
