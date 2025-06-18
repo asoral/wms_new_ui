@@ -78,6 +78,16 @@ export interface PurchaseOrder {
   currency: string;
 }
 
+export interface PurchaseReceiptItem {
+  item_code: string;
+  qty: number;
+  warehouse: string;
+  rate: number;
+  uom: string;
+  batch_no?: string;
+  serial_no?: string;
+}
+
 export interface PurchaseReceipt {
   name: string;
   supplier: string;
@@ -87,6 +97,9 @@ export interface PurchaseReceipt {
   status: string;
   posting_date?: string;
   posting_time?: string;
+  purchase_order?: string;
+  set_posting_time?: number;
+  items?: PurchaseReceiptItem[];
 }
 
 export interface MaterialRequest {
