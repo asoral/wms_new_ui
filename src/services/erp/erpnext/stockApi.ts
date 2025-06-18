@@ -291,4 +291,30 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
     return response.json();
   }
+
+  async getSerialBatchBundle(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Serial and Batch Bundle/${name}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch serial batch bundle: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createSerialBatchBundle(bundleData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Serial and Batch Bundle`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(bundleData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create serial batch bundle: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }

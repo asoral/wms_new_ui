@@ -1,3 +1,4 @@
+
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
 import { ERPNextCompanyAPI } from './companyApi';
@@ -196,6 +197,15 @@ export class ERPNextAPI {
 
   async updateStockReconciliation(name: string, reconciliationData: any) {
     return this.stock.updateStockReconciliation(name, reconciliationData);
+  }
+
+  // Serial Batch Bundle methods
+  async getSerialBatchBundle(name: string) {
+    return this.stock.getSerialBatchBundle(name);
+  }
+
+  async createSerialBatchBundle(bundleData: any) {
+    return this.stock.createSerialBatchBundle(bundleData);
   }
 
   // Validation methods
