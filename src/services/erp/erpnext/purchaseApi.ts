@@ -130,6 +130,28 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
   async createPurchaseReceipt(
     receiptData: Partial<PurchaseReceipt>
   ): Promise<ERPNextResponse<PurchaseReceipt>> {
+    // Clean the data to avoid inter-company validation issues
+    const cleanedData = {
+      ...receiptData,
+      // Explicitly set fields that might cause inter-company issues
+      is_internal_supplier: 0,
+      represents_company: null,
+      inter_company_delivery_reference: null,
+      inter_company_invoice_reference: null,
+      inter_company_reference: null,
+      // Ensure these fields are not passed if empty
+      ...(receiptData.purchase_order && { purchase_order: receiptData.purchase_order }),
+    };
+
+    // Remove any undefined or null fields that might cause issues
+    Object.keys(cleanedData).forEach(key => {
+      if (cleanedData[key] === undefined || cleanedData[key] === null) {
+        delete cleanedData[key];
+      }
+    });
+
+    console.log('Creating Purchase Receipt with cleaned data:', cleanedData);
+
     const response = await fetch(
       `${this.baseURL}/api/resource/Purchase Receipt`,
       {
@@ -138,7 +160,7 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
           ...this.getHeaders(),
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(receiptData)
+        body: JSON.stringify(cleanedData)
       }
     );
     if (!response.ok) {
