@@ -58,31 +58,18 @@ const BatchSelector = ({
       const batchResult = await erpnextAPI.stock.getBatches(itemCode, warehouse);
       
       if (batchResult.data) {
-        // Get stock ledger entries to get actual quantities
-        const stockLedgerFilters = [
-          ['item_code', '=', itemCode],
-          ['warehouse', '=', warehouse],
-          ['actual_qty', '>', 0]
-        ];
+        // Get stock balance to get actual quantities
+        const stockResult = await erpnextAPI.stock.getStockBalance(itemCode, undefined, warehouse);
         
-        const stockResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
-          filters: JSON.stringify(stockLedgerFilters),
-          fields: JSON.stringify(['batch_no', 'actual_qty']),
-          group_by: 'batch_no'
-        })}`, {
-          headers: erpnextAPI.getHeaders(),
-        });
-
         let stockData: any[] = [];
-        if (stockResponse.ok) {
-          const stockResult = await stockResponse.json();
-          stockData = stockResult.data || [];
+        if (stockResult.data) {
+          stockData = stockResult.data;
         }
 
         // Combine batch info with stock quantities
         const batchesWithQty: BatchInfo[] = batchResult.data
           .map((batch: any) => {
-            const stockEntry = stockData.find(s => s.batch_no === (batch.batch_id || batch.name));
+            const stockEntry = stockData.find(s => s.warehouse === warehouse);
             return {
               batch_no: batch.batch_id || batch.name,
               qty: 0,
