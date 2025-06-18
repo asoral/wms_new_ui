@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Package, CheckCircle, Truck } from "lucide-react";
+import { ArrowLeft, Package, CheckCircle, Truck, Calendar, DollarSign, User, Hash, Warehouse, Archive } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ReceiptItem {
   item_code: string;
@@ -37,6 +38,7 @@ const ReceiptDetail = () => {
   const navigate = useNavigate();
   const { receiptName } = useParams<{ receiptName: string }>();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [receipt, setReceipt] = useState<ReceiptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -168,6 +170,64 @@ const ReceiptDetail = () => {
     }
   };
 
+  const MobileItemCard = ({ item, index }: { item: ReceiptItem; index: number }) => (
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-semibold text-lg">{item.item_code}</div>
+          <Badge variant="default" className="text-xs">Received</Badge>
+        </div>
+        
+        <div className="space-y-2 text-sm">
+          <div>
+            <span className="text-gray-600">Item:</span>
+            <p className="font-medium">{item.item_name}</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center">
+              <Hash className="w-4 h-4 mr-2 text-gray-500" />
+              <div>
+                <span className="text-gray-600">Qty:</span>
+                <p className="font-medium">{item.qty}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center">
+              <DollarSign className="w-4 h-4 mr-2 text-gray-500" />
+              <div>
+                <span className="text-gray-600">Rate:</span>
+                <p className="font-medium">₹{item.rate.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center">
+            <DollarSign className="w-4 h-4 mr-2 text-gray-500" />
+            <span className="text-gray-600">Amount:</span>
+            <span className="ml-1 font-semibold">₹{item.amount.toLocaleString()}</span>
+          </div>
+          
+          <div className="flex items-center">
+            <Warehouse className="w-4 h-4 mr-2 text-gray-500" />
+            <span className="text-gray-600">Warehouse:</span>
+            <span className="ml-1">{item.warehouse}</span>
+          </div>
+          
+          {(item.batch_no || item.serial_no) && (
+            <div className="flex items-center">
+              <Archive className="w-4 h-4 mr-2 text-gray-500" />
+              <div className="flex flex-wrap gap-1">
+                {item.batch_no && <Badge variant="outline" className="text-xs">B: {item.batch_no}</Badge>}
+                {item.serial_no && <Badge variant="outline" className="text-xs">S: {item.serial_no}</Badge>}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -203,9 +263,9 @@ const ReceiptDetail = () => {
               Back to Drafts
             </Button>
             <Truck className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Purchase Receipt: {receipt.name}</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Purchase Receipt: {receipt.name}</h1>
           </div>
-          {receipt.docstatus === 0 && (
+          {receipt.docstatus === 0 && !isMobile && (
             <div className="flex items-center space-x-2">
               <Badge variant="outline">{receipt.name}</Badge>
               <Button onClick={handleSubmitReceipt} disabled={submitting}>
@@ -235,73 +295,139 @@ const ReceiptDetail = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-600">Receipt Number</p>
-                      <p className="font-medium">{receipt.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Supplier</p>
-                      <p className="font-medium">{receipt.supplier_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Date</p>
-                      <p className="font-medium">{receipt.posting_date}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Total Amount</p>
-                      <p className="font-medium">₹{receipt.grand_total.toLocaleString()}</p>
-                    </div>
-                    {receipt.purchase_order && (
+                  {isMobile ? (
+                    // Mobile Card View
+                    <div className="space-y-4">
                       <div>
-                        <p className="text-gray-600">PO Reference</p>
-                        <p className="font-medium">{receipt.purchase_order}</p>
+                        <div className="flex items-center mb-2">
+                          <Hash className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="text-gray-600">Receipt Number</span>
+                        </div>
+                        <p className="font-medium">{receipt.name}</p>
                       </div>
-                    )}
-                    <div>
-                      <p className="text-gray-600">Company</p>
-                      <p className="font-medium">{receipt.company}</p>
+                      
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <User className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="text-gray-600">Supplier</span>
+                        </div>
+                        <p className="font-medium">{receipt.supplier_name}</p>
+                      </div>
+                      
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="text-gray-600">Date</span>
+                        </div>
+                        <p className="font-medium">{receipt.posting_date}</p>
+                      </div>
+                      
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <DollarSign className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="text-gray-600">Total Amount</span>
+                        </div>
+                        <p className="font-medium text-lg">₹{receipt.grand_total.toLocaleString()}</p>
+                      </div>
+                      
+                      {receipt.purchase_order && (
+                        <div>
+                          <div className="flex items-center mb-2">
+                            <Package className="w-4 h-4 mr-2 text-gray-500" />
+                            <span className="text-gray-600">PO Reference</span>
+                          </div>
+                          <p className="font-medium">{receipt.purchase_order}</p>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <Warehouse className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="text-gray-600">Company</span>
+                        </div>
+                        <p className="font-medium">{receipt.company}</p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    // Desktop Grid View
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-600">Receipt Number</p>
+                        <p className="font-medium">{receipt.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Supplier</p>
+                        <p className="font-medium">{receipt.supplier_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Date</p>
+                        <p className="font-medium">{receipt.posting_date}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Total Amount</p>
+                        <p className="font-medium">₹{receipt.grand_total.toLocaleString()}</p>
+                      </div>
+                      {receipt.purchase_order && (
+                        <div>
+                          <p className="text-gray-600">PO Reference</p>
+                          <p className="font-medium">{receipt.purchase_order}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-gray-600">Company</p>
+                        <p className="font-medium">{receipt.company}</p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Items Table */}
+              {/* Items */}
               <Card>
                 <CardHeader>
                   <CardTitle>Purchase Order Items</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Item Code</TableHead>
-                          <TableHead>Item Name</TableHead>
-                          <TableHead>Ordered</TableHead>
-                          <TableHead>Received</TableHead>
-                          <TableHead>Pending</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {receipt.items.map((item, index) => (
-                          <TableRow key={index}>
-                            <TableCell className="font-medium">{item.item_code}</TableCell>
-                            <TableCell>{item.item_name}</TableCell>
-                            <TableCell>{item.qty}</TableCell>
-                            <TableCell>{item.qty}</TableCell>
-                            <TableCell>0</TableCell>
-                            <TableCell>
-                              <Badge variant="default" className="text-xs">
-                                Received
-                              </Badge>
-                            </TableCell>
+                  {isMobile ? (
+                    // Mobile Card View
+                    <div className="space-y-4">
+                      {receipt.items.map((item, index) => (
+                        <MobileItemCard key={index} item={item} index={index} />
+                      ))}
+                    </div>
+                  ) : (
+                    // Desktop Table View
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Item Code</TableHead>
+                            <TableHead>Item Name</TableHead>
+                            <TableHead>Ordered</TableHead>
+                            <TableHead>Received</TableHead>
+                            <TableHead>Pending</TableHead>
+                            <TableHead>Status</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        </TableHeader>
+                        <TableBody>
+                          {receipt.items.map((item, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium">{item.item_code}</TableCell>
+                              <TableCell>{item.item_name}</TableCell>
+                              <TableCell>{item.qty}</TableCell>
+                              <TableCell>{item.qty}</TableCell>
+                              <TableCell>0</TableCell>
+                              <TableCell>
+                                <Badge variant="default" className="text-xs">
+                                  Received
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -327,42 +453,52 @@ const ReceiptDetail = () => {
                     </div>
                   </div>
 
-                  {/* Items Summary Table */}
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Item Code</TableHead>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead>Qty</TableHead>
-                        <TableHead>Rate</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Warehouse</TableHead>
-                        <TableHead>Batch/Serial</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  {/* Items Summary */}
+                  {isMobile ? (
+                    // Mobile Card View
+                    <div className="space-y-4">
                       {receipt.items.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{item.item_code}</TableCell>
-                          <TableCell>{item.item_name}</TableCell>
-                          <TableCell>{item.qty}</TableCell>
-                          <TableCell>₹{item.rate.toLocaleString()}</TableCell>
-                          <TableCell>₹{item.amount.toLocaleString()}</TableCell>
-                          <TableCell>{item.warehouse}</TableCell>
-                          <TableCell>
-                            {item.batch_no && <Badge variant="outline" className="mr-1">B: {item.batch_no}</Badge>}
-                            {item.serial_no && <Badge variant="outline">S: {item.serial_no}</Badge>}
-                            {!item.batch_no && !item.serial_no && <span className="text-gray-400">-</span>}
-                          </TableCell>
-                        </TableRow>
+                        <MobileItemCard key={index} item={item} index={index} />
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  ) : (
+                    // Desktop Table View
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item Code</TableHead>
+                          <TableHead>Item Name</TableHead>
+                          <TableHead>Qty</TableHead>
+                          <TableHead>Rate</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Warehouse</TableHead>
+                          <TableHead>Batch/Serial</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {receipt.items.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{item.item_code}</TableCell>
+                            <TableCell>{item.item_name}</TableCell>
+                            <TableCell>{item.qty}</TableCell>
+                            <TableCell>₹{item.rate.toLocaleString()}</TableCell>
+                            <TableCell>₹{item.amount.toLocaleString()}</TableCell>
+                            <TableCell>{item.warehouse}</TableCell>
+                            <TableCell>
+                              {item.batch_no && <Badge variant="outline" className="mr-1">B: {item.batch_no}</Badge>}
+                              {item.serial_no && <Badge variant="outline">S: {item.serial_no}</Badge>}
+                              {!item.batch_no && !item.serial_no && <span className="text-gray-400">-</span>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
 
                   {/* Submit Section */}
                   {receipt.docstatus === 0 && (
                     <div className="flex justify-end pt-4 border-t">
-                      <Button onClick={handleSubmitReceipt} disabled={submitting} size="lg">
+                      <Button onClick={handleSubmitReceipt} disabled={submitting} size="lg" className="w-full md:w-auto">
                         <CheckCircle className="w-4 h-4 mr-2" />
                         {submitting ? 'Submitting Receipt...' : 'Submit Receipt'}
                       </Button>

@@ -1,13 +1,13 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Edit, Eye, ArrowLeft } from "lucide-react";
+import { FileText, Edit, Eye, ArrowLeft, Calendar, DollarSign, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DraftReceipt {
   name: string;
@@ -22,6 +22,7 @@ interface DraftReceipt {
 const DraftReceipts = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [draftReceipts, setDraftReceipts] = useState<DraftReceipt[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -80,6 +81,52 @@ const DraftReceipts = () => {
     navigate(`/receive/receipt/${encodeURIComponent(receiptName)}`);
   };
 
+  const MobileReceiptCard = ({ receipt }: { receipt: DraftReceipt }) => (
+    <Card className="mb-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleReceiptClick(receipt.name)}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-semibold text-lg">{receipt.name}</div>
+          <Badge variant="secondary">{receipt.status}</Badge>
+        </div>
+        
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center">
+            <User className="w-4 h-4 mr-2 text-gray-500" />
+            <span className="text-gray-600">Supplier:</span>
+            <span className="ml-1 font-medium">{receipt.supplier_name}</span>
+          </div>
+          
+          {receipt.purchase_order && (
+            <div className="flex items-center">
+              <FileText className="w-4 h-4 mr-2 text-gray-500" />
+              <span className="text-gray-600">PO:</span>
+              <Badge variant="outline" className="ml-1">{receipt.purchase_order}</Badge>
+            </div>
+          )}
+          
+          <div className="flex items-center">
+            <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+            <span className="text-gray-600">Date:</span>
+            <span className="ml-1">{receipt.posting_date}</span>
+          </div>
+          
+          <div className="flex items-center">
+            <DollarSign className="w-4 h-4 mr-2 text-gray-500" />
+            <span className="text-gray-600">Total:</span>
+            <span className="ml-1 font-semibold">₹{receipt.grand_total.toLocaleString()}</span>
+          </div>
+        </div>
+        
+        <div className="mt-4 pt-3 border-t">
+          <Button variant="outline" size="sm" className="w-full">
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Receipt
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
@@ -109,7 +156,15 @@ const DraftReceipts = () => {
                 <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No draft purchase receipts found</p>
               </div>
+            ) : isMobile ? (
+              // Mobile Card View
+              <div className="space-y-4">
+                {draftReceipts.map((receipt) => (
+                  <MobileReceiptCard key={receipt.name} receipt={receipt} />
+                ))}
+              </div>
             ) : (
+              // Desktop Table View
               <Table>
                 <TableHeader>
                   <TableRow>
