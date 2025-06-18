@@ -8,9 +8,9 @@ import { useNavigate } from "react-router-dom";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
-import DeliveryProcess from "../components/deliver/DeliveryProcess";
-import SalesOrderList from "../components/deliver/SalesOrderList";
-import SalesOrderSearch from "../components/deliver/SalesOrderSearch";
+import SalesOrderSelector from "../components/deliver/SalesOrderSelector";
+import EnhancedDeliveryForm from "../components/deliver/EnhancedDeliveryForm";
+import DeliveryTable from "../components/deliver/DeliveryTable";
 import DraftDeliveryNotes from "../components/deliver/DraftDeliveryNotes";
 
 export interface SalesOrder {
@@ -132,7 +132,6 @@ const Deliver = () => {
 
   const handleDraftSelected = (draftName: string) => {
     setCurrentDeliveryNote(draftName);
-    // TODO: Load draft data and continue from where left off
     toast({
       title: "Draft Loaded",
       description: `Draft delivery note ${draftName} loaded.`,
@@ -142,6 +141,10 @@ const Deliver = () => {
   const addDeliveryEntry = (entry: DeliveryEntry) => {
     console.log('Adding delivery entry:', entry);
     setDeliveryEntries(prev => [...prev, entry]);
+  };
+
+  const removeDeliveryEntry = (index: number) => {
+    setDeliveryEntries(prev => prev.filter((_, i) => i !== index));
   };
 
   const submitDeliveryNote = async () => {
@@ -240,7 +243,7 @@ const Deliver = () => {
 
   const tabsLabels = {
     dashboard: "Dashboard",
-    deliver: "Deliver Items", 
+    deliver: "Scan & Add Items", 
     review: "Review & Submit"
   };
 
@@ -259,7 +262,7 @@ const Deliver = () => {
               {currentDeliveryNote && (
                 <Badge variant="secondary">DN: {currentDeliveryNote}</Badge>
               )}
-              <Button onClick={submitDeliveryNote} disabled={!selectedSO || loading}>
+              <Button onClick={submitDeliveryNote} disabled={!selectedSO || loading || deliveryEntries.length === 0}>
                 <Package className="w-4 h-4 mr-2" />
                 {loading ? 'Submitting...' : 'Submit Delivery Note'}
               </Button>
@@ -277,8 +280,8 @@ const Deliver = () => {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            {/* Sales Order Search */}
-            <SalesOrderSearch 
+            {/* Sales Order Selector */}
+            <SalesOrderSelector 
               onOrderSelected={selectSalesOrder}
               loading={loading}
             />
@@ -288,7 +291,6 @@ const Deliver = () => {
               data={dashboardData}
               shortcuts={shortcuts}
               onViewOrders={() => {
-                // Show sales order list modal or navigate to search
                 toast({
                   title: "Feature Coming Soon",
                   description: "Advanced sales order search will be available soon.",
@@ -303,15 +305,69 @@ const Deliver = () => {
           {selectedSO && (
             <>
               <TabsContent value="deliver" className="space-y-6">
-                <DeliveryProcess 
-                  salesOrder={selectedSO}
-                  onBack={() => {
-                    setSelectedSO(null);
-                    setActiveTab("dashboard");
-                  }}
-                  onNext={() => setActiveTab("review")}
+                {/* Sales Order Summary */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <span>Delivering: {selectedSO.number}</span>
+                      <Badge>{selectedSO.status}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-lg md:text-xl font-bold text-gray-900 break-words">{selectedSO.customer}</div>
+                        <div className="text-sm text-gray-600">Customer</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <div className="text-xl md:text-2xl font-bold text-green-600">{selectedSO.totalItems}</div>
+                        <div className="text-sm text-gray-600">Total Items</div>
+                      </div>
+                      <div className="text-center p-3 bg-purple-50 rounded-lg">
+                        <div className="text-lg md:text-xl font-bold text-purple-600">₹{selectedSO.totalValue.toLocaleString()}</div>
+                        <div className="text-sm text-gray-600">Total Value</div>
+                      </div>
+                      <div className="text-center p-3 bg-orange-50 rounded-lg">
+                        <div className="text-lg md:text-xl font-bold text-orange-600">
+                          {new Date(selectedSO.deliveryDate).toLocaleDateString()}
+                        </div>
+                        <div className="text-sm text-gray-600">Delivery Date</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Enhanced Delivery Form */}
+                <EnhancedDeliveryForm 
+                  soItems={selectedSO.items}
                   onAddEntry={addDeliveryEntry}
                 />
+
+                {/* Current Delivery Items */}
+                {deliveryEntries.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Items to Deliver ({deliveryEntries.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <DeliveryTable entries={deliveryEntries} />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Navigation */}
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+                  <Button variant="outline" onClick={() => {
+                    setSelectedSO(null);
+                    setActiveTab("dashboard");
+                    setDeliveryEntries([]);
+                  }}>
+                    Back to Dashboard
+                  </Button>
+                  <Button onClick={() => setActiveTab("review")} size="lg" disabled={deliveryEntries.length === 0}>
+                    Review & Submit ({deliveryEntries.length} items)
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="review" className="space-y-6">
@@ -326,32 +382,7 @@ const Deliver = () => {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse">
-                            <thead>
-                              <tr className="bg-gray-50">
-                                <th className="text-left p-3 border">Item Code</th>
-                                <th className="text-left p-3 border">Item Name</th>
-                                <th className="text-left p-3 border">Quantity</th>
-                                <th className="text-left p-3 border">Warehouse</th>
-                                <th className="text-left p-3 border">Rate</th>
-                                <th className="text-left p-3 border">Amount</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {deliveryEntries.map((entry, index) => (
-                                <tr key={index} className="border-b">
-                                  <td className="p-3 border">{entry.itemCode}</td>
-                                  <td className="p-3 border">{entry.itemName}</td>
-                                  <td className="p-3 border">{entry.qtyToDeliver} {entry.uom}</td>
-                                  <td className="p-3 border">{entry.warehouse}</td>
-                                  <td className="p-3 border">₹{entry.rate}</td>
-                                  <td className="p-3 border">₹{(entry.qtyToDeliver * entry.rate).toFixed(2)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        <DeliveryTable entries={deliveryEntries} />
                         <div className="flex justify-between items-center pt-4">
                           <Button 
                             variant="outline" 

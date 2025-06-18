@@ -35,27 +35,41 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
   }
 
   async searchSalesOrders(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<SalesOrder[]>> {
+    // Enhanced filters for sales orders ready for delivery
     const filters = [
-      ['docstatus', '=', 1],
-      ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+      ['docstatus', '=', 1], // Submitted orders only
+      ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']] // Orders that need delivery
     ];
 
     if (company) {
       filters.push(['company', '=', company]);
     }
 
-    // Add search filters using OR logic
+    // Enhanced search filters with more fields
     const orFilters = [
       ['name', 'like', `%${searchTerm}%`],
       ['customer', 'like', `%${searchTerm}%`],
-      ['customer_name', 'like', `%${searchTerm}%`]
+      ['customer_name', 'like', `%${searchTerm}%`],
+      ['po_no', 'like', `%${searchTerm}%`] // Also search by PO number
     ];
 
     const params = new URLSearchParams({
       filters: JSON.stringify(filters),
       or_filters: JSON.stringify(orFilters),
-      fields: JSON.stringify(['name', 'customer', 'customer_name', 'delivery_date', 'transaction_date', 'grand_total', 'status', 'items']),
-      limit_page_length: limitPageLength.toString()
+      fields: JSON.stringify([
+        'name', 
+        'customer', 
+        'customer_name', 
+        'delivery_date', 
+        'transaction_date', 
+        'grand_total', 
+        'status', 
+        'po_no',
+        'per_delivered',
+        'company'
+      ]),
+      limit_page_length: limitPageLength.toString(),
+      order_by: 'delivery_date asc' // Order by delivery date
     });
 
     const response = await fetch(`${this.baseURL}/api/resource/Sales Order?${params}`, {
@@ -122,5 +136,46 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
     }
 
     return response.json();
+  }
+
+  /**
+   * Get delivery notes for dashboard metrics
+   */
+  async getDeliveryMetrics(company?: string): Promise<ERPNextResponse<any>> {
+    const today = new Date().toISOString().split('T')[0];
+    
+    try {
+      // Get today's deliveries
+      const todayFilters = [
+        ['posting_date', '=', today],
+        ['docstatus', '=', 1]
+      ];
+      if (company) {
+        todayFilters.push(['company', '=', company]);
+      }
+
+      // Get all deliveries
+      const allFilters = [
+        ['docstatus', '=', 1]
+      ];
+      if (company) {
+        allFilters.push(['company', '=', company]);
+      }
+
+      const [todayResult, allResult] = await Promise.all([
+        this.getDeliveryNotes(todayFilters, company, 1000),
+        this.getDeliveryNotes(allFilters, company, 1000)
+      ]);
+
+      return {
+        data: {
+          todaysDelivery: todayResult.data ? todayResult.data.length : 0,
+          totalDeliveries: allResult.data ? allResult.data.length : 0
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching delivery metrics:', error);
+      return { data: { todaysDelivery: 0, totalDeliveries: 0 } };
+    }
   }
 }
