@@ -81,6 +81,72 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
   }
 
   /**
+   * Create a Serial and Batch Bundle for batch/serial tracked items
+   */
+  async createSerialBatchBundle(bundleData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Serial and Batch Bundle`,
+      {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bundleData)
+      }
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create serial batch bundle: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Create or get existing batch
+   */
+  async ensureBatchExists(batchNo: string, itemCode: string): Promise<boolean> {
+    try {
+      // First, try to get existing batch
+      const params = new URLSearchParams();
+      params.append('filters', JSON.stringify([['name', '=', batchNo]]));
+      
+      const response = await fetch(
+        `${this.baseURL}/api/resource/Batch?${params.toString()}`,
+        { headers: this.getHeaders() }
+      );
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data && result.data.length > 0) {
+          return true; // Batch exists
+        }
+      }
+
+      // Create new batch if it doesn't exist
+      const createResponse = await fetch(
+        `${this.baseURL}/api/resource/Batch`,
+        {
+          method: 'POST',
+          headers: {
+            ...this.getHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            batch_id: batchNo,
+            item: itemCode
+          })
+        }
+      );
+
+      return createResponse.ok;
+    } catch (error) {
+      console.error('Error ensuring batch exists:', error);
+      return false;
+    }
+  }
+
+  /**
    * Create a new Purchase Receipt
    */
   async createPurchaseReceipt(
