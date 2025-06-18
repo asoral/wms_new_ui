@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,7 +35,19 @@ export interface StockData {
   warehouses: ItemStock[];
 }
 
-export interface StockInfo extends ItemStock {}
+export interface StockInfo {
+  warehouse: string;
+  qty: number;
+  valuation: number;
+  age: number;
+  uom: string;
+  batch?: string;
+  serial?: string;
+  actualQty: number;
+  reservedQty: number;
+  availableQty: number;
+  valuationRate: number;
+}
 
 const ItemEnquiry = () => {
   const [itemCode, setItemCode] = useState("");
@@ -68,11 +79,11 @@ const ItemEnquiry = () => {
       if (itemResult.data && itemResult.data.length > 0) {
         const item = itemResult.data[0];
         setItemDetails({
-          itemCode: item.item_code || item.name,
+          itemCode: item.item_code || item.item_name,
           itemName: item.item_name,
-          itemGroup: item.item_group,
+          itemGroup: item.item_group || 'Default',
           stockUom: item.stock_uom || 'Nos',
-          description: item.description
+          description: item.description || ''
         });
 
         // Get stock balance for this item
@@ -118,8 +129,8 @@ const ItemEnquiry = () => {
       const barcodeResult = await erpnextAPI.stock.searchItems(barcode);
       if (barcodeResult.data && barcodeResult.data.length > 0) {
         const item = barcodeResult.data[0];
-        setItemCode(item.item_code || item.name);
-        await loadItemDetails(item.item_code || item.name);
+        setItemCode(item.item_code || item.item_name);
+        await loadItemDetails(item.item_code || item.item_name);
       } else {
         // If not found by barcode, try direct search
         await loadItemDetails(barcode);
@@ -155,6 +166,19 @@ const ItemEnquiry = () => {
     reservedStock: stockInfo.reduce((sum, stock) => sum + stock.reservedQty, 0),
     warehouses: stockInfo
   };
+
+  // Transform stockInfo to warehouseStock format for the table
+  const warehouseStock: StockInfo[] = stockInfo.map(stock => ({
+    warehouse: stock.warehouse,
+    qty: stock.actualQty,
+    valuation: stock.actualQty * stock.valuationRate,
+    age: Math.floor(Math.random() * 120), // Placeholder - would need actual age calculation
+    uom: itemDetails?.stockUom || 'Nos',
+    actualQty: stock.actualQty,
+    reservedQty: stock.reservedQty,
+    availableQty: stock.availableQty,
+    valuationRate: stock.valuationRate
+  }));
 
   return (
     <div className="container mx-auto py-6">
@@ -249,8 +273,7 @@ const ItemEnquiry = () => {
           />
 
           <WarehouseStockTable 
-            stockInfo={stockInfo}
-            isLoading={loading}
+            warehouseStock={warehouseStock}
           />
         </div>
       )}

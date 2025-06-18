@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Scan, Package } from "lucide-react";
-import { DeliveryEntry } from "../../pages/Deliver";
+import { DeliveryEntry, SOItem } from "../../pages/Deliver";
 
 interface DeliveryFormProps {
+  soItems: SOItem[];
   onAddEntry: (entry: DeliveryEntry) => void;
 }
 
-const DeliveryForm = ({ onAddEntry }: DeliveryFormProps) => {
+const DeliveryForm = ({ soItems, onAddEntry }: DeliveryFormProps) => {
   const [formData, setFormData] = useState({
     itemCode: "",
     warehouse: "",
@@ -21,19 +22,13 @@ const DeliveryForm = ({ onAddEntry }: DeliveryFormProps) => {
     actualQty: ""
   });
 
-  // Mock item data
-  const mockItem = {
-    itemCode: "ITM-001",
-    itemName: "Laptop Dell Inspiron",
-    qtyToDeliver: 5,
-    rate: 25000,
-    uom: "Nos"
-  };
+  // Get current item details based on selected item code
+  const currentItem = soItems.find(item => item.itemCode === formData.itemCode);
 
   const handleScan = (field: string) => {
     // Simulate scanning
-    if (field === "item") {
-      setFormData(prev => ({ ...prev, itemCode: mockItem.itemCode }));
+    if (field === "item" && soItems.length > 0) {
+      setFormData(prev => ({ ...prev, itemCode: soItems[0].itemCode }));
     } else if (field === "warehouse") {
       setFormData(prev => ({ ...prev, warehouse: "Main Store" }));
     }
@@ -42,20 +37,20 @@ const DeliveryForm = ({ onAddEntry }: DeliveryFormProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.itemCode || !formData.warehouse || !formData.actualQty) {
+    if (!formData.itemCode || !formData.warehouse || !formData.actualQty || !currentItem) {
       return;
     }
 
     const entry: DeliveryEntry = {
       itemCode: formData.itemCode,
-      itemName: mockItem.itemName,
+      itemName: currentItem.itemName,
       warehouse: formData.warehouse,
       batch: formData.batch || undefined,
       serial: formData.serial || undefined,
-      qtyToDeliver: mockItem.qtyToDeliver,
+      qtyToDeliver: currentItem.pendingQty,
       actualQty: parseInt(formData.actualQty),
-      rate: mockItem.rate,
-      uom: mockItem.uom
+      rate: currentItem.rate,
+      uom: currentItem.uom
     };
 
     onAddEntry(entry);
@@ -140,36 +135,37 @@ const DeliveryForm = ({ onAddEntry }: DeliveryFormProps) => {
                 onChange={(e) => setFormData(prev => ({ ...prev, actualQty: e.target.value }))}
                 placeholder="Enter quantity"
                 min="1"
+                max={currentItem ? currentItem.pendingQty : undefined}
               />
             </div>
           </div>
 
           {/* Item Preview */}
-          {formData.itemCode && (
+          {currentItem && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium mb-2">Item Details:</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                 <div>
                   <span className="text-gray-600">Name:</span>
-                  <div className="font-medium">{mockItem.itemName}</div>
+                  <div className="font-medium">{currentItem.itemName}</div>
                 </div>
                 <div>
-                  <span className="text-gray-600">To Deliver:</span>
-                  <div className="font-medium">{mockItem.qtyToDeliver} {mockItem.uom}</div>
+                  <span className="text-gray-600">Pending:</span>
+                  <div className="font-medium">{currentItem.pendingQty} {currentItem.uom}</div>
                 </div>
                 <div>
                   <span className="text-gray-600">Rate:</span>
-                  <div className="font-medium">₹{mockItem.rate.toLocaleString()}</div>
+                  <div className="font-medium">₹{currentItem.rate.toLocaleString()}</div>
                 </div>
                 <div>
                   <span className="text-gray-600">UOM:</span>
-                  <div className="font-medium">{mockItem.uom}</div>
+                  <div className="font-medium">{currentItem.uom}</div>
                 </div>
               </div>
             </div>
           )}
 
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full" disabled={!currentItem}>
             Add Item to Delivery
           </Button>
         </form>

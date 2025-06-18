@@ -15,6 +15,9 @@ export interface Item {
   item_code: string;
   item_name: string;
   stock_uom: string;
+  name: string;
+  item_group: string;
+  description?: string;
   has_batch_no?: number;
   has_serial_no?: number;
   barcodes?: Array<{
