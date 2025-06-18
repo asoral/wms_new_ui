@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, Item } from './types';
 
@@ -18,24 +17,36 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       // If company is provided but no specific warehouse, get all warehouses for that company first
       if (company && !warehouse) {
         // Get warehouses for the company first
-        const warehouseResponse = await this.baseApi.get('/api/resource/Warehouse', {
+        const warehouseResponse = await fetch(`${this.baseURL}/api/resource/Warehouse?${new URLSearchParams({
           filters: JSON.stringify([['company', '=', company], ['disabled', '=', 0]]),
           fields: JSON.stringify(['name'])
+        })}`, {
+          headers: this.getHeaders(),
         });
         
-        if (warehouseResponse.data?.data && warehouseResponse.data.data.length > 0) {
-          const warehouseNames = warehouseResponse.data.data.map((w: any) => w.name);
-          filters.push(['warehouse', 'in', warehouseNames]);
+        if (warehouseResponse.ok) {
+          const warehouseData = await warehouseResponse.json();
+          if (warehouseData.data && warehouseData.data.length > 0) {
+            const warehouseNames = warehouseData.data.map((w: any) => w.name);
+            filters.push(['warehouse', 'in', warehouseNames]);
+          }
         }
       }
 
-      const result = await this.baseApi.get('/api/resource/Stock Balance', {
+      const response = await fetch(`${this.baseURL}/api/resource/Stock Balance?${new URLSearchParams({
         filters: JSON.stringify(filters),
         fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'stock_value'])
+      })}`, {
+        headers: this.getHeaders(),
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       return {
-        data: result.data?.data || [],
+        data: result.data || [],
         message: result.message || 'Stock balance fetched successfully'
       };
     } catch (error) {
@@ -44,15 +55,27 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     }
   }
 
-  async getCurrentStock(itemCode: string, warehouse: string) {
+  async getCurrentStock(itemCode: string, warehouse?: string) {
     try {
-      const result = await this.baseApi.get('/api/method/erpnext.stock.utils.get_item_current_stock', {
-        item_code: itemCode,
-        warehouse: warehouse
+      const params = new URLSearchParams({
+        item_code: itemCode
+      });
+      
+      if (warehouse) {
+        params.append('warehouse', warehouse);
+      }
+
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.utils.get_item_current_stock?${params}`, {
+        headers: this.getHeaders(),
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to fetch current stock: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       return {
-        data: result.data?.message || null,
+        data: result.message || null,
         message: result.message || 'Current stock fetched successfully'
       };
     } catch (error) {
@@ -72,13 +95,20 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         filters.push(['warehouse', '=', warehouse]);
       }
 
-      const result = await this.baseApi.get('/api/resource/Batch', {
+      const response = await fetch(`${this.baseURL}/api/resource/Batch?${new URLSearchParams({
         filters: JSON.stringify(filters),
         fields: JSON.stringify(['name', 'batch_id', 'batch_qty', 'expiry_date'])
+      })}`, {
+        headers: this.getHeaders(),
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to fetch batches: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       return {
-        data: result.data?.data || [],
+        data: result.data || [],
         message: result.message || 'Batches fetched successfully'
       };
     } catch (error) {
@@ -98,13 +128,20 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         filters.push(['warehouse', '=', warehouse]);
       }
 
-      const result = await this.baseApi.get('/api/resource/Serial No', {
+      const response = await fetch(`${this.baseURL}/api/resource/Serial No?${new URLSearchParams({
         filters: JSON.stringify(filters),
         fields: JSON.stringify(['name', 'serial_no', 'warehouse'])
+      })}`, {
+        headers: this.getHeaders(),
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to fetch serial numbers: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       return {
-        data: result.data?.data || [],
+        data: result.data || [],
         message: result.message || 'Serial numbers fetched successfully'
       };
     } catch (error) {
@@ -129,17 +166,24 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         filters.push(['posting_date', '<=', toDate]);
       }
 
-      const result = await this.baseApi.get('/api/resource/Stock Ledger Entry', {
+      const response = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
         filters: JSON.stringify(filters),
         fields: JSON.stringify([
           'posting_date', 'voucher_type', 'voucher_no', 
           'actual_qty', 'qty_after_transaction', 'stock_value'
         ]),
         order_by: 'posting_date desc'
+      })}`, {
+        headers: this.getHeaders(),
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stock ledger entries: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       return {
-        data: result.data?.data || [],
+        data: result.data || [],
         message: result.message || 'Stock ledger entries fetched successfully'
       };
     } catch (error) {
@@ -213,14 +257,19 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     
     // If company is provided, get warehouses for that company first
     if (company && !warehouse) {
-      const warehouseResponse = await this.baseApi.get('/api/resource/Warehouse', {
+      const warehouseResponse = await fetch(`${this.baseURL}/api/resource/Warehouse?${new URLSearchParams({
         filters: JSON.stringify([['company', '=', company], ['disabled', '=', 0]]),
         fields: JSON.stringify(['name'])
+      })}`, {
+        headers: this.getHeaders(),
       });
       
-      if (warehouseResponse.data?.data && warehouseResponse.data.data.length > 0) {
-        const warehouseNames = warehouseResponse.data.data.map((w: any) => w.name);
-        filters.push(['warehouse', 'in', warehouseNames]);
+      if (warehouseResponse.ok) {
+        const warehouseData = await warehouseResponse.json();
+        if (warehouseData.data && warehouseData.data.length > 0) {
+          const warehouseNames = warehouseData.data.map((w: any) => w.name);
+          filters.push(['warehouse', 'in', warehouseNames]);
+        }
       }
     } else if (warehouse) {
       filters.push(['warehouse', '=', warehouse]);

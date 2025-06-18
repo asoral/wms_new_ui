@@ -70,7 +70,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       }
 
       console.log('Fetching current qty for:', { itemCode, warehouse, batch, serial });
-      const response = await erpnextAPI.getCurrentStock(itemCode, warehouse, batch, serial);
+      const response = await erpnextAPI.getCurrentStock(itemCode, warehouse);
       
       // Extract quantity from the response data
       let qty = 0;
