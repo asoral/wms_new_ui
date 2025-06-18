@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -106,19 +105,19 @@ const searchItems = useCallback((searchValue: string) => {
             result = await erpnextAPI.searchItemsByBarcode(search);
             if (!result.data || result.data.length === 0) {
               // If barcode search fails, try regular search
-              result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
+              result = await erpnextAPI.searchItems(search, limit);
             }
           } catch (error) {
             // Fallback to regular search
-            result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
+            result = await erpnextAPI.searchItems(search, limit);
           }
         } else {
           // Regular text search
-          result = await erpnextAPI.searchItems(search, defaultCompany || undefined, limit);
+          result = await erpnextAPI.searchItems(search, limit);
         }
       } else {
         console.log('Fetching initial items');
-        result = await erpnextAPI.getItemsPaginated(undefined, undefined, defaultCompany || undefined, limit, 1);
+        result = await erpnextAPI.getItemsPaginated(undefined, undefined, limit, 1);
       }
       
       console.log('API result:', result);

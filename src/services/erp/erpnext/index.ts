@@ -1,4 +1,3 @@
-
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
 import { ERPNextCompanyAPI } from './companyApi';
