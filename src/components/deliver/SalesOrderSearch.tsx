@@ -16,6 +16,7 @@ interface SalesOrderSearchProps {
 
 const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) => {
   const [soNumber, setSoNumber] = useState("");
+  const [searching, setSearching] = useState(false);
   const { toast } = useToast();
 
   const handleSearch = async () => {
@@ -29,6 +30,7 @@ const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) =
     }
 
     try {
+      setSearching(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -39,49 +41,122 @@ const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) =
         return;
       }
 
-      // Fetch SO data from ERPNext
-      const soResult = await erpnextAPI.sales.getSalesOrder(soNumber.trim());
-      if (!soResult.data) {
-        toast({
-          title: "Sales Order Not Found",
-          description: `SO ${soNumber} could not be found in ERPNext.`,
-          variant: "destructive"
-        });
-        return;
+      const company = await getUserDefaultCompany();
+      console.log('Searching SO with company:', company);
+
+      // First try to get the specific SO
+      try {
+        const soResult = await erpnextAPI.sales.getSalesOrder(soNumber.trim());
+        console.log('SO search result:', soResult);
+        
+        if (soResult.data) {
+          const so = soResult.data;
+          
+          // Check if SO belongs to the correct company
+          if (company && so.company !== company) {
+            toast({
+              title: "Sales Order Not Found",
+              description: `SO ${soNumber} not found for company ${company}.`,
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          // Transform ERPNext SO data to our interface
+          const transformedSO: SalesOrder = {
+            number: so.name,
+            customer: so.customer_name || so.customer,
+            status: so.status,
+            deliveryDate: so.delivery_date || so.transaction_date,
+            totalItems: so.items ? so.items.length : 0,
+            totalValue: so.grand_total || 0,
+            items: so.items ? so.items.map((item: any) => ({
+              itemCode: item.item_code,
+              itemName: item.item_name,
+              orderedQty: item.qty || 0,
+              deliveredQty: item.delivered_qty || 0,
+              pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
+              rate: item.rate || 0,
+              uom: item.stock_uom || item.uom,
+              warehouse: item.warehouse || 'Main Store',
+              qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
+            })) : []
+          };
+
+          onOrderSelected(transformedSO);
+          toast({
+            title: "Success",
+            description: `Sales Order ${soNumber} loaded successfully.`,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching specific SO:', error);
+        
+        // If direct fetch fails, try searching
+        try {
+          const searchResult = await erpnextAPI.sales.searchSalesOrders(soNumber.trim(), company);
+          console.log('SO search by term result:', searchResult);
+          
+          if (searchResult.data && searchResult.data.length > 0) {
+            const so = searchResult.data[0]; // Take first match
+            
+            // Get full SO details
+            const fullSOResult = await erpnextAPI.sales.getSalesOrder(so.name);
+            if (fullSOResult.data) {
+              const fullSO = fullSOResult.data;
+              
+              const transformedSO: SalesOrder = {
+                number: fullSO.name,
+                customer: fullSO.customer_name || fullSO.customer,
+                status: fullSO.status,
+                deliveryDate: fullSO.delivery_date || fullSO.transaction_date,
+                totalItems: fullSO.items ? fullSO.items.length : 0,
+                totalValue: fullSO.grand_total || 0,
+                items: fullSO.items ? fullSO.items.map((item: any) => ({
+                  itemCode: item.item_code,
+                  itemName: item.item_name,
+                  orderedQty: item.qty || 0,
+                  deliveredQty: item.delivered_qty || 0,
+                  pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
+                  rate: item.rate || 0,
+                  uom: item.stock_uom || item.uom,
+                  warehouse: item.warehouse || 'Main Store',
+                  qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
+                })) : []
+              };
+
+              onOrderSelected(transformedSO);
+              toast({
+                title: "Success",
+                description: `Sales Order ${fullSO.name} loaded successfully.`,
+              });
+            }
+          } else {
+            toast({
+              title: "Sales Order Not Found",
+              description: `No sales order found matching "${soNumber}".`,
+              variant: "destructive"
+            });
+          }
+        } catch (searchError) {
+          console.error('Error searching SO:', searchError);
+          toast({
+            title: "Error",
+            description: "Failed to search for Sales Order in ERPNext",
+            variant: "destructive"
+          });
+        }
       }
-
-      const so = soResult.data;
-      
-      // Transform ERPNext SO data to our interface
-      const transformedSO: SalesOrder = {
-        number: so.name,
-        customer: so.customer_name || so.customer,
-        status: so.status,
-        deliveryDate: so.delivery_date || so.transaction_date,
-        totalItems: so.items ? so.items.length : 0,
-        totalValue: so.grand_total || 0,
-        items: so.items ? so.items.map((item: any) => ({
-          itemCode: item.item_code,
-          itemName: item.item_name,
-          orderedQty: item.qty || 0,
-          deliveredQty: item.delivered_qty || 0,
-          pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
-          rate: item.rate || 0,
-          uom: item.stock_uom || item.uom,
-          warehouse: item.warehouse || 'Main Store',
-          qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
-        })) : []
-      };
-
-      onOrderSelected(transformedSO);
       
     } catch (error) {
-      console.error('Error fetching SO:', error);
+      console.error('Error in SO search:', error);
       toast({
         title: "Error",
         description: "Failed to fetch Sales Order from ERPNext",
         variant: "destructive"
       });
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -110,8 +185,8 @@ const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) =
             />
           </div>
           <div className="flex items-end">
-            <Button onClick={handleSearch} disabled={loading}>
-              {loading ? 'Searching...' : 'Search'}
+            <Button onClick={handleSearch} disabled={loading || searching}>
+              {searching ? 'Searching...' : 'Search'}
             </Button>
           </div>
         </div>

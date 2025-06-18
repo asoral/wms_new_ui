@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,20 +77,21 @@ const Deliver = () => {
       }
 
       const defaultCompany = await getUserDefaultCompany();
+      console.log('Fetching dashboard data for company:', defaultCompany);
       
       // Get today's date in YYYY-MM-DD format
       const today = new Date().toISOString().split('T')[0];
       
       // Fetch delivery notes for today
       const deliveryNotesResult = await erpnextAPI.sales.getDeliveryNotes([
-        ['posting_date', '=', today]
+        ['posting_date', '=', today],
+        ['docstatus', '=', 1]
       ], defaultCompany || undefined);
       
       // Fetch all delivery notes for total count
-      const allDeliveryNotesResult = await erpnextAPI.sales.getDeliveryNotes(
-        undefined, 
-        defaultCompany || undefined
-      );
+      const allDeliveryNotesResult = await erpnextAPI.sales.getDeliveryNotes([
+        ['docstatus', '=', 1]
+      ], defaultCompany || undefined);
 
       // Fetch stock balance to calculate FG stock value (simplified)
       let stockValue = 0;
@@ -113,12 +113,19 @@ const Deliver = () => {
         averageAge: 15 // Placeholder - would need custom calculation
       });
 
+      console.log('Dashboard data updated:', {
+        todaysDelivery: deliveryNotesResult.data ? deliveryNotesResult.data.length : 0,
+        totalDeliveries: allDeliveryNotesResult.data ? allDeliveryNotesResult.data.length : 0,
+        fgStockValue: stockValue
+      });
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     }
   };
 
   const selectSalesOrder = (order: SalesOrder) => {
+    console.log('Selected sales order:', order);
     setSelectedSO(order);
     setActiveTab("deliver");
   };
@@ -133,6 +140,7 @@ const Deliver = () => {
   };
 
   const addDeliveryEntry = (entry: DeliveryEntry) => {
+    console.log('Adding delivery entry:', entry);
     setDeliveryEntries(prev => [...prev, entry]);
   };
 
@@ -147,6 +155,7 @@ const Deliver = () => {
     }
     
     try {
+      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -158,6 +167,7 @@ const Deliver = () => {
       }
 
       const company = await getUserDefaultCompany();
+      console.log('Creating delivery note for company:', company);
 
       // Create delivery note data
       const deliveryData = {
@@ -178,6 +188,8 @@ const Deliver = () => {
         }))
       };
 
+      console.log('Delivery note data:', deliveryData);
+
       if (currentDeliveryNote) {
         // Update existing delivery note
         await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, deliveryData);
@@ -188,6 +200,7 @@ const Deliver = () => {
       } else {
         // Create new delivery note
         const result = await erpnextAPI.sales.createDeliveryNote(deliveryData);
+        console.log('Delivery note created:', result);
         toast({
           title: "Success",
           description: `Delivery note ${result.data?.name} created successfully!`,
@@ -200,6 +213,9 @@ const Deliver = () => {
       setCurrentDeliveryNote(null);
       setActiveTab("dashboard");
       
+      // Refresh dashboard data
+      await fetchDashboardData();
+      
     } catch (error) {
       console.error('Error submitting delivery note:', error);
       toast({
@@ -207,6 +223,8 @@ const Deliver = () => {
         description: `Failed to create delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -243,7 +261,7 @@ const Deliver = () => {
               )}
               <Button onClick={submitDeliveryNote} disabled={!selectedSO || loading}>
                 <Package className="w-4 h-4 mr-2" />
-                Submit Delivery Note
+                {loading ? 'Submitting...' : 'Submit Delivery Note'}
               </Button>
             </div>
           )}

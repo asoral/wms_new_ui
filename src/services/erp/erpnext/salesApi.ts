@@ -23,12 +23,47 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
   }
 
   async getSalesOrder(soNumber: string): Promise<ERPNextResponse<any>> {
-    const response = await fetch(`${this.baseURL}/api/resource/Sales Order/${soNumber}`, {
+    const response = await fetch(`${this.baseURL}/api/resource/Sales Order/${encodeURIComponent(soNumber)}`, {
       headers: this.getHeaders(),
     });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch sales order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async searchSalesOrders(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<SalesOrder[]>> {
+    const filters = [
+      ['docstatus', '=', 1],
+      ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+    ];
+
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+
+    // Add search filters using OR logic
+    const orFilters = [
+      ['name', 'like', `%${searchTerm}%`],
+      ['customer', 'like', `%${searchTerm}%`],
+      ['customer_name', 'like', `%${searchTerm}%`]
+    ];
+
+    const params = new URLSearchParams({
+      filters: JSON.stringify(filters),
+      or_filters: JSON.stringify(orFilters),
+      fields: JSON.stringify(['name', 'customer', 'customer_name', 'delivery_date', 'transaction_date', 'grand_total', 'status', 'items']),
+      limit_page_length: limitPageLength.toString()
+    });
+
+    const response = await fetch(`${this.baseURL}/api/resource/Sales Order?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search sales orders: ${response.statusText}`);
     }
 
     return response.json();
