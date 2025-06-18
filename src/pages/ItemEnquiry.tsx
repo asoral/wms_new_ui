@@ -1,12 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, X, Package, Camera } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import ItemSelector from "../components/item-enquiry/ItemSelector";
 import ItemScanner from "../components/item-enquiry/ItemScanner";
 import CameraScanner from "../components/item-enquiry/CameraScanner";
 import StockSummary from "../components/item-enquiry/StockSummary";
@@ -50,15 +48,14 @@ export interface StockInfo {
 }
 
 const ItemEnquiry = () => {
-  const [itemCode, setItemCode] = useState("");
   const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
   const [stockInfo, setStockInfo] = useState<ItemStock[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("search");
+  const [activeTab, setActiveTab] = useState("selector");
   const [showCamera, setShowCamera] = useState(false);
   const { toast } = useToast();
 
-  const loadItemDetails = async (code: string) => {
+  const loadItemDetails = async (itemCode: string) => {
     try {
       setLoading(true);
       const erpnextAPI = await createERPNextAPI();
@@ -71,15 +68,15 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get item details using the stock API
-      const itemResult = await erpnextAPI.stock.getItems([
-        ['item_code', '=', code]
-      ], undefined, 1);
+      // Get item details
+      const itemResult = await erpnextAPI.stock.getItems({
+        item_code: itemCode
+      });
 
       if (itemResult.data && itemResult.data.length > 0) {
         const item = itemResult.data[0];
         setItemDetails({
-          itemCode: item.item_code || item.item_name,
+          itemCode: item.item_code || item.name,
           itemName: item.item_name,
           itemGroup: item.item_group || 'Default',
           stockUom: item.stock_uom || 'Nos',
@@ -87,7 +84,7 @@ const ItemEnquiry = () => {
         });
 
         // Get stock balance for this item
-        const stockResult = await erpnextAPI.stock.getStockBalance(code);
+        const stockResult = await erpnextAPI.stock.getStockBalance(itemCode);
         if (stockResult.data) {
           const stockData: ItemStock[] = stockResult.data.map((stock: any) => ({
             warehouse: stock.warehouse,
@@ -101,7 +98,7 @@ const ItemEnquiry = () => {
       } else {
         toast({
           title: "Item Not Found",
-          description: `Item ${code} could not be found in ERPNext.`,
+          description: `Item ${itemCode} could not be found in ERPNext.`,
           variant: "destructive"
         });
         setItemDetails(null);
@@ -126,11 +123,10 @@ const ItemEnquiry = () => {
       if (!erpnextAPI) return;
 
       // Try to find item by barcode first
-      const barcodeResult = await erpnextAPI.stock.searchItems(barcode);
+      const barcodeResult = await erpnextAPI.stock.searchItemsByBarcode(barcode);
       if (barcodeResult.data && barcodeResult.data.length > 0) {
         const item = barcodeResult.data[0];
-        setItemCode(item.item_code || item.item_name);
-        await loadItemDetails(item.item_code || item.item_name);
+        await loadItemDetails(item.item_code || item.name);
       } else {
         // If not found by barcode, try direct search
         await loadItemDetails(barcode);
@@ -139,24 +135,6 @@ const ItemEnquiry = () => {
       console.error('Error searching by barcode:', error);
       await loadItemDetails(barcode);
     }
-  };
-
-  const handleSearch = () => {
-    if (itemCode.trim()) {
-      loadItemDetails(itemCode.trim());
-    } else {
-      toast({
-        title: "Validation Error",
-        description: "Please enter an item code to search.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleClear = () => {
-    setItemCode("");
-    setItemDetails(null);
-    setStockInfo([]);
   };
 
   // Create stock data for summary
@@ -189,51 +167,21 @@ const ItemEnquiry = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="search">Search</TabsTrigger>
-          <TabsTrigger value="barcode">Barcode</TabsTrigger>
-          <TabsTrigger value="camera">Camera</TabsTrigger>
+          <TabsTrigger value="selector">Item Selector</TabsTrigger>
+          <TabsTrigger value="barcode">Barcode Scanner</TabsTrigger>
+          <TabsTrigger value="camera">Camera Scanner</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="search">
+        <TabsContent value="selector">
           <Card>
             <CardHeader>
-              <CardTitle>Search by Item Code</CardTitle>
+              <CardTitle>Select Item</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="itemCode" className="text-right">
-                    Item Code
-                  </Label>
-                  <Input
-                    type="text"
-                    id="itemCode"
-                    value={itemCode}
-                    onChange={(e) => setItemCode(e.target.value)}
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="gap-2"
-                    onClick={handleClear}
-                  >
-                    <X className="h-4 w-4" />
-                    Clear
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="gap-2"
-                    onClick={handleSearch}
-                    disabled={loading}
-                  >
-                    <Search className="h-4 w-4" />
-                    {loading ? "Loading..." : "Search"}
-                  </Button>
-                </div>
-              </div>
+              <ItemSelector 
+                onItemSelected={loadItemDetails}
+                isLoading={loading}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -254,10 +202,12 @@ const ItemEnquiry = () => {
           ) : (
             <Card>
               <CardContent className="p-6 text-center">
-                <Button onClick={() => setShowCamera(true)}>
-                  <Camera className="w-4 h-4 mr-2" />
-                  Open Camera Scanner
-                </Button>
+                <button 
+                  onClick={() => setShowCamera(true)}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 mx-auto"
+                >
+                  <span>Open Camera Scanner</span>
+                </button>
               </CardContent>
             </Card>
           )}
@@ -278,10 +228,10 @@ const ItemEnquiry = () => {
         </div>
       )}
 
-      {!loading && itemCode && !itemDetails && (
+      {!loading && !itemDetails && (
         <Card className="mt-6">
           <CardContent className="text-center py-8">
-            <p className="text-gray-500">No item found with code "{itemCode}".</p>
+            <p className="text-gray-500">Select an item to view its stock details.</p>
           </CardContent>
         </Card>
       )}
