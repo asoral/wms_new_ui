@@ -1,100 +1,60 @@
 
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Camera, Search, Package } from "lucide-react";
-import ItemSelector from "./ItemSelector";
-import CameraScanner from './CameraScanner';
+import { Label } from "@/components/ui/label";
+import { Scan, X } from "lucide-react";
 
 interface ItemScannerProps {
-  onItemSelect: (itemCode: string) => void;
+  onBarcodeScanned: (barcode: string) => Promise<void>;
+  isLoading: boolean;
 }
 
-const ItemScanner = ({ onItemSelect }: ItemScannerProps) => {
-  const [activeTab, setActiveTab] = useState("manual");
-  const [showCamera, setShowCamera] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+const ItemScanner = ({ onBarcodeScanned, isLoading }: ItemScannerProps) => {
+  const [barcode, setBarcode] = useState("");
 
-  const handleItemSelected = (itemCode: string) => {
-    setIsLoading(true);
-    onItemSelect(itemCode);
-    // Reset loading state after a short delay to allow parent to handle the selection
-    setTimeout(() => setIsLoading(false), 500);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (barcode.trim()) {
+      await onBarcodeScanned(barcode.trim());
+      setBarcode("");
+    }
   };
 
-  const handleBarcodeDetected = (code: string) => {
-    console.log('Barcode detected in ItemScanner:', code);
-    onItemSelect(code);
-    setShowCamera(false);
-    setActiveTab("manual");
-  };
-
-  const startScanning = () => {
-    setShowCamera(true);
-  };
-
-  const stopScanning = () => {
-    setShowCamera(false);
+  const handleClear = () => {
+    setBarcode("");
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg flex items-center space-x-2">
-          <Package className="w-5 h-5" />
-          <span>Item Code / Name</span>
-        </CardTitle>
+        <CardTitle>Barcode Scanner</CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="manual" className="flex items-center space-x-2">
-              <Search className="w-4 h-4" />
-              <span>Manual Entry</span>
-            </TabsTrigger>
-            <TabsTrigger value="scan" className="flex items-center space-x-2">
-              <Camera className="w-4 h-4" />
-              <span>Scan Barcode</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="manual" className="mt-4">
-            <ItemSelector 
-              onItemSelected={handleItemSelected}
-              isLoading={isLoading}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="barcode">Barcode</Label>
+            <Input
+              id="barcode"
+              type="text"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              placeholder="Scan or enter barcode"
+              disabled={isLoading}
             />
-          </TabsContent>
-
-          <TabsContent value="scan" className="mt-4">
-            {!showCamera ? (
-              <div className="text-center space-y-4">
-                <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg">
-                  <Camera className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Scan Item Barcode
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Use your camera to scan an item barcode
-                  </p>
-                  <Button 
-                    onClick={startScanning}
-                    disabled={isLoading}
-                    className="flex items-center space-x-2"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>Start Camera</span>
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <CameraScanner
-                onBarcodeScanned={handleBarcodeDetected}
-                onClose={stopScanning}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
+          </div>
+          <div className="flex space-x-2">
+            <Button type="submit" disabled={!barcode.trim() || isLoading}>
+              <Scan className="w-4 h-4 mr-2" />
+              {isLoading ? "Searching..." : "Search"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={handleClear}>
+              <X className="w-4 h-4 mr-2" />
+              Clear
+            </Button>
+          </div>
+        </form>
       </CardContent>
     </Card>
   );
