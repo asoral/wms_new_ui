@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -29,6 +30,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const timeoutRef = useRef<NodeJS.Timeout>();
+  
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
@@ -37,14 +39,12 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   }, []);
 
   // Debounced search function
-
-const searchItems = useCallback((searchValue: string) => {
-  if (timeoutRef.current) clearTimeout(timeoutRef.current);
-  timeoutRef.current = setTimeout(() => {
-    fetchItems(searchValue);
-  }, 300);
-}, []);
-
+  const searchItems = useCallback((searchValue: string) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      fetchItems(searchValue);
+    }, 300);
+  }, []);
 
   // Load initial items and cached items
   useEffect(() => {
@@ -102,22 +102,22 @@ const searchItems = useCallback((searchValue: string) => {
         if (/^[0-9]+$/.test(search) || search.length > 10) {
           // Try barcode search first
           try {
-            result = await erpnextAPI.searchItemsByBarcode(search);
+            result = await erpnextAPI.stock.searchItemsByBarcode(search);
             if (!result.data || result.data.length === 0) {
               // If barcode search fails, try regular search
-              result = await erpnextAPI.searchItems(search, limit);
+              result = await erpnextAPI.stock.searchItems(search, limit);
             }
           } catch (error) {
             // Fallback to regular search
-            result = await erpnextAPI.searchItems(search, limit);
+            result = await erpnextAPI.stock.searchItems(search, limit);
           }
         } else {
           // Regular text search
-          result = await erpnextAPI.searchItems(search, limit);
+          result = await erpnextAPI.stock.searchItems(search, limit);
         }
       } else {
         console.log('Fetching initial items');
-        result = await erpnextAPI.getItemsPaginated(undefined, undefined, limit, 1);
+        result = await erpnextAPI.stock.getItemsPaginated(undefined, undefined, limit, 1);
       }
       
       console.log('API result:', result);
@@ -127,7 +127,6 @@ const searchItems = useCallback((searchValue: string) => {
           setItems(result.data);
         }
 
-        
         // Cache the results
         const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
         await offlineStorage.cacheData(cacheKey, result.data, 300000); // 5 minutes
