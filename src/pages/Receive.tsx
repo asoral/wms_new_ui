@@ -164,24 +164,24 @@ const Receive = () => {
         console.log('Creating new Purchase Receipt...');
         
         const receiptData = {
-          doctype: "Purchase Receipt",
           supplier: selectedPO.supplier,
           posting_date: new Date().toISOString().split('T')[0],
           purchase_order: selectedPO.poNumber,
+          set_posting_time: 1,
           items: [{
             item_code: entryWithWarehouse.itemCode,
             qty: entryWithWarehouse.receivedQty,
             warehouse: entryWithWarehouse.warehouse,
             rate: entryWithWarehouse.rate,
             uom: entryWithWarehouse.uom,
-            batch_no: entryWithWarehouse.batch,
-            serial_no: entryWithWarehouse.serial
+            ...(entryWithWarehouse.batch && { batch_no: entryWithWarehouse.batch }),
+            ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
           }]
         };
 
         console.log('Creating new Purchase Receipt with data:', receiptData);
         
-        const result = await erpnextAPI.createPurchaseReceipt(receiptData);
+        const result = await erpnextAPI.purchase.createPurchaseReceipt(receiptData);
         console.log('Purchase Receipt creation result:', result);
         
         if (result.data?.name) {
@@ -189,7 +189,7 @@ const Receive = () => {
           console.log('Purchase Receipt created successfully:', result.data.name);
           toast({
             title: "Purchase Receipt Created",
-            description: `Purchase Receipt ${result.data.name} created with item ${entryWithWarehouse.itemCode}`,
+            description: `Draft Purchase Receipt ${result.data.name} created successfully`,
           });
         } else {
           console.error('No name returned from receipt creation:', result);
@@ -197,25 +197,42 @@ const Receive = () => {
         }
       } else {
         console.log('Adding item to existing Purchase Receipt:', currentPurchaseReceipt);
-        // Add item to existing Purchase Receipt
-        try {
-          // Use a custom method to update the purchase receipt with new items
-          await updatePurchaseReceiptWithItem(erpnextAPI, currentPurchaseReceipt, entryWithWarehouse);
-          
-          console.log('Item added to existing receipt successfully');
-          toast({
-            title: "Item Added",
-            description: `Item ${entryWithWarehouse.itemCode} added to Purchase Receipt ${currentPurchaseReceipt}`,
-          });
-        } catch (error) {
-          console.error('Error updating receipt:', error);
-          toast({
-            title: "Error",
-            description: "Failed to add item to existing receipt",
-            variant: "destructive"
-          });
-          return;
+        
+        // Fetch current receipt data
+        const currentReceiptResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`, {
+          headers: erpnextAPI.getHeaders(),
+        });
+        
+        if (!currentReceiptResponse.ok) {
+          throw new Error('Failed to fetch current receipt data');
         }
+        
+        const currentReceiptData = await currentReceiptResponse.json();
+        console.log('Current receipt data:', currentReceiptData);
+        
+        // Add new item to existing items array
+        const newItem = {
+          item_code: entryWithWarehouse.itemCode,
+          qty: entryWithWarehouse.receivedQty,
+          warehouse: entryWithWarehouse.warehouse,
+          rate: entryWithWarehouse.rate,
+          uom: entryWithWarehouse.uom,
+          ...(entryWithWarehouse.batch && { batch_no: entryWithWarehouse.batch }),
+          ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
+        };
+        
+        const updatedItems = [...(currentReceiptData.data.items || []), newItem];
+        
+        // Update the receipt with new items
+        const updateResult = await erpnextAPI.purchase.updatePurchaseReceipt(currentPurchaseReceipt, {
+          items: updatedItems
+        });
+        
+        console.log('Item added to existing receipt successfully:', updateResult);
+        toast({
+          title: "Item Added",
+          description: `Item ${entryWithWarehouse.itemCode} added to Purchase Receipt ${currentPurchaseReceipt}`,
+        });
       }
 
       // Add to local state
@@ -230,51 +247,6 @@ const Receive = () => {
         variant: "destructive"
       });
     }
-  };
-
-  // Helper function to update purchase receipt with new item
-  const updatePurchaseReceiptWithItem = async (erpnextAPI: any, receiptName: string, item: ReceiveEntry) => {
-    console.log('updatePurchaseReceiptWithItem called with:', { receiptName, item });
-    
-    // Create a new receipt item entry using ERPNext API pattern
-    const itemData = {
-      doctype: "Purchase Receipt Item",
-      parent: receiptName,
-      parenttype: "Purchase Receipt",
-      parentfield: "items",
-      item_code: item.itemCode,
-      qty: item.receivedQty,
-      warehouse: item.warehouse,
-      rate: item.rate,
-      uom: item.uom,
-      batch_no: item.batch,
-      serial_no: item.serial
-    };
-
-    console.log('Sending item data to ERPNext:', itemData);
-
-    // Use a direct API call to add the item
-    const response = await fetch(`${erpnextAPI.baseURL}/api/method/frappe.client.insert`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ doc: itemData }),
-    });
-
-    console.log('API response status:', response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API error response:', errorText);
-      throw new Error(`Failed to add item to receipt: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    console.log('API success response:', result);
-    return result;
   };
 
   const submitReceipt = async () => {
@@ -298,23 +270,8 @@ const Receive = () => {
         return;
       }
 
-      // Submit the Purchase Receipt using a proper API method
-      const submitResponse = await fetch(`${erpnextAPI.baseURL}/api/method/frappe.client.submit`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          doctype: 'Purchase Receipt',
-          name: currentPurchaseReceipt
-        }),
-      });
-
-      if (!submitResponse.ok) {
-        throw new Error('Failed to submit receipt');
-      }
+      // Submit the Purchase Receipt
+      await erpnextAPI.purchase.submitPurchaseReceipt(currentPurchaseReceipt);
       
       toast({
         title: "Success",
@@ -332,7 +289,7 @@ const Receive = () => {
       console.error('Error submitting receipt:', error);
       toast({
         title: "Error",
-        description: "Failed to submit purchase receipt",
+        description: `Failed to submit purchase receipt: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     }

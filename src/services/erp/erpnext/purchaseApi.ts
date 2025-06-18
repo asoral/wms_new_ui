@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, PurchaseOrder, PurchaseReceipt } from './types';
 
@@ -97,7 +98,58 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
       }
     );
     if (!response.ok) {
-      throw new Error(`Failed to create purchase receipt: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to create purchase receipt: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Update an existing Purchase Receipt
+   */
+  async updatePurchaseReceipt(
+    receiptName: string,
+    updateData: Partial<PurchaseReceipt>
+  ): Promise<ERPNextResponse<PurchaseReceipt>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Purchase Receipt/${encodeURIComponent(receiptName)}`,
+      {
+        method: 'PUT',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      }
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update purchase receipt: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Submit a Purchase Receipt (change status from Draft to Submitted)
+   */
+  async submitPurchaseReceipt(receiptName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/api/method/frappe.client.submit`,
+      {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          doctype: 'Purchase Receipt',
+          name: receiptName
+        })
+      }
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to submit purchase receipt: ${response.status} ${response.statusText} - ${errorText}`);
     }
     return response.json();
   }
