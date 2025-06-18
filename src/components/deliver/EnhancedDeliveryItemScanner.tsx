@@ -26,7 +26,9 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
   const [quantity, setQuantity] = useState("");
   const [batchInputMethod, setBatchInputMethod] = useState<'traditional' | 'bundle'>('traditional');
   const [availableBatches, setAvailableBatches] = useState<string[]>([]);
+  const [availableSerials, setAvailableSerials] = useState<string[]>([]);
   const [stockInfo, setStockInfo] = useState<any>(null);
+  const [itemDetails, setItemDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -37,24 +39,50 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
   }, []);
 
   useEffect(() => {
+    if (selectedItem) {
+      fetchItemDetails();
+    }
+  }, [selectedItem]);
+
+  useEffect(() => {
     if (selectedItem && warehouse) {
       fetchStockInfo();
-      checkBatchTracking();
+      if (itemDetails?.has_batch_no) {
+        fetchBatches();
+      }
+      if (itemDetails?.has_serial_no) {
+        fetchSerials();
+      }
     }
-  }, [selectedItem, warehouse]);
+  }, [selectedItem, warehouse, itemDetails]);
 
   const fetchWarehouses = async () => {
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      const result = await erpnextAPI.warehouse.getWarehouses();
+      const result = await erpnextAPI.getWarehouses();
       if (result.data) {
         const warehouseNames = result.data.map((wh: any) => wh.name || wh.warehouse_name);
         setWarehouses(warehouseNames);
       }
     } catch (error) {
       console.error('Error fetching warehouses:', error);
+    }
+  };
+
+  const fetchItemDetails = async () => {
+    if (!selectedItem) return;
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const result = await erpnextAPI.getItemDetails(selectedItem.itemCode);
+      console.log('Item details:', result.data);
+      setItemDetails(result.data);
+    } catch (error) {
+      console.error('Error fetching item details:', error);
     }
   };
 
@@ -66,7 +94,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      const stockResult = await erpnextAPI.stock.getCurrentStock(
+      const stockResult = await erpnextAPI.getCurrentStock(
         selectedItem.itemCode,
         warehouse
       );
@@ -79,24 +107,35 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
     }
   };
 
-  const checkBatchTracking = async () => {
+  const fetchBatches = async () => {
     if (!selectedItem) return;
     
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      // Check if item has batch tracking
-      const itemResult = await erpnextAPI.items.getItem(selectedItem.itemCode);
-      if (itemResult.data?.has_batch_no) {
-        // Fetch available batches for the item in the warehouse
-        const batchResult = await erpnextAPI.stock.getBatches(selectedItem.itemCode, warehouse);
-        if (batchResult.data) {
-          setAvailableBatches(batchResult.data.map((batch: any) => batch.batch_id || batch.name));
-        }
+      const batchResult = await erpnextAPI.stock.getBatches(selectedItem.itemCode, warehouse);
+      if (batchResult.data) {
+        setAvailableBatches(batchResult.data.map((batch: any) => batch.batch_id || batch.name));
       }
     } catch (error) {
-      console.error('Error checking batch tracking:', error);
+      console.error('Error fetching batches:', error);
+    }
+  };
+
+  const fetchSerials = async () => {
+    if (!selectedItem) return;
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const serialResult = await erpnextAPI.stock.getSerialNumbers(selectedItem.itemCode, warehouse);
+      if (serialResult.data) {
+        setAvailableSerials(serialResult.data.map((serial: any) => serial.serial_no || serial.name));
+      }
+    } catch (error) {
+      console.error('Error fetching serials:', error);
     }
   };
 
@@ -138,6 +177,25 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       return;
     }
 
+    // Validate batch/serial requirements
+    if (itemDetails?.has_batch_no && !batchNumber) {
+      toast({
+        title: "Batch Required",
+        description: "This item requires a batch number",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (itemDetails?.has_serial_no && !serialNumber) {
+      toast({
+        title: "Serial Required", 
+        description: "This item requires a serial number",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const entry: DeliveryEntry = {
       itemCode: selectedItem.itemCode,
       itemName: selectedItem.itemName,
@@ -160,6 +218,8 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
     setQuantity("");
     setStockInfo(null);
     setAvailableBatches([]);
+    setAvailableSerials([]);
+    setItemDetails(null);
 
     toast({
       title: "Item Added",
@@ -183,7 +243,8 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
   };
 
   const stockStatus = getStockStatus();
-  const isBatchTracked = availableBatches.length > 0;
+  const isBatchTracked = itemDetails?.has_batch_no;
+  const isSerialTracked = itemDetails?.has_serial_no;
 
   return (
     <Card>
@@ -239,18 +300,20 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
             <div className="bg-blue-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-medium">Item Details</h4>
-                {stockStatus && (
-                  <div className="flex items-center space-x-2">
-                    {stockStatus.status === 'sufficient' ? (
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-orange-600" />
-                    )}
-                    <span className={`text-sm font-medium text-${stockStatus.color}-600`}>
-                      {stockStatus.message}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center space-x-2">
+                  {stockStatus && (
+                    <>
+                      {stockStatus.status === 'sufficient' ? (
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-orange-600" />
+                      )}
+                      <span className={`text-sm font-medium text-${stockStatus.color}-600`}>
+                        {stockStatus.message}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                 <div>
@@ -269,12 +332,17 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
                   <span className="text-gray-600">Warehouse:</span>
                   <div className="font-medium">{selectedItem.warehouse}</div>
                 </div>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
                 {isBatchTracked && (
-                  <div className="col-span-2 md:col-span-4">
-                    <Badge variant="outline" className="text-xs">
-                      Batch Tracked
-                    </Badge>
-                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    Batch Tracked
+                  </Badge>
+                )}
+                {isSerialTracked && (
+                  <Badge variant="outline" className="text-xs">
+                    Serial Tracked
+                  </Badge>
                 )}
               </div>
             </div>
@@ -311,8 +379,8 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
               </div>
             </div>
 
-            {/* Batch/Serial Input Method */}
-            {isBatchTracked && (
+            {/* Serial/Batch Input Method for tracked items */}
+            {(isBatchTracked || isSerialTracked) && (
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Serial/Batch Input Method</label>
@@ -324,31 +392,40 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
 
                     <TabsContent value="traditional" className="space-y-4 mt-4">
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium mb-1 block">Batch Number {isBatchTracked ? '*' : ''}</label>
-                          <Select value={batchNumber} onValueChange={setBatchNumber}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select batch..." />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                              {availableBatches.map((batch) => (
-                                <SelectItem key={batch} value={batch}>
-                                  {batch}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-1 block">Actual Quantity *</label>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            value={quantity}
-                            onChange={(e) => setQuantity(e.target.value)}
-                            min="1"
-                          />
-                        </div>
+                        {isBatchTracked && (
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Batch Number *</label>
+                            <Select value={batchNumber} onValueChange={setBatchNumber}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select batch..." />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                {availableBatches.map((batch) => (
+                                  <SelectItem key={batch} value={batch}>
+                                    {batch}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {isSerialTracked && (
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Serial Number *</label>
+                            <Select value={serialNumber} onValueChange={setSerialNumber}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select serial..." />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                {availableSerials.map((serial) => (
+                                  <SelectItem key={serial} value={serial}>
+                                    {serial}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
                     </TabsContent>
 
@@ -362,24 +439,12 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
               </div>
             )}
 
-            {/* Serial Number for non-batch items */}
-            {!isBatchTracked && (
-              <div>
-                <label className="text-sm font-medium mb-1 block">Serial Number</label>
-                <Input
-                  placeholder="Enter serial number"
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                />
-              </div>
-            )}
-
             <Button 
               onClick={handleAddItem} 
               className="w-full"
               disabled={!warehouse || !quantity || loading || (stockStatus && stockStatus.status === 'insufficient')}
             >
-              {loading ? 'Checking Stock...' : '+ Add to Delivery'}
+              {loading ? 'Checking Stock...' : '+ Add to Count'}
             </Button>
           </div>
         )}

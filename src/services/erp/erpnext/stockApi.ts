@@ -148,7 +148,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters, limitPageLength);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
 
     const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
       headers: this.getHeaders(),
