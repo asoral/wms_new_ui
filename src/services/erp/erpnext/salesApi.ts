@@ -52,4 +52,40 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
 
     return response.json();
   }
+
+  async createDeliveryNote(deliveryData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Delivery Note`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(deliveryData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create delivery note: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  async updateDeliveryNote(name: string, deliveryData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Delivery Note/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(deliveryData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update delivery note: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
 }
