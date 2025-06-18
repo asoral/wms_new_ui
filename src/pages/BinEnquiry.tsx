@@ -1,68 +1,37 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Warehouse, QrCode, Scan } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, X } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import BinScanner from "../components/bin-enquiry/BinScanner";
-import CameraScanner from "../components/bin-enquiry/CameraScanner";
-import BinItemsTable from "../components/bin-enquiry/BinItemsTable";
-import WarehouseSelector from "../components/bin-enquiry/WarehouseSelector";
 
-export interface BinEnquiryItem {
-  itemCode: string;
-  itemName: string;
-  quantity: number;
-  reserved: number;
-  available: number;
-  uom: string;
-  binLocation: string;
+export interface BinItem {
+  item_code: string;
+  item_name: string;
+  actual_qty: number;
+  valuation_rate: number;
+  warehouse: string;
+  bin: string;
 }
 
 const BinEnquiry = () => {
-  const [activeTab, setActiveTab] = useState("search");
   const [binCode, setBinCode] = useState("");
-  const [selectedWarehouse, setSelectedWarehouse] = useState("");
-  const [binItems, setBinItems] = useState<BinEnquiryItem[]>([]);
+  const [binItems, setBinItems] = useState<BinItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
 
-  const handleBinCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBinCode(e.target.value);
-  };
-
-  const handleWarehouseSelected = (warehouseCode: string) => {
-    setSelectedWarehouse(warehouseCode);
-  };
-
-  const handleSearchBin = async () => {
-    if (!binCode.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a bin code to search",
-        variant: "destructive",
-      });
-      return;
+  useEffect(() => {
+    // Optional: Load bin items if a bin code is already present
+    if (binCode) {
+      loadBinItems(binCode);
     }
-    
-    await fetchBinItems();
-  };
+  }, []);
 
-  const handleBinScanned = async (scannedBin: string) => {
-    setBinCode(scannedBin);
-    await fetchBinItems(scannedBin);
-  };
-
-  const fetchBinItems = async (binCodeToSearch = binCode) => {
-    setLoading(true);
-    setHasSearched(true);
-    
+  const loadBinItems = async (bin: string) => {
     try {
+      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -73,195 +42,142 @@ const BinEnquiry = () => {
         return;
       }
 
-      // First get warehouses to validate if bin exists
-      const warehousesResult = await erpnextAPI.warehouse.getWarehouses();
-      const warehouses = warehousesResult?.data || [];
-      
-      // Get warehouse code from bin if not set already
-      let warehouseCode = selectedWarehouse;
-      if (!warehouseCode && binCodeToSearch.includes('-')) {
-        warehouseCode = binCodeToSearch.split('-')[0];
-        setSelectedWarehouse(warehouseCode);
-      }
+      // Fetch bin stock details
+      const response = await erpnextAPI.stock.getBinStock(undefined, bin);
+      console.log('Bin stock response:', response);
 
-      // Validate warehouse exists
-      const warehouseExists = !warehouseCode || warehouses.some((wh: any) => wh.name === warehouseCode);
-      if (warehouseCode && !warehouseExists) {
-        toast({
-          title: "Invalid Warehouse",
-          description: `Warehouse ${warehouseCode} does not exist in the system.`,
-          variant: "destructive"
-        });
+      if (response?.data) {
+        // Transform the data to match our BinItem interface
+        const transformedItems: BinItem[] = response.data.map((item: any) => ({
+          item_code: item.item_code,
+          item_name: item.item_name,
+          actual_qty: item.actual_qty,
+          valuation_rate: item.valuation_rate,
+          warehouse: item.warehouse,
+          bin: item.warehouse
+        }));
+        setBinItems(transformedItems);
+      } else {
         setBinItems([]);
-        setLoading(false);
-        return;
-      }
-
-      // Check bin/warehouse combination exists
-      const binWarehouseExists = await validateBinExists(binCodeToSearch, warehouseCode);
-      if (!binWarehouseExists) {
-        toast({
-          title: "Invalid Bin",
-          description: `Bin ${binCodeToSearch} does not exist in warehouse ${warehouseCode || 'any'}.`,
-          variant: "destructive"
-        });
-        setBinItems([]);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch bin stock data
-      const binStockData = await erpnextAPI.stock.getBinStock("", warehouseCode);
-      
-      // Filter and transform the data for the given bin
-      const filteredBinData = binStockData?.data?.filter((item: any) => 
-        item.bin_code === binCodeToSearch
-      ) || [];
-      
-      const transformedData: BinEnquiryItem[] = filteredBinData.map((item: any) => ({
-        itemCode: item.item_code || "",
-        itemName: item.item_name || "",
-        quantity: Number(item.actual_qty || 0),
-        reserved: Number(item.reserved_qty || 0),
-        available: Number((item.actual_qty || 0) - (item.reserved_qty || 0)),
-        uom: item.stock_uom || "",
-        binLocation: item.bin_code || "",
-      }));
-
-      setBinItems(transformedData);
-      
-      if (transformedData.length === 0) {
-        toast({
-          title: "No Items Found",
-          description: `No items found in bin ${binCodeToSearch}.`,
-          variant: "default"
-        });
       }
 
     } catch (error) {
-      console.error('Error fetching bin items:', error);
+      console.error('Failed to load bin items:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch bin items from ERPNext",
+        description: "Failed to load bin items from ERPNext",
         variant: "destructive"
       });
-      setBinItems([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const validateBinExists = async (binCode: string, warehouseCode: string): Promise<boolean> => {
-    try {
-      // This is a simple validation that could be enhanced with a direct bin check API
-      // For now, assume the bin exists if it follows the format
-      return true;
-    } catch (error) {
-      console.error('Error validating bin:', error);
-      return false;
+  const handleSearch = () => {
+    if (binCode) {
+      loadBinItems(binCode);
+    } else {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a bin code to search.",
+        variant: "destructive"
+      });
     }
+  };
+
+  const handleClear = () => {
+    setBinCode("");
+    setBinItems([]);
   };
 
   return (
     <div className="container mx-auto py-6">
-      <div className="flex items-center mb-6">
-        <Warehouse className="w-6 h-6 mr-2 text-blue-600" />
+      <div className="mb-6">
         <h1 className="text-2xl font-bold">Bin Enquiry</h1>
+        <p className="text-gray-500">Check the items in a specific bin.</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 mb-6">
-          <TabsTrigger value="search">
-            <Search className="w-4 h-4 mr-2" />
-            <span>Manual Search</span>
-          </TabsTrigger>
-          <TabsTrigger value="scan">
-            <QrCode className="w-4 h-4 mr-2" />
-            <span>QR Code</span>
-          </TabsTrigger>
-          <TabsTrigger value="camera">
-            <Scan className="w-4 h-4 mr-2" />
-            <span>Camera</span>
-          </TabsTrigger>
-        </TabsList>
+      <Card>
+        <CardHeader>
+          <CardTitle>Enter Bin Code</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="binCode" className="text-right">
+                Bin Code
+              </Label>
+              <Input
+                type="text"
+                id="binCode"
+                value={binCode}
+                onChange={(e) => setBinCode(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-2"
+                onClick={handleClear}
+              >
+                <X className="h-4 w-4" />
+                Clear
+              </Button>
+              <Button
+                type="submit"
+                className="gap-2"
+                onClick={handleSearch}
+                disabled={loading}
+              >
+                <Search className="h-4 w-4" />
+                {loading ? "Loading..." : "Search"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="search">
-          <Card>
-            <CardHeader>
-              <CardTitle>Search Bin</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="binCode">Bin Code</Label>
-                  <div className="flex mt-1">
-                    <Input
-                      id="binCode"
-                      value={binCode}
-                      onChange={handleBinCodeChange}
-                      placeholder="Enter bin code (e.g. WH1-A1-B2)"
-                    />
-                    <Button onClick={handleSearchBin} className="ml-2" disabled={loading}>
-                      {loading ? (
-                        <span className="animate-spin mr-2">◠</span>
-                      ) : (
-                        <Search className="w-4 h-4 mr-2" />
-                      )}
-                      Search
-                    </Button>
-                  </div>
-                </div>
+      {binItems.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Bin Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Item Code</th>
+                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Item Name</th>
+                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Quantity</th>
+                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Valuation Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {binItems.map((item) => (
+                    <tr key={item.item_code} className="border-b hover:bg-gray-50">
+                      <td className="py-4 px-4">{item.item_code}</td>
+                      <td className="py-4 px-4">{item.item_name}</td>
+                      <td className="py-4 px-4">{item.actual_qty}</td>
+                      <td className="py-4 px-4">{item.valuation_rate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-                <div>
-                  <Label>Warehouse (Optional)</Label>
-                  <WarehouseSelector
-                    onWarehouseSelected={handleWarehouseSelected}
-                    isLoading={loading}
-                  />
-                </div>
-              </div>
-
-              {hasSearched && (
-                <BinItemsTable items={binItems} isLoading={loading} />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="scan">
-          <Card>
-            <CardHeader>
-              <CardTitle>Scan QR Code</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <BinScanner onBinScanned={handleBinScanned} />
-              
-              {hasSearched && (
-                <div className="mt-6">
-                  <BinItemsTable items={binItems} isLoading={loading} />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="camera">
-          <Card>
-            <CardHeader>
-              <CardTitle>Camera Scan</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CameraScanner onBinScanned={handleBinScanned} />
-              
-              {hasSearched && (
-                <div className="mt-6">
-                  <BinItemsTable items={binItems} isLoading={loading} />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {!loading && binCode && binItems.length === 0 && (
+        <Card className="mt-6">
+          <CardContent className="text-center py-8">
+            <p className="text-gray-500">No items found in bin "{binCode}".</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

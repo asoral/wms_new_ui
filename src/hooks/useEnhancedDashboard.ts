@@ -11,6 +11,10 @@ export interface DashboardStats {
   totalCustomers: number;
   revenueGrowth: number;
   inventoryValue: number;
+  lowStockItems: number;
+  pendingOrders: number;
+  totalWarehouses: number;
+  totalStockValue: number;
 }
 
 export interface OperationalMetrics {
@@ -53,6 +57,15 @@ export interface RecentActivity {
   amount: number;
   date: string;
   status: string;
+  title: string;
+  subtitle: string;
+  time: string;
+}
+
+export interface StockAgingData {
+  items_count: number;
+  aged_30_days: number;
+  aged_90_days: number;
 }
 
 export function useEnhancedDashboard() {
@@ -63,6 +76,10 @@ export function useEnhancedDashboard() {
     totalCustomers: 0,
     revenueGrowth: 0,
     inventoryValue: 0,
+    lowStockItems: 0,
+    pendingOrders: 0,
+    totalWarehouses: 0,
+    totalStockValue: 0,
   });
 
   const [operationalMetrics, setOperationalMetrics] = useState<OperationalMetrics>({
@@ -98,15 +115,15 @@ export function useEnhancedDashboard() {
   });
 
   const [activities, setActivities] = useState<RecentActivity[]>([]);
+  const [stockAgingData, setStockAgingData] = useState<StockAgingData>({
+    items_count: 0,
+    aged_30_days: 0,
+    aged_90_days: 0,
+  });
 
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Additional properties needed by Home.tsx
-  const [stats, setStats] = useState(dashboardStats);
-  const [recentActivities, setRecentActivities] = useState(activities);
-  const [stockAgingData, setStockAgingData] = useState<any[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [error, setError] = useState<string>('');
 
   const { toast } = useToast();
 
@@ -114,7 +131,7 @@ export function useEnhancedDashboard() {
     async function fetchDashboardData() {
       try {
         setIsLoading(true);
-        setError(null);
+        setError('');
         
         const api = await createERPNextAPI();
         if (!api) {
@@ -133,7 +150,11 @@ export function useEnhancedDashboard() {
             totalItems: 1245,
             totalCustomers: 487,
             revenueGrowth: 8.7,
-            inventoryValue: 3245600
+            inventoryValue: 3245600,
+            lowStockItems: 45,
+            pendingOrders: 12,
+            totalWarehouses: 8,
+            totalStockValue: 3245600
           }
         };
         
@@ -176,7 +197,11 @@ export function useEnhancedDashboard() {
         setDashboardStats(dashboardResult.data as DashboardStats);
         setOperationalMetrics(operationalResult.data as OperationalMetrics);
         setFinancialMetrics(financialResult.data as FinancialMetrics);
-        setStats(dashboardResult.data as DashboardStats);
+        setStockAgingData({
+          items_count: 1245,
+          aged_30_days: 123,
+          aged_90_days: 45
+        });
 
         // Load recent activities
         await loadRecentActivities();
@@ -214,7 +239,10 @@ export function useEnhancedDashboard() {
             description: 'New order from ABC Corp',
             amount: 12450,
             date: '2023-05-14',
-            status: 'To Deliver'
+            status: 'To Deliver',
+            title: 'Sales Order SO-2023-0034',
+            subtitle: 'New order from ABC Corp',
+            time: '2 hours ago'
           },
           {
             id: 'act2',
@@ -223,7 +251,10 @@ export function useEnhancedDashboard() {
             description: 'Delivery to XYZ Ltd.',
             amount: 8760,
             date: '2023-05-13',
-            status: 'Completed'
+            status: 'completed',
+            title: 'Delivery Note DN-2023-0067',
+            subtitle: 'Delivery to XYZ Ltd.',
+            time: '4 hours ago'
           },
           {
             id: 'act3',
@@ -232,31 +263,15 @@ export function useEnhancedDashboard() {
             description: 'Office supplies from Vendor Inc',
             amount: 3200,
             date: '2023-05-12',
-            status: 'To Receive'
-          },
-          {
-            id: 'act4',
-            type: 'payment',
-            reference: 'PAY-2023-0097',
-            description: 'Payment received from DEF Industries',
-            amount: 24700,
-            date: '2023-05-11',
-            status: 'Completed'
-          },
-          {
-            id: 'act5',
-            type: 'receipt',
-            reference: 'PREC-2023-0042',
-            description: 'Inventory received from Supplier Co',
-            amount: 15600,
-            date: '2023-05-10',
-            status: 'Completed'
+            status: 'pending',
+            title: 'Purchase Order PO-2023-0054',
+            subtitle: 'Office supplies from Vendor Inc',
+            time: '1 day ago'
           }
         ]
       };
 
       setActivities(activitiesResult.data as RecentActivity[]);
-      setRecentActivities(activitiesResult.data as RecentActivity[]);
       
     } catch (error) {
       console.error('Error fetching recent activities:', error);
@@ -275,14 +290,14 @@ export function useEnhancedDashboard() {
     operationalMetrics,
     financialMetrics,
     activities,
-    isLoading,
-    error: error || '',
-    loadRecentActivities,
-    // Additional properties for Home.tsx compatibility
-    stats,
-    recentActivities,
     stockAgingData,
+    isLoading,
     isLoadingActivities,
+    error,
+    loadRecentActivities,
     refreshData,
+    // Backward compatibility aliases
+    stats: dashboardStats,
+    recentActivities: activities,
   };
 }

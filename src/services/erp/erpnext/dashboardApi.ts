@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextItemsAPI } from './itemsApi';
 import { ERPNextStockAPI } from './stockApi';
@@ -28,23 +27,34 @@ export class ERPNextDashboardAPI extends ERPNextBaseAPI {
 
   async getDashboardMetrics(company?: string): Promise<DashboardMetrics> {
     try {
-      const [itemsResponse, warehousesResponse, ordersResponse, stockBalanceResponse] = await Promise.all([
+      const [itemsResponse, warehousesResponse, ordersResponse] = await Promise.all([
         this.itemsApi.getItems(undefined, undefined, 20),
         this.warehouseApi.getWarehouses(undefined, company),
-        this.salesApi.getSalesOrders([['status', '=', 'Draft']], company),
-        this.stockApi.getStockBalance({ actual_qty: ['<', '10'] }, company)
+        this.salesApi.getSalesOrders([['status', '=', 'Draft']], company)
       ]);
 
-      // Calculate total stock value using stock balance
+      // Try to get stock balance with proper error handling
+      let lowStockItems = 0;
       let totalStockValue = 0;
-      if (stockBalanceResponse.data) {
-        totalStockValue = stockBalanceResponse.data.reduce((sum: number, entry: any) => 
-          sum + ((entry.actual_qty || 0) * (entry.valuation_rate || 0)), 0);
+      try {
+        const stockBalanceResponse = await this.stockApi.getStockBalance();
+        if (stockBalanceResponse.data) {
+          // Filter for low stock items (less than 10)
+          lowStockItems = stockBalanceResponse.data.filter((entry: any) => 
+            (entry.actual_qty || 0) < 10
+          ).length;
+          
+          // Calculate total stock value
+          totalStockValue = stockBalanceResponse.data.reduce((sum: number, entry: any) => 
+            sum + ((entry.actual_qty || 0) * (entry.valuation_rate || 0)), 0);
+        }
+      } catch (error) {
+        console.warn('Could not fetch stock balance for dashboard metrics:', error);
       }
 
       return {
         totalItems: itemsResponse.data?.length || 0,
-        lowStockItems: stockBalanceResponse.data?.length || 0,
+        lowStockItems,
         pendingOrders: ordersResponse.data?.length || 0,
         totalWarehouses: warehousesResponse.data?.length || 0,
         totalStockValue,
@@ -169,7 +179,7 @@ export class ERPNextDashboardAPI extends ERPNextBaseAPI {
     try {
       let totalStockValue = 0;
       try {
-        const stockBalanceResponse = await this.stockApi.getStockBalance(undefined, company);
+        const stockBalanceResponse = await this.stockApi.getStockBalance();
         totalStockValue = stockBalanceResponse.data?.reduce((sum: number, entry: any) => 
           sum + ((entry.actual_qty || 0) * (entry.valuation_rate || 0)), 0) || 0;
       } catch (error) {

@@ -43,8 +43,8 @@ const Home = () => {
   const [refreshing, setRefreshing] = useState(false);
   
   const {
-    stats,
-    recentActivities,
+    dashboardStats,
+    recentActivities = [],
     operationalMetrics,
     financialMetrics,
     stockAgingData,
@@ -79,7 +79,8 @@ const Home = () => {
     }
   };
 
-  const formatValue = (value: number, type: 'currency' | 'percentage' | 'number' = 'number') => {
+  const formatValue = (value: number | undefined, type: 'currency' | 'percentage' | 'number' = 'number') => {
+    if (value === undefined || value === null) return '0';
     if (type === 'currency') {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
     } else if (type === 'percentage') {
@@ -87,6 +88,37 @@ const Home = () => {
     } else {
       return value.toLocaleString();
     }
+  };
+
+  // Safe property access with defaults
+  const safeStats = {
+    totalItems: dashboardStats?.totalItems || 0,
+    lowStockItems: dashboardStats?.lowStockItems || 0,
+    pendingOrders: dashboardStats?.pendingOrders || 0,
+    totalWarehouses: dashboardStats?.totalWarehouses || 0,
+    totalStockValue: dashboardStats?.totalStockValue || 0,
+  };
+
+  const safeOperationalMetrics = {
+    pickAccuracy: operationalMetrics?.pickAccuracy || 0,
+    putawaySpeed: operationalMetrics?.putawaySpeed || 0,
+    cycleCountAccuracy: operationalMetrics?.cycleCountAccuracy || 0,
+    orderFulfillmentRate: operationalMetrics?.orderFulfillmentRate || 0,
+    warehouseUtilization: operationalMetrics?.warehouseUtilization || 0,
+    averageProcessingTime: operationalMetrics?.averageProcessingTime || 0,
+  };
+
+  const safeFinancialMetrics = {
+    stockTurnoverRatio: financialMetrics?.stockTurnoverRatio || 0,
+    deadStockValue: financialMetrics?.deadStockValue || 0,
+    carryingCostPercentage: financialMetrics?.carryingCostPercentage || 0,
+    abcAnalysis: financialMetrics?.abcAnalysis || { classA: 0, classB: 0, classC: 0 },
+  };
+
+  const safeStockAgingData = {
+    items_count: stockAgingData?.items_count || 0,
+    aged_30_days: stockAgingData?.aged_30_days || 0,
+    aged_90_days: stockAgingData?.aged_90_days || 0,
   };
 
   return (
@@ -138,22 +170,22 @@ const Home = () => {
                 <>
                   <MetricCard
                     title="Total Items"
-                    value={stats.totalItems.toString()}
+                    value={safeStats.totalItems.toString()}
                     icon={PackageOpen}
                   />
                   <MetricCard
                     title="Low Stock Items"
-                    value={stats.lowStockItems.toString()}
+                    value={safeStats.lowStockItems.toString()}
                     icon={AlertTriangle}
                   />
                   <MetricCard
                     title="Pending Orders"
-                    value={stats.pendingOrders.toString()}
+                    value={safeStats.pendingOrders.toString()}
                     icon={ShoppingCart}
                   />
                   <MetricCard
                     title="Total Warehouses"
-                    value={stats.totalWarehouses.toString()}
+                    value={safeStats.totalWarehouses.toString()}
                     icon={Warehouse}
                   />
                 </>
@@ -174,22 +206,22 @@ const Home = () => {
                 <>
                   <MetricCard
                     title="Total Stock Value"
-                    value={formatValue(stats.totalStockValue, 'currency')}
+                    value={formatValue(safeStats.totalStockValue, 'currency')}
                     icon={CreditCard}
                   />
                   <MetricCard
                     title="Stock Turnover Ratio"
-                    value={financialMetrics.stockTurnoverRatio.toString()}
+                    value={safeFinancialMetrics.stockTurnoverRatio.toString()}
                     icon={TrendingUp}
                   />
                   <MetricCard
                     title="Dead Stock Value"
-                    value={formatValue(financialMetrics.deadStockValue, 'currency')}
+                    value={formatValue(safeFinancialMetrics.deadStockValue, 'currency')}
                     icon={AlertTriangle}
                   />
                   <MetricCard
                     title="Carrying Cost"
-                    value={formatValue(financialMetrics.carryingCostPercentage, 'percentage')}
+                    value={formatValue(safeFinancialMetrics.carryingCostPercentage, 'percentage')}
                     icon={Percent}
                   />
                 </>
@@ -218,7 +250,7 @@ const Home = () => {
                         <Target className="w-4 h-4 text-green-600" />
                         <h4 className="font-medium text-green-600">Pick Accuracy</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(operationalMetrics.pickAccuracy, 'percentage')}</p>
+                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.pickAccuracy, 'percentage')}</p>
                       <p className="text-sm text-gray-600">Target: 95%</p>
                     </div>
                     <div className="space-y-2">
@@ -226,7 +258,7 @@ const Home = () => {
                         <Timer className="w-4 h-4 text-blue-600" />
                         <h4 className="font-medium text-blue-600">Putaway Speed</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(operationalMetrics.putawaySpeed, 'percentage')}</p>
+                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.putawaySpeed, 'percentage')}</p>
                       <p className="text-sm text-gray-600">Items per hour efficiency</p>
                     </div>
                     <div className="space-y-2">
@@ -234,7 +266,7 @@ const Home = () => {
                         <Package className="w-4 h-4 text-purple-600" />
                         <h4 className="font-medium text-purple-600">Cycle Count Accuracy</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(operationalMetrics.cycleCountAccuracy, 'percentage')}</p>
+                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.cycleCountAccuracy, 'percentage')}</p>
                       <p className="text-sm text-gray-600">Inventory accuracy</p>
                     </div>
                     <div className="space-y-2">
@@ -242,7 +274,7 @@ const Home = () => {
                         <ShoppingCart className="w-4 h-4 text-orange-600" />
                         <h4 className="font-medium text-orange-600">Order Fulfillment</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(operationalMetrics.orderFulfillmentRate, 'percentage')}</p>
+                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.orderFulfillmentRate, 'percentage')}</p>
                       <p className="text-sm text-gray-600">On-time delivery</p>
                     </div>
                     <div className="space-y-2">
@@ -250,7 +282,7 @@ const Home = () => {
                         <Warehouse className="w-4 h-4 text-indigo-600" />
                         <h4 className="font-medium text-indigo-600">Warehouse Utilization</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(operationalMetrics.warehouseUtilization, 'percentage')}</p>
+                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.warehouseUtilization, 'percentage')}</p>
                       <p className="text-sm text-gray-600">Space efficiency</p>
                     </div>
                     <div className="space-y-2">
@@ -258,7 +290,7 @@ const Home = () => {
                         <Clock className="w-4 h-4 text-red-600" />
                         <h4 className="font-medium text-red-600">Avg Processing Time</h4>
                       </div>
-                      <p className="text-2xl font-bold">{operationalMetrics.averageProcessingTime}h</p>
+                      <p className="text-2xl font-bold">{safeOperationalMetrics.averageProcessingTime}h</p>
                       <p className="text-sm text-gray-600">Per order processing</p>
                     </div>
                   </div>
@@ -381,17 +413,17 @@ const Home = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                       <div className="space-y-2">
                         <h4 className="font-medium text-green-600">Fresh Stock (0-30 days)</h4>
-                        <p className="text-2xl font-bold">{stockAgingData.items_count - stockAgingData.aged_30_days}</p>
+                        <p className="text-2xl font-bold">{safeStockAgingData.items_count - safeStockAgingData.aged_30_days}</p>
                         <p className="text-sm text-gray-600">Items in good condition</p>
                       </div>
                       <div className="space-y-2">
                         <h4 className="font-medium text-yellow-600">Aging Stock (30-90 days)</h4>
-                        <p className="text-2xl font-bold">{stockAgingData.aged_30_days - stockAgingData.aged_90_days}</p>
+                        <p className="text-2xl font-bold">{safeStockAgingData.aged_30_days - safeStockAgingData.aged_90_days}</p>
                         <p className="text-sm text-gray-600">Monitor for movement</p>
                       </div>
                       <div className="space-y-2">
                         <h4 className="font-medium text-red-600">Old Stock (90+ days)</h4>
-                        <p className="text-2xl font-bold">{stockAgingData.aged_90_days}</p>
+                        <p className="text-2xl font-bold">{safeStockAgingData.aged_90_days}</p>
                         <p className="text-sm text-gray-600">Requires immediate attention</p>
                       </div>
                     </div>
@@ -406,39 +438,39 @@ const Home = () => {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">Class A Items</span>
-                            <span className="text-sm text-gray-600">{financialMetrics.abcAnalysis.classA}%</span>
+                            <span className="text-sm text-gray-600">{safeFinancialMetrics.abcAnalysis.classA}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div className="bg-green-600 h-2 rounded-full" style={{ width: `${financialMetrics.abcAnalysis.classA}%` }}></div>
+                            <div className="bg-green-600 h-2 rounded-full" style={{ width: `${safeFinancialMetrics.abcAnalysis.classA}%` }}></div>
                           </div>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">Class B Items</span>
-                            <span className="text-sm text-gray-600">{financialMetrics.abcAnalysis.classB}%</span>
+                            <span className="text-sm text-gray-600">{safeFinancialMetrics.abcAnalysis.classB}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div className="bg-yellow-600 h-2 rounded-full" style={{ width: `${financialMetrics.abcAnalysis.classB}%` }}></div>
+                            <div className="bg-yellow-600 h-2 rounded-full" style={{ width: `${safeFinancialMetrics.abcAnalysis.classB}%` }}></div>
                           </div>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">Class C Items</span>
-                            <span className="text-sm text-gray-600">{financialMetrics.abcAnalysis.classC}%</span>
+                            <span className="text-sm text-gray-600">{safeFinancialMetrics.abcAnalysis.classC}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div className="bg-red-600 h-2 rounded-full" style={{ width: `${financialMetrics.abcAnalysis.classC}%` }}></div>
+                            <div className="bg-red-600 h-2 rounded-full" style={{ width: `${safeFinancialMetrics.abcAnalysis.classC}%` }}></div>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {stockAgingData.aged_90_days > 0 && (
+                    {safeStockAgingData.aged_90_days > 0 && (
                       <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                         <div className="flex items-center">
                           <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
                           <p className="text-red-800 font-medium">
-                            Action Required: {stockAgingData.aged_90_days} items have been in stock for over 90 days
+                            Action Required: {safeStockAgingData.aged_90_days} items have been in stock for over 90 days
                           </p>
                         </div>
                       </div>
