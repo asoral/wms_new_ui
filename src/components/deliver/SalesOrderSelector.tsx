@@ -160,9 +160,9 @@ const SalesOrderSelector = ({ onOrderSelected, loading }: SalesOrderSelectorProp
                     onClick={() => selectSalesOrder(so)}
                   >
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="font-medium text-gray-900">{so.name}</div>
-                        <div className="text-sm text-gray-600">{so.customer_name || so.customer}</div>
+                        <div className="text-sm text-gray-600 truncate">{so.customer_name || so.customer}</div>
                         <div className="flex items-center space-x-4 mt-1">
                           <Badge variant="outline" className="text-xs">
                             {so.status}
@@ -172,7 +172,7 @@ const SalesOrderSelector = ({ onOrderSelected, loading }: SalesOrderSelectorProp
                           </span>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right ml-2">
                         <div className="font-medium text-green-600">
                           ₹{(so.grand_total || 0).toLocaleString()}
                         </div>
@@ -210,8 +210,8 @@ const SalesOrderSelector = ({ onOrderSelected, loading }: SalesOrderSelectorProp
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <Package className="w-5 h-5 text-blue-600" />
                 </div>
-                <div>
-                  <div className="font-medium">{selectedSO.number}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{selectedSO.number}</div>
                   <div className="text-sm text-gray-600">Order Number</div>
                 </div>
               </div>
@@ -220,8 +220,8 @@ const SalesOrderSelector = ({ onOrderSelected, loading }: SalesOrderSelectorProp
                 <div className="p-2 bg-green-100 rounded-lg">
                   <User className="w-5 h-5 text-green-600" />
                 </div>
-                <div>
-                  <div className="font-medium truncate">{selectedSO.customer}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate" title={selectedSO.customer}>{selectedSO.customer}</div>
                   <div className="text-sm text-gray-600">Customer</div>
                 </div>
               </div>
@@ -230,7 +230,7 @@ const SalesOrderSelector = ({ onOrderSelected, loading }: SalesOrderSelectorProp
                 <div className="p-2 bg-orange-100 rounded-lg">
                   <Calendar className="w-5 h-5 text-orange-600" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="font-medium">
                     {new Date(selectedSO.deliveryDate).toLocaleDateString()}
                   </div>
@@ -242,7 +242,7 @@ const SalesOrderSelector = ({ onOrderSelected, loading }: SalesOrderSelectorProp
                 <div className="p-2 bg-purple-100 rounded-lg">
                   <DollarSign className="w-5 h-5 text-purple-600" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="font-medium">₹{selectedSO.totalValue.toLocaleString()}</div>
                   <div className="text-sm text-gray-600">Total Value</div>
                 </div>

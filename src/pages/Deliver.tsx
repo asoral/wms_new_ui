@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import SalesOrderSelector from "../components/deliver/SalesOrderSelector";
-import EnhancedDeliveryForm from "../components/deliver/EnhancedDeliveryForm";
+import DeliveryItemScanner from "../components/deliver/DeliveryItemScanner";
 import DeliveryTable from "../components/deliver/DeliveryTable";
 import DraftDeliveryNotes from "../components/deliver/DraftDeliveryNotes";
 
@@ -305,30 +306,26 @@ const Deliver = () => {
           {selectedSO && (
             <>
               <TabsContent value="deliver" className="space-y-6">
-                {/* Sales Order Summary */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <span>Delivering: {selectedSO.number}</span>
-                      <Badge>{selectedSO.status}</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="text-lg md:text-xl font-bold text-gray-900 break-words">{selectedSO.customer}</div>
+                {/* Sales Order Summary Card */}
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="text-center p-3 bg-white rounded-lg shadow-sm">
+                        <div className="text-xl font-bold text-gray-900 truncate" title={selectedSO.customer}>
+                          {selectedSO.customer}
+                        </div>
                         <div className="text-sm text-gray-600">Customer</div>
                       </div>
                       <div className="text-center p-3 bg-green-50 rounded-lg">
-                        <div className="text-xl md:text-2xl font-bold text-green-600">{selectedSO.totalItems}</div>
+                        <div className="text-xl font-bold text-green-600">{selectedSO.totalItems}</div>
                         <div className="text-sm text-gray-600">Total Items</div>
                       </div>
                       <div className="text-center p-3 bg-purple-50 rounded-lg">
-                        <div className="text-lg md:text-xl font-bold text-purple-600">₹{selectedSO.totalValue.toLocaleString()}</div>
+                        <div className="text-xl font-bold text-purple-600">₹{selectedSO.totalValue.toLocaleString()}</div>
                         <div className="text-sm text-gray-600">Total Value</div>
                       </div>
                       <div className="text-center p-3 bg-orange-50 rounded-lg">
-                        <div className="text-lg md:text-xl font-bold text-orange-600">
+                        <div className="text-xl font-bold text-orange-600">
                           {new Date(selectedSO.deliveryDate).toLocaleDateString()}
                         </div>
                         <div className="text-sm text-gray-600">Delivery Date</div>
@@ -337,11 +334,50 @@ const Deliver = () => {
                   </CardContent>
                 </Card>
 
-                {/* Enhanced Delivery Form */}
-                <EnhancedDeliveryForm 
+                {/* Item Scanner */}
+                <DeliveryItemScanner 
                   soItems={selectedSO.items}
                   onAddEntry={addDeliveryEntry}
                 />
+
+                {/* Sales Order Items Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Sales Order Items</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="text-left p-3 border text-sm font-medium">Item Code</th>
+                            <th className="text-left p-3 border text-sm font-medium">Item Name</th>
+                            <th className="text-left p-3 border text-sm font-medium">Ordered</th>
+                            <th className="text-left p-3 border text-sm font-medium">Received</th>
+                            <th className="text-left p-3 border text-sm font-medium">Pending</th>
+                            <th className="text-left p-3 border text-sm font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedSO.items.map((item, index) => (
+                            <tr key={index} className="border-b hover:bg-gray-50">
+                              <td className="p-3 border text-sm font-medium">{item.itemCode}</td>
+                              <td className="p-3 border text-sm">{item.itemName}</td>
+                              <td className="p-3 border text-sm">{item.orderedQty} {item.uom}</td>
+                              <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td>
+                              <td className="p-3 border text-sm">{item.pendingQty} {item.uom}</td>
+                              <td className="p-3 border text-sm">
+                                <Badge variant={item.pendingQty > 0 ? "default" : "secondary"}>
+                                  {item.pendingQty > 0 ? "Pending" : "Delivered"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Current Delivery Items */}
                 {deliveryEntries.length > 0 && (
