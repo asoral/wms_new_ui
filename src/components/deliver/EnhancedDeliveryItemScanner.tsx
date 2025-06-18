@@ -87,7 +87,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      const result = await erpnextAPI.getItemDetails(selectedItem.itemCode);
+      const result = await erpnextAPI.items.getItemDetails(selectedItem.itemCode);
       console.log('Item details:', result.data);
       setItemDetails(result.data);
     } catch (error) {
@@ -103,7 +103,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      const stockResult = await erpnextAPI.getCurrentStock(
+      const stockResult = await erpnextAPI.stock.getCurrentStock(
         selectedItem.itemCode,
         warehouse
       );
@@ -306,7 +306,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
           }))
         };
         
-        const bundleResult = await erpnextAPI.createSerialBatchBundle(bundleData);
+        const bundleResult = await erpnextAPI.stock.createSerialBatchBundle(bundleData);
         serialBatchBundle = bundleResult.data?.name;
       }
 

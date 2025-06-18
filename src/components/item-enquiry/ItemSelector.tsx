@@ -92,7 +92,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       }
 
       const defaultCompany = await getUserDefaultCompany();
-      console.log("default company:----->",defaultCompany)
+      console.log("default company:----->", defaultCompany);
       const limit = 50;
       
       let result;
@@ -102,22 +102,22 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
         if (/^[0-9]+$/.test(search) || search.length > 10) {
           // Try barcode search first
           try {
-            result = await erpnextAPI.stock.searchItemsByBarcode(search);
+            result = await erpnextAPI.items.searchItemsByBarcode(search);
             if (!result.data || result.data.length === 0) {
               // If barcode search fails, try regular search
-              result = await erpnextAPI.stock.searchItems(search, limit);
+              result = await erpnextAPI.items.searchItems(search, defaultCompany, limit);
             }
           } catch (error) {
             // Fallback to regular search
-            result = await erpnextAPI.stock.searchItems(search, limit);
+            result = await erpnextAPI.items.searchItems(search, defaultCompany, limit);
           }
         } else {
           // Regular text search
-          result = await erpnextAPI.stock.searchItems(search, limit);
+          result = await erpnextAPI.items.searchItems(search, defaultCompany, limit);
         }
       } else {
         console.log('Fetching initial items');
-        result = await erpnextAPI.stock.getItemsPaginated(undefined, undefined, limit, 1);
+        result = await erpnextAPI.items.getItemsPaginated(undefined, undefined, defaultCompany, limit, 1);
       }
       
       console.log('API result:', result);
