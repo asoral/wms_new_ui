@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +9,7 @@ import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import SalesOrderSelector from "../components/deliver/SalesOrderSelector";
-import DeliveryItemScanner from "../components/deliver/DeliveryItemScanner";
+import EnhancedDeliveryItemScanner from "../components/deliver/EnhancedDeliveryItemScanner";
 import DeliveryTable from "../components/deliver/DeliveryTable";
 import DraftDeliveryNotes from "../components/deliver/DraftDeliveryNotes";
 
@@ -238,16 +237,6 @@ const Deliver = () => {
     { label: 'Stock Transfer', icon: ArrowRight, action: () => navigate('/stock-entry') }
   ];
 
-  const tabsList = selectedSO 
-    ? ["dashboard", "deliver", "review"] 
-    : ["dashboard"];
-
-  const tabsLabels = {
-    dashboard: "Dashboard",
-    deliver: "Scan & Add Items", 
-    review: "Review & Submit"
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
@@ -272,12 +261,17 @@ const Deliver = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${selectedSO ? 'grid-cols-3' : 'grid-cols-1'}`}>
-            {tabsList.map((tab) => (
-              <TabsTrigger key={tab} value={tab} disabled={tab !== "dashboard" && !selectedSO}>
-                {tabsLabels[tab as keyof typeof tabsLabels]}
-              </TabsTrigger>
-            ))}
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="deliver" disabled={!selectedSO}>
+              Deliver Items
+            </TabsTrigger>
+            <TabsTrigger value="review" disabled={deliveryEntries.length === 0} className="relative">
+              Review & Submit
+              {deliveryEntries.length > 0 && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -334,8 +328,8 @@ const Deliver = () => {
                   </CardContent>
                 </Card>
 
-                {/* Item Scanner */}
-                <DeliveryItemScanner 
+                {/* Enhanced Item Scanner */}
+                <EnhancedDeliveryItemScanner 
                   soItems={selectedSO.items}
                   onAddEntry={addDeliveryEntry}
                 />
@@ -353,7 +347,7 @@ const Deliver = () => {
                             <th className="text-left p-3 border text-sm font-medium">Item Code</th>
                             <th className="text-left p-3 border text-sm font-medium">Item Name</th>
                             <th className="text-left p-3 border text-sm font-medium">Ordered</th>
-                            <th className="text-left p-3 border text-sm font-medium">Received</th>
+                            <th className="text-left p-3 border text-sm font-medium">Delivered</th>
                             <th className="text-left p-3 border text-sm font-medium">Pending</th>
                             <th className="text-left p-3 border text-sm font-medium">Status</th>
                           </tr>
@@ -378,32 +372,6 @@ const Deliver = () => {
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Current Delivery Items */}
-                {deliveryEntries.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Items to Deliver ({deliveryEntries.length})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <DeliveryTable entries={deliveryEntries} />
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Navigation */}
-                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-                  <Button variant="outline" onClick={() => {
-                    setSelectedSO(null);
-                    setActiveTab("dashboard");
-                    setDeliveryEntries([]);
-                  }}>
-                    Back to Dashboard
-                  </Button>
-                  <Button onClick={() => setActiveTab("review")} size="lg" disabled={deliveryEntries.length === 0}>
-                    Review & Submit ({deliveryEntries.length} items)
-                  </Button>
-                </div>
               </TabsContent>
 
               <TabsContent value="review" className="space-y-6">
