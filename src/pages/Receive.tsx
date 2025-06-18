@@ -85,7 +85,7 @@ const Receive = () => {
       // Transform ERPNext PO data to our interface
       const transformedPO: PurchaseOrder = {
         poNumber: po.name,
-        supplier: po.supplier_name || po.supplier,
+        supplier: po.supplier, // Use the supplier field directly from ERPNext
         date: po.schedule_date || po.transaction_date,
         totalAmount: po.grand_total || 0,
         status: po.status === 'To Receive' ? 'pending' : 
@@ -160,12 +160,17 @@ const Receive = () => {
 
       console.log('Processing entry with warehouse:', entryWithWarehouse);
 
+      // Get the company from the PO
+      const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
+      const company = poDetails.data.company;
+
       // If this is the first item, create a new Purchase Receipt
       if (!currentPurchaseReceipt) {
         console.log('Creating new Purchase Receipt...');
         
         const receiptData = {
-          supplier: selectedPO.supplier,
+          supplier: selectedPO.supplier, // This should now be the correct supplier ID
+          company: company, // Add company field
           posting_date: new Date().toISOString().split('T')[0],
           purchase_order: selectedPO.poNumber,
           set_posting_time: 1,
@@ -199,12 +204,13 @@ const Receive = () => {
       } else {
         console.log('Adding item to existing Purchase Receipt:', currentPurchaseReceipt);
         
-        // Fetch current receipt data using standard fetch API since we can't access protected getHeaders
+        // Fetch current receipt data using manual authentication
         const storedApiKey = localStorage.getItem('erpnextApiKey');
         const storedApiSecret = localStorage.getItem('erpnextApiSecret');
+        const storedBaseURL = localStorage.getItem('erpnextBaseURL');
         const authString = btoa(`${storedApiKey}:${storedApiSecret}`);
         
-        const currentReceiptResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`, {
+        const currentReceiptResponse = await fetch(`${storedBaseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`, {
           headers: {
             'Authorization': `Basic ${authString}`,
             'Content-Type': 'application/json'
