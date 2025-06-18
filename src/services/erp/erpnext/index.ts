@@ -7,15 +7,16 @@ import { ERPNextWarehouseAPI } from './warehouseApi';
 import { ERPNextBaseAPI } from './baseApi';
 
 export class ERPNextAPI {
-  private baseURL: string;
-  private apiKey: string;
-  private apiSecret: string;
+  public baseURL: string;
+  public apiKey: string;
+  public apiSecret: string;
 
   public sales: ERPNextSalesAPI;
   public stock: ERPNextStockAPI;
   public company: ERPNextCompanyAPI;
   public material: ERPNextMaterialAPI;
   public warehouse: ERPNextWarehouseAPI;
+  public purchase: ERPNextSalesAPI; // Reuse sales API for purchase orders
   private baseApi: ERPNextBaseAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
@@ -28,6 +29,7 @@ export class ERPNextAPI {
     this.company = new ERPNextCompanyAPI(baseURL, apiKey, apiSecret);
     this.material = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
     this.warehouse = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
+    this.purchase = new ERPNextSalesAPI(baseURL, apiKey, apiSecret); // Reuse for purchase operations
     this.baseApi = new ERPNextBaseAPI(baseURL, apiKey, apiSecret);
   }
 
@@ -42,6 +44,293 @@ export class ERPNextAPI {
 
   async getItems(filters?: any, company?: string, limitPageLength?: number) {
     return this.stock.getItems(filters, company, limitPageLength);
+  }
+
+  // Item methods
+  async searchItems(search: string, company?: string, limit?: number) {
+    return this.stock.searchItems(search, company, limit);
+  }
+
+  async searchItemsByBarcode(barcode: string) {
+    return this.stock.searchItemsByBarcode(barcode);
+  }
+
+  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit?: number, page?: number) {
+    return this.stock.getItemsPaginated(filters, fields, company, limit, page);
+  }
+
+  async getItemDetails(itemCode: string) {
+    return this.stock.getItemDetails(itemCode);
+  }
+
+  async getItemByBarcode(barcode: string) {
+    return this.stock.getItemByBarcode(barcode);
+  }
+
+  // Warehouse methods
+  async getWarehouses(filters?: any, company?: string) {
+    return this.warehouse.getWarehouses(filters, company);
+  }
+
+  // Stock methods
+  async getStockBalance(itemCode?: string, warehouse?: string) {
+    return this.stock.getStockBalance(itemCode, warehouse);
+  }
+
+  async getCurrentStock(itemCode: string, warehouse?: string, batch?: string, serial?: string) {
+    return this.stock.getCurrentStock(itemCode, warehouse, batch, serial);
+  }
+
+  async getBinStock(itemCode?: string, warehouse?: string) {
+    return this.stock.getBinStock(itemCode, warehouse);
+  }
+
+  // Sales methods
+  async getSalesOrders(filters?: any, company?: string, limitPageLength?: number) {
+    return this.sales.getSalesOrders(filters, company, limitPageLength);
+  }
+
+  async getSalesOrder(soNumber: string) {
+    return this.sales.getSalesOrder(soNumber);
+  }
+
+  async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
+    return this.sales.getDeliveryNotes(filters, company, limitPageLength);
+  }
+
+  async createDeliveryNote(deliveryData: any) {
+    return this.sales.createDeliveryNote(deliveryData);
+  }
+
+  async updateDeliveryNote(name: string, deliveryData: any) {
+    return this.sales.updateDeliveryNote(name, deliveryData);
+  }
+
+  // Purchase methods (using sales API structure)
+  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
+    const params = new URLSearchParams();
+    if (filters) {
+      params.append('filters', JSON.stringify(filters));
+    }
+    if (company) {
+      params.append('company', company);
+    }
+    if (limitPageLength) {
+      params.append('limit_page_length', limitPageLength.toString());
+    }
+
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order?${params}`, {
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase orders: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPurchaseOrder(poNumber: string) {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order/${poNumber}`, {
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase order: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
+    const params = new URLSearchParams();
+    if (filters) {
+      params.append('filters', JSON.stringify(filters));
+    }
+    if (company) {
+      params.append('company', company);
+    }
+    if (limitPageLength) {
+      params.append('limit_page_length', limitPageLength.toString());
+    }
+
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt?${params}`, {
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase receipts: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Placeholder methods for other missing functionality
+  async getMaterialRequests(filters?: any, company?: string) {
+    return { data: [] };
+  }
+
+  async getStockEntries(filters?: any, company?: string) {
+    return { data: [] };
+  }
+
+  async getPickLists(filters?: any, company?: string) {
+    return { data: [] };
+  }
+
+  async getPackingSlips(filters?: any, company?: string) {
+    return { data: [] };
+  }
+
+  async getQualityInspections(filters?: any, company?: string) {
+    return { data: [] };
+  }
+
+  async getProductBundles(filters?: any, company?: string) {
+    return { data: [] };
+  }
+
+  async getDashboardMetrics() {
+    return { data: {} };
+  }
+
+  async getOperationalMetrics() {
+    return { data: {} };
+  }
+
+  async getFinancialMetrics() {
+    return { data: {} };
+  }
+
+  async getStockAgingReport() {
+    return { data: [] };
+  }
+
+  async getRecentActivities() {
+    return { data: [] };
+  }
+
+  // Stock reconciliation methods
+  async createStockReconciliation(reconciliationData: any) {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(reconciliationData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create stock reconciliation: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async updateStockReconciliation(name: string, reconciliationData: any) {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(reconciliationData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update stock reconciliation: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Validation methods
+  async validateBatch(batchNo: string, itemCode: string): Promise<boolean> {
+    try {
+      // Check if batch exists
+      const response = await fetch(`${this.baseURL}/api/resource/Batch/${encodeURIComponent(batchNo)}`, {
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        return true; // Batch exists
+      }
+
+      // Create new batch if it doesn't exist
+      const createResponse = await fetch(`${this.baseURL}/api/resource/Batch`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          batch_id: batchNo,
+          item: itemCode
+        })
+      });
+
+      return createResponse.ok;
+    } catch (error) {
+      console.error('Error validating/creating batch:', error);
+      return false;
+    }
+  }
+
+  async validateSerial(serialNo: string, itemCode: string, warehouse?: string): Promise<boolean> {
+    try {
+      // Check if serial exists
+      const response = await fetch(`${this.baseURL}/api/resource/Serial No/${encodeURIComponent(serialNo)}`, {
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        return true; // Serial exists
+      }
+
+      // Create new serial if it doesn't exist
+      const createResponse = await fetch(`${this.baseURL}/api/resource/Serial No`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          serial_no: serialNo,
+          item_code: itemCode,
+          warehouse: warehouse
+        })
+      });
+
+      return createResponse.ok;
+    } catch (error) {
+      console.error('Error validating/creating serial:', error);
+      return false;
+    }
   }
 }
 
