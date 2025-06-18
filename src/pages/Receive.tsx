@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,8 +70,8 @@ const Receive = () => {
         return;
       }
 
-      // Fetch PO data from ERPNext
-      const poResult = await erpnextAPI.getPurchaseOrder(poNumber);
+      // Fetch PO data from ERPNext - use purchase API
+      const poResult = await erpnextAPI.purchase.getPurchaseOrder(poNumber);
       if (!poResult.data) {
         toast({
           title: "Purchase Order Not Found",
@@ -177,7 +176,7 @@ const Receive = () => {
       console.log('Processing entry with warehouse and PO item reference:', entryWithWarehouse);
 
       // Get the company from the PO
-      const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
+      const poDetails = await erpnextAPI.purchase.getPurchaseOrder(selectedPO.poNumber);
       const company = poDetails.data.company;
 
       // Ensure batch exists if batch tracking is used
@@ -319,7 +318,7 @@ const Receive = () => {
         return;
       }
 
-      // Submit the Purchase Receipt
+      // Submit the Purchase Receipt using purchase API
       await erpnextAPI.purchase.submitPurchaseReceipt(currentPurchaseReceipt);
       
       toast({

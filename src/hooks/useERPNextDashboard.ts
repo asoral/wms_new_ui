@@ -1,61 +1,114 @@
 
 import { useState, useEffect } from 'react';
-import { createERPNextAPI } from '@/services/erpnextApi';
+import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
+import { useToast } from './use-toast';
 
-interface DashboardStats {
-  totalItems: number;
-  lowStockItems: number;
-  pendingOrders: number;
-  totalWarehouses: number;
+interface DashboardData {
+  warehouses: number;
+  salesOrders: number;
+  totalStock: number;
+  pendingDelivery: number;
+  pendingReceive: number;
+  itemsOutOfStock: number;
+  company: string | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
-export const useERPNextDashboard = () => {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalItems: 0,
-    lowStockItems: 0,
-    pendingOrders: 0,
-    totalWarehouses: 0
+export function useERPNextDashboard() {
+  const [data, setData] = useState<DashboardData>({
+    warehouses: 0,
+    salesOrders: 0,
+    totalStock: 0,
+    pendingDelivery: 0,
+    pendingReceive: 0,
+    itemsOutOfStock: 0,
+    company: null,
+    isLoading: true,
+    error: null,
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const { toast } = useToast();
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    async function fetchDashboardData() {
       try {
-        setIsLoading(true);
-        const erpnextAPI = await createERPNextAPI();
-        
-        if (!erpnextAPI) {
-          setError('ERPNext API not configured');
+        const api = await createERPNextAPI();
+        if (!api) {
+          setData(prev => ({ ...prev, isLoading: false, error: 'ERPNext API not configured' }));
           return;
         }
 
-        // Fetch various data for dashboard using the new API structure
-        const [itemsResponse, warehousesResponse, ordersResponse, stockBalanceResponse] = await Promise.all([
-          erpnextAPI.getItems(),
-          erpnextAPI.getWarehouses(),
-          erpnextAPI.getSalesOrders([['status', '=', 'Draft']]),
-          erpnextAPI.getStockBalance({ actual_qty: ['<', 10] })
+        const company = await getUserDefaultCompany();
+
+        // Fetch data in parallel
+        const [warehousesRes, salesOrdersRes, stockBalanceRes] = await Promise.all([
+          api.warehouse.getWarehouses({}, company),
+          api.sales.getSalesOrders({}, company),
+          api.stock.getStockBalance('', '') // Empty string parameters for getting all stock
         ]);
 
-        setStats({
-          totalItems: itemsResponse.data?.length || 0,
-          lowStockItems: stockBalanceResponse.data?.length || 0,
-          pendingOrders: ordersResponse.data?.length || 0,
-          totalWarehouses: warehousesResponse.data?.length || 0
-        });
+        // Calculate dashboard metrics
+        const warehousesCount = warehousesRes?.data?.length || 0;
+        const salesOrdersCount = salesOrdersRes?.data?.length || 0;
         
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
-      } finally {
-        setIsLoading(false);
+        // Process stock data
+        let totalStock = 0;
+        let outOfStockCount = 0;
+        
+        if (stockBalanceRes?.data) {
+          for (const item of stockBalanceRes.data) {
+            const qty = parseFloat(item.actual_qty || '0');
+            totalStock += qty;
+            if (qty <= 0) outOfStockCount++;
+          }
+        }
+
+        // Get pending deliveries from sales orders
+        let pendingDeliveryCount = 0;
+        if (salesOrdersRes?.data) {
+          pendingDeliveryCount = salesOrdersRes.data.filter(
+            (so: any) => ['To Deliver', 'To Deliver and Bill'].includes(so.status)
+          ).length;
+        }
+
+        // Get pending purchase receipts
+        const purchaseOrdersRes = await api.purchase.getPurchaseOrders({ 
+          status: ['To Receive', 'To Receive and Bill']
+        }, company);
+        
+        const pendingReceiveCount = purchaseOrdersRes?.data?.length || 0;
+
+        setData({
+          warehouses: warehousesCount,
+          salesOrders: salesOrdersCount,
+          totalStock,
+          pendingDelivery: pendingDeliveryCount,
+          pendingReceive: pendingReceiveCount,
+          itemsOutOfStock: outOfStockCount,
+          company,
+          isLoading: false,
+          error: null,
+        });
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        setData(prev => ({
+          ...prev,
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }));
+        
+        toast({
+          title: 'Error',
+          description: 'Failed to load dashboard data from ERPNext',
+          variant: 'destructive',
+        });
       }
-    };
+    }
 
     fetchDashboardData();
-  }, []);
+  }, [toast]);
 
-  return { stats, isLoading, error };
-};
+  return data;
+}

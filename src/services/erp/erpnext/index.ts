@@ -5,6 +5,7 @@ import { ERPNextCompanyAPI } from './companyApi';
 import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextWarehouseAPI } from './warehouseApi';
 import { ERPNextBaseAPI } from './baseApi';
+import { ERPNextPurchaseAPI } from './purchaseApi';
 
 export class ERPNextAPI {
   public baseURL: string;
@@ -16,7 +17,7 @@ export class ERPNextAPI {
   public company: ERPNextCompanyAPI;
   public material: ERPNextMaterialAPI;
   public warehouse: ERPNextWarehouseAPI;
-  public purchase: ERPNextSalesAPI; // Reuse sales API for purchase orders
+  public purchase: ERPNextPurchaseAPI; // Use proper PurchaseAPI
   private baseApi: ERPNextBaseAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
@@ -29,7 +30,7 @@ export class ERPNextAPI {
     this.company = new ERPNextCompanyAPI(baseURL, apiKey, apiSecret);
     this.material = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
     this.warehouse = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
-    this.purchase = new ERPNextSalesAPI(baseURL, apiKey, apiSecret); // Reuse for purchase operations
+    this.purchase = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret); // Use proper PurchaseAPI
     this.baseApi = new ERPNextBaseAPI(baseURL, apiKey, apiSecret);
   }
 
@@ -106,75 +107,21 @@ export class ERPNextAPI {
     return this.sales.updateDeliveryNote(name, deliveryData);
   }
 
-  // Purchase methods (using sales API structure)
+  // Purchase methods - forward to purchase API
   async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
-    const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
-    if (company) {
-      params.append('company', company);
-    }
-    if (limitPageLength) {
-      params.append('limit_page_length', limitPageLength.toString());
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order?${params}`, {
-      headers: {
-        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch purchase orders: ${response.statusText}`);
-    }
-
-    return response.json();
+    return this.purchase.getPurchaseOrders(filters, company, limitPageLength);
   }
 
   async getPurchaseOrder(poNumber: string) {
-    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order/${poNumber}`, {
-      headers: {
-        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch purchase order: ${response.statusText}`);
-    }
-
-    return response.json();
+    return this.purchase.getPurchaseOrder(poNumber);
   }
 
   async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
-    const params = new URLSearchParams();
-    if (filters) {
-      params.append('filters', JSON.stringify(filters));
-    }
-    if (company) {
-      params.append('company', company);
-    }
-    if (limitPageLength) {
-      params.append('limit_page_length', limitPageLength.toString());
-    }
+    return this.purchase.getPurchaseReceipts(filters, company, limitPageLength);
+  }
 
-    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt?${params}`, {
-      headers: {
-        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch purchase receipts: ${response.statusText}`);
-    }
-
-    return response.json();
+  async getPurchaseReceipt(receiptNumber: string) {
+    return this.purchase.getPurchaseReceipt(receiptNumber);
   }
 
   // Placeholder methods for other missing functionality
