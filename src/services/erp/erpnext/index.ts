@@ -43,25 +43,22 @@ export class ERPNextAPI {
     return this.company.getCompanies();
   }
 
-  async getItems(filters?: any, company?: string, limitPageLength?: number) {
-    // Use user's default company if no company specified
-    const effectiveCompany = company || await this.getUserDefaultCompany();
-    return this.stock.getItems(filters || {}, effectiveCompany, limitPageLength);
+  // Items don't have company field, so we remove company parameter from item methods
+  async getItems(filters?: any, limitPageLength?: number) {
+    return this.stock.getItems(filters || {}, limitPageLength);
   }
 
   // Item methods
-  async searchItems(search: string, company?: string, limit?: number) {
-    const effectiveCompany = company || await this.getUserDefaultCompany();
-    return this.stock.searchItems(search, effectiveCompany, limit);
+  async searchItems(search: string, limit?: number) {
+    return this.stock.searchItems(search, limit);
   }
 
   async searchItemsByBarcode(barcode: string) {
     return this.stock.searchItemsByBarcode(barcode);
   }
 
-  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit?: number, page?: number) {
-    const effectiveCompany = company || await this.getUserDefaultCompany();
-    return this.stock.getItemsPaginated(filters, fields, effectiveCompany, limit, page);
+  async getItemsPaginated(filters?: any, fields?: string[], limit?: number, page?: number) {
+    return this.stock.getItemsPaginated(filters, fields, limit, page);
   }
 
   async getItemDetails(itemCode: string) {
@@ -72,13 +69,13 @@ export class ERPNextAPI {
     return this.stock.getItemByBarcode(barcode);
   }
 
-  // Warehouse methods
+  // Warehouse methods - warehouses have company field
   async getWarehouses(filters?: any, company?: string) {
     const effectiveCompany = company || await this.getUserDefaultCompany();
     return this.warehouse.getWarehouses(filters || {}, effectiveCompany);
   }
 
-  // Stock methods
+  // Stock methods - filter by company through warehouses
   async getStockBalance(itemCode?: string, warehouse?: string) {
     const effectiveCompany = await this.getUserDefaultCompany();
     return this.stock.getStockBalance(itemCode, effectiveCompany, warehouse);
@@ -89,7 +86,8 @@ export class ERPNextAPI {
   }
 
   async getBinStock(itemCode?: string, warehouse?: string) {
-    return this.stock.getBinStock(itemCode, warehouse);
+    const effectiveCompany = await this.getUserDefaultCompany();
+    return this.stock.getBinStock(itemCode, warehouse, effectiveCompany);
   }
 
   // Sales methods

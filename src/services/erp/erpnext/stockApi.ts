@@ -11,12 +11,22 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         filters.push(['item_code', '=', itemCode]);
       }
 
-      if (company) {
-        filters.push(['company', '=', company]);
+      if (warehouse) {
+        filters.push(['warehouse', '=', warehouse]);
       }
 
-       if (warehouse) {
-        filters.push(['warehouse', '=', warehouse]);
+      // If company is provided but no specific warehouse, get all warehouses for that company first
+      if (company && !warehouse) {
+        // Get warehouses for the company first
+        const warehouseResponse = await this.get('/api/resource/Warehouse', {
+          filters: JSON.stringify([['company', '=', company], ['disabled', '=', 0]]),
+          fields: JSON.stringify(['name'])
+        });
+        
+        if (warehouseResponse.data?.data && warehouseResponse.data.data.length > 0) {
+          const warehouseNames = warehouseResponse.data.data.map((w: any) => w.name);
+          filters.push(['warehouse', 'in', warehouseNames]);
+        }
       }
 
       const result = await this.get('/api/resource/Stock Balance', {
@@ -138,14 +148,10 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     }
   }
 
-  async getItems(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<Item[]>> {
+  async getItems(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<Item[]>> {
     let finalFilters = [];
     if (filters) {
       finalFilters = this.convertToFrappeFilters(filters);
-    }
-    
-    if (company) {
-      finalFilters.push(['company', '=', company]);
     }
     
     const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
@@ -161,17 +167,13 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-  async searchItems(search: string, company?: string, limit?: number): Promise<ERPNextResponse<Item[]>> {
+  async searchItems(search: string, limit?: number): Promise<ERPNextResponse<Item[]>> {
     const filters = [
       ['item_code', 'like', `%${search}%`],
       ['item_name', 'like', `%${search}%`]
     ];
     
-    if (company) {
-      filters.push(['company', '=', company]);
-    }
-    
-    return this.getItems({ filters }, company, limit);
+    return this.getItems({ filters }, limit);
   }
 
   async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
@@ -179,8 +181,8 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return this.getItems({ filters });
   }
 
-  async getItemsPaginated(filters?: any, fields?: string[], company?: string, limit?: number, page?: number): Promise<ERPNextResponse<Item[]>> {
-    return this.getItems(filters, company, limit);
+  async getItemsPaginated(filters?: any, fields?: string[], limit?: number, page?: number): Promise<ERPNextResponse<Item[]>> {
+    return this.getItems(filters, limit);
   }
 
   async getItemDetails(itemCode: string): Promise<ERPNextResponse<Item>> {
@@ -203,12 +205,24 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     throw new Error('Item not found');
   }
 
-  async getBinStock(itemCode?: string, warehouse?: string): Promise<ERPNextResponse<any[]>> {
+  async getBinStock(itemCode?: string, warehouse?: string, company?: string): Promise<ERPNextResponse<any[]>> {
     const filters = [];
     if (itemCode) {
       filters.push(['item_code', '=', itemCode]);
     }
-    if (warehouse) {
+    
+    // If company is provided, get warehouses for that company first
+    if (company && !warehouse) {
+      const warehouseResponse = await this.get('/api/resource/Warehouse', {
+        filters: JSON.stringify([['company', '=', company], ['disabled', '=', 0]]),
+        fields: JSON.stringify(['name'])
+      });
+      
+      if (warehouseResponse.data?.data && warehouseResponse.data.data.length > 0) {
+        const warehouseNames = warehouseResponse.data.data.map((w: any) => w.name);
+        filters.push(['warehouse', 'in', warehouseNames]);
+      }
+    } else if (warehouse) {
       filters.push(['warehouse', '=', warehouse]);
     }
 
