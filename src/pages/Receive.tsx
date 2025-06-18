@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -198,9 +199,16 @@ const Receive = () => {
       } else {
         console.log('Adding item to existing Purchase Receipt:', currentPurchaseReceipt);
         
-        // Fetch current receipt data
+        // Fetch current receipt data using standard fetch API since we can't access protected getHeaders
+        const storedApiKey = localStorage.getItem('erpnextApiKey');
+        const storedApiSecret = localStorage.getItem('erpnextApiSecret');
+        const authString = btoa(`${storedApiKey}:${storedApiSecret}`);
+        
         const currentReceiptResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`, {
-          headers: erpnextAPI.getHeaders(),
+          headers: {
+            'Authorization': `Basic ${authString}`,
+            'Content-Type': 'application/json'
+          },
         });
         
         if (!currentReceiptResponse.ok) {

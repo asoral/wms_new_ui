@@ -3,219 +3,203 @@ import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, StockEntry } from './types';
 
 export class ERPNextStockAPI extends ERPNextBaseAPI {
-  async getStockBalance(filters?: any, company?: string): Promise<ERPNextResponse<StockBalance[]>> {
-    let finalFilters = this.convertToFrappeFilters(filters);
-    
-    // If company is specified, get warehouses for that company first
+  /**
+   * Fetch stock balance with optional filters
+   */
+  async getStockBalance(
+    filters: Record<string, any> = {},
+    company?: string
+  ): Promise<ERPNextResponse<StockBalance[]>> {
+    const conditions: any[] = this.convertToFrappeFilters(filters);
     if (company) {
-      try {
-        const warehouseResponse = await fetch(`${this.baseURL}/api/resource/Warehouse?filters=${JSON.stringify([['company', '=', company]])}&fields=["name"]&limit_page_length=1000`, {
-          headers: this.getHeaders(),
-        });
-        
-        if (warehouseResponse.ok) {
-          const warehouseData = await warehouseResponse.json();
-          if (warehouseData.data && warehouseData.data.length > 0) {
-            const warehouseNames = warehouseData.data.map((w: any) => w.name);
-            finalFilters.push(['warehouse', 'in', warehouseNames]);
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to fetch warehouses for company filter:', error);
-      }
+      conditions.push(['company', '=', company]);
     }
-    
-    const params = this.buildQueryParams(finalFilters, undefined, 1000);
 
-    const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
-      headers: this.getHeaders(),
-    });
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(conditions));
 
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Stock Balance?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
     if (!response.ok) {
       throw new Error(`Failed to fetch stock balance: ${response.statusText}`);
     }
-
     return response.json();
   }
 
-  async getBinStock(filters?: any): Promise<ERPNextResponse<any[]>> {
-    const finalFilters = this.convertToFrappeFilters(filters);
+  /**
+   * Fetch bin stock data
+   */
+  async getBinStock(filters: Record<string, any> = {}): Promise<ERPNextResponse<any[]>> {
+    const conditions: any[] = this.convertToFrappeFilters(filters);
 
-    const filtersParam = `filters=${encodeURIComponent(JSON.stringify(finalFilters))}`;
-    
-    const fields = [
-      "name",
-      "actual_qty",
-      "item_code",
-      "warehouse",
-      "valuation_rate",
-      "stock_value"
-    ];
-    const fieldsParam = `fields=${encodeURIComponent(JSON.stringify(fields))}`;
-    const limitParam = `limit_page_length=1000`;
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(conditions));
 
-    const url = `${this.baseURL}/api/resource/Bin?${filtersParam}&${fieldsParam}&${limitParam}`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: this.getHeaders(),
-    });
-
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Bin?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to fetch bin stock: ${response.status} ${response.statusText} - ${errorText}`
-      );
+      throw new Error(`Failed to fetch bin stock: ${response.statusText}`);
     }
-
     return response.json();
   }
 
-  async getCurrentStock(itemCode: string, warehouse: string, batch?: string, serial?: string): Promise<ERPNextResponse<any>> {
-    const filters = [
-      ['item_code', '=', itemCode],
-      ['warehouse', '=', warehouse]
-    ];
+  /**
+   * Get current stock for a specific item, warehouse, batch, and serial
+   */
+  async getCurrentStock(
+    itemCode: string,
+    warehouse: string,
+    batch?: string,
+    serial?: string
+  ): Promise<ERPNextResponse<any>> {
+    const params = new URLSearchParams();
+    params.append('item_code', itemCode);
+    params.append('warehouse', warehouse);
+    if (batch) params.append('batch_no', batch);
+    if (serial) params.append('serial_no', serial);
 
-    if (batch) {
-      filters.push(['batch_no', '=', batch]);
-    }
-    if (serial) {
-      filters.push(['serial_no', '=', serial]);
-    }
-
-    const params = this.buildQueryParams(filters);
-
-    const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
-      headers: this.getHeaders(),
-    });
-
+    const response = await fetch(
+      `${this.baseURL}/api/method/erpnext.stock.utils.get_stock_balance?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
     if (!response.ok) {
       throw new Error(`Failed to fetch current stock: ${response.statusText}`);
     }
-
     return response.json();
   }
 
-  async getStockLedgerEntries(filters?: any, company?: string): Promise<ERPNextResponse<any[]>> {
-    let finalFilters = this.convertToFrappeFilters(filters);
+  /**
+   * Fetch stock ledger entries
+   */
+  async getStockLedgerEntries(
+    filters: Record<string, any> = {},
+    company?: string
+  ): Promise<ERPNextResponse<any[]>> {
+    const conditions: any[] = this.convertToFrappeFilters(filters);
     if (company) {
-      finalFilters.push(['company', '=', company]);
+      conditions.push(['company', '=', company]);
     }
-    
-    const params = this.buildQueryParams(finalFilters);
 
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Ledger Entry?${params}`, {
-      headers: this.getHeaders(),
-    });
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(conditions));
 
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Stock Ledger Entry?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
     if (!response.ok) {
       throw new Error(`Failed to fetch stock ledger entries: ${response.statusText}`);
     }
-
     return response.json();
   }
 
-  async getStockAgingReport(filters?: any): Promise<ERPNextResponse<any[]>> {
-    try {
-      // Prepare filters for the Stock Ageing report
-      const reportFilters: any = {};
-      
-      // Set default date range if not provided
-      const today = new Date();
-      const fromDate = new Date(today.getFullYear(), 0, 1); // Start of current year
-      
-      reportFilters.from_date = fromDate.toISOString().split('T')[0];
-      reportFilters.to_date = today.toISOString().split('T')[0];
-      
-      // Add any additional filters
-      if (filters) {
-        Object.assign(reportFilters, filters);
-      }
-
-      console.log('Running Stock Ageing report with filters:', reportFilters);
-      
-      // Use the generic report runner
-      const result = await this.runReport('Stock Ageing', reportFilters);
-      
-      console.log('Stock Ageing report result:', result);
-      
-      // Transform the report data to match expected format with proper null checks
-      if (result && typeof result === 'object') {
-        const message = result.message;
-        if (message && typeof message === 'object' && 'result' in message && Array.isArray((message as any).result)) {
-          return {
-            data: (message as any).result
-          };
-        }
-      }
-      
-      // If result has data directly
-      if (result && typeof result === 'object' && 'data' in result && Array.isArray((result as any).data)) {
-        return {
-          data: (result as any).data
-        };
-      }
-      
-      return { data: [] };
-      
-    } catch (error) {
-      console.error('Failed to fetch stock aging report:', error);
-      // Return empty data if there's an error instead of throwing
-      return { data: [] };
-    }
-  }
-
-  async getStockEntries(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<StockEntry[]>> {
-    let finalFilters = this.convertToFrappeFilters(filters);
-    if (company) {
-      finalFilters.push(['company', '=', company]);
-    }
+  /**
+   * Get stock aging report
+   */
+  async getStockAgingReport(filters: Record<string, any> = {}): Promise<ERPNextResponse<any[]>> {
+    const params = new URLSearchParams();
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
-
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry?${params}`, {
-      headers: this.getHeaders(),
+    // Add filters to params
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        params.append(key, String(value));
+      }
     });
 
+    const response = await fetch(
+      `${this.baseURL}/api/method/erpnext.stock.report.stock_ageing.stock_ageing.execute?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock aging report: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    
+    // Handle the response format from stock aging report
+    if (result.message && Array.isArray(result.message)) {
+      return {
+        data: result.message,
+        message: result.message || 'Stock aging report fetched successfully'
+      };
+    }
+    
+    return result;
+  }
+
+  /**
+   * Fetch stock entries with optional filters
+   */
+  async getStockEntries(
+    filters: Record<string, any> = {},
+    company?: string,
+    limitPageLength: number = 20
+  ): Promise<ERPNextResponse<StockEntry[]>> {
+    const conditions: any[] = this.convertToFrappeFilters(filters);
+    if (company) {
+      conditions.push(['company', '=', company]);
+    }
+
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(conditions));
+    params.append('limit_page_length', String(limitPageLength));
+
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Stock Entry?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
     if (!response.ok) {
       throw new Error(`Failed to fetch stock entries: ${response.statusText}`);
     }
-
     return response.json();
   }
 
-  async createStockReconciliation(reconciliationData: any, company?: string): Promise<ERPNextResponse<any>> {
-    // Add company to reconciliation data if provided
-    const finalData = { ...reconciliationData };
-    if (company) {
-      finalData.company = company;
-    }
-
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(finalData),
-    });
-
+  /**
+   * Create a new Stock Reconciliation
+   */
+  async createStockReconciliation(reconciliationData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Stock Reconciliation`,
+      {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(reconciliationData)
+      }
+    );
     if (!response.ok) {
-      throw new Error(`Failed to create stock reconciliation: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to create stock reconciliation: ${response.status} ${response.statusText} - ${errorText}`);
     }
-
     return response.json();
   }
 
+  /**
+   * Update an existing Stock Reconciliation
+   */
   async updateStockReconciliation(name: string, reconciliationData: any): Promise<ERPNextResponse<any>> {
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation/${name}`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify(reconciliationData),
-    });
-
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Stock Reconciliation/${encodeURIComponent(name)}`,
+      {
+        method: 'PUT',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(reconciliationData)
+      }
+    );
     if (!response.ok) {
-      throw new Error(`Failed to update stock reconciliation: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to update stock reconciliation: ${response.status} ${response.statusText} - ${errorText}`);
     }
-
     return response.json();
   }
 }
