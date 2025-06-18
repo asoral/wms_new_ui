@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -101,22 +102,22 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
         if (/^[0-9]+$/.test(search) || search.length > 10) {
           // Try barcode search first
           try {
-            result = await erpnextAPI.items.searchItemsByBarcode(search);
+            result = await erpnextAPI.searchItemsByBarcode(search);
             if (!result.data || result.data.length === 0) {
               // If barcode search fails, try regular search
-              result = await erpnextAPI.items.searchItems(search, defaultCompany, limit);
+              result = await erpnextAPI.searchItems(search, limit);
             }
           } catch (error) {
             // Fallback to regular search
-            result = await erpnextAPI.items.searchItems(search, defaultCompany, limit);
+            result = await erpnextAPI.searchItems(search, limit);
           }
         } else {
           // Regular text search
-          result = await erpnextAPI.items.searchItems(search, defaultCompany, limit);
+          result = await erpnextAPI.searchItems(search, limit);
         }
       } else {
         console.log('Fetching initial items');
-        result = await erpnextAPI.items.getItemsPaginated(undefined, undefined, defaultCompany, limit, 1);
+        result = await erpnextAPI.getItemsPaginated(undefined, undefined, limit, 1);
       }
       
       console.log('API result:', result);
