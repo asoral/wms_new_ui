@@ -48,6 +48,7 @@ export interface DeliveryEntry {
   actualQty: number;
   rate: number;
   uom: string;
+  serial_batch_bundle?: string;
 }
 
 const Deliver = () => {
@@ -172,13 +173,26 @@ const Deliver = () => {
       const company = await getUserDefaultCompany();
       console.log('Creating delivery note for company:', company);
 
-      // Create delivery note data
+      // Get the actual sales order to get the correct customer reference
+      const salesOrderResult = await erpnextAPI.sales.getSalesOrder(selectedSO.number);
+      const actualCustomer = salesOrderResult.data?.customer;
+
+      if (!actualCustomer) {
+        toast({
+          title: "Error",
+          description: "Could not find customer from sales order",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create delivery note data in draft status
       const deliveryData = {
-        customer: selectedSO.customer,
+        customer: actualCustomer,
         company: company,
         posting_date: new Date().toISOString().split('T')[0],
-        against_sales_order: selectedSO.number,
         set_posting_time: 1,
+        docstatus: 0, // Draft status
         items: deliveryEntries.map(entry => ({
           item_code: entry.itemCode,
           qty: entry.qtyToDeliver,
@@ -187,7 +201,8 @@ const Deliver = () => {
           uom: entry.uom,
           against_sales_order: selectedSO.number,
           ...(entry.batch && { batch_no: entry.batch }),
-          ...(entry.serial && { serial_no: entry.serial })
+          ...(entry.serial && { serial_no: entry.serial }),
+          ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })
         }))
       };
 
@@ -198,7 +213,7 @@ const Deliver = () => {
         await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, deliveryData);
         toast({
           title: "Success",
-          description: `Delivery note ${currentDeliveryNote} updated successfully!`,
+          description: `Draft delivery note ${currentDeliveryNote} updated successfully!`,
         });
       } else {
         // Create new delivery note
@@ -206,7 +221,7 @@ const Deliver = () => {
         console.log('Delivery note created:', result);
         toast({
           title: "Success",
-          description: `Delivery note ${result.data?.name} created successfully!`,
+          description: `Draft delivery note ${result.data?.name} created successfully!`,
         });
       }
       

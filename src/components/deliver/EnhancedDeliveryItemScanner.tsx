@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -87,7 +86,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      const result = await erpnextAPI.items.getItemDetails(selectedItem.itemCode);
+      const result = await erpnextAPI.getItemDetails(selectedItem.itemCode);
       console.log('Item details:', result.data);
       setItemDetails(result.data);
     } catch (error) {
@@ -103,7 +102,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      const stockResult = await erpnextAPI.stock.getCurrentStock(
+      const stockResult = await erpnextAPI.getCurrentStock(
         selectedItem.itemCode,
         warehouse
       );
