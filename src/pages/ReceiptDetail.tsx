@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Package, CheckCircle } from "lucide-react";
+import { ArrowLeft, Package, CheckCircle, Truck } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +40,7 @@ const ReceiptDetail = () => {
   const [receipt, setReceipt] = useState<ReceiptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState("details");
 
   useEffect(() => {
     if (receiptName) {
@@ -201,96 +202,188 @@ const ReceiptDetail = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Drafts
             </Button>
-            <Package className="w-6 h-6 text-blue-600" />
+            <Truck className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Purchase Receipt: {receipt.name}</h1>
           </div>
           {receipt.docstatus === 0 && (
-            <Button onClick={handleSubmitReceipt} disabled={submitting}>
-              <CheckCircle className="w-4 h-4 mr-2" />
-              {submitting ? 'Submitting...' : 'Submit Receipt'}
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Badge variant="outline">{receipt.name}</Badge>
+              <Button onClick={handleSubmitReceipt} disabled={submitting}>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                {submitting ? 'Submitting...' : 'Submit Receipt'}
+              </Button>
+            </div>
           )}
         </div>
 
-        {/* Receipt Summary */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              Purchase Receipt Details
-              <Badge variant={receipt.docstatus === 0 ? 'destructive' : 'default'}>
-                {receipt.status}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-gray-600">Receipt Number</p>
-                <p className="font-medium">{receipt.name}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Supplier</p>
-                <p className="font-medium">{receipt.supplier_name}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Date</p>
-                <p className="font-medium">{receipt.posting_date}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Total Amount</p>
-                <p className="font-medium">₹{receipt.grand_total.toLocaleString()}</p>
-              </div>
-              {receipt.purchase_order && (
-                <div>
-                  <p className="text-gray-600">PO Reference</p>
-                  <p className="font-medium">{receipt.purchase_order}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-gray-600">Company</p>
-                <p className="font-medium">{receipt.company}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details">Receipt Details</TabsTrigger>
+            <TabsTrigger value="review">Review & Submit</TabsTrigger>
+          </TabsList>
 
-        {/* Items Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Items ({receipt.items.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item Code</TableHead>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Rate</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Warehouse</TableHead>
-                  <TableHead>Batch/Serial</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {receipt.items.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{item.item_code}</TableCell>
-                    <TableCell>{item.item_name}</TableCell>
-                    <TableCell>{item.qty}</TableCell>
-                    <TableCell>₹{item.rate.toLocaleString()}</TableCell>
-                    <TableCell>₹{item.amount.toLocaleString()}</TableCell>
-                    <TableCell>{item.warehouse}</TableCell>
-                    <TableCell>
-                      {item.batch_no && <Badge variant="outline" className="mr-1">B: {item.batch_no}</Badge>}
-                      {item.serial_no && <Badge variant="outline">S: {item.serial_no}</Badge>}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          <TabsContent value="details">
+            <div className="space-y-6">
+              {/* Purchase Receipt Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    Purchase Receipt Details
+                    <Badge variant={receipt.docstatus === 0 ? 'destructive' : 'default'}>
+                      {receipt.status}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600">Receipt Number</p>
+                      <p className="font-medium">{receipt.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Supplier</p>
+                      <p className="font-medium">{receipt.supplier_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Date</p>
+                      <p className="font-medium">{receipt.posting_date}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Total Amount</p>
+                      <p className="font-medium">₹{receipt.grand_total.toLocaleString()}</p>
+                    </div>
+                    {receipt.purchase_order && (
+                      <div>
+                        <p className="text-gray-600">PO Reference</p>
+                        <p className="font-medium">{receipt.purchase_order}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-gray-600">Company</p>
+                      <p className="font-medium">{receipt.company}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Items Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Purchase Order Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item Code</TableHead>
+                          <TableHead>Item Name</TableHead>
+                          <TableHead>Ordered</TableHead>
+                          <TableHead>Received</TableHead>
+                          <TableHead>Pending</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {receipt.items.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{item.item_code}</TableCell>
+                            <TableCell>{item.item_name}</TableCell>
+                            <TableCell>{item.qty}</TableCell>
+                            <TableCell>{item.qty}</TableCell>
+                            <TableCell>0</TableCell>
+                            <TableCell>
+                              <Badge variant="default" className="text-xs">
+                                Received
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="review">
+            <Card>
+              <CardHeader>
+                <CardTitle>Review Receipt</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Summary */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-blue-900">Receipt Summary</h3>
+                        <p className="text-sm text-blue-700">
+                          {receipt.items.length} items • Total: ₹{receipt.grand_total.toLocaleString()}
+                        </p>
+                      </div>
+                      <Package className="w-8 h-8 text-blue-600" />
+                    </div>
+                  </div>
+
+                  {/* Items Summary Table */}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item Code</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead>Qty</TableHead>
+                        <TableHead>Rate</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Warehouse</TableHead>
+                        <TableHead>Batch/Serial</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {receipt.items.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{item.item_code}</TableCell>
+                          <TableCell>{item.item_name}</TableCell>
+                          <TableCell>{item.qty}</TableCell>
+                          <TableCell>₹{item.rate.toLocaleString()}</TableCell>
+                          <TableCell>₹{item.amount.toLocaleString()}</TableCell>
+                          <TableCell>{item.warehouse}</TableCell>
+                          <TableCell>
+                            {item.batch_no && <Badge variant="outline" className="mr-1">B: {item.batch_no}</Badge>}
+                            {item.serial_no && <Badge variant="outline">S: {item.serial_no}</Badge>}
+                            {!item.batch_no && !item.serial_no && <span className="text-gray-400">-</span>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  {/* Submit Section */}
+                  {receipt.docstatus === 0 && (
+                    <div className="flex justify-end pt-4 border-t">
+                      <Button onClick={handleSubmitReceipt} disabled={submitting} size="lg">
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        {submitting ? 'Submitting Receipt...' : 'Submit Receipt'}
+                      </Button>
+                    </div>
+                  )}
+
+                  {receipt.docstatus === 1 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                        <p className="text-green-800 font-medium">
+                          This purchase receipt has been successfully submitted.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
