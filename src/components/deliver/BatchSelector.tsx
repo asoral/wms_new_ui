@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { createERPNextAPI } from '@/services/erpnextApi';
 import { useToast } from '@/hooks/use-toast';
 
@@ -38,6 +39,7 @@ const BatchSelector = ({
   const [selectedBatches, setSelectedBatches] = useState<BatchInfo[]>([]);
   const [qtyToFetch, setQtyToFetch] = useState(requiredQty);
   const [fetchMethod, setFetchMethod] = useState<'FIFO' | 'LIFO' | 'FEFO'>('FIFO');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -55,123 +57,58 @@ const BatchSelector = ({
 
       console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
 
-      // Use ERPNext's batch-wise stock balance API
-      try {
-        // Call the batch-wise stock balance method
-        const response = await fetch(`${erpnextAPI.baseURL}/api/method/erpnext.stock.utils.get_stock_balance`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            item_code: itemCode,
-            warehouse: warehouse,
-            batch_wise: 1
-          })
+      // Get stock ledger entries to find batches with available stock
+      const stockLedgerResult = await erpnextAPI.stock.getStockLedgerEntries(
+        itemCode,
+        warehouse
+      );
+
+      if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
+        // Group by batch and calculate available quantities
+        const batchGroups: { [key: string]: BatchInfo } = {};
+        
+        stockLedgerResult.data.forEach((entry: any) => {
+          if (entry.batch_no) {
+            if (!batchGroups[entry.batch_no]) {
+              batchGroups[entry.batch_no] = {
+                batch_no: entry.batch_no,
+                qty: 0,
+                available_qty: 0,
+                expiry_date: entry.expiry_date
+              };
+            }
+            // Add to available quantity (positive for inward, negative for outward)
+            batchGroups[entry.batch_no].available_qty = 
+              (batchGroups[entry.batch_no].available_qty || 0) + (entry.actual_qty || 0);
+          }
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Batch-wise stock balance result:', result);
-          
-          if (result.message && Array.isArray(result.message)) {
-            const batchesWithStock = result.message
-              .filter((batch: any) => batch.batch_no && batch.actual_qty > 0)
-              .map((batch: any) => ({
-                batch_no: batch.batch_no,
-                qty: 0,
-                available_qty: batch.actual_qty,
-                expiry_date: batch.expiry_date
-              }));
+        // Filter batches with positive stock and convert to array
+        const batchesWithStock = Object.values(batchGroups)
+          .filter(batch => (batch.available_qty || 0) > 0)
+          .map(batch => ({
+            ...batch,
+            available_qty: Math.max(0, batch.available_qty || 0)
+          }));
 
-            console.log('Available batches with stock:', batchesWithStock);
-            setAvailableBatches(batchesWithStock);
-            
-            if (batchesWithStock.length === 0) {
-              toast({
-                title: "No Stock Available",
-                description: "No batches found with available stock in the selected warehouse",
-                variant: "destructive"
-              });
-            }
-          } else {
-            console.log('No batch stock data returned');
-            setAvailableBatches([]);
-          }
-        } else {
-          throw new Error(`API call failed: ${response.status}`);
-        }
-      } catch (apiError) {
-        console.warn('Batch-wise API failed, trying alternative method:', apiError);
+        console.log('Available batches with stock:', batchesWithStock);
+        setAvailableBatches(batchesWithStock);
         
-        // Fallback: Get all batches for the item and check each one individually
-        const batchResult = await erpnextAPI.stock.getBatches(itemCode);
-        console.log('Fallback batch result:', batchResult);
-        
-        if (batchResult.data && batchResult.data.length > 0) {
-          // For each batch, get its stock balance in the specific warehouse
-          const batchStockPromises = batchResult.data.map(async (batch: any) => {
-            const batchNo = batch.batch_id || batch.name;
-            
-            try {
-              // Get stock balance for this specific batch-warehouse combination
-              const stockResponse = await fetch(`${erpnextAPI.baseURL}/api/method/erpnext.stock.utils.get_stock_balance`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  item_code: itemCode,
-                  warehouse: warehouse,
-                  batch_no: batchNo
-                })
-              });
-
-              if (stockResponse.ok) {
-                const stockResult = await stockResponse.json();
-                const availableQty = stockResult.message || 0;
-                
-                console.log(`Batch ${batchNo}: available qty = ${availableQty}`);
-
-                return {
-                  batch_no: batchNo,
-                  qty: 0,
-                  available_qty: Math.max(0, availableQty),
-                  expiry_date: batch.expiry_date
-                };
-              }
-            } catch (error) {
-              console.warn(`Error fetching stock for batch ${batchNo}:`, error);
-            }
-            
-            return {
-              batch_no: batchNo,
-              qty: 0,
-              available_qty: 0,
-              expiry_date: batch.expiry_date
-            };
+        if (batchesWithStock.length === 0) {
+          toast({
+            title: "No Stock Available",
+            description: "No batches found with available stock in the selected warehouse",
+            variant: "destructive"
           });
-
-          const batchesWithStock = await Promise.all(batchStockPromises);
-          
-          // Filter to only show batches with available stock
-          const availableBatchesWithStock = batchesWithStock.filter(
-            (batch: BatchInfo) => batch.available_qty && batch.available_qty > 0
-          );
-
-          console.log('Available batches with stock (fallback):', availableBatchesWithStock);
-          setAvailableBatches(availableBatchesWithStock);
-          
-          if (availableBatchesWithStock.length === 0) {
-            toast({
-              title: "No Stock Available",
-              description: "No batches found with available stock in the selected warehouse",
-              variant: "destructive"
-            });
-          }
         }
+      } else {
+        console.log('No stock ledger entries found');
+        setAvailableBatches([]);
+        toast({
+          title: "No Stock Available",
+          description: "No batches found with available stock in the selected warehouse",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Error fetching batches:', error);
@@ -191,9 +128,8 @@ const BatchSelector = ({
     
     // Sort batches based on fetch method
     let sortedBatches = [...availableBatches];
-    if (fetchMethod === 'FIFO') {
-      // First In First Out - no sorting needed (assume chronological order)
-    } else if (fetchMethod === 'LIFO') {
+    
+    if (fetchMethod === 'LIFO') {
       // Last In First Out - reverse order
       sortedBatches.reverse();
     } else if (fetchMethod === 'FEFO') {
@@ -204,6 +140,7 @@ const BatchSelector = ({
         return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime();
       });
     }
+    // FIFO is default order (no additional sorting needed)
 
     for (const batch of sortedBatches) {
       if (remainingQty <= 0) break;
@@ -219,6 +156,19 @@ const BatchSelector = ({
     }
 
     setSelectedBatches(selected);
+    
+    if (selected.length > 0) {
+      toast({
+        title: "Batches Auto-Selected",
+        description: `Selected ${selected.length} batches using ${fetchMethod} method`,
+      });
+    } else {
+      toast({
+        title: "No Batches Available",
+        description: "No batches with sufficient stock found",
+        variant: "destructive"
+      });
+    }
   };
 
   const updateBatchQty = (batchNo: string, qty: number) => {
@@ -267,6 +217,11 @@ const BatchSelector = ({
     onClose();
   };
 
+  // Filter batches based on search term
+  const filteredBatches = availableBatches.filter(batch =>
+    batch.batch_no.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -295,14 +250,14 @@ const BatchSelector = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FIFO">FIFO</SelectItem>
-                    <SelectItem value="LIFO">LIFO</SelectItem>
-                    <SelectItem value="FEFO">FEFO</SelectItem>
+                    <SelectItem value="FIFO">FIFO (First In, First Out)</SelectItem>
+                    <SelectItem value="LIFO">LIFO (Last In, First Out)</SelectItem>
+                    <SelectItem value="FEFO">FEFO (First Expiry, First Out)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <Button onClick={autoFetchBatches} className="mt-3" disabled={loading}>
+            <Button onClick={autoFetchBatches} className="mt-3" disabled={loading || availableBatches.length === 0}>
               Auto Fetch Batches
             </Button>
           </div>
@@ -311,6 +266,17 @@ const BatchSelector = ({
           <div className="bg-blue-50 p-3 rounded">
             <Label className="text-sm text-gray-600">Warehouse</Label>
             <div className="font-medium">{warehouse}</div>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search batch numbers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
 
           {/* Available Batches Table */}
@@ -340,14 +306,14 @@ const BatchSelector = ({
                         Loading batches...
                       </td>
                     </tr>
-                  ) : availableBatches.length === 0 ? (
+                  ) : filteredBatches.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="p-4 text-center text-gray-500">
-                        No batches with available stock found
+                        {searchTerm ? 'No matching batches found' : 'No batches with available stock found'}
                       </td>
                     </tr>
                   ) : (
-                    availableBatches.map((batch) => {
+                    filteredBatches.map((batch) => {
                       const selectedBatch = selectedBatches.find(s => s.batch_no === batch.batch_no);
                       const isSelected = !!selectedBatch;
                       
@@ -436,14 +402,9 @@ const BatchSelector = ({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <div className="space-x-2">
-              <Button variant="outline">
-                Edit Full Form
-              </Button>
-              <Button onClick={handleConfirm}>
-                Add Batch Nos
-              </Button>
-            </div>
+            <Button onClick={handleConfirm}>
+              Add Batch Nos
+            </Button>
           </div>
         </div>
       </DialogContent>

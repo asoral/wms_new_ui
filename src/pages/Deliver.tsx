@@ -7,6 +7,7 @@ import { Truck, Package, CheckCircle, Printer, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import DeliverDashboard from "../components/deliver/DeliverDashboard";
 import SalesOrderSelector from "../components/deliver/SalesOrderSelector";
 import EnhancedDeliveryItemScanner from "../components/deliver/EnhancedDeliveryItemScanner";
@@ -54,6 +55,7 @@ export interface DeliveryEntry {
 const Deliver = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -252,6 +254,97 @@ const Deliver = () => {
     { label: 'Stock Transfer', icon: ArrowRight, action: () => navigate('/stock-entry') }
   ];
 
+  const SalesOrderItemsDisplay = () => {
+    if (!selectedSO) return null;
+
+    if (isMobile) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sales Order Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {selectedSO.items.map((item, index) => (
+                <Card key={index} className="border-l-4 border-l-blue-500">
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg text-gray-900">{item.itemCode}</h3>
+                          <p className="text-gray-600 text-sm mt-1">{item.itemName}</p>
+                        </div>
+                        <Badge variant={item.pendingQty > 0 ? "default" : "secondary"}>
+                          {item.pendingQty > 0 ? "Pending" : "Delivered"}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600 font-medium">Ordered:</span>
+                          <p className="font-semibold mt-1">{item.orderedQty} {item.uom}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 font-medium">Delivered:</span>
+                          <p className="font-semibold mt-1">{item.deliveredQty} {item.uom}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 font-medium">Pending:</span>
+                          <p className="font-semibold mt-1">{item.pendingQty} {item.uom}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Desktop table view
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Sales Order Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="text-left p-3 border text-sm font-medium">Item Code</th>
+                  <th className="text-left p-3 border text-sm font-medium">Item Name</th>
+                  <th className="text-left p-3 border text-sm font-medium">Ordered</th>
+                  <th className="text-left p-3 border text-sm font-medium">Delivered</th>
+                  <th className="text-left p-3 border text-sm font-medium">Pending</th>
+                  <th className="text-left p-3 border text-sm font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedSO.items.map((item, index) => (
+                  <tr key={index} className="border-b hover:bg-gray-50">
+                    <td className="p-3 border text-sm font-medium">{item.itemCode}</td>
+                    <td className="p-3 border text-sm">{item.itemName}</td>
+                    <td className="p-3 border text-sm">{item.orderedQty} {item.uom}</td>
+                    <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td>
+                    <td className="p-3 border text-sm">{item.pendingQty} {item.uom}</td>
+                    <td className="p-3 border text-sm">
+                      <Badge variant={item.pendingQty > 0 ? "default" : "secondary"}>
+                        {item.pendingQty > 0 ? "Pending" : "Delivered"}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
@@ -349,44 +442,8 @@ const Deliver = () => {
                   onAddEntry={addDeliveryEntry}
                 />
 
-                {/* Sales Order Items Table */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Sales Order Items</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="text-left p-3 border text-sm font-medium">Item Code</th>
-                            <th className="text-left p-3 border text-sm font-medium">Item Name</th>
-                            <th className="text-left p-3 border text-sm font-medium">Ordered</th>
-                            <th className="text-left p-3 border text-sm font-medium">Delivered</th>
-                            <th className="text-left p-3 border text-sm font-medium">Pending</th>
-                            <th className="text-left p-3 border text-sm font-medium">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedSO.items.map((item, index) => (
-                            <tr key={index} className="border-b hover:bg-gray-50">
-                              <td className="p-3 border text-sm font-medium">{item.itemCode}</td>
-                              <td className="p-3 border text-sm">{item.itemName}</td>
-                              <td className="p-3 border text-sm">{item.orderedQty} {item.uom}</td>
-                              <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td>
-                              <td className="p-3 border text-sm">{item.pendingQty} {item.uom}</td>
-                              <td className="p-3 border text-sm">
-                                <Badge variant={item.pendingQty > 0 ? "default" : "secondary"}>
-                                  {item.pendingQty > 0 ? "Pending" : "Delivered"}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* Sales Order Items Display */}
+                <SalesOrderItemsDisplay />
               </TabsContent>
 
               <TabsContent value="review" className="space-y-6">
