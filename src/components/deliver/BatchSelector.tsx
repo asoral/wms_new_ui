@@ -50,7 +50,6 @@ const BatchSelector = ({
   }, [isOpen, itemCode, warehouse]);
 
   useEffect(() => {
-    // Update qty to fetch when requiredQty changes
     setQtyToFetch(requiredQty);
   }, [requiredQty]);
 
@@ -62,136 +61,155 @@ const BatchSelector = ({
 
       console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
 
-      // Method 1: Try to get available batches using the get_available_batches method
+      // Method 1: Use Stock Ledger Entry to get actual batch-wise stock balances
       try {
-        const batchResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/method/erpnext.stock.doctype.batch.batch.get_available_batches`, {
-          method: 'POST',
+        const stockLedgerResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
+          filters: JSON.stringify([
+            ['item_code', '=', itemCode],
+            ['warehouse', '=', warehouse],
+            ['batch_no', '!=', '']
+          ]),
+          fields: JSON.stringify(['batch_no', 'actual_qty']),
+          order_by: 'posting_date desc'
+        })}`, {
+          method: 'GET',
           headers: {
             'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-          },
-          body: JSON.stringify({
-            item_code: itemCode,
-            warehouse: warehouse
-          })
+          }
         });
 
-        console.log('Batch API response status:', batchResponse.status);
+        if (stockLedgerResponse.ok) {
+          const stockLedgerResult = await stockLedgerResponse.json();
+          console.log('Stock Ledger entries:', stockLedgerResult);
 
-        if (batchResponse.ok) {
-          const result = await batchResponse.json();
-          console.log('Batch API result:', result);
-
-          if (result.message && Array.isArray(result.message)) {
-            const batches = result.message
-              .filter((batch: any) => (batch.available_qty || batch.actual_qty || 0) > 0) // Only include batches with stock
-              .map((batch: any) => ({
-                batch_no: batch.batch_no || batch.name,
-                qty: 0, // Will be set when selected
-                available_qty: batch.available_qty || batch.actual_qty || 0,
-                expiry_date: batch.expiry_date
-              }));
-
-            console.log('Available batches with stock:', batches);
-            setAvailableBatches(batches);
+          if (stockLedgerResult.data && Array.isArray(stockLedgerResult.data)) {
+            // Group by batch_no and sum actual_qty to get current stock per batch
+            const batchStockMap = new Map<string, number>();
             
-            if (batches.length === 0) {
+            stockLedgerResult.data.forEach((entry: any) => {
+              if (entry.batch_no) {
+                const currentStock = batchStockMap.get(entry.batch_no) || 0;
+                batchStockMap.set(entry.batch_no, currentStock + (entry.actual_qty || 0));
+              }
+            });
+
+            console.log('Batch stock map:', Object.fromEntries(batchStockMap));
+
+            // Get batch details (expiry dates, etc.)
+            const batchNosWithStock = Array.from(batchStockMap.keys()).filter(batchNo => 
+              (batchStockMap.get(batchNo) || 0) > 0
+            );
+
+            if (batchNosWithStock.length > 0) {
+              const batchDetailsResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Batch?${new URLSearchParams({
+                filters: JSON.stringify([
+                  ['name', 'in', batchNosWithStock],
+                  ['item', '=', itemCode]
+                ]),
+                fields: JSON.stringify(['name', 'expiry_date'])
+              })}`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                }
+              });
+
+              if (batchDetailsResponse.ok) {
+                const batchDetailsResult = await batchDetailsResponse.json();
+                console.log('Batch details:', batchDetailsResult);
+
+                const batches = batchDetailsResult.data?.map((batch: any) => ({
+                  batch_no: batch.name,
+                  qty: 0,
+                  available_qty: batchStockMap.get(batch.name) || 0,
+                  expiry_date: batch.expiry_date
+                })).filter((batch: any) => batch.available_qty > 0) || [];
+
+                console.log('Final available batches:', batches);
+                setAvailableBatches(batches);
+
+                if (batches.length === 0) {
+                  toast({
+                    title: "No Batches Available",
+                    description: `No batches found with available stock in warehouse: ${warehouse}`,
+                    variant: "destructive"
+                  });
+                }
+                return;
+              }
+            } else {
+              console.log('No batches with positive stock found');
+              setAvailableBatches([]);
               toast({
                 title: "No Batches Available",
-                description: "No batches found with available stock in the selected warehouse",
+                description: `No batches found with available stock in warehouse: ${warehouse}`,
                 variant: "destructive"
               });
+              return;
             }
-            return;
           }
         }
       } catch (error) {
-        console.log('get_available_batches failed, trying alternative approach:', error);
+        console.log('Stock Ledger approach failed:', error);
       }
 
-      // Method 2: Fallback - Get actual stock balance for each batch in the specific warehouse
-      console.log('Using Batch doctype with warehouse-specific stock verification');
-      
-      const batchListResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Batch?filters=[["item","=","${itemCode}"],["disabled","=",0]]&fields=["name","expiry_date","item"]`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        }
-      });
-
-      if (batchListResponse.ok) {
-        const batchListResult = await batchListResponse.json();
-        console.log('Batch list result:', batchListResult);
-
-        if (batchListResult.data && Array.isArray(batchListResult.data)) {
-          // For each batch, check current stock in the specific warehouse using get_stock_balance
-          const batchesWithStock = await Promise.all(
-            batchListResult.data.map(async (batch: any) => {
-              try {
-                // Use the get_stock_balance method for accurate warehouse-specific stock calculation
-                const stockResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/method/erpnext.stock.utils.get_stock_balance`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    item_code: itemCode,
-                    warehouse: warehouse,
-                    batch_no: batch.name
-                  })
-                });
-
-                if (stockResponse.ok) {
-                  const stockResult = await stockResponse.json();
-                  const actualQty = stockResult.message || 0;
-                  
-                  console.log(`Stock for batch ${batch.name} in warehouse ${warehouse}:`, actualQty);
-                  
-                  // Only include batches with positive stock in this warehouse
-                  if (actualQty > 0) {
-                    return {
-                      batch_no: batch.name,
-                      qty: 0,
-                      available_qty: actualQty,
-                      expiry_date: batch.expiry_date
-                    };
-                  }
-                }
-                return null;
-              } catch (error) {
-                console.error('Error checking stock for batch:', batch.name, error);
-                return null;
-              }
-            })
-          );
-
-          const validBatches = batchesWithStock.filter(batch => batch !== null);
-          console.log('Batches with stock in warehouse:', validBatches);
-          setAvailableBatches(validBatches);
-
-          if (validBatches.length === 0) {
-            toast({
-              title: "No Batches Available",
-              description: `No batches found with available stock in warehouse: ${warehouse}`,
-              variant: "destructive"
-            });
+      // Method 2: Fallback - Use Bin doctype for batch stock
+      try {
+        console.log('Using Bin doctype for batch stock');
+        const binResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Bin?${new URLSearchParams({
+          filters: JSON.stringify([
+            ['item_code', '=', itemCode],
+            ['warehouse', '=', warehouse],
+            ['actual_qty', '>', 0]
+          ]),
+          fields: JSON.stringify(['batch_no', 'actual_qty'])
+        })}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
           }
-        } else {
-          console.log('No batches found for item');
-          setAvailableBatches([]);
-          toast({
-            title: "No Batches Found",
-            description: "No batches found for this item",
-            variant: "destructive"
-          });
+        });
+
+        if (binResponse.ok) {
+          const binResult = await binResponse.json();
+          console.log('Bin result for batches:', binResult);
+
+          if (binResult.data && Array.isArray(binResult.data)) {
+            const batchesFromBin = binResult.data
+              .filter((bin: any) => bin.batch_no && bin.actual_qty > 0)
+              .map((bin: any) => ({
+                batch_no: bin.batch_no,
+                qty: 0,
+                available_qty: bin.actual_qty,
+                expiry_date: null
+              }));
+
+            console.log('Batches from Bin:', batchesFromBin);
+            setAvailableBatches(batchesFromBin);
+
+            if (batchesFromBin.length === 0) {
+              toast({
+                title: "No Batches Available",
+                description: `No batches found with available stock in warehouse: ${warehouse}`,
+                variant: "destructive"
+              });
+            }
+          }
         }
-      } else {
-        throw new Error(`Failed to fetch batches: ${batchListResponse.status}`);
+      } catch (error) {
+        console.error('Bin approach also failed:', error);
+        setAvailableBatches([]);
+        toast({
+          title: "Error",
+          description: "Failed to fetch available batches",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Error fetching batches:', error);
@@ -209,7 +227,6 @@ const BatchSelector = ({
   const autoFetchBatches = async () => {
     setLoading(true);
     try {
-      // Sort available batches based on the selected method
       let sortedBatches = [...availableBatches];
       
       switch (fetchMethod) {
@@ -222,7 +239,6 @@ const BatchSelector = ({
           });
           break;
         case 'FIFO':
-          // Assuming creation order is maintained in the array
           break;
         case 'LIFO':
           sortedBatches.reverse();
@@ -317,7 +333,6 @@ const BatchSelector = ({
     onClose();
   };
 
-  // Filter batches based on search term
   const filteredBatches = availableBatches.filter(batch =>
     batch.batch_no.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -382,7 +397,7 @@ const BatchSelector = ({
           {/* Available Batches Table */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium">Available Batches (Warehouse: {warehouse})</h4>
+              <h4 className="font-medium">Available Batches (Stock Ledger Based)</h4>
               <Badge variant="secondary">
                 Selected Qty: {getTotalSelectedQty()} / {requiredQty}
               </Badge>
