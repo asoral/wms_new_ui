@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Scan, Package, AlertCircle, CheckCircle } from "lucide-react";
+import { Scan, Package, AlertCircle, CheckCircle, Info } from "lucide-react";
 import { DeliveryEntry, SOItem } from "../../pages/Deliver";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +46,10 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
   useEffect(() => {
     if (selectedItem) {
       fetchItemDetails();
+      // Auto-select the SO warehouse as default
+      if (selectedItem.warehouse && !warehouse) {
+        setWarehouse(selectedItem.warehouse);
+      }
     }
   }, [selectedItem]);
 
@@ -89,7 +93,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
   };
 
   const fetchStockInfo = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem || !warehouse) return;
     
     try {
       setLoading(true);
@@ -98,16 +102,16 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
 
       console.log('Fetching stock for item:', selectedItem.itemCode, 'warehouse:', warehouse);
 
-      // For batch-tracked items, we need to check batch-wise stock
+      // Use the selected warehouse for stock checking, not the SO warehouse
       if (itemDetails?.has_batch_no) {
-        // Get batch-wise stock using Stock Ledger Entries
+        // Get batch-wise stock using Stock Ledger Entries for the SELECTED warehouse
         const stockLedgerResult = await erpnextAPI.stock.getStockLedgerEntries(
           selectedItem.itemCode,
-          warehouse
+          warehouse // Use selected warehouse, not SO warehouse
         );
         
         if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
-          // Calculate total available stock from all batches
+          // Calculate total available stock from all batches in the selected warehouse
           const batchGroups = stockLedgerResult.data.reduce((acc: any, entry: any) => {
             if (entry.batch_no) {
               if (!acc[entry.batch_no]) {
@@ -123,36 +127,39 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
             (sum: number, qty: any) => sum + Math.max(0, qty), 0
           );
 
-          console.log('Batch-wise stock calculation:', batchGroups);
+          console.log('Batch-wise stock in warehouse', warehouse, ':', batchGroups);
           console.log('Total available qty for batch item:', totalAvailableQty);
 
-          setStockInfo({ actual_qty: totalAvailableQty });
+          setStockInfo({ actual_qty: totalAvailableQty, warehouse_used: warehouse });
         } else {
-          console.log('No stock ledger entries found for batch item');
-          setStockInfo({ actual_qty: 0 });
+          console.log('No stock ledger entries found for batch item in warehouse:', warehouse);
+          setStockInfo({ actual_qty: 0, warehouse_used: warehouse });
         }
       } else {
-        // For non-batch items, use regular stock balance
+        // For non-batch items, use regular stock balance for the selected warehouse
         const stockResult = await erpnextAPI.stock.getStockBalance(
           selectedItem.itemCode,
           undefined,
-          warehouse
+          warehouse // Use selected warehouse
         );
         
         if (stockResult.data && stockResult.data.length > 0) {
           const warehouseStock = stockResult.data.find((stock: any) => 
             stock.warehouse === warehouse
           );
-          console.log('Regular stock balance:', warehouseStock);
-          setStockInfo(warehouseStock || { actual_qty: 0 });
+          console.log('Regular stock balance in warehouse', warehouse, ':', warehouseStock);
+          setStockInfo({ 
+            actual_qty: warehouseStock?.actual_qty || 0, 
+            warehouse_used: warehouse 
+          });
         } else {
-          console.log('No stock balance found');
-          setStockInfo({ actual_qty: 0 });
+          console.log('No stock balance found in warehouse:', warehouse);
+          setStockInfo({ actual_qty: 0, warehouse_used: warehouse });
         }
       }
     } catch (error) {
       console.error('Error fetching stock info:', error);
-      setStockInfo({ actual_qty: 0 });
+      setStockInfo({ actual_qty: 0, warehouse_used: warehouse });
     } finally {
       setLoading(false);
     }
@@ -237,6 +244,16 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       return;
     }
 
+    // Check if we have enough stock in the selected warehouse
+    if (stockInfo && stockInfo.actual_qty < qty) {
+      toast({
+        title: "Insufficient Stock",
+        description: `Only ${stockInfo.actual_qty} available in warehouse ${warehouse}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Validate batch requirements for batch tracked items
     if (itemDetails?.has_batch_no && selectedBatches.length === 0) {
       toast({
@@ -262,7 +279,8 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
           voucher_type: "Delivery Note",
           entries: selectedBatches.map(batch => ({
             batch_no: batch.batch_no,
-            qty: batch.qty
+            qty: batch.qty,
+            warehouse: warehouse
           }))
         };
         
@@ -275,7 +293,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       const entry: DeliveryEntry = {
         itemCode: selectedItem.itemCode,
         itemName: selectedItem.itemName,
-        warehouse: warehouse,
+        warehouse: warehouse, // Use selected warehouse
         qtyToDeliver: qty,
         actualQty: qty,
         rate: selectedItem.rate,
@@ -296,7 +314,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
 
       toast({
         title: "Item Added",
-        description: `${qty} ${selectedItem.uom} of ${selectedItem.itemCode} added to delivery`,
+        description: `${qty} ${selectedItem.uom} of ${selectedItem.itemCode} added to delivery from ${warehouse}`,
       });
     } catch (error) {
       console.error('Error creating serial batch bundle:', error);
@@ -315,17 +333,18 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
     const requiredQty = selectedItem.pendingQty;
     
     if (availableQty >= requiredQty) {
-      return { status: 'sufficient', message: `${availableQty} ${selectedItem.uom} available`, color: 'green' };
+      return { status: 'sufficient', message: `${availableQty} ${selectedItem.uom} available in ${stockInfo.warehouse_used}`, color: 'green' };
     } else if (availableQty > 0) {
-      return { status: 'partial', message: `Only ${availableQty} ${selectedItem.uom} available`, color: 'orange' };
+      return { status: 'partial', message: `Only ${availableQty} ${selectedItem.uom} available in ${stockInfo.warehouse_used}`, color: 'orange' };
     } else {
-      return { status: 'insufficient', message: 'Out of stock', color: 'red' };
+      return { status: 'insufficient', message: `Out of stock in ${stockInfo.warehouse_used}`, color: 'red' };
     }
   };
 
   const stockStatus = getStockStatus();
   const isBatchTracked = itemDetails?.has_batch_no;
   const isSerialTracked = itemDetails?.has_serial_no;
+  const warehouseMismatch = selectedItem && warehouse && selectedItem.warehouse !== warehouse;
 
   return (
     <>
@@ -429,6 +448,19 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
                 </div>
               </div>
 
+              {/* Warehouse Mismatch Warning */}
+              {warehouseMismatch && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <Info className="w-4 h-4 text-yellow-600" />
+                    <span className="text-sm text-yellow-800">
+                      <strong>Warehouse Changed:</strong> SO warehouse is {selectedItem.warehouse}, but you selected {warehouse}. 
+                      Stock will be checked in {warehouse}.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 {/* Warehouse */}
                 <div>
@@ -440,7 +472,12 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
                     <SelectContent className="bg-white border border-gray-200 rounded-md shadow-lg z-50">
                       {warehouses.map((wh) => (
                         <SelectItem key={wh} value={wh}>
-                          {wh}
+                          <div className="flex items-center justify-between w-full">
+                            <span>{wh}</span>
+                            {selectedItem.warehouse === wh && (
+                              <Badge variant="secondary" className="ml-2 text-xs">SO Default</Badge>
+                            )}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
