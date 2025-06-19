@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -95,20 +96,59 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      // Use stock balance instead of current stock to avoid API issues
-      const stockResult = await erpnextAPI.stock.getStockBalance(
-        selectedItem.itemCode,
-        undefined,
-        warehouse
-      );
-      
-      if (stockResult.data && stockResult.data.length > 0) {
-        const warehouseStock = stockResult.data.find((stock: any) => 
-          stock.warehouse === warehouse
+      console.log('Fetching stock for item:', selectedItem.itemCode, 'warehouse:', warehouse);
+
+      // For batch-tracked items, we need to check batch-wise stock
+      if (itemDetails?.has_batch_no) {
+        // Get batch-wise stock using Stock Ledger Entries
+        const stockLedgerResult = await erpnextAPI.stock.getStockLedgerEntries(
+          selectedItem.itemCode,
+          warehouse
         );
-        setStockInfo(warehouseStock || { actual_qty: 0 });
+        
+        if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
+          // Calculate total available stock from all batches
+          const batchGroups = stockLedgerResult.data.reduce((acc: any, entry: any) => {
+            if (entry.batch_no) {
+              if (!acc[entry.batch_no]) {
+                acc[entry.batch_no] = 0;
+              }
+              acc[entry.batch_no] += entry.actual_qty || 0;
+            }
+            return acc;
+          }, {});
+
+          // Sum all positive batch quantities
+          const totalAvailableQty = Object.values(batchGroups).reduce(
+            (sum: number, qty: any) => sum + Math.max(0, qty), 0
+          );
+
+          console.log('Batch-wise stock calculation:', batchGroups);
+          console.log('Total available qty for batch item:', totalAvailableQty);
+
+          setStockInfo({ actual_qty: totalAvailableQty });
+        } else {
+          console.log('No stock ledger entries found for batch item');
+          setStockInfo({ actual_qty: 0 });
+        }
       } else {
-        setStockInfo({ actual_qty: 0 });
+        // For non-batch items, use regular stock balance
+        const stockResult = await erpnextAPI.stock.getStockBalance(
+          selectedItem.itemCode,
+          undefined,
+          warehouse
+        );
+        
+        if (stockResult.data && stockResult.data.length > 0) {
+          const warehouseStock = stockResult.data.find((stock: any) => 
+            stock.warehouse === warehouse
+          );
+          console.log('Regular stock balance:', warehouseStock);
+          setStockInfo(warehouseStock || { actual_qty: 0 });
+        } else {
+          console.log('No stock balance found');
+          setStockInfo({ actual_qty: 0 });
+        }
       }
     } catch (error) {
       console.error('Error fetching stock info:', error);
@@ -226,8 +266,10 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
           }))
         };
         
+        console.log('Creating serial batch bundle:', bundleData);
         const bundleResult = await erpnextAPI.stock.createSerialBatchBundle(bundleData);
         serialBatchBundle = bundleResult.data?.name;
+        console.log('Serial batch bundle created:', serialBatchBundle);
       }
 
       const entry: DeliveryEntry = {

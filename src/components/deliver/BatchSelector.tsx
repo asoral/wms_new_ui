@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -54,32 +53,81 @@ const BatchSelector = ({
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      // Get batches for the item
-      const batchResult = await erpnextAPI.stock.getBatches(itemCode, warehouse);
+      console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
+
+      // Get all batches for the item first
+      const batchResult = await erpnextAPI.stock.getBatches(itemCode);
+      console.log('Batch result:', batchResult);
       
-      if (batchResult.data) {
-        // Get stock balance to get actual quantities
-        const stockResult = await erpnextAPI.stock.getStockBalance(itemCode, undefined, warehouse);
+      if (batchResult.data && batchResult.data.length > 0) {
+        // Get batch-wise stock using Stock Ledger Entries
+        const batchStockPromises = batchResult.data.map(async (batch: any) => {
+          const batchNo = batch.batch_id || batch.name;
+          
+          try {
+            // Get stock ledger entries for this specific batch and warehouse
+            const stockLedgerResult = await erpnextAPI.stock.getStockLedgerEntries(
+              itemCode, 
+              warehouse
+            );
+            
+            if (stockLedgerResult.data) {
+              // Filter entries for this specific batch and calculate current stock
+              const batchEntries = stockLedgerResult.data.filter((entry: any) => 
+                entry.batch_no === batchNo
+              );
+              
+              // Calculate current available qty by summing all actual_qty for this batch
+              const availableQty = batchEntries.reduce((sum: number, entry: any) => 
+                sum + (entry.actual_qty || 0), 0
+              );
+
+              console.log(`Batch ${batchNo}: available qty = ${availableQty}`);
+
+              return {
+                batch_no: batchNo,
+                qty: 0,
+                available_qty: Math.max(0, availableQty),
+                expiry_date: batch.expiry_date
+              };
+            }
+          } catch (error) {
+            console.warn(`Error fetching stock for batch ${batchNo}:`, error);
+          }
+          
+          return {
+            batch_no: batchNo,
+            qty: 0,
+            available_qty: 0,
+            expiry_date: batch.expiry_date
+          };
+        });
+
+        const batchesWithStock = await Promise.all(batchStockPromises);
         
-        let stockData: any[] = [];
-        if (stockResult.data) {
-          stockData = stockResult.data;
+        // Filter to only show batches with available stock
+        const availableBatchesWithStock = batchesWithStock.filter(
+          (batch: BatchInfo) => batch.available_qty && batch.available_qty > 0
+        );
+
+        console.log('Available batches with stock:', availableBatchesWithStock);
+        setAvailableBatches(availableBatchesWithStock);
+        
+        if (availableBatchesWithStock.length === 0) {
+          toast({
+            title: "No Stock Available",
+            description: "No batches found with available stock in the selected warehouse",
+            variant: "destructive"
+          });
         }
-
-        // Combine batch info with stock quantities
-        const batchesWithQty: BatchInfo[] = batchResult.data
-          .map((batch: any) => {
-            const stockEntry = stockData.find(s => s.warehouse === warehouse);
-            return {
-              batch_no: batch.batch_id || batch.name,
-              qty: 0,
-              available_qty: stockEntry?.actual_qty || 0,
-              expiry_date: batch.expiry_date
-            };
-          })
-          .filter((batch: BatchInfo) => batch.available_qty && batch.available_qty > 0);
-
-        setAvailableBatches(batchesWithQty);
+      } else {
+        console.log('No batches found for item:', itemCode);
+        setAvailableBatches([]);
+        toast({
+          title: "No Batches Found",
+          description: "No batches found for this item",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Error fetching batches:', error);
@@ -242,40 +290,54 @@ const BatchSelector = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {availableBatches.map((batch) => {
-                    const selectedBatch = selectedBatches.find(s => s.batch_no === batch.batch_no);
-                    const isSelected = !!selectedBatch;
-                    
-                    return (
-                      <tr key={batch.batch_no} className="border-b hover:bg-gray-50">
-                        <td className="p-3">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => toggleBatch(batch, !!checked)}
-                          />
-                        </td>
-                        <td className="p-3 font-medium">{batch.batch_no}</td>
-                        <td className="p-3">{batch.available_qty}</td>
-                        <td className="p-3">
-                          {isSelected ? (
-                            <Input
-                              type="number"
-                              value={selectedBatch.qty}
-                              onChange={(e) => updateBatchQty(batch.batch_no, Number(e.target.value))}
-                              min="1"
-                              max={batch.available_qty}
-                              className="w-20"
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="p-4 text-center text-gray-500">
+                        Loading batches...
+                      </td>
+                    </tr>
+                  ) : availableBatches.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-4 text-center text-gray-500">
+                        No batches with available stock found
+                      </td>
+                    </tr>
+                  ) : (
+                    availableBatches.map((batch) => {
+                      const selectedBatch = selectedBatches.find(s => s.batch_no === batch.batch_no);
+                      const isSelected = !!selectedBatch;
+                      
+                      return (
+                        <tr key={batch.batch_no} className="border-b hover:bg-gray-50">
+                          <td className="p-3">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => toggleBatch(batch, !!checked)}
                             />
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                        <td className="p-3 text-sm text-gray-600">
-                          {batch.expiry_date ? new Date(batch.expiry_date).toLocaleDateString() : '-'}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                          <td className="p-3 font-medium">{batch.batch_no}</td>
+                          <td className="p-3">{batch.available_qty}</td>
+                          <td className="p-3">
+                            {isSelected ? (
+                              <Input
+                                type="number"
+                                value={selectedBatch.qty}
+                                onChange={(e) => updateBatchQty(batch.batch_no, Number(e.target.value))}
+                                min="1"
+                                max={batch.available_qty}
+                                className="w-20"
+                              />
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td className="p-3 text-sm text-gray-600">
+                            {batch.expiry_date ? new Date(batch.expiry_date).toLocaleDateString() : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                   
                   {/* Selected batches that are not in available list */}
                   {selectedBatches
