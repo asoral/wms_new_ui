@@ -56,92 +56,120 @@ const BatchSelector = ({
 
       console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
 
-      // First, get all Bin entries for this item-warehouse combination to get batch numbers
-      const binResult = await erpnextAPI.stock.getBinStock(itemCode, warehouse);
-      console.log('Bin result for batches:', binResult);
+      // Use Stock Ledger Entry to get batches with current stock in the warehouse
+      const stockLedgerFilters = [
+        ['item_code', '=', itemCode],
+        ['warehouse', '=', warehouse],
+        ['batch_no', '!=', '']  // Only entries with batch numbers
+      ];
 
-      if (binResult.data && binResult.data.length > 0) {
-        // Extract unique batch numbers from bin data
-        const batchNumbers = new Set<string>();
-        binResult.data.forEach((bin: any) => {
-          if (bin.batch_no && bin.actual_qty > 0) {
-            batchNumbers.add(bin.batch_no);
-          }
-        });
+      const stockLedgerResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
+        filters: JSON.stringify(stockLedgerFilters),
+        fields: JSON.stringify(['batch_no', 'actual_qty', 'posting_date']),
+        order_by: 'posting_date desc'
+      })}`, {
+        headers: {
+          'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
 
-        console.log('Found batch numbers from Bin:', Array.from(batchNumbers));
+      console.log('Stock Ledger API response status:', stockLedgerResponse.status);
 
-        if (batchNumbers.size > 0) {
-          // Now get detailed batch information including expiry dates
-          const batchPromises = Array.from(batchNumbers).map(async (batchNo) => {
-            try {
-              // Get batch details including expiry date using the stock API
-              const batchResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Batch/${batchNo}`, {
-                headers: {
-                  'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                },
-              });
-              
-              let expiryDate = null;
-              if (batchResponse.ok) {
-                const batchData = await batchResponse.json();
-                expiryDate = batchData.data?.expiry_date;
-              }
+      if (stockLedgerResponse.ok) {
+        const stockLedgerResult = await stockLedgerResponse.json();
+        console.log('Stock Ledger result:', stockLedgerResult);
 
-              // Get current stock for this batch in the warehouse
-              const binEntry = binResult.data.find((bin: any) => bin.batch_no === batchNo);
-              const availableQty = binEntry ? binEntry.actual_qty : 0;
-
-              return {
-                batch_no: batchNo,
-                qty: 0, // Will be set when selected
-                available_qty: availableQty,
-                expiry_date: expiryDate
-              };
-            } catch (error) {
-              console.warn('Error fetching batch details for', batchNo, ':', error);
-              // Return basic batch info even if details fetch fails
-              const binEntry = binResult.data.find((bin: any) => bin.batch_no === batchNo);
-              return {
-                batch_no: batchNo,
-                qty: 0,
-                available_qty: binEntry ? binEntry.actual_qty : 0
-              };
+        if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
+          // Group by batch_no and calculate current stock for each batch
+          const batchStockMap = new Map<string, number>();
+          
+          stockLedgerResult.data.forEach((entry: any) => {
+            if (entry.batch_no) {
+              const currentStock = batchStockMap.get(entry.batch_no) || 0;
+              batchStockMap.set(entry.batch_no, currentStock + (entry.actual_qty || 0));
             }
           });
 
-          const batchDetails = await Promise.all(batchPromises);
-          const validBatches = batchDetails.filter(batch => (batch.available_qty || 0) > 0);
-          
-          console.log('Available batches with stock:', validBatches);
-          setAvailableBatches(validBatches);
-          
-          if (validBatches.length === 0) {
+          console.log('Batch stock map:', Array.from(batchStockMap.entries()));
+
+          // Filter batches with positive stock and get details
+          const batchesWithStock = Array.from(batchStockMap.entries())
+            .filter(([batchNo, stock]) => stock > 0)
+            .map(([batchNo]) => batchNo);
+
+          console.log('Batches with positive stock:', batchesWithStock);
+
+          if (batchesWithStock.length > 0) {
+            // Get detailed batch information including expiry dates
+            const batchPromises = batchesWithStock.map(async (batchNo) => {
+              try {
+                // Get batch details including expiry date
+                const batchResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Batch/${batchNo}`, {
+                  headers: {
+                    'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                  },
+                });
+                
+                let expiryDate = null;
+                if (batchResponse.ok) {
+                  const batchData = await batchResponse.json();
+                  expiryDate = batchData.data?.expiry_date;
+                }
+
+                const availableQty = batchStockMap.get(batchNo) || 0;
+
+                return {
+                  batch_no: batchNo,
+                  qty: 0, // Will be set when selected
+                  available_qty: availableQty,
+                  expiry_date: expiryDate
+                };
+              } catch (error) {
+                console.warn('Error fetching batch details for', batchNo, ':', error);
+                return {
+                  batch_no: batchNo,
+                  qty: 0,
+                  available_qty: batchStockMap.get(batchNo) || 0
+                };
+              }
+            });
+
+            const batchDetails = await Promise.all(batchPromises);
+            console.log('Available batches with stock:', batchDetails);
+            setAvailableBatches(batchDetails);
+            
+            if (batchDetails.length === 0) {
+              toast({
+                title: "No Stock Available",
+                description: "No batches found with available stock in the selected warehouse",
+                variant: "destructive"
+              });
+            }
+          } else {
+            console.log('No batches found with positive stock');
+            setAvailableBatches([]);
             toast({
-              title: "No Stock Available",
-              description: "No batches found with available stock in the selected warehouse",
+              title: "No Batches Found",
+              description: "No batches with positive stock found for this item in the selected warehouse",
               variant: "destructive"
             });
           }
         } else {
-          console.log('No batch numbers found in Bin data');
+          console.log('No stock ledger entries found');
           setAvailableBatches([]);
           toast({
-            title: "No Batches Found",
-            description: "No batch numbers found for this item in the selected warehouse",
+            title: "No Stock Available",
+            description: "No stock ledger entries found for this item in the selected warehouse",
             variant: "destructive"
           });
         }
       } else {
-        console.log('No bin entries found');
-        setAvailableBatches([]);
-        toast({
-          title: "No Stock Available",
-          description: "No stock found for this item in the selected warehouse",
-          variant: "destructive"
-        });
+        console.error('Stock Ledger API failed:', stockLedgerResponse.statusText);
+        throw new Error(`Failed to fetch stock ledger entries: ${stockLedgerResponse.statusText}`);
       }
     } catch (error) {
       console.error('Error fetching batches:', error);
