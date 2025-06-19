@@ -55,79 +55,123 @@ const BatchSelector = ({
 
       console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
 
-      // Get all batches for the item first
-      const batchResult = await erpnextAPI.stock.getBatches(itemCode);
-      console.log('Batch result:', batchResult);
-      
-      if (batchResult.data && batchResult.data.length > 0) {
-        // Get batch-wise stock using Stock Ledger Entries
-        const batchStockPromises = batchResult.data.map(async (batch: any) => {
-          const batchNo = batch.batch_id || batch.name;
+      // Use ERPNext's batch-wise stock balance API
+      try {
+        // Call the batch-wise stock balance method
+        const response = await fetch(`${erpnextAPI.baseURL}/api/method/erpnext.stock.utils.get_stock_balance`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            item_code: itemCode,
+            warehouse: warehouse,
+            batch_wise: 1
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Batch-wise stock balance result:', result);
           
-          try {
-            // Get stock ledger entries for this specific batch and warehouse
-            const stockLedgerResult = await erpnextAPI.stock.getStockLedgerEntries(
-              itemCode, 
-              warehouse
-            );
-            
-            if (stockLedgerResult.data) {
-              // Filter entries for this specific batch and calculate current stock
-              const batchEntries = stockLedgerResult.data.filter((entry: any) => 
-                entry.batch_no === batchNo
-              );
-              
-              // Calculate current available qty by summing all actual_qty for this batch
-              const availableQty = batchEntries.reduce((sum: number, entry: any) => 
-                sum + (entry.actual_qty || 0), 0
-              );
-
-              console.log(`Batch ${batchNo}: available qty = ${availableQty}`);
-
-              return {
-                batch_no: batchNo,
+          if (result.message && Array.isArray(result.message)) {
+            const batchesWithStock = result.message
+              .filter((batch: any) => batch.batch_no && batch.actual_qty > 0)
+              .map((batch: any) => ({
+                batch_no: batch.batch_no,
                 qty: 0,
-                available_qty: Math.max(0, availableQty),
+                available_qty: batch.actual_qty,
                 expiry_date: batch.expiry_date
-              };
+              }));
+
+            console.log('Available batches with stock:', batchesWithStock);
+            setAvailableBatches(batchesWithStock);
+            
+            if (batchesWithStock.length === 0) {
+              toast({
+                title: "No Stock Available",
+                description: "No batches found with available stock in the selected warehouse",
+                variant: "destructive"
+              });
             }
-          } catch (error) {
-            console.warn(`Error fetching stock for batch ${batchNo}:`, error);
+          } else {
+            console.log('No batch stock data returned');
+            setAvailableBatches([]);
           }
-          
-          return {
-            batch_no: batchNo,
-            qty: 0,
-            available_qty: 0,
-            expiry_date: batch.expiry_date
-          };
-        });
-
-        const batchesWithStock = await Promise.all(batchStockPromises);
-        
-        // Filter to only show batches with available stock
-        const availableBatchesWithStock = batchesWithStock.filter(
-          (batch: BatchInfo) => batch.available_qty && batch.available_qty > 0
-        );
-
-        console.log('Available batches with stock:', availableBatchesWithStock);
-        setAvailableBatches(availableBatchesWithStock);
-        
-        if (availableBatchesWithStock.length === 0) {
-          toast({
-            title: "No Stock Available",
-            description: "No batches found with available stock in the selected warehouse",
-            variant: "destructive"
-          });
+        } else {
+          throw new Error(`API call failed: ${response.status}`);
         }
-      } else {
-        console.log('No batches found for item:', itemCode);
-        setAvailableBatches([]);
-        toast({
-          title: "No Batches Found",
-          description: "No batches found for this item",
-          variant: "destructive"
-        });
+      } catch (apiError) {
+        console.warn('Batch-wise API failed, trying alternative method:', apiError);
+        
+        // Fallback: Get all batches for the item and check each one individually
+        const batchResult = await erpnextAPI.stock.getBatches(itemCode);
+        console.log('Fallback batch result:', batchResult);
+        
+        if (batchResult.data && batchResult.data.length > 0) {
+          // For each batch, get its stock balance in the specific warehouse
+          const batchStockPromises = batchResult.data.map(async (batch: any) => {
+            const batchNo = batch.batch_id || batch.name;
+            
+            try {
+              // Get stock balance for this specific batch-warehouse combination
+              const stockResponse = await fetch(`${erpnextAPI.baseURL}/api/method/erpnext.stock.utils.get_stock_balance`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  item_code: itemCode,
+                  warehouse: warehouse,
+                  batch_no: batchNo
+                })
+              });
+
+              if (stockResponse.ok) {
+                const stockResult = await stockResponse.json();
+                const availableQty = stockResult.message || 0;
+                
+                console.log(`Batch ${batchNo}: available qty = ${availableQty}`);
+
+                return {
+                  batch_no: batchNo,
+                  qty: 0,
+                  available_qty: Math.max(0, availableQty),
+                  expiry_date: batch.expiry_date
+                };
+              }
+            } catch (error) {
+              console.warn(`Error fetching stock for batch ${batchNo}:`, error);
+            }
+            
+            return {
+              batch_no: batchNo,
+              qty: 0,
+              available_qty: 0,
+              expiry_date: batch.expiry_date
+            };
+          });
+
+          const batchesWithStock = await Promise.all(batchStockPromises);
+          
+          // Filter to only show batches with available stock
+          const availableBatchesWithStock = batchesWithStock.filter(
+            (batch: BatchInfo) => batch.available_qty && batch.available_qty > 0
+          );
+
+          console.log('Available batches with stock (fallback):', availableBatchesWithStock);
+          setAvailableBatches(availableBatchesWithStock);
+          
+          if (availableBatchesWithStock.length === 0) {
+            toast({
+              title: "No Stock Available",
+              description: "No batches found with available stock in the selected warehouse",
+              variant: "destructive"
+            });
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching batches:', error);
