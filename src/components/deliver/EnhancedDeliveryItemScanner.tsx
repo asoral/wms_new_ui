@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -102,12 +101,11 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
 
       console.log('Fetching stock for item:', selectedItem.itemCode, 'warehouse:', warehouse);
 
-      // Use the selected warehouse for stock checking, not the SO warehouse
       if (itemDetails?.has_batch_no) {
-        // Get batch-wise stock using Stock Ledger Entries for the SELECTED warehouse
+        // For batch items, get stock ledger entries
         const stockLedgerResult = await erpnextAPI.stock.getStockLedgerEntries(
           selectedItem.itemCode,
-          warehouse // Use selected warehouse, not SO warehouse
+          warehouse
         );
         
         if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
@@ -136,29 +134,30 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
           setStockInfo({ actual_qty: 0, warehouse_used: warehouse });
         }
       } else {
-        // For non-batch items, use regular stock balance for the selected warehouse
-        const stockResult = await erpnextAPI.stock.getStockBalance(
+        // For non-batch items, use Bin to get current stock
+        const binResult = await erpnextAPI.stock.getBinStock(
           selectedItem.itemCode,
-          undefined,
-          warehouse // Use selected warehouse
+          warehouse
         );
         
-        if (stockResult.data && stockResult.data.length > 0) {
-          const warehouseStock = stockResult.data.find((stock: any) => 
-            stock.warehouse === warehouse
+        if (binResult.data && binResult.data.length > 0) {
+          const binStock = binResult.data.find((bin: any) => 
+            bin.warehouse === warehouse && bin.item_code === selectedItem.itemCode
           );
-          console.log('Regular stock balance in warehouse', warehouse, ':', warehouseStock);
+          const actualQty = binStock?.actual_qty || 0;
+          console.log('Bin stock for item', selectedItem.itemCode, 'in warehouse', warehouse, ':', actualQty);
           setStockInfo({ 
-            actual_qty: warehouseStock?.actual_qty || 0, 
+            actual_qty: actualQty, 
             warehouse_used: warehouse 
           });
         } else {
-          console.log('No stock balance found in warehouse:', warehouse);
+          console.log('No bin stock found for item:', selectedItem.itemCode, 'in warehouse:', warehouse);
           setStockInfo({ actual_qty: 0, warehouse_used: warehouse });
         }
       }
     } catch (error) {
       console.error('Error fetching stock info:', error);
+      // Don't show error toast for stock check failures, just set to 0
       setStockInfo({ actual_qty: 0, warehouse_used: warehouse });
     } finally {
       setLoading(false);

@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, Item } from './types';
 
@@ -205,7 +204,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         filters: JSON.stringify(filters),
         fields: JSON.stringify([
           'posting_date', 'voucher_type', 'voucher_no', 
-          'actual_qty', 'qty_after_transaction', 'stock_value'
+          'actual_qty', 'qty_after_transaction', 'stock_value', 'batch_no'
         ]),
         order_by: 'posting_date desc'
       })}`, {
@@ -290,6 +289,10 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       filters.push(['item_code', '=', itemCode]);
     }
     
+    if (warehouse) {
+      filters.push(['warehouse', '=', warehouse]);
+    }
+    
     // If company is provided, get warehouses for that company first
     if (company && !warehouse) {
       const warehouseResponse = await fetch(`${this.baseURL}/api/resource/Warehouse?${new URLSearchParams({
@@ -306,11 +309,9 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
           filters.push(['warehouse', 'in', warehouseNames]);
         }
       }
-    } else if (warehouse) {
-      filters.push(['warehouse', '=', warehouse]);
     }
 
-    const params = this.buildQueryParams(filters);
+    const params = this.buildQueryParams(filters, ['item_code', 'warehouse', 'actual_qty', 'projected_qty', 'stock_value']);
     const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
       headers: this.getHeaders(),
     });
