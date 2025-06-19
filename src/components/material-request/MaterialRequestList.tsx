@@ -25,22 +25,26 @@ import { MaterialRequest, MaterialRequestPurpose, MaterialRequestStatus } from "
 
 interface MaterialRequestListProps {
   onCreateNew: (purpose: MaterialRequestPurpose) => void;
+  onEditRequest: (request: MaterialRequest) => void;
+  onBackToDashboard: () => void;
 }
 
-const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
+const MaterialRequestList = ({ onCreateNew, onEditRequest, onBackToDashboard }: MaterialRequestListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [purposeFilter, setPurposeFilter] = useState<string>("all");
 
-  // Mock data
+  // Mock data - using correct property names from MaterialRequest interface
   const mockRequests: MaterialRequest[] = [
     {
       id: "1",
-      number: "MAT-REQ-2024-001",
+      name: "MAT-REQ-2024-001",
       purpose: "Purchase",
       status: "Draft",
-      createdDate: "2024-01-15",
+      transactionDate: "2024-01-15",
       requestedBy: "John Doe",
+      company: "Test Company",
+      priority: "Medium",
       items: [
         {
           itemCode: "ITM-001",
@@ -54,11 +58,13 @@ const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
     },
     {
       id: "2",
-      number: "MAT-REQ-2024-002",
+      name: "MAT-REQ-2024-002",
       purpose: "Material Transfer",
       status: "Submitted",
-      createdDate: "2024-01-14",
+      transactionDate: "2024-01-14",
       requestedBy: "Jane Smith",
+      company: "Test Company",
+      priority: "High",
       items: [
         {
           itemCode: "ITM-002",
@@ -84,7 +90,7 @@ const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
   };
 
   const filteredRequests = mockRequests.filter(request => {
-    const matchesSearch = request.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = request.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          request.requestedBy.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || request.status === statusFilter;
     const matchesPurpose = purposeFilter === "all" || request.purpose === purposeFilter;
@@ -185,7 +191,7 @@ const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
                   <div className="flex items-center space-x-3">
                     <FileText className="w-5 h-5 text-blue-600" />
                     <div>
-                      <h3 className="font-medium">{request.number}</h3>
+                      <h3 className="font-medium">{request.name}</h3>
                       <p className="text-sm text-gray-500">{request.purpose}</p>
                     </div>
                   </div>
@@ -204,7 +210,7 @@ const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
                           <Eye className="w-4 h-4 mr-2" />
                           View
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onEditRequest(request)}>
                           <Edit className="w-4 h-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
@@ -224,7 +230,7 @@ const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
                   </div>
                   <div>
                     <span className="text-gray-500">Date:</span>
-                    <p className="font-medium">{request.createdDate}</p>
+                    <p className="font-medium">{request.transactionDate}</p>
                   </div>
                   <div>
                     <span className="text-gray-500">Items:</span>

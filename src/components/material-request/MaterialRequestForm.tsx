@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,22 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
-import { MaterialRequestPurpose, MaterialRequestItem } from "@/pages/MaterialRequest";
+import { MaterialRequestPurpose, MaterialRequestItem, MaterialRequest } from "@/pages/MaterialRequest";
 
 interface MaterialRequestFormProps {
   purpose: MaterialRequestPurpose;
+  editingRequest?: MaterialRequest | null;
   onBack: () => void;
+  onSave: () => void;
 }
 
-const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
-  const [items, setItems] = useState<MaterialRequestItem[]>([
-    {
-      itemCode: "",
-      itemName: "",
-      qty: 0,
-      uom: "Nos"
-    }
-  ]);
+const MaterialRequestForm = ({ purpose, editingRequest, onBack, onSave }: MaterialRequestFormProps) => {
+  const [items, setItems] = useState<MaterialRequestItem[]>(
+    editingRequest?.items || [
+      {
+        itemCode: "",
+        itemName: "",
+        qty: 0,
+        uom: "Nos"
+      }
+    ]
+  );
 
   const addItem = () => {
     setItems([
@@ -52,8 +55,8 @@ const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
     e.preventDefault();
     console.log("Submitting material request:", { purpose, items });
     // Implement submission logic here
-    alert("Material request created successfully!");
-    onBack();
+    alert(`Material request ${editingRequest ? 'updated' : 'created'} successfully!`);
+    onSave();
   };
 
   return (
@@ -63,7 +66,9 @@ const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <h2 className="text-xl font-semibold">Create {purpose} Request</h2>
+        <h2 className="text-xl font-semibold">
+          {editingRequest ? `Edit ${purpose} Request` : `Create ${purpose} Request`}
+        </h2>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -85,15 +90,15 @@ const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
               </div>
               <div>
                 <Label htmlFor="priority">Priority</Label>
-                <Select defaultValue="medium">
+                <Select defaultValue={editingRequest?.priority || "Medium"}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Urgent">Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -136,6 +141,7 @@ const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
                 id="description"
                 placeholder="Enter request description..."
                 rows={3}
+                defaultValue={editingRequest?.remarks || ""}
               />
             </div>
           </CardContent>
@@ -259,7 +265,7 @@ const MaterialRequestForm = ({ purpose, onBack }: MaterialRequestFormProps) => {
           </Button>
           <Button type="submit">
             <Save className="w-4 h-4 mr-2" />
-            Create Request
+            {editingRequest ? 'Update Request' : 'Create Request'}
           </Button>
         </div>
       </form>

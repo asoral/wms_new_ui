@@ -99,7 +99,7 @@ const MaterialRequest = () => {
           <MaterialRequestForm
             purpose={selectedPurpose}
             editingRequest={editingRequest}
-            onBack={currentView === "list" ? handleBackToList : handleBackToDashboard}
+            onBack={editingRequest ? handleBackToList : handleBackToDashboard}
             onSave={() => {
               // After saving, go back to appropriate view
               if (editingRequest) {
