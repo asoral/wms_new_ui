@@ -57,139 +57,93 @@ const BatchSelector = ({
 
       console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
 
-      // Method 1: Try to get batches using frappe.db.sql approach
-      // This uses Stock Ledger Entry to find batches with positive stock
-      const sqlQuery = `
-        SELECT 
-          sle.batch_no,
-          SUM(sle.actual_qty) as available_qty,
-          b.expiry_date
-        FROM \`tabStock Ledger Entry\` sle
-        LEFT JOIN \`tabBatch\` b ON sle.batch_no = b.name
-        WHERE 
-          sle.item_code = '${itemCode}' 
-          AND sle.warehouse = '${warehouse}'
-          AND sle.batch_no IS NOT NULL 
-          AND sle.batch_no != ''
-          AND sle.is_cancelled = 0
-        GROUP BY sle.batch_no, b.expiry_date
-        HAVING SUM(sle.actual_qty) > 0
-        ORDER BY b.expiry_date ASC, sle.creation ASC
-      `;
+      // Method 1: Try to get available batches using the get_available_batches method
+      try {
+        const batchResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/method/erpnext.stock.doctype.batch.batch.get_available_batches`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            item_code: itemCode,
+            warehouse: warehouse
+          })
+        });
 
-      const response = await fetch(`${erpnextAPI.stock.baseURL}/api/method/frappe.db.sql`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          query: sqlQuery,
-          as_dict: 1
-        })
-      });
+        console.log('Batch API response status:', batchResponse.status);
 
-      console.log('SQL query response status:', response.status);
+        if (batchResponse.ok) {
+          const result = await batchResponse.json();
+          console.log('Batch API result:', result);
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('SQL query result:', result);
+          if (result.message && Array.isArray(result.message)) {
+            const batches = result.message.map((batch: any) => ({
+              batch_no: batch.batch_no || batch.name,
+              qty: 0, // Will be set when selected
+              available_qty: batch.available_qty || batch.actual_qty || 0,
+              expiry_date: batch.expiry_date
+            }));
 
-        if (result.message && Array.isArray(result.message)) {
-          const batches = result.message.map((batch: any) => ({
-            batch_no: batch.batch_no,
-            qty: 0, // Will be set when selected
-            available_qty: batch.available_qty || 0,
-            expiry_date: batch.expiry_date
-          }));
-
-          console.log('Available batches from SQL query:', batches);
-          setAvailableBatches(batches);
-          
-          if (batches.length === 0) {
-            toast({
-              title: "No Batches Available",
-              description: "No batches found with available stock in the selected warehouse",
-              variant: "destructive"
-            });
+            console.log('Available batches from API:', batches);
+            setAvailableBatches(batches);
+            
+            if (batches.length === 0) {
+              toast({
+                title: "No Batches Available",
+                description: "No batches found with available stock in the selected warehouse",
+                variant: "destructive"
+              });
+            }
+            return;
           }
-        } else {
-          console.log('No batches returned from SQL query');
-          setAvailableBatches([]);
-          toast({
-            title: "No Batches Found",
-            description: "No batches with available stock found for this item in the selected warehouse",
-            variant: "destructive"
-          });
         }
-      } else {
-        // Fallback: Try using the Batch doctype directly
-        console.log('SQL query failed, trying Batch doctype approach');
-        await fetchBatchesFromBatchDoctype();
+      } catch (error) {
+        console.log('get_available_batches failed, trying alternative approach:', error);
       }
-    } catch (error) {
-      console.error('Error fetching batches:', error);
-      // Fallback: Try using the Batch doctype directly
-      await fetchBatchesFromBatchDoctype();
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const fetchBatchesFromBatchDoctype = async () => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      console.log('Fetching batches using Batch doctype');
-
-      // Get all batches for the item
-      const batchResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Batch`, {
+      // Method 2: Fallback - Use direct Batch doctype query with stock checking
+      console.log('Using Batch doctype with stock verification');
+      
+      const batchListResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Batch?filters=[["item","=","${itemCode}"],["disabled","=",0]]&fields=["name","expiry_date","item"]`, {
         method: 'GET',
         headers: {
           'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          filters: [
-            ['item', '=', itemCode],
-            ['disabled', '=', 0]
-          ],
-          fields: ['name', 'expiry_date', 'item']
-        })
+        }
       });
 
-      if (batchResponse.ok) {
-        const batchResult = await batchResponse.json();
-        console.log('Batch doctype result:', batchResult);
+      if (batchListResponse.ok) {
+        const batchListResult = await batchListResponse.json();
+        console.log('Batch list result:', batchListResult);
 
-        if (batchResult.data && Array.isArray(batchResult.data)) {
-          // For each batch, check stock in the warehouse using Bin
+        if (batchListResult.data && Array.isArray(batchListResult.data)) {
+          // For each batch, check current stock in the warehouse using Stock Ledger Entry
           const batchesWithStock = await Promise.all(
-            batchResult.data.map(async (batch: any) => {
+            batchListResult.data.map(async (batch: any) => {
               try {
-                const binResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Bin`, {
-                  method: 'GET',
+                // Use the get_stock_balance method for accurate stock calculation
+                const stockResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/method/erpnext.stock.utils.get_stock_balance`, {
+                  method: 'POST',
                   headers: {
                     'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                   },
                   body: JSON.stringify({
-                    filters: [
-                      ['item_code', '=', itemCode],
-                      ['warehouse', '=', warehouse],
-                      ['batch_no', '=', batch.name]
-                    ],
-                    fields: ['actual_qty', 'batch_no']
+                    item_code: itemCode,
+                    warehouse: warehouse,
+                    batch_no: batch.name
                   })
                 });
 
-                if (binResponse.ok) {
-                  const binResult = await binResponse.json();
-                  const actualQty = binResult.data && binResult.data.length > 0 ? binResult.data[0].actual_qty : 0;
+                if (stockResponse.ok) {
+                  const stockResult = await stockResponse.json();
+                  const actualQty = stockResult.message || 0;
+                  
+                  console.log(`Stock for batch ${batch.name}:`, actualQty);
                   
                   if (actualQty > 0) {
                     return {
@@ -219,15 +173,28 @@ const BatchSelector = ({
               variant: "destructive"
             });
           }
+        } else {
+          console.log('No batches found for item');
+          setAvailableBatches([]);
+          toast({
+            title: "No Batches Found",
+            description: "No batches found for this item",
+            variant: "destructive"
+          });
         }
+      } else {
+        throw new Error(`Failed to fetch batches: ${batchListResponse.status}`);
       }
     } catch (error) {
-      console.error('Error fetching batches from Batch doctype:', error);
+      console.error('Error fetching batches:', error);
       toast({
         title: "Error",
         description: "Failed to fetch available batches",
         variant: "destructive"
       });
+      setAvailableBatches([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -357,7 +324,7 @@ const BatchSelector = ({
         <div className="space-y-4">
           {/* Auto Fetch Section */}
           <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium mb-3">Auto Fetch (Stock Ledger Based)</h4>
+            <h4 className="font-medium mb-3">Auto Fetch Batches</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Qty to Fetch</Label>
@@ -407,7 +374,7 @@ const BatchSelector = ({
           {/* Available Batches Table */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium">Available Batches (Stock Ledger Based)</h4>
+              <h4 className="font-medium">Available Batches</h4>
               <Badge variant="secondary">
                 Selected Qty: {getTotalSelectedQty()} / {requiredQty}
               </Badge>
@@ -428,7 +395,7 @@ const BatchSelector = ({
                   {loading ? (
                     <tr>
                       <td colSpan={5} className="p-4 text-center text-gray-500">
-                        Loading batches from Stock Ledger...
+                        Loading available batches...
                       </td>
                     </tr>
                   ) : filteredBatches.length === 0 ? (
