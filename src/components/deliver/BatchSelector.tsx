@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -57,56 +56,86 @@ const BatchSelector = ({
 
       console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
 
-      // Get stock ledger entries to find batches with available stock
-      const stockLedgerResult = await erpnextAPI.stock.getStockLedgerEntries(
-        itemCode,
-        warehouse
-      );
+      // First, get all Bin entries for this item-warehouse combination to get batch numbers
+      const binResult = await erpnextAPI.stock.getBinStock(itemCode, warehouse);
+      console.log('Bin result for batches:', binResult);
 
-      if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
-        // Group by batch and calculate available quantities
-        const batchGroups: { [key: string]: BatchInfo } = {};
-        
-        stockLedgerResult.data.forEach((entry: any) => {
-          if (entry.batch_no) {
-            if (!batchGroups[entry.batch_no]) {
-              batchGroups[entry.batch_no] = {
-                batch_no: entry.batch_no,
-                qty: 0,
-                available_qty: 0,
-                expiry_date: entry.expiry_date
-              };
-            }
-            // Add to available quantity (positive for inward, negative for outward)
-            batchGroups[entry.batch_no].available_qty = 
-              (batchGroups[entry.batch_no].available_qty || 0) + (entry.actual_qty || 0);
+      if (binResult.data && binResult.data.length > 0) {
+        // Extract unique batch numbers from bin data
+        const batchNumbers = new Set<string>();
+        binResult.data.forEach((bin: any) => {
+          if (bin.batch_no && bin.actual_qty > 0) {
+            batchNumbers.add(bin.batch_no);
           }
         });
 
-        // Filter batches with positive stock and convert to array
-        const batchesWithStock = Object.values(batchGroups)
-          .filter(batch => (batch.available_qty || 0) > 0)
-          .map(batch => ({
-            ...batch,
-            available_qty: Math.max(0, batch.available_qty || 0)
-          }));
+        console.log('Found batch numbers from Bin:', Array.from(batchNumbers));
 
-        console.log('Available batches with stock:', batchesWithStock);
-        setAvailableBatches(batchesWithStock);
-        
-        if (batchesWithStock.length === 0) {
+        if (batchNumbers.size > 0) {
+          // Now get detailed batch information including expiry dates
+          const batchPromises = Array.from(batchNumbers).map(async (batchNo) => {
+            try {
+              // Get batch details including expiry date
+              const batchResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch/${batchNo}`, {
+                headers: erpnextAPI.getHeaders(),
+              });
+              
+              let expiryDate = null;
+              if (batchResponse.ok) {
+                const batchData = await batchResponse.json();
+                expiryDate = batchData.data?.expiry_date;
+              }
+
+              // Get current stock for this batch in the warehouse
+              const binEntry = binResult.data.find((bin: any) => bin.batch_no === batchNo);
+              const availableQty = binEntry ? binEntry.actual_qty : 0;
+
+              return {
+                batch_no: batchNo,
+                qty: 0, // Will be set when selected
+                available_qty: availableQty,
+                expiry_date: expiryDate
+              };
+            } catch (error) {
+              console.warn('Error fetching batch details for', batchNo, ':', error);
+              // Return basic batch info even if details fetch fails
+              const binEntry = binResult.data.find((bin: any) => bin.batch_no === batchNo);
+              return {
+                batch_no: batchNo,
+                qty: 0,
+                available_qty: binEntry ? binEntry.actual_qty : 0
+              };
+            }
+          });
+
+          const batchDetails = await Promise.all(batchPromises);
+          const validBatches = batchDetails.filter(batch => (batch.available_qty || 0) > 0);
+          
+          console.log('Available batches with stock:', validBatches);
+          setAvailableBatches(validBatches);
+          
+          if (validBatches.length === 0) {
+            toast({
+              title: "No Stock Available",
+              description: "No batches found with available stock in the selected warehouse",
+              variant: "destructive"
+            });
+          }
+        } else {
+          console.log('No batch numbers found in Bin data');
+          setAvailableBatches([]);
           toast({
-            title: "No Stock Available",
-            description: "No batches found with available stock in the selected warehouse",
+            title: "No Batches Found",
+            description: "No batch numbers found for this item in the selected warehouse",
             variant: "destructive"
           });
         }
       } else {
-        console.log('No stock ledger entries found');
+        console.log('No bin entries found');
         setAvailableBatches([]);
         toast({
           title: "No Stock Available",
-          description: "No batches found with available stock in the selected warehouse",
+          description: "No stock found for this item in the selected warehouse",
           variant: "destructive"
         });
       }
