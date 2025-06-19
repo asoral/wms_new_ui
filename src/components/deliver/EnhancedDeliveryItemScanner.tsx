@@ -102,35 +102,27 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
       console.log('Fetching stock for item:', selectedItem.itemCode, 'warehouse:', warehouse);
 
       if (itemDetails?.has_batch_no) {
-        // For batch items, get stock ledger entries
-        const stockLedgerResult = await erpnextAPI.stock.getStockLedgerEntries(
+        // For batch items, we need to use Bin table which contains current stock by batch
+        console.log('Item is batch-tracked, using Bin API to get batch stock');
+        
+        const binResult = await erpnextAPI.stock.getBinStock(
           selectedItem.itemCode,
           warehouse
         );
         
-        if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
-          // Calculate total available stock from all batches in the selected warehouse
-          const batchGroups = stockLedgerResult.data.reduce((acc: any, entry: any) => {
-            if (entry.batch_no) {
-              if (!acc[entry.batch_no]) {
-                acc[entry.batch_no] = 0;
-              }
-              acc[entry.batch_no] += entry.actual_qty || 0;
-            }
-            return acc;
-          }, {});
-
-          // Sum all positive batch quantities
-          const totalAvailableQty = Object.values(batchGroups).reduce(
-            (sum: number, qty: any) => sum + Math.max(0, qty), 0
-          );
-
-          console.log('Batch-wise stock in warehouse', warehouse, ':', batchGroups);
-          console.log('Total available qty for batch item:', totalAvailableQty);
-
-          setStockInfo({ actual_qty: totalAvailableQty, warehouse_used: warehouse });
+        console.log('Bin API response:', binResult);
+        
+        if (binResult.data && binResult.data.length > 0) {
+          // For batch items, Bin contains the current stock per batch
+          const totalStock = binResult.data.reduce((sum: number, bin: any) => {
+            console.log('Bin entry:', bin);
+            return sum + (bin.actual_qty || 0);
+          }, 0);
+          
+          console.log('Total batch stock in warehouse', warehouse, ':', totalStock);
+          setStockInfo({ actual_qty: totalStock, warehouse_used: warehouse });
         } else {
-          console.log('No stock ledger entries found for batch item in warehouse:', warehouse);
+          console.log('No bin stock found for batch item in warehouse:', warehouse);
           setStockInfo({ actual_qty: 0, warehouse_used: warehouse });
         }
       } else {
