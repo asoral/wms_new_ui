@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ interface BatchInfo {
   qty: number;
   available_qty?: number;
   expiry_date?: string;
+  serial_and_batch_bundle?: string;
 }
 
 interface BatchSelectorProps {
@@ -54,142 +56,69 @@ const BatchSelector = ({
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      console.log('Fetching batches using ERPNext methodology for item:', itemCode, 'warehouse:', warehouse);
+      console.log('Fetching batches using ERPNext API for item:', itemCode, 'warehouse:', warehouse);
 
-      // Step 1: Get all batch numbers for this item that have stock ledger entries in this warehouse
-      const stockLedgerFilters = [
-        ['item_code', '=', itemCode],
-        ['warehouse', '=', warehouse],
-        ['batch_no', '!=', '']  // Only entries with batch numbers
-      ];
-
-      const stockLedgerResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
-        filters: JSON.stringify(stockLedgerFilters),
-        fields: JSON.stringify(['batch_no', 'actual_qty', 'posting_date']),
-        order_by: 'posting_date asc'  // FIFO order by default
-      })}`, {
+      // Use the standard ERPNext API endpoint for getting batches
+      const response = await fetch(`${erpnextAPI.stock.baseURL}/api/method/erpnext.stock.utils.get_batches`, {
+        method: 'POST',
         headers: {
           'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        body: JSON.stringify({
+          item_code: itemCode,
+          warehouse: warehouse,
+          qty: qtyToFetch || requiredQty,
+          posting_date: new Date().toISOString().split('T')[0],
+          serial_and_batch_bundle_required: 1
+        })
       });
 
-      console.log('Stock Ledger API response status:', stockLedgerResponse.status);
+      console.log('ERPNext get_batches API response status:', response.status);
 
-      if (stockLedgerResponse.ok) {
-        const stockLedgerResult = await stockLedgerResponse.json();
-        console.log('Stock Ledger result:', stockLedgerResult);
+      if (response.ok) {
+        const result = await response.json();
+        console.log('ERPNext get_batches result:', result);
 
-        if (stockLedgerResult.data && stockLedgerResult.data.length > 0) {
-          // Step 2: Group by batch_no and calculate current stock for each batch
-          // This mimics ERPNext's logic: SUM(actual_qty) GROUP BY batch_no
-          const batchStockMap = new Map<string, number>();
+        if (result.message && Array.isArray(result.message)) {
+          const batches = result.message.map((batch: any) => ({
+            batch_no: batch.batch_no,
+            qty: 0, // Will be set when selected
+            available_qty: batch.actual_qty || batch.qty || 0,
+            expiry_date: batch.expiry_date,
+            serial_and_batch_bundle: batch.serial_and_batch_bundle
+          }));
+
+          console.log('Available batches from ERPNext API:', batches);
+          setAvailableBatches(batches);
           
-          stockLedgerResult.data.forEach((entry: any) => {
-            if (entry.batch_no) {
-              const currentStock = batchStockMap.get(entry.batch_no) || 0;
-              batchStockMap.set(entry.batch_no, currentStock + (entry.actual_qty || 0));
-            }
-          });
-
-          console.log('Batch stock map from Stock Ledger:', Array.from(batchStockMap.entries()));
-
-          // Step 3: Filter batches with positive stock (available for delivery)
-          const batchesWithStock = Array.from(batchStockMap.entries())
-            .filter(([batchNo, stock]) => stock > 0)
-            .map(([batchNo, stock]) => ({ batchNo, stock }));
-
-          console.log('Batches with positive stock:', batchesWithStock);
-
-          if (batchesWithStock.length > 0) {
-            // Step 4: Get detailed batch information including expiry dates
-            // This follows ERPNext's pattern of fetching batch details after identifying available batches
-            const batchPromises = batchesWithStock.map(async ({ batchNo, stock }) => {
-              try {
-                // Get batch details including expiry date from Batch doctype
-                const batchResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Batch/${batchNo}`, {
-                  headers: {
-                    'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                  },
-                });
-                
-                let expiryDate = null;
-                if (batchResponse.ok) {
-                  const batchData = await batchResponse.json();
-                  expiryDate = batchData.data?.expiry_date;
-                  console.log(`Batch ${batchNo} details:`, { expiry_date: expiryDate, available_qty: stock });
-                }
-
-                return {
-                  batch_no: batchNo,
-                  qty: 0, // Will be set when selected
-                  available_qty: stock,
-                  expiry_date: expiryDate
-                };
-              } catch (error) {
-                console.warn('Error fetching batch details for', batchNo, ':', error);
-                return {
-                  batch_no: batchNo,
-                  qty: 0,
-                  available_qty: stock
-                };
-              }
-            });
-
-            const batchDetails = await Promise.all(batchPromises);
-            
-            // Step 5: Sort batches according to ERPNext's FEFO logic by default
-            // Sort by expiry_date ASC (earliest first), then by creation (batch_no)
-            const sortedBatches = batchDetails.sort((a, b) => {
-              if (a.expiry_date && b.expiry_date) {
-                const dateA = new Date(a.expiry_date).getTime();
-                const dateB = new Date(b.expiry_date).getTime();
-                if (dateA !== dateB) return dateA - dateB;
-              }
-              // If dates are same or missing, sort by batch number
-              return a.batch_no.localeCompare(b.batch_no);
-            });
-            
-            console.log('Available batches (FEFO sorted):', sortedBatches);
-            setAvailableBatches(sortedBatches);
-            
-            if (sortedBatches.length === 0) {
-              toast({
-                title: "No Stock Available",
-                description: "No batches found with available stock in the selected warehouse",
-                variant: "destructive"
-              });
-            }
-          } else {
-            console.log('No batches found with positive stock');
-            setAvailableBatches([]);
+          if (batches.length === 0) {
             toast({
-              title: "No Batches Found",
-              description: "No batches with positive stock found for this item in the selected warehouse",
+              title: "No Batches Available",
+              description: "No batches found with available stock in the selected warehouse",
               variant: "destructive"
             });
           }
         } else {
-          console.log('No stock ledger entries found with batch numbers');
+          console.log('No batches returned from ERPNext API');
           setAvailableBatches([]);
           toast({
-            title: "No Stock Available",
-            description: "No stock ledger entries found for this item in the selected warehouse",
+            title: "No Batches Found",
+            description: "No batches with available stock found for this item in the selected warehouse",
             variant: "destructive"
           });
         }
       } else {
-        console.error('Stock Ledger API failed:', stockLedgerResponse.statusText);
-        throw new Error(`Failed to fetch stock ledger entries: ${stockLedgerResponse.statusText}`);
+        const errorText = await response.text();
+        console.error('ERPNext get_batches API failed:', response.statusText, errorText);
+        throw new Error(`Failed to fetch batches: ${response.statusText}`);
       }
     } catch (error) {
       console.error('Error fetching batches:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch available batches",
+        description: "Failed to fetch available batches using ERPNext API",
         variant: "destructive"
       });
     } finally {
@@ -197,53 +126,103 @@ const BatchSelector = ({
     }
   };
 
-  const autoFetchBatches = () => {
-    let remainingQty = qtyToFetch;
-    const selected: BatchInfo[] = [];
-    
-    // Sort batches based on fetch method (following ERPNext's logic)
-    let sortedBatches = [...availableBatches];
-    
-    if (fetchMethod === 'LIFO') {
-      // Last In First Out - reverse the FIFO order
-      sortedBatches.reverse();
-    } else if (fetchMethod === 'FEFO') {
-      // First Expiry First Out - sort by expiry date (already sorted this way)
-      sortedBatches.sort((a, b) => {
-        if (!a.expiry_date) return 1;
-        if (!b.expiry_date) return -1;
-        return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime();
-      });
-    }
-    // FIFO is default order (no additional sorting needed)
+  const autoFetchBatches = async () => {
+    setLoading(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
 
-    // Auto-allocate stock following ERPNext's allocation logic
-    for (const batch of sortedBatches) {
-      if (remainingQty <= 0) break;
-      
-      const qtyToTake = Math.min(remainingQty, batch.available_qty || 0);
-      if (qtyToTake > 0) {
-        selected.push({
-          ...batch,
-          qty: qtyToTake
-        });
-        remainingQty -= qtyToTake;
+      console.log('Auto-fetching batches using ERPNext API with method:', fetchMethod);
+
+      // Use ERPNext API to get batches with proper FIFO/FEFO logic
+      const response = await fetch(`${erpnextAPI.stock.baseURL}/api/method/erpnext.stock.utils.get_batches`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          item_code: itemCode,
+          warehouse: warehouse,
+          qty: qtyToFetch,
+          posting_date: new Date().toISOString().split('T')[0],
+          serial_and_batch_bundle_required: 1,
+          based_on: fetchMethod // Pass the fetch method to ERPNext
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Auto-fetch batches result:', result);
+
+        if (result.message && Array.isArray(result.message)) {
+          let remainingQty = qtyToFetch;
+          const selected: BatchInfo[] = [];
+
+          for (const batch of result.message) {
+            if (remainingQty <= 0) break;
+            
+            const qtyToTake = Math.min(remainingQty, batch.actual_qty || batch.qty || 0);
+            if (qtyToTake > 0) {
+              selected.push({
+                batch_no: batch.batch_no,
+                qty: qtyToTake,
+                available_qty: batch.actual_qty || batch.qty || 0,
+                expiry_date: batch.expiry_date,
+                serial_and_batch_bundle: batch.serial_and_batch_bundle
+              });
+              remainingQty -= qtyToTake;
+            }
+          }
+
+          setSelectedBatches(selected);
+          
+          if (selected.length > 0) {
+            toast({
+              title: "Batches Auto-Selected",
+              description: `Selected ${selected.length} batches using ${fetchMethod} method (total: ${selected.reduce((sum, b) => sum + b.qty, 0)})`,
+            });
+          } else {
+            toast({
+              title: "No Batches Available",
+              description: "No batches with sufficient stock found",
+              variant: "destructive"
+            });
+          }
+        }
+      } else {
+        throw new Error(`Auto-fetch failed: ${response.statusText}`);
       }
-    }
+    } catch (error) {
+      console.error('Error auto-fetching batches:', error);
+      // Fallback to manual selection from available batches
+      let remainingQty = qtyToFetch;
+      const selected: BatchInfo[] = [];
+      
+      for (const batch of availableBatches) {
+        if (remainingQty <= 0) break;
+        
+        const qtyToTake = Math.min(remainingQty, batch.available_qty || 0);
+        if (qtyToTake > 0) {
+          selected.push({
+            ...batch,
+            qty: qtyToTake
+          });
+          remainingQty -= qtyToTake;
+        }
+      }
 
-    setSelectedBatches(selected);
-    
-    if (selected.length > 0) {
-      toast({
-        title: "Batches Auto-Selected",
-        description: `Selected ${selected.length} batches using ${fetchMethod} method (total: ${selected.reduce((sum, b) => sum + b.qty, 0)})`,
-      });
-    } else {
-      toast({
-        title: "No Batches Available",
-        description: "No batches with sufficient stock found",
-        variant: "destructive"
-      });
+      setSelectedBatches(selected);
+      
+      if (selected.length > 0) {
+        toast({
+          title: "Batches Auto-Selected (Fallback)",
+          description: `Selected ${selected.length} batches (total: ${selected.reduce((sum, b) => sum + b.qty, 0)})`,
+        });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -308,7 +287,7 @@ const BatchSelector = ({
         <div className="space-y-4">
           {/* Auto Fetch Section */}
           <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium mb-3">Auto Fetch (ERPNext Style)</h4>
+            <h4 className="font-medium mb-3">Auto Fetch (ERPNext API)</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Qty to Fetch</Label>
@@ -358,7 +337,7 @@ const BatchSelector = ({
           {/* Available Batches Table */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium">Available Batches (Stock Ledger Based)</h4>
+              <h4 className="font-medium">Available Batches (ERPNext API)</h4>
               <Badge variant="secondary">
                 Selected Qty: {getTotalSelectedQty()} / {requiredQty}
               </Badge>
@@ -379,13 +358,13 @@ const BatchSelector = ({
                   {loading ? (
                     <tr>
                       <td colSpan={5} className="p-4 text-center text-gray-500">
-                        Loading batches from Stock Ledger...
+                        Loading batches from ERPNext API...
                       </td>
                     </tr>
                   ) : filteredBatches.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="p-4 text-center text-gray-500">
-                        {searchTerm ? 'No matching batches found' : 'No batches with available stock found in Stock Ledger'}
+                        {searchTerm ? 'No matching batches found' : 'No batches with available stock found'}
                       </td>
                     </tr>
                   ) : (
