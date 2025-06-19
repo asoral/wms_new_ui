@@ -75,9 +75,13 @@ const BatchSelector = ({
           // Now get detailed batch information including expiry dates
           const batchPromises = Array.from(batchNumbers).map(async (batchNo) => {
             try {
-              // Get batch details including expiry date
-              const batchResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch/${batchNo}`, {
-                headers: erpnextAPI.getHeaders(),
+              // Get batch details including expiry date using the stock API
+              const batchResponse = await fetch(`${erpnextAPI.stock.baseURL}/api/resource/Batch/${batchNo}`, {
+                headers: {
+                  'Authorization': `token ${erpnextAPI.stock.apiKey}:${erpnextAPI.stock.apiSecret}`,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
               });
               
               let expiryDate = null;
