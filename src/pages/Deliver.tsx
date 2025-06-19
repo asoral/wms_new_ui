@@ -175,9 +175,10 @@ const Deliver = () => {
       const company = await getUserDefaultCompany();
       console.log('Creating delivery note for company:', company);
 
-      // Get the actual sales order to get the correct customer reference
+      // Get the actual sales order to get the correct customer reference and items
       const salesOrderResult = await erpnextAPI.sales.getSalesOrder(selectedSO.number);
       const actualCustomer = salesOrderResult.data?.customer;
+      const soItems = salesOrderResult.data?.items || [];
 
       if (!actualCustomer) {
         toast({
@@ -188,24 +189,31 @@ const Deliver = () => {
         return;
       }
 
-      // Create delivery note data in draft status
+      // Create delivery note data in draft status with proper sales order references
       const deliveryData = {
         customer: actualCustomer,
         company: company,
         posting_date: new Date().toISOString().split('T')[0],
         set_posting_time: 1,
         docstatus: 0, // Draft status
-        items: deliveryEntries.map(entry => ({
-          item_code: entry.itemCode,
-          qty: entry.qtyToDeliver,
-          warehouse: entry.warehouse,
-          rate: entry.rate,
-          uom: entry.uom,
-          against_sales_order: selectedSO.number,
-          ...(entry.batch && { batch_no: entry.batch }),
-          ...(entry.serial && { serial_no: entry.serial }),
-          ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })
-        }))
+        items: deliveryEntries.map(entry => {
+          // Find the corresponding SO item to get the against_sales_order_item reference
+          const soItem = soItems.find((item: any) => item.item_code === entry.itemCode);
+          
+          return {
+            item_code: entry.itemCode,
+            item_name: entry.itemName,
+            qty: entry.qtyToDeliver,
+            warehouse: entry.warehouse,
+            rate: entry.rate,
+            uom: entry.uom,
+            against_sales_order: selectedSO.number,
+            against_sales_order_item: soItem?.name || null, // This is the key field that was missing
+            ...(entry.batch && { batch_no: entry.batch }),
+            ...(entry.serial && { serial_no: entry.serial }),
+            ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })
+          };
+        })
       };
 
       console.log('Delivery note data:', deliveryData);
