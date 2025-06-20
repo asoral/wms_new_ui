@@ -16,14 +16,14 @@ interface EnhancedDeliveryItemScannerProps {
   soItems: SOItem[];
   onAddEntry: (entry: DeliveryEntry) => void;
   company?: string;
-  deliveryNoteName?: string; // Add delivery note reference
+  deliveryNoteName?: string;
 }
 
 const EnhancedDeliveryItemScanner = ({ 
   soItems, 
   onAddEntry, 
   company,
-  deliveryNoteName // Add delivery note reference
+  deliveryNoteName
 }: EnhancedDeliveryItemScannerProps) => {
   const [selectedItemCode, setSelectedItemCode] = useState("");
   const [scannedCode, setScannedCode] = useState("");
@@ -44,7 +44,7 @@ const EnhancedDeliveryItemScanner = ({
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return { hasBatch: false, hasSerial: false };
 
-      const result = await erpnextAPI.items.getItem(itemCode);
+      const result = await erpnextAPI.items.getItemDetails(itemCode);
       return {
         hasBatch: result.data?.has_batch_no === 1,
         hasSerial: result.data?.has_serial_no === 1
@@ -421,7 +421,7 @@ const EnhancedDeliveryItemScanner = ({
         requiredQty={parseInt(quantity) || 1}
         onBatchesSelected={handleBatchesSelected}
         company={company || ""}
-        deliveryNoteName={deliveryNoteName} // Pass delivery note reference
+        deliveryNoteName={deliveryNoteName}
       />
     </>
   );

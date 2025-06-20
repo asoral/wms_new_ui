@@ -224,12 +224,12 @@ const Deliver = () => {
       }
 
       // Get current delivery note
-      const currentDNResult = await erpnextAPI.sales.getDeliveryNotes([['name', '=', deliveryNoteName]]);
-      if (!currentDNResult.data || currentDNResult.data.length === 0) {
+      const currentDNResult = await erpnextAPI.sales.getDeliveryNote(deliveryNoteName);
+      if (!currentDNResult.data) {
         throw new Error('Could not find delivery note');
       }
 
-      const currentDN = currentDNResult.data[0];
+      const currentDN = currentDNResult.data;
       
       // Get the actual sales order with all item details
       const salesOrderResult = await erpnextAPI.sales.getSalesOrder(selectedSO.number);
@@ -434,7 +434,7 @@ const Deliver = () => {
                     <td className="p-3 border text-sm font-medium">{item.itemCode}</td>
                     <td className="p-3 border text-sm">{item.itemName}</td>
                     <td className="p-3 border text-sm">{item.orderedQty} {item.uom}</td>
-                    <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td>
+                    <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td
                     <td className="p-3 border text-sm">{item.pendingQty} {item.uom}</td>
                     <td className="p-3 border text-sm">
                       <Badge variant={item.pendingQty > 0 ? "default" : "secondary"}>
