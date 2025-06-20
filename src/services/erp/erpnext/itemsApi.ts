@@ -222,7 +222,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Fetch items with filters, pagination, and optional text search
+   * Fetch items with proper filters - FIXED VERSION
    */
   async getItems(
     filters: Record<string, any> = {},
@@ -236,15 +236,16 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       ['has_variants', '=', 0]
     ];
 
-    // apply extra filters
+    // Apply extra filters correctly
     for (const [field, value] of Object.entries(filters)) {
       conditions.push([field, '=', value]);
     }
     
-    // apply searchText filters
+    // Apply searchText filters using OR logic
     if (searchText) {
-      conditions.push(['item_code', 'like', `%${searchText}%`]);
-      conditions.push(['item_name', 'like', `%${searchText}%`]);
+      // For text search, we need to use a different approach
+      // Let's use the search_link API instead for text searches
+      return this.searchItems(searchText, limit);
     }
 
     const params = new URLSearchParams();
@@ -261,10 +262,14 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String(offset));
 
+    console.log('Fetching items with conditions:', conditions);
+    console.log('API URL:', `${this.baseURL}/api/resource/Item?${params.toString()}`);
+
     const response = await fetch(
       `${this.baseURL}/api/resource/Item?${params.toString()}`,
       { headers: this.getHeaders() }
     );
+    
     if (!response.ok) {
       throw new Error(`Failed to fetch items: ${response.statusText}`);
     }
