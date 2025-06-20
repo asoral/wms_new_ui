@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ interface BatchInfo {
 interface EnhancedDeliveryItemScannerProps {
   soItems: SOItem[];
   onAddEntry: (entry: DeliveryEntry) => void;
-  company?: string; // Add company prop
+  company?: string;
 }
 
 const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedDeliveryItemScannerProps) => {
@@ -155,7 +156,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Enhanced Item Scanner</CardTitle>
+          <CardTitle>Item</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs defaultValue="manual" className="w-full">
@@ -299,7 +300,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
           warehouse={warehouse}
           requiredQty={parseInt(quantity)}
           onBatchesSelected={handleBatchesSelected}
-          company={company} // Pass company prop
+          company={company}
         />
       )}
     </>
