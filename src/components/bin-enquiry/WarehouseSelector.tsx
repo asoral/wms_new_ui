@@ -194,7 +194,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[9999]" align="start">
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[10000]" align="start">
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search warehouses..." 
@@ -218,7 +218,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                   )}
                   {!isLoadingWarehouses && filteredWarehouses.length > 0 && (
                     <CommandGroup>
-                      {filtere dWarehouses.map((warehouse) => {
+                      {filteredWarehouses.map((warehouse) => {
                         console.log('Rendering warehouse:', warehouse.name, warehouse.warehouse_name);
                         return (
                           <CommandItem
