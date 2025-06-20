@@ -44,9 +44,15 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     }, 300);
   }, []);
 
-  // Don't load items initially - only when user starts typing
   const fetchItems = async (search: string = "") => {
     console.log('fetchItems called with search:', search);
+    
+    // Only search when user types something
+    if (!search.trim()) {
+      setItems([]);
+      return;
+    }
+    
     setIsLoadingItems(true);
     
     try {
@@ -60,72 +66,49 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       const limit = 50;
       
       let result;
-      if (search.trim()) {
-        console.log('Searching items with term:', search);
-        if (/^[0-9]+$/.test(search) || search.length > 10) {
-          try {
-            result = await erpnextAPI.searchItemsByBarcode(search);
-            if (!result.data || result.data.length === 0) {
-              result = await erpnextAPI.searchItems(search, limit);
-            }
-          } catch (error) {
-            console.log('Barcode search failed, trying regular search');
+      console.log('Searching items with term:', search);
+      
+      // Check if it's a barcode (numeric or long string)
+      if (/^[0-9]+$/.test(search) || search.length > 10) {
+        try {
+          result = await erpnextAPI.searchItemsByBarcode(search);
+          if (!result.data || result.data.length === 0) {
             result = await erpnextAPI.searchItems(search, limit);
           }
-        } else {
+        } catch (error) {
+          console.log('Barcode search failed, trying regular search');
           result = await erpnextAPI.searchItems(search, limit);
         }
       } else {
-        // Only fetch initial items if we have a search term or user opens dropdown
-        return;
+        result = await erpnextAPI.searchItems(search, limit);
       }
       
       console.log('API result:', result);
       
       if (result && result.data && Array.isArray(result.data)) {
-        // Get detailed item information to ensure we have proper item names
-        const itemsWithDetails = await Promise.all(
-          result.data.slice(0, limit).map(async (item) => {
-            try {
-              const detailResult = await erpnextAPI.getItemDetails(item.item_code || item.name);
-              if (detailResult.data) {
-                return {
-                  name: detailResult.data.name,
-                  item_code: detailResult.data.item_code,
-                  item_name: detailResult.data.item_name,
-                  stock_uom: detailResult.data.stock_uom || 'Nos',
-                  has_batch_no: detailResult.data.has_batch_no || false,
-                  has_serial_no: detailResult.data.has_serial_no || false
-                };
-              }
-            } catch (error) {
-              console.warn('Failed to get details for item:', item.item_code || item.name);
+        const validItems = result.data
+          .slice(0, limit)
+          .filter(item => {
+            const isValid = item && item.item_code && item.item_name;
+            if (!isValid) {
+              console.warn('Filtering out invalid item:', item);
             }
-            
-            // Fallback to original item data
-            return {
-              name: item.name,
-              item_code: item.item_code || item.name || '',
-              item_name: item.item_name || item.item_code || item.name || '',
-              stock_uom: item.stock_uom || 'Nos',
-              has_batch_no: item.has_batch_no || false,
-              has_serial_no: item.has_serial_no || false
-            };
+            return isValid;
           })
-        );
-
-        const validItems = itemsWithDetails.filter(item => {
-          const isValid = item && item.item_code && item.item_name;
-          if (!isValid) {
-            console.warn('Filtering out invalid item:', item);
-          }
-          return isValid;
-        });
+          .map(item => ({
+            name: item.name,
+            item_code: item.item_code || item.name || '',
+            item_name: item.item_name || item.item_code || item.name || '',
+            stock_uom: item.stock_uom || 'Nos',
+            has_batch_no: item.has_batch_no || false,
+            has_serial_no: item.has_serial_no || false
+          }));
         
         console.log('Setting items:', validItems.length);
         console.log('Sample items with names:', validItems.slice(0, 3).map(i => ({ code: i.item_code, name: i.item_name })));
         setItems(validItems);
 
+        // Cache the results
         const cacheKey = `items_search_${search}`;
         await offlineStorage.cacheData(cacheKey, validItems, 300000);
       } else {
@@ -135,6 +118,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     } catch (error) {
       console.error('Failed to fetch items:', error);
       
+      // Try to load from cache as fallback
       try {
         const cacheKey = `items_search_${search}`;
         const cached = await offlineStorage.getCachedData(cacheKey);
