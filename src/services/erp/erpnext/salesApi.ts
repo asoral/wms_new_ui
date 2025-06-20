@@ -1,4 +1,5 @@
 
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, SalesOrder, DeliveryNote } from './types';
 
@@ -102,6 +103,18 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
+  async getDeliveryNote(deliveryNoteName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Delivery Note/${encodeURIComponent(deliveryNoteName)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch delivery note: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async createDeliveryNote(deliveryData: any): Promise<ERPNextResponse<any>> {
     const response = await fetch(`${this.baseURL}/api/resource/Delivery Note`, {
       method: 'POST',
@@ -179,3 +192,4 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
     }
   }
 }
+
