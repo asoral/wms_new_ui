@@ -204,6 +204,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 {filteredItems.map((item) => (
                   <CommandItem
                     key={item.item_code}
+                    value={`${item.item_code} ${item.item_name}`}
                     onSelect={() => handleItemSelect(item)}
                   >
                     <Check

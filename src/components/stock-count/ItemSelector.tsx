@@ -219,6 +219,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                     {filteredItems.map((item) => (
                       <CommandItem
                         key={item.item_code}
+                        value={`${item.item_code} ${item.item_name}`}
                         onSelect={() => handleItemSelect(item)}
                       >
                         <Check
@@ -240,7 +241,11 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                       </CommandItem>
                     ))}
                     {hasMore && (
-                      <CommandItem onSelect={loadMoreItems}>
+                      <CommandItem 
+                        key="load-more"
+                        value="load-more"
+                        onSelect={loadMoreItems}
+                      >
                         <div className="flex items-center justify-center w-full py-2">
                           {isLoadingItems ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
