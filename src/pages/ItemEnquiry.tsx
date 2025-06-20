@@ -2,12 +2,13 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Package, Warehouse, Search, TrendingUp, AlertTriangle, Calendar, DollarSign, Scan } from "lucide-react";
+import { Package, Warehouse, TrendingUp, AlertTriangle, Calendar, DollarSign, Camera } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import ItemSelector from "@/components/item-enquiry/ItemSelector";
+import ItemScanner from "@/components/item-enquiry/ItemScanner";
+import CameraScanner from "@/components/item-enquiry/CameraScanner";
 
 interface StockItem {
   itemCode: string;
@@ -27,7 +28,7 @@ const ItemEnquiry = () => {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<string>("");
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
-  const [barcode, setBarcode] = useState("");
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
   const { toast } = useToast();
 
   const loadItemStock = async (itemCode: string) => {
@@ -58,11 +59,10 @@ const ItemEnquiry = () => {
       const company = await getUserDefaultCompany();
       if (company) {
         try {
-          // Use the company API to get company details
           const companiesResult = await erpnextAPI.getCompanies();
           const companyData = companiesResult.data?.find(c => c.name === company);
           if (companyData) {
-            setCompanyCurrency("INR"); // Default currency, can be enhanced later
+            setCompanyCurrency("INR");
           }
         } catch (error) {
           console.error('Failed to fetch company currency:', error);
@@ -74,15 +74,13 @@ const ItemEnquiry = () => {
       console.log('Item stock response:', response);
 
       if (response?.data) {
-        // Transform the data to match our StockItem interface
         const transformedItems: StockItem[] = response.data
-          .filter((item: any) => (item.actual_qty || 0) > 0) // Filter out zero stock items
+          .filter((item: any) => (item.actual_qty || 0) > 0)
           .map((item: any) => {
             const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
             const valuationRate = item.valuation_rate || 0;
             const stockValue = item.stock_value || 0;
             
-            // Use stock_value if available, otherwise calculate from qty * rate
             let totalValuation = stockValue;
             if (!stockValue && valuationRate && actualQty > 0) {
               totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
@@ -95,7 +93,7 @@ const ItemEnquiry = () => {
               qty: actualQty,
               uom: 'Nos',
               valuation: totalValuation,
-              age: Math.floor(Math.random() * 120), // Placeholder
+              age: Math.floor(Math.random() * 120),
               binLocation: item.warehouse
             };
           });
@@ -134,16 +132,7 @@ const ItemEnquiry = () => {
     }
   };
 
-  const handleBarcodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (barcode.trim()) {
-      await loadItemStock(barcode.trim());
-      setBarcode("");
-    }
-  };
-
   const handleClear = () => {
-    setBarcode("");
     setSelectedItem("");
     setStockItems([]);
   };
@@ -177,39 +166,42 @@ const ItemEnquiry = () => {
         <p className="text-gray-500">Check the stock levels of a specific item.</p>
       </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="w-5 h-5" />
-            <span>Select Item</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleBarcodeSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="barcode">Item Code / Barcode</Label>
-              <Input
-                id="barcode"
-                type="text"
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                placeholder="Scan or enter item code/barcode"
-                disabled={loading}
-                className="text-lg"
-              />
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Select Item</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ItemSelector 
+              onItemSelected={loadItemStock}
+              isLoading={loading}
+            />
             <div className="flex space-x-2">
-              <Button type="submit" disabled={!barcode.trim() || loading}>
-                <Scan className="w-4 h-4 mr-2" />
-                {loading ? "Searching..." : "Search"}
+              <Button 
+                variant="outline" 
+                onClick={() => setShowCameraScanner(true)}
+                className="flex-1"
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Camera
               </Button>
-              <Button type="button" variant="secondary" onClick={handleClear}>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={handleClear}
+                className="flex-1"
+              >
                 Clear
               </Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <ItemScanner 
+          onBarcodeScanned={loadItemStock}
+          isLoading={loading}
+        />
+      </div>
 
       {selectedItem && (
         <>
@@ -371,14 +363,24 @@ const ItemEnquiry = () => {
         <Card>
           <CardContent className="text-center py-8">
             <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500 mb-4">Enter an item code or scan a barcode to view stock levels.</p>
+            <p className="text-gray-500 mb-4">Select an item using the dropdown or scan a barcode to view stock levels.</p>
             <div className="text-sm text-gray-400">
-              <p>• Use the search box above to enter item codes</p>
-              <p>• Scan barcodes for quick lookup</p>
+              <p>• Use the item selector dropdown for quick selection</p>
+              <p>• Scan barcodes for instant lookup</p>
               <p>• View stock across all warehouses</p>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {showCameraScanner && (
+        <CameraScanner
+          onBarcodeScanned={(barcode) => {
+            setShowCameraScanner(false);
+            loadItemStock(barcode);
+          }}
+          onClose={() => setShowCameraScanner(false)}
+        />
       )}
     </div>
   );
