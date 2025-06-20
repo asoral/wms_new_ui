@@ -19,6 +19,11 @@ interface EnhancedDeliveryItemScannerProps {
   deliveryNoteName?: string;
 }
 
+interface WarehouseInfo {
+  name: string;
+  warehouse_name: string;
+}
+
 const EnhancedDeliveryItemScanner = ({ 
   soItems, 
   onAddEntry, 
@@ -28,6 +33,7 @@ const EnhancedDeliveryItemScanner = ({
   const [selectedItemCode, setSelectedItemCode] = useState("");
   const [scannedCode, setScannedCode] = useState("");
   const [warehouse, setWarehouse] = useState("");
+  const [warehouses, setWarehouses] = useState<WarehouseInfo[]>([]);
   const [batchNumber, setBatchNumber] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -37,6 +43,30 @@ const EnhancedDeliveryItemScanner = ({
   const { toast } = useToast();
 
   const selectedItem = soItems.find(item => item.itemCode === selectedItemCode);
+
+  // Fetch warehouses on component mount
+  useEffect(() => {
+    fetchWarehouses();
+  }, []);
+
+  const fetchWarehouses = async () => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const defaultCompany = await getUserDefaultCompany();
+      const result = await erpnextAPI.warehouses.getWarehouses(
+        [['disabled', '=', 0]], 
+        defaultCompany || undefined
+      );
+      
+      if (result.data) {
+        setWarehouses(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching warehouses:', error);
+    }
+  };
 
   // Check if item is batch/serial tracked
   const checkItemTracking = async (itemCode: string) => {
@@ -211,6 +241,20 @@ const EnhancedDeliveryItemScanner = ({
     });
   };
 
+  const getTrackingInfo = () => {
+    if (!itemDetails) return "Loading...";
+    
+    if (itemDetails.hasBatch && itemDetails.hasSerial) {
+      return "Batch & Serial";
+    } else if (itemDetails.hasBatch) {
+      return "Batch";
+    } else if (itemDetails.hasSerial) {
+      return "Serial";
+    } else {
+      return "None";
+    }
+  };
+
   return (
     <>
       <Card>
@@ -268,11 +312,18 @@ const EnhancedDeliveryItemScanner = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Warehouse *</label>
-                  <Input
-                    placeholder="Scan or enter warehouse"
-                    value={warehouse}
-                    onChange={(e) => setWarehouse(e.target.value)}
-                  />
+                  <Select value={warehouse} onValueChange={setWarehouse}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select warehouse..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((wh) => (
+                        <SelectItem key={wh.name} value={wh.name}>
+                          {wh.warehouse_name || wh.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Quantity to Deliver *</label>
@@ -359,44 +410,53 @@ const EnhancedDeliveryItemScanner = ({
                 </div>
               )}
 
-              {/* Item Details */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium mb-2">Item Details</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+              {/* Item Details with proper styling */}
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <h4 className="font-medium mb-3 text-blue-900">Item Details</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                   <div>
-                    <span className="text-gray-600">Name:</span>
-                    <div className="font-medium">{selectedItem.itemName}</div>
+                    <span className="text-gray-600 font-medium">Name:</span>
+                    <div className="font-semibold text-gray-900">{selectedItem.itemName}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Pending:</span>
-                    <div className="font-medium">{selectedItem.pendingQty} {selectedItem.uom}</div>
+                    <span className="text-gray-600 font-medium">Pending:</span>
+                    <div className="font-semibold text-gray-900">{selectedItem.pendingQty} {selectedItem.uom}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Rate:</span>
-                    <div className="font-medium">₹{selectedItem.rate.toLocaleString()}</div>
+                    <span className="text-gray-600 font-medium">Rate:</span>
+                    <div className="font-semibold text-gray-900">₹{selectedItem.rate.toLocaleString()}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">UOM:</span>
-                    <div className="font-medium">{selectedItem.uom}</div>
+                    <span className="text-gray-600 font-medium">UOM:</span>
+                    <div className="font-semibold text-gray-900">{selectedItem.uom}</div>
                   </div>
                 </div>
                 
-                {itemDetails && (
-                  <div className="mt-2 flex space-x-4">
-                    <div className="flex items-center space-x-1">
-                      <span className="text-xs text-gray-600">Batch Tracking:</span>
-                      <Badge variant={itemDetails.hasBatch ? "default" : "secondary"} className="text-xs">
-                        {itemDetails.hasBatch ? "Yes" : "No"}
+                <div className="mt-3 pt-3 border-t border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-gray-700">Tracking Info:</span>
+                      <Badge 
+                        variant={getTrackingInfo() !== "None" ? "default" : "secondary"}
+                        className="text-xs"
+                      >
+                        {getTrackingInfo()}
                       </Badge>
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <span className="text-xs text-gray-600">Serial Tracking:</span>
-                      <Badge variant={itemDetails.hasSerial ? "default" : "secondary"} className="text-xs">
-                        {itemDetails.hasSerial ? "Yes" : "No"}
-                      </Badge>
-                    </div>
+                    
+                    {itemDetails && (itemDetails.hasBatch || itemDetails.hasSerial) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenBatchSelector}
+                        disabled={!selectedItem || !warehouse || !quantity}
+                      >
+                        Pick Serial / Batch No
+                      </Button>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               <Button 
