@@ -7,7 +7,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   /**
    * Search items using Frappe's search_link API
    */
-  async searchItems(query: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
+  async searchItems(query: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
     params.append('doctype', 'Item');
     params.append('txt', query);
@@ -74,7 +74,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       'item_name',
       'stock_uom',
       'has_batch_no',
-      'has_serial_no'
+      'has_serial_no',
+      'item_group'
     ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String((page - 1) * limit));
@@ -101,7 +102,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       item_name: item.item_name || item.item_code || item.name,
       stock_uom: item.stock_uom || 'Nos',
       has_batch_no: item.has_batch_no || false,
-      has_serial_no: item.has_serial_no || false
+      has_serial_no: item.has_serial_no || false,
+      item_group: item.item_group || 'All Item Groups'
     }));
 
     console.log('Transformed items:', transformedItems);
@@ -136,6 +138,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
         'stock_uom',
         'has_batch_no',
         'has_serial_no',
+        'item_group',
         'barcodes'
       ])
     });
@@ -157,7 +160,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       item_name: result.data.item_name || result.data.item_code || result.data.name,
       stock_uom: result.data.stock_uom || 'Nos',
       has_batch_no: result.data.has_batch_no || false,
-      has_serial_no: result.data.has_serial_no || false
+      has_serial_no: result.data.has_serial_no || false,
+      item_group: result.data.item_group || 'All Item Groups'
     };
     
     return { data: transformedItem };
@@ -177,6 +181,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
           'stock_uom',
           'has_batch_no',
           'has_serial_no',
+          'item_group',
           'barcodes'
         ]),
       });
@@ -205,7 +210,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
         item_name: result.data.item_name || result.data.item_code || result.data.name,
         stock_uom: result.data.stock_uom || 'Nos',
         has_batch_no: result.data.has_batch_no || false,
-        has_serial_no: result.data.has_serial_no || false
+        has_serial_no: result.data.has_serial_no || false,
+        item_group: result.data.item_group || 'All Item Groups'
       };
       
       return { data: transformedItem };
@@ -249,7 +255,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       'item_name',
       'stock_uom',
       'has_batch_no',
-      'has_serial_no'
+      'has_serial_no',
+      'item_group'
     ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String(offset));
@@ -271,7 +278,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       item_name: item.item_name || item.item_code || item.name,
       stock_uom: item.stock_uom || 'Nos',
       has_batch_no: item.has_batch_no || false,
-      has_serial_no: item.has_serial_no || false
+      has_serial_no: item.has_serial_no || false,
+      item_group: item.item_group || 'All Item Groups'
     }));
 
     return { data: transformedItems };
