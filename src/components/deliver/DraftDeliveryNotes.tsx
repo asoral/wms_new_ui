@@ -14,10 +14,11 @@ interface DraftDeliveryNote {
   grand_total: number;
   status: string;
   items_count: number;
+  against_sales_order?: string;
 }
 
 interface DraftDeliveryNotesProps {
-  onSelectDraft: (draftName: string) => void;
+  onSelectDraft: (draftName: string, salesOrderNumber?: string) => void;
 }
 
 const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
@@ -44,22 +45,49 @@ const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
 
       const company = await getUserDefaultCompany();
       
-      // Fetch draft delivery notes
+      // Fetch draft delivery notes with more details
       const result = await erpnextAPI.sales.getDeliveryNotes([
         ['docstatus', '=', 0] // Draft status
       ], company || undefined);
       
       if (result.data) {
-        const transformedNotes: DraftDeliveryNote[] = result.data.map((note: any) => ({
-          name: note.name,
-          customer: note.customer_name || note.customer,
-          posting_date: note.posting_date,
-          grand_total: note.grand_total || 0,
-          status: note.status,
-          items_count: note.items ? note.items.length : 0
-        }));
+        // Get detailed info for each draft note to find associated sales orders
+        const detailedNotes = await Promise.all(
+          result.data.map(async (note: any) => {
+            try {
+              const detailResult = await erpnextAPI.sales.getDeliveryNote(note.name);
+              const detailData = detailResult.data;
+              
+              // Find the sales order from the items
+              let salesOrderNumber = '';
+              if (detailData?.items && detailData.items.length > 0) {
+                salesOrderNumber = detailData.items[0].against_sales_order || '';
+              }
+              
+              return {
+                name: note.name,
+                customer: note.customer_name || note.customer,
+                posting_date: note.posting_date,
+                grand_total: note.grand_total || 0,
+                status: note.status,
+                items_count: detailData?.items ? detailData.items.length : 0,
+                against_sales_order: salesOrderNumber
+              };
+            } catch (error) {
+              console.error(`Error getting details for ${note.name}:`, error);
+              return {
+                name: note.name,
+                customer: note.customer_name || note.customer,
+                posting_date: note.posting_date,
+                grand_total: note.grand_total || 0,
+                status: note.status,
+                items_count: 0
+              };
+            }
+          })
+        );
         
-        setDraftNotes(transformedNotes);
+        setDraftNotes(detailedNotes);
       }
       
     } catch (error) {
@@ -80,6 +108,10 @@ const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
       currency: 'INR',
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const handleContinueDraft = (note: DraftDeliveryNote) => {
+    onSelectDraft(note.name, note.against_sales_order);
   };
 
   return (
@@ -110,6 +142,9 @@ const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
                       <div className="flex items-center space-x-2">
                         <h3 className="font-semibold">{note.name}</h3>
                         <Badge variant="secondary">Draft</Badge>
+                        {note.against_sales_order && (
+                          <Badge variant="outline">SO: {note.against_sales_order}</Badge>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                         <div className="flex items-center space-x-2">
@@ -129,7 +164,7 @@ const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
                         </div>
                       </div>
                     </div>
-                    <Button onClick={() => onSelectDraft(note.name)}>
+                    <Button onClick={() => handleContinueDraft(note)}>
                       Continue
                     </Button>
                   </div>

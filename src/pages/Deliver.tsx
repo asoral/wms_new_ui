@@ -134,12 +134,93 @@ const Deliver = () => {
     setActiveTab("deliver");
   };
 
-  const handleDraftSelected = (draftName: string) => {
-    setCurrentDeliveryNote(draftName);
-    toast({
-      title: "Draft Loaded",
-      description: `Draft delivery note ${draftName} loaded.`,
-    });
+  const handleDraftSelected = async (draftName: string, salesOrderNumber?: string) => {
+    try {
+      setLoading(true);
+      setCurrentDeliveryNote(draftName);
+      
+      // Load the draft delivery note items
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured');
+      }
+
+      // Get the draft delivery note details
+      const draftResult = await erpnextAPI.sales.getDeliveryNote(draftName);
+      const draftData = draftResult.data;
+      
+      if (!draftData) {
+        throw new Error('Could not load draft delivery note');
+      }
+
+      // If we have a sales order number, load that too
+      if (salesOrderNumber) {
+        const soResult = await erpnextAPI.sales.getSalesOrder(salesOrderNumber);
+        if (soResult.data) {
+          const soData = soResult.data;
+          
+          // Transform to our SalesOrder format
+          const salesOrder: SalesOrder = {
+            number: soData.name,
+            customer: soData.customer_name || soData.customer,
+            status: soData.status,
+            deliveryDate: soData.delivery_date,
+            totalItems: soData.items ? soData.items.length : 0,
+            totalValue: soData.grand_total,
+            company: soData.company,
+            items: soData.items ? soData.items.map((item: any) => ({
+              itemCode: item.item_code,
+              itemName: item.item_name,
+              orderedQty: item.qty,
+              deliveredQty: item.delivered_qty || 0,
+              pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
+              rate: item.rate,
+              uom: item.uom,
+              warehouse: item.warehouse,
+              qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
+            })) : []
+          };
+          
+          setSelectedSO(salesOrder);
+        }
+      }
+
+      // Convert draft items to delivery entries
+      if (draftData.items) {
+        const entries: DeliveryEntry[] = draftData.items.map((item: any) => ({
+          itemCode: item.item_code,
+          itemName: item.item_name,
+          warehouse: item.warehouse,
+          batch: item.batch_no,
+          serial: item.serial_no,
+          qtyToDeliver: item.qty,
+          actualQty: item.qty,
+          rate: item.rate,
+          uom: item.uom,
+          serial_batch_bundle: item.serial_and_batch_bundle
+        }));
+        
+        setDeliveryEntries(entries);
+        
+        // Switch to review tab so user can see the loaded items
+        setActiveTab("review");
+      }
+      
+      toast({
+        title: "Draft Loaded",
+        description: `Draft delivery note ${draftName} loaded with ${draftData.items ? draftData.items.length : 0} items.`,
+      });
+      
+    } catch (error) {
+      console.error('Error loading draft delivery note:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load draft delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const createDraftDeliveryNote = async (firstEntry: DeliveryEntry): Promise<string | null> => {
@@ -316,8 +397,53 @@ const Deliver = () => {
     setDeliveryEntries(prev => [...prev, entry]);
   };
 
-  const removeDeliveryEntry = (index: number) => {
+  const removeDeliveryEntry = async (index: number) => {
+    const entryToRemove = deliveryEntries[index];
+    
+    // Remove from local state
     setDeliveryEntries(prev => prev.filter((_, i) => i !== index));
+    
+    // If we have a current delivery note, update it in ERPNext
+    if (currentDeliveryNote && entryToRemove) {
+      try {
+        const erpnextAPI = await createERPNextAPI();
+        if (!erpnextAPI) return;
+
+        // Get current delivery note
+        const currentDNResult = await erpnextAPI.sales.getDeliveryNote(currentDeliveryNote);
+        if (!currentDNResult.data) return;
+
+        const currentDN = currentDNResult.data;
+        
+        // Remove the item from the delivery note
+        const updatedItems = currentDN.items.filter((item: any) => 
+          !(item.item_code === entryToRemove.itemCode && 
+            item.warehouse === entryToRemove.warehouse &&
+            item.qty === entryToRemove.qtyToDeliver)
+        );
+
+        // Update delivery note
+        const updateData = {
+          ...currentDN,
+          items: updatedItems
+        };
+
+        await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, updateData);
+        
+        toast({
+          title: "Item Removed",
+          description: `Item removed from draft delivery note ${currentDeliveryNote}`,
+        });
+
+      } catch (error) {
+        console.error('Error removing item from draft delivery note:', error);
+        toast({
+          title: "Warning",
+          description: "Item removed locally but may still exist in draft delivery note",
+          variant: "destructive"
+        });
+      }
+    }
   };
 
   const submitDeliveryNote = async () => {
@@ -583,11 +709,14 @@ const Deliver = () => {
                   <CardContent>
                     {deliveryEntries.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
-                        No items added for delivery. Go back to add items.
+                        No items added for delivery. Go back to add items or load a draft delivery note.
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <DeliveryTable entries={deliveryEntries} />
+                        <DeliveryTable 
+                          entries={deliveryEntries} 
+                          onRemoveEntry={removeDeliveryEntry}
+                        />
                         <div className="flex justify-between items-center pt-4">
                           <Button 
                             variant="outline" 
