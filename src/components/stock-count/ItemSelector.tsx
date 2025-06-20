@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -95,7 +94,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       if (search.trim()) {
         result = await erpnextAPI.searchItems(search, limit);
       } else {
-        // Use basic fields without problematic filters
         result = await erpnextAPI.getItemsPaginated([], ['item_code', 'item_name', 'stock_uom'], limit, pageToFetch);
       }
       
@@ -204,7 +202,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[100]" align="start">
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[9999]" align="start">
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search items..." 
@@ -219,7 +217,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                     {filteredItems.map((item) => (
                       <CommandItem
                         key={item.item_code}
-                        value={`${item.item_code} ${item.item_name}`}
+                        value={item.item_code}
                         onSelect={() => handleItemSelect(item)}
                       >
                         <Check
