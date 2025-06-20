@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -51,8 +52,10 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
 
   const loadInitialItems = async () => {
     try {
+      console.log('Loading initial items for stock count...');
       const cached = await offlineStorage.getCachedData('items_page_1');
       if (cached && Array.isArray(cached) && cached.length > 0) {
+        console.log('Loaded items from cache:', cached.length);
         setItems(cached);
         return;
       }
@@ -66,6 +69,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     try {
       const cached = await offlineStorage.getCachedData('items_page_1');
       if (cached && Array.isArray(cached)) {
+        console.log('Setting cached items:', cached.length);
         setItems(cached);
       }
     } catch (error) {
@@ -74,6 +78,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   };
 
   const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
+    console.log('fetchItems called with search:', search, 'isNewSearch:', isNewSearch);
     setIsLoadingItems(true);
     
     try {
@@ -97,14 +102,16 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
         result = await erpnextAPI.getItemsPaginated([], ['item_code', 'item_name', 'stock_uom'], limit, pageToFetch);
       }
       
-      if (result.data) {
+      console.log('API result:', result);
+      
+      if (result && result.data) {
         const itemData = Array.isArray(result.data) ? result.data : [];
         if (!Array.isArray(result.data)) {
           console.error("Invalid data format:", result.data);
           return;
         }
 
-        console.log("item data:----->",itemData)
+        console.log("item data:", itemData.length);
         
         if (isNewSearch) {
           setItems(itemData);
@@ -122,6 +129,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           setCurrentPage(prev => prev + 1);
         }
       } else {
+        console.log('No items found or invalid response');
         if (isNewSearch) {
           setItems([]);
         }
@@ -133,6 +141,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
         const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
         const cached = await offlineStorage.getCachedData(cacheKey);
         if (cached && Array.isArray(cached)) {
+          console.log('Loaded fallback cached items:', cached.length);
           setItems(cached);
         }
       } catch (cacheError) {
@@ -152,6 +161,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   }, [searchValue, searchItems]);
 
   const handleItemSelect = (item: ItemInfo) => {
+    console.log('Item selected:', item);
     setSelectedItem(item);
     setOpen(false);
     onItemSelected(item);
@@ -164,20 +174,28 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   };
 
   const filteredItems = useMemo(() => {
+    console.log('Filtering items. Total items:', items.length, 'Search value:', searchValue);
     if (!searchValue) return items;
     const lowercaseSearch = searchValue.toLowerCase();
-    return items.filter(item => 
+    const filtered = items.filter(item => 
       item.item_code.toLowerCase().includes(lowercaseSearch) ||
       item.item_name.toLowerCase().includes(lowercaseSearch)
     );
+    console.log('Filtered items count:', filtered.length);
+    return filtered;
   }, [items, searchValue]);
+
+  console.log('Rendering Stock Count ItemSelector. Items count:', items.length, 'Filtered count:', filteredItems.length, 'Loading:', isLoadingItems);
 
   return (
     <div className="space-y-4">
       <div>
         <Label htmlFor="item-search">Item Code / Name</Label>
         <div className="flex-1 min-w-0 mt-1">
-          <Popover open={open} onOpenChange={setOpen}>
+          <Popover open={open} onOpenChange={(newOpen) => {
+            console.log('Stock Count Popover open state changing:', newOpen);
+            setOpen(newOpen);
+          }}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -185,6 +203,9 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 aria-expanded={open}
                 className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
                 disabled={isLoadingItems || isLoading}
+                onClick={() => {
+                  console.log('Stock Count Popover trigger clicked. Current open state:', open);
+                }}
               >
                 <div className="flex-1 min-w-0 text-left">
                   <div className="truncate">
@@ -207,37 +228,49 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 <CommandInput 
                   placeholder="Search items..." 
                   value={searchValue}
-                  onValueChange={setSearchValue}
+                  onValueChange={(value) => {
+                    console.log('Stock Count Search value changing to:', value);
+                    setSearchValue(value);
+                  }}
                 />
                 <CommandList>
                   <CommandEmpty>
                     {isLoadingItems ? "Loading items..." : "No items found."}
                   </CommandEmpty>
                   <CommandGroup>
-                    {filteredItems.map((item) => (
-                      <CommandItem
-                        key={item.item_code}
-                        value={item.item_code}
-                        onSelect={() => handleItemSelect(item)}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          <Package className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{item.item_name || item.item_code}</div>
-                            <div className="text-sm text-muted-foreground truncate">{item.item_code}</div>
-                            <span className="text-xs px-1 py-0.5 bg-gray-100 text-gray-600 rounded mt-1 inline-block">
-                              {item.stock_uom || 'Nos'}
-                            </span>
+                    {filteredItems.map((item) => {
+                      console.log('Rendering stock count item:', item.item_code, item.item_name);
+                      return (
+                        <CommandItem
+                          key={item.item_code}
+                          value={item.item_code}
+                          onSelect={(currentValue) => {
+                            console.log('Stock Count CommandItem onSelect called with:', currentValue);
+                            const selectedItemData = filteredItems.find(i => i.item_code === currentValue);
+                            if (selectedItemData) {
+                              handleItemSelect(selectedItemData);
+                            }
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{item.item_name || item.item_code}</div>
+                              <div className="text-sm text-muted-foreground truncate">{item.item_code}</div>
+                              <span className="text-xs px-1 py-0.5 bg-gray-100 text-gray-600 rounded mt-1 inline-block">
+                                {item.stock_uom || 'Nos'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      </CommandItem>
-                    ))}
+                        </CommandItem>
+                      );
+                    })}
                     {hasMore && (
                       <CommandItem 
                         key="load-more"

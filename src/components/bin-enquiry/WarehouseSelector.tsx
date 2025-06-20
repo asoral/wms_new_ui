@@ -59,6 +59,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   };
 
   const fetchWarehouses = async (search: string = "") => {
+    console.log('fetchWarehouses called with search:', search);
     setIsLoadingWarehouses(true);
     
     try {
@@ -74,7 +75,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      // Use basic filters without is_group which might not be permitted
       let filters: any[] = [];
       
       if (search.trim()) {
@@ -89,7 +89,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       console.log('API filters:', filters);
       
       const result = await erpnextAPI.getWarehouses(filters);
-      console.log('API result:', result);
+      console.log('Warehouse API result:', result);
       
       if (result && result.data) {
         const warehouseData: WarehouseInfo[] = result.data.map(warehouse => ({
@@ -138,26 +138,35 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   }, [searchValue]);
 
   const handleWarehouseSelect = (warehouse: WarehouseInfo) => {
+    console.log('Warehouse selected:', warehouse);
     setSelectedWarehouse(warehouse);
     setOpen(false);
     onWarehouseSelected(warehouse.name);
   };
 
   const filteredWarehouses = useMemo(() => {
+    console.log('Filtering warehouses. Total warehouses:', warehouses.length, 'Search value:', searchValue);
     if (!searchValue) return warehouses;
     const lowercaseSearch = searchValue.toLowerCase();
-    return warehouses.filter(warehouse => 
+    const filtered = warehouses.filter(warehouse => 
       warehouse.name.toLowerCase().includes(lowercaseSearch) ||
       warehouse.warehouse_name.toLowerCase().includes(lowercaseSearch)
     );
+    console.log('Filtered warehouses count:', filtered.length);
+    return filtered;
   }, [warehouses, searchValue]);
+
+  console.log('Rendering WarehouseSelector. Warehouses count:', warehouses.length, 'Filtered count:', filteredWarehouses.length, 'Loading:', isLoadingWarehouses);
 
   return (
     <div className="space-y-4">
       <div>
         <Label htmlFor="warehouse-search">Warehouse Code / Name</Label>
         <div className="flex-1 min-w-0 mt-1">
-          <Popover open={open} onOpenChange={setOpen}>
+          <Popover open={open} onOpenChange={(newOpen) => {
+            console.log('Warehouse Popover open state changing:', newOpen);
+            setOpen(newOpen);
+          }}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -165,6 +174,9 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 aria-expanded={open}
                 className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
                 disabled={isLoading}
+                onClick={() => {
+                  console.log('Warehouse Popover trigger clicked. Current open state:', open);
+                }}
               >
                 <div className="flex-1 min-w-0 text-left">
                   <div className="truncate">
@@ -182,12 +194,15 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[100]" align="start">
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[9999]" align="start">
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search warehouses..." 
                   value={searchValue}
-                  onValueChange={setSearchValue}
+                  onValueChange={(value) => {
+                    console.log('Warehouse Search value changing to:', value);
+                    setSearchValue(value);
+                  }}
                 />
                 <CommandList>
                   <CommandEmpty>
@@ -203,29 +218,39 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                   )}
                   {!isLoadingWarehouses && filteredWarehouses.length > 0 && (
                     <CommandGroup>
-                      {filteredWarehouses.map((warehouse) => (
-                        <CommandItem
-                          key={warehouse.name}
-                          onSelect={() => handleWarehouseSelect(warehouse)}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedWarehouse?.name === warehouse.name ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            <Warehouse className="w-4 h-4 text-muted-foreground shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{warehouse.warehouse_name || warehouse.name}</div>
-                              <div className="text-sm text-muted-foreground truncate">{warehouse.name}</div>
-                              {warehouse.is_group === 1 && (
-                                <span className="text-xs px-1 py-0.5 bg-blue-100 text-blue-600 rounded mt-1 inline-block">Group</span>
+                      {filtere dWarehouses.map((warehouse) => {
+                        console.log('Rendering warehouse:', warehouse.name, warehouse.warehouse_name);
+                        return (
+                          <CommandItem
+                            key={warehouse.name}
+                            value={warehouse.name}
+                            onSelect={(currentValue) => {
+                              console.log('Warehouse CommandItem onSelect called with:', currentValue);
+                              const selectedWarehouseData = filteredWarehouses.find(w => w.name === currentValue);
+                              if (selectedWarehouseData) {
+                                handleWarehouseSelect(selectedWarehouseData);
+                              }
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedWarehouse?.name === warehouse.name ? "opacity-100" : "opacity-0"
                               )}
+                            />
+                            <div className="flex items-center space-x-3 flex-1 min-w-0">
+                              <Warehouse className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{warehouse.warehouse_name || warehouse.name}</div>
+                                <div className="text-sm text-muted-foreground truncate">{warehouse.name}</div>
+                                {warehouse.is_group === 1 && (
+                                  <span className="text-xs px-1 py-0.5 bg-blue-100 text-blue-600 rounded mt-1 inline-block">Group</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </CommandItem>
-                      ))}
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   )}
                 </CommandList>
