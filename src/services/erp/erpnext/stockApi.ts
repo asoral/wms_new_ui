@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, StockBalance, Item } from './types';
 
@@ -226,61 +227,48 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     }
   }
 
+  // Delegate all item-related methods to the items API instead of duplicating logic
   async getItems(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<Item[]>> {
-    let finalFilters = [];
-    if (filters) {
-      finalFilters = this.convertToFrappeFilters(filters);
+    // Import the items API dynamically to avoid circular dependencies
+    const { ERPNextItemsAPI } = await import('./itemsApi');
+    const itemsAPI = new ERPNextItemsAPI(this.baseURL, this.apiKey, this.apiSecret);
+    
+    if (filters && typeof filters === 'object' && !Array.isArray(filters)) {
+      // Convert object filters to proper format and delegate to items API
+      return itemsAPI.getItems(filters, undefined, limitPageLength);
     }
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
-
-    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch items: ${response.statusText}`);
-    }
-
-    return response.json();
+    return itemsAPI.getItemsPaginated(filters, undefined, limitPageLength);
   }
 
   async searchItems(search: string, limit?: number): Promise<ERPNextResponse<Item[]>> {
-    const filters = [
-      ['item_code', 'like', `%${search}%`],
-      ['item_name', 'like', `%${search}%`]
-    ];
-    
-    return this.getItems({ filters }, limit);
+    const { ERPNextItemsAPI } = await import('./itemsApi');
+    const itemsAPI = new ERPNextItemsAPI(this.baseURL, this.apiKey, this.apiSecret);
+    return itemsAPI.searchItems(search, limit);
   }
 
   async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
-    const filters = [['barcodes.barcode', '=', barcode]];
-    return this.getItems({ filters });
+    const { ERPNextItemsAPI } = await import('./itemsApi');
+    const itemsAPI = new ERPNextItemsAPI(this.baseURL, this.apiKey, this.apiSecret);
+    return itemsAPI.searchItemsByBarcode(barcode);
   }
 
   async getItemsPaginated(filters?: any, fields?: string[], limit?: number, page?: number): Promise<ERPNextResponse<Item[]>> {
-    return this.getItems(filters, limit);
+    const { ERPNextItemsAPI } = await import('./itemsApi');
+    const itemsAPI = new ERPNextItemsAPI(this.baseURL, this.apiKey, this.apiSecret);
+    return itemsAPI.getItemsPaginated(filters, fields, limit, page);
   }
 
   async getItemDetails(itemCode: string): Promise<ERPNextResponse<Item>> {
-    const response = await fetch(`${this.baseURL}/api/resource/Item/${itemCode}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch item details: ${response.statusText}`);
-    }
-
-    return response.json();
+    const { ERPNextItemsAPI } = await import('./itemsApi');
+    const itemsAPI = new ERPNextItemsAPI(this.baseURL, this.apiKey, this.apiSecret);
+    return itemsAPI.getItemDetails(itemCode);
   }
 
   async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item>> {
-    const result = await this.searchItemsByBarcode(barcode);
-    if (result.data && result.data.length > 0) {
-      return { data: result.data[0] };
-    }
-    throw new Error('Item not found');
+    const { ERPNextItemsAPI } = await import('./itemsApi');
+    const itemsAPI = new ERPNextItemsAPI(this.baseURL, this.apiKey, this.apiSecret);
+    return itemsAPI.getItemByBarcode(barcode);
   }
 
   async getBinStock(itemCode?: string, warehouse?: string, company?: string): Promise<ERPNextResponse<any[]>> {
