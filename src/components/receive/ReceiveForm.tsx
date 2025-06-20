@@ -7,8 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Scan, Plus, Loader2 } from "lucide-react";
+import { Scan, Plus, Loader2, Trash2 } from "lucide-react";
 import { POItem, ReceiveEntry } from "../../pages/Receive";
 import { createERPNextAPI } from "@/services/erpnextApi";
 
@@ -23,6 +22,11 @@ interface ItemDetails {
   has_serial_no?: number;
 }
 
+interface BatchEntry {
+  batch: string;
+  qty: number;
+}
+
 const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps) => {
   const [formData, setFormData] = useState({
     selectedItem: '',
@@ -35,11 +39,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
   const [inputMethod, setInputMethod] = useState<'traditional' | 'bundle'>('traditional');
   const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
   const [loadingItemDetails, setLoadingItemDetails] = useState(false);
-  const [bundleData, setBundleData] = useState({
-    batches: '',
-    serials: '',
-    qty: 0
-  });
+  const [batchEntries, setBatchEntries] = useState<BatchEntry[]>([{ batch: '', qty: 0 }]);
 
   const selectedItemData = poItems.find(item => item.itemCode === formData.selectedItem);
 
@@ -81,77 +81,72 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     }, 2000);
   };
 
-  const handleBundleSubmit = (e: React.FormEvent) => {
+  const addBatchEntry = () => {
+    setBatchEntries(prev => [...prev, { batch: '', qty: 0 }]);
+  };
+
+  const removeBatchEntry = (index: number) => {
+    setBatchEntries(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateBatchEntry = (index: number, field: 'batch' | 'qty', value: string | number) => {
+    setBatchEntries(prev => prev.map((entry, i) => 
+      i === index ? { ...entry, [field]: value } : entry
+    ));
+  };
+
+  const handleBundleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedItemData || bundleData.qty <= 0) return;
+    if (!selectedItemData || batchEntries.length === 0) return;
 
     const hasBatch = itemDetails?.has_batch_no === 1;
     const hasSerial = itemDetails?.has_serial_no === 1;
 
-    if (hasBatch && hasSerial) {
-      // Handle both batch and serial
-      const batches = bundleData.batches.split('\n').filter(b => b.trim());
-      const serials = bundleData.serials.split('\n').filter(s => s.trim());
-      
-      // Create entries for each serial with its corresponding batch
-      serials.forEach((serial, index) => {
-        const batch = batches[Math.min(index, batches.length - 1)]; // Use last batch if fewer batches than serials
-        onAddEntry({
-          itemCode: selectedItemData.itemCode,
-          itemName: selectedItemData.itemName,
-          receivedQty: 1, // Each serial is qty 1
-          warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
-          batch: batch?.trim() || undefined,
-          serial: serial.trim(),
-          uom: selectedItemData.uom,
-          rate: selectedItemData.rate
-        });
-      });
-    } else if (hasBatch) {
-      // Handle batch only - allow multiple batches
-      const batches = bundleData.batches.split('\n').filter(b => b.trim());
-      const qtyPerBatch = Math.floor(bundleData.qty / batches.length);
-      const remainder = bundleData.qty % batches.length;
-      
-      batches.forEach((batch, index) => {
-        const qty = qtyPerBatch + (index < remainder ? 1 : 0);
-        onAddEntry({
-          itemCode: selectedItemData.itemCode,
-          itemName: selectedItemData.itemName,
-          receivedQty: qty,
-          warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
-          batch: batch.trim(),
-          uom: selectedItemData.uom,
-          rate: selectedItemData.rate
-        });
-      });
-    } else if (hasSerial) {
-      // Handle serial only - allow multiple serials
-      const serials = bundleData.serials.split('\n').filter(s => s.trim());
-      serials.forEach((serial) => {
-        onAddEntry({
-          itemCode: selectedItemData.itemCode,
-          itemName: selectedItemData.itemName,
-          receivedQty: 1, // Each serial is qty 1
-          warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
-          serial: serial.trim(),
-          uom: selectedItemData.uom,
-          rate: selectedItemData.rate
-        });
-      });
+    // Validate batch entries
+    const validBatchEntries = batchEntries.filter(entry => entry.batch.trim() && entry.qty > 0);
+    if (validBatchEntries.length === 0) {
+      alert('Please enter at least one valid batch with quantity');
+      return;
     }
 
-    // Reset bundle form
-    setBundleData({ batches: '', serials: '', qty: 0 });
-    setFormData({
-      selectedItem: '',
-      receivedQty: 0,
-      warehouse: defaultWarehouse || '',
-      batch: '',
-      serial: ''
-    });
-    setItemDetails(null);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      
+      // Process each batch entry
+      for (const batchEntry of validBatchEntries) {
+        // Check if batch exists, create if not
+        if (hasBatch && erpnextAPI) {
+          await erpnextAPI.purchase.ensureBatchExists(batchEntry.batch, selectedItemData.itemCode);
+        }
+
+        // Create entry for this batch
+        onAddEntry({
+          itemCode: selectedItemData.itemCode,
+          itemName: selectedItemData.itemName,
+          receivedQty: batchEntry.qty,
+          warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
+          batch: hasBatch ? batchEntry.batch : undefined,
+          serial: hasSerial ? formData.serial : undefined,
+          uom: selectedItemData.uom,
+          rate: selectedItemData.rate
+        });
+      }
+
+      // Reset form
+      setBatchEntries([{ batch: '', qty: 0 }]);
+      setFormData({
+        selectedItem: '',
+        receivedQty: 0,
+        warehouse: defaultWarehouse || '',
+        batch: '',
+        serial: ''
+      });
+      setItemDetails(null);
+    } catch (error) {
+      console.error('Error processing batch entries:', error);
+      alert('Error processing batch entries');
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -197,10 +192,11 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
 
   const hasBatchTracking = itemDetails?.has_batch_no === 1;
   const hasSerialTracking = itemDetails?.has_serial_no === 1;
+  const totalBundleQty = batchEntries.reduce((sum, entry) => sum + entry.qty, 0);
 
   return (
     <div className="space-y-6">
-      {/* Scan Items Section - Moved above the PO Items Table */}
+      {/* Scan Items Section */}
       <Card>
         <CardContent className="pt-6">
           <h3 className="text-lg font-semibold mb-4">Scan Items</h3>
@@ -397,56 +393,62 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
               </form>
             ) : (
               <form onSubmit={handleBundleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="bundleQty">Total Quantity *</Label>
-                  <Input
-                    id="bundleQty"
-                    type="number"
-                    value={bundleData.qty}
-                    onChange={(e) => setBundleData(prev => ({ ...prev, qty: Number(e.target.value) }))}
-                    placeholder="0"
-                    max={selectedItemData.pendingQty}
-                    min="1"
-                    required
-                  />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Batch Entries</Label>
+                    <div className="text-sm text-gray-600">
+                      Total Qty: {totalBundleQty}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {batchEntries.map((entry, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <Input
+                            placeholder="Batch Number"
+                            value={entry.batch}
+                            onChange={(e) => updateBatchEntry(index, 'batch', e.target.value)}
+                          />
+                        </div>
+                        <div className="w-24">
+                          <Input
+                            type="number"
+                            placeholder="Qty"
+                            value={entry.qty}
+                            onChange={(e) => updateBatchEntry(index, 'qty', Number(e.target.value))}
+                            min="0"
+                          />
+                        </div>
+                        {batchEntries.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeBatchEntry(index)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addBatchEntry}
+                    className="w-full"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Batch Row
+                  </Button>
                 </div>
-
-                {hasBatchTracking && (
-                  <div>
-                    <Label htmlFor="batches">Batch Numbers (one per line) *</Label>
-                    <Textarea
-                      id="batches"
-                      value={bundleData.batches}
-                      onChange={(e) => setBundleData(prev => ({ ...prev, batches: e.target.value }))}
-                      placeholder="BATCH001&#10;BATCH002&#10;BATCH003"
-                      rows={4}
-                      required
-                    />
-                  </div>
-                )}
-
-                {hasSerialTracking && (
-                  <div>
-                    <Label htmlFor="serials">Serial Numbers (one per line) *</Label>
-                    <Textarea
-                      id="serials"
-                      value={bundleData.serials}
-                      onChange={(e) => setBundleData(prev => ({ ...prev, serials: e.target.value }))}
-                      placeholder="SN001&#10;SN002&#10;SN003"
-                      rows={4}
-                      required
-                    />
-                  </div>
-                )}
 
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={
-                    bundleData.qty <= 0 || 
-                    (hasBatchTracking && !bundleData.batches.trim()) ||
-                    (hasSerialTracking && !bundleData.serials.trim())
-                  }
+                  disabled={batchEntries.filter(e => e.batch.trim() && e.qty > 0).length === 0}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Bundle to Count
@@ -491,7 +493,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
         </Card>
       )}
 
-      {/* PO Items Table - Moved below scan section */}
+      {/* PO Items Table */}
       <Card>
         <CardContent className="pt-6">
           <h3 className="text-lg font-semibold mb-4">Purchase Order Items</h3>
