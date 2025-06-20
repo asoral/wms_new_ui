@@ -107,6 +107,42 @@ const Profile = () => {
     loadConfiguration();
   }, [user]);
 
+  const loadPalletTemplateItems = async () => {
+    if (!baseURL || !apiKey || !apiSecret) return;
+
+    setIsLoadingTemplateItems(true);
+    try {
+      const testAPI = new ERPNextAPI(baseURL, apiKey, apiSecret);
+      
+      // Fetch items with maintain_stock=1 and is_template=1
+      const result = await testAPI.getItems({
+        maintain_stock: 1,
+        is_template: 1
+      }, undefined, 20, 0);
+
+      // Map items to correct shape for selector (ERPNext might return item_code instead of name)
+      const mapped =
+        result.data && Array.isArray(result.data)
+          ? result.data
+              .filter((item: any) => item.name && item.item_name)
+              .map((item: any) => ({
+                name: item.name,
+                item_name: item.item_name,
+              }))
+          : [];
+      setPalletTemplateItems(mapped);
+    } catch (error) {
+      console.error('Error loading pallet template items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load pallet template items",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingTemplateItems(false);
+    }
+  };
+
   const testConnectionAndLoadCompanies = async (url: string, key: string, secret: string) => {
     try {
       const testAPI = new ERPNextAPI(url, key, secret);
@@ -143,49 +179,6 @@ const Profile = () => {
       return false;
     }
   };
-
-  const loadPalletTemplateItems = async () => {
-    if (!baseURL || !apiKey || !apiSecret) return;
-
-    setIsLoadingTemplateItems(true);
-    try {
-      const testAPI = new ERPNextAPI(baseURL, apiKey, apiSecret);
-      
-      // Fetch items with maintain_stock=1 and is_template=1
-      const result = await testAPI.getItems({
-        maintain_stock: 1,
-        is_template: 1
-      });
-
-      // Map items to correct shape for selector (ERPNext might return item_code instead of name)
-      const mapped =
-        result.data && Array.isArray(result.data)
-          ? result.data
-              .filter((item: any) => item.name && item.item_name)
-              .map((item: any) => ({
-                name: item.name,
-                item_name: item.item_name,
-              }))
-          : [];
-      setPalletTemplateItems(mapped);
-    } catch (error) {
-      console.error('Error loading pallet template items:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load pallet template items",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingTemplateItems(false);
-    }
-  };
-
-  // Load template items when company is selected and connection is established
-  useEffect(() => {
-    if (selectedCompany && connectionStatus === 'connected') {
-      loadPalletTemplateItems();
-    }
-  }, [selectedCompany, connectionStatus]);
 
   const handleTestConnection = async () => {
     if (!baseURL || !apiKey || !apiSecret) {

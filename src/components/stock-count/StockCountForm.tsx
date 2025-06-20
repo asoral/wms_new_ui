@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Search, Package, ScanLine, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "../item-enquiry/ItemSelector";
+import SerialBatchBundleSelector from "./SerialBatchBundleSelector";
+import { createERPNextAPI } from "@/services/erpnextApi";
+import { createSerialBatchBundleFromTraditionalEntry } from "@/services/serialBatchBundleApi";
 
 interface StockCountItem {
   item_code: string;
@@ -19,6 +22,8 @@ interface StockCountItem {
   uom: string;
   batch_no?: string;
   serial_no?: string;
+  serialBatchBundle?: string;
+  useTraditionalEntry?: boolean;
 }
 
 interface StockCountFormProps {
@@ -35,11 +40,39 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
   const [countedQty, setCountedQty] = useState<number>(0);
   const [batchNo, setBatchNo] = useState("");
   const [serialNo, setSerialNo] = useState("");
+  const [selectedBundle, setSelectedBundle] = useState("");
+  const [useTraditionalEntry, setUseTraditionalEntry] = useState(false);
+  const [itemDetails, setItemDetails] = useState<any>(null);
   const { toast } = useToast();
 
-  const handleItemSelected = (itemCode: string) => {
+  const handleItemSelected = async (itemCode: string) => {
     setSelectedItemCode(itemCode);
     setSearchTerm(itemCode);
+    
+    // Fetch item details to check if it has serial/batch tracking
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (erpnextAPI) {
+        const itemResult = await erpnextAPI.getItem(itemCode);
+        if (itemResult.data) {
+          setItemDetails(itemResult.data);
+          // Reset bundle selection when item changes
+          setSelectedBundle("");
+          setBatchNo("");
+          setSerialNo("");
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching item details:', error);
+    }
+  };
+
+  const handleBundleSelected = (bundleName: string) => {
+    setSelectedBundle(bundleName);
+    // Clear traditional entry fields when bundle is selected
+    setBatchNo("");
+    setSerialNo("");
+    setUseTraditionalEntry(false);
   };
 
   const addItemToCount = async () => {
@@ -58,29 +91,69 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
     });
 
     try {
+      let serialBatchBundle = selectedBundle;
+      
+      // If using traditional entry and item has serial/batch tracking, create bundle
+      if (useTraditionalEntry && itemDetails && (itemDetails.has_serial_no || itemDetails.has_batch_no) && (batchNo || serialNo)) {
+        try {
+          serialBatchBundle = await createSerialBatchBundleFromTraditionalEntry(
+            selectedItemCode,
+            itemDetails.item_name || searchTerm,
+            itemDetails.item_group || 'All Item Groups',
+            itemDetails.has_serial_no || 0,
+            itemDetails.has_batch_no || 0,
+            warehouse || '',
+            countedQty,
+            itemDetails.stock_uom || 'Nos',
+            batchNo || undefined,
+            serialNo || undefined
+          );
+          
+          if (!serialBatchBundle) {
+            throw new Error('Failed to create Serial and Batch Bundle');
+          }
+          
+          toast({
+            title: "Bundle Created",
+            description: `Serial and Batch Bundle created: ${serialBatchBundle}`,
+          });
+        } catch (bundleError) {
+          console.error('Error creating bundle:', bundleError);
+          toast({
+            title: "Bundle Creation Failed",
+            description: "Failed to create Serial and Batch Bundle. Item will be added without bundle.",
+            variant: "destructive"
+          });
+        }
+      }
+
       if (onAddEntry) {
         await onAddEntry({
           itemCode: selectedItemCode,
-          itemName: searchTerm,
+          itemName: itemDetails?.item_name || searchTerm,
           warehouse: warehouse || '',
           currentQty: 0,
           actualQty: countedQty,
-          uom: "Nos",
-          batch: batchNo || undefined,
-          serial: serialNo || undefined,
+          uom: itemDetails?.stock_uom || "Nos",
+          batch: useTraditionalEntry ? batchNo || undefined : undefined,
+          serial: useTraditionalEntry ? serialNo || undefined : undefined,
+          serialBatchBundle: serialBatchBundle || undefined,
+          useTraditionalEntry: useTraditionalEntry
         });
       } else {
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         const newItem: StockCountItem = {
           item_code: selectedItemCode,
-          item_name: searchTerm,
+          item_name: itemDetails?.item_name || searchTerm,
           current_qty: 0,
           counted_qty: countedQty,
           difference: countedQty - 0,
-          uom: "Nos",
-          batch_no: batchNo || undefined,
-          serial_no: serialNo || undefined,
+          uom: itemDetails?.stock_uom || "Nos",
+          batch_no: useTraditionalEntry ? batchNo || undefined : undefined,
+          serial_no: useTraditionalEntry ? serialNo || undefined : undefined,
+          serialBatchBundle: serialBatchBundle || undefined,
+          useTraditionalEntry: useTraditionalEntry
         };
 
         setSelectedItems(prev => [...prev, newItem]);
@@ -91,6 +164,9 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
       setCountedQty(0);
       setBatchNo("");
       setSerialNo("");
+      setSelectedBundle("");
+      setUseTraditionalEntry(false);
+      setItemDetails(null);
 
       toast({
         title: "Item Added",
@@ -98,6 +174,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
         variant: "default"
       });
     } catch (error) {
+      console.error('Error adding item:', error);
       toast({
         title: "Error",
         description: "Failed to add item to count.",
@@ -134,6 +211,8 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
 
     onSubmit(selectedItems);
   };
+
+  const hasSerialBatchTracking = itemDetails && (itemDetails.has_serial_no || itemDetails.has_batch_no);
 
   return (
     <div className="space-y-6">
@@ -212,25 +291,82 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
                 step="0.01"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="batch_no">Batch No (Optional)</Label>
-              <Input
-                id="batch_no"
-                value={batchNo}
-                onChange={(e) => setBatchNo(e.target.value)}
-                placeholder="Enter batch number"
-              />
+            {itemDetails && (
+              <div className="space-y-2">
+                <Label>Item Info</Label>
+                <div className="text-sm text-muted-foreground">
+                  <p>UOM: {itemDetails.stock_uom || 'Nos'}</p>
+                  {hasSerialBatchTracking && (
+                    <div className="flex gap-2 mt-1">
+                      {itemDetails.has_serial_no && <Badge variant="outline">Serial Tracking</Badge>}
+                      {itemDetails.has_batch_no && <Badge variant="outline">Batch Tracking</Badge>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Serial and Batch Bundle Selection */}
+          {hasSerialBatchTracking && selectedItemCode && warehouse && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>Serial/Batch Entry Method</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setUseTraditionalEntry(!useTraditionalEntry)}
+                >
+                  {useTraditionalEntry ? 'Use Bundle' : 'Manual Entry'}
+                </Button>
+              </div>
+
+              {!useTraditionalEntry ? (
+                <div className="space-y-2">
+                  <Label>Select Serial and Batch Bundle</Label>
+                  <SerialBatchBundleSelector
+                    itemCode={selectedItemCode}
+                    warehouse={warehouse}
+                    onBundleSelected={handleBundleSelected}
+                    hasSerial={itemDetails.has_serial_no}
+                    hasBatch={itemDetails.has_batch_no}
+                  />
+                  {selectedBundle && (
+                    <p className="text-sm text-muted-foreground">
+                      Selected Bundle: {selectedBundle}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {itemDetails.has_batch_no && (
+                    <div className="space-y-2">
+                      <Label htmlFor="batch_no">Batch No</Label>
+                      <Input
+                        id="batch_no"
+                        value={batchNo}
+                        onChange={(e) => setBatchNo(e.target.value)}
+                        placeholder="Enter batch number"
+                      />
+                    </div>
+                  )}
+                  {itemDetails.has_serial_no && (
+                    <div className="space-y-2">
+                      <Label htmlFor="serial_no">Serial No</Label>
+                      <Input
+                        id="serial_no"
+                        value={serialNo}
+                        onChange={(e) => setSerialNo(e.target.value)}
+                        placeholder="Enter serial number"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="serial_no">Serial No (Optional)</Label>
-            <Input
-              id="serial_no"
-              value={serialNo}
-              onChange={(e) => setSerialNo(e.target.value)}
-              placeholder="Enter serial number"
-            />
-          </div>
+          )}
+
           <Button 
             onClick={addItemToCount} 
             className="w-full"
@@ -276,8 +412,11 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
                         Diff: {item.difference > 0 ? '+' : ''}{item.difference}
                       </span>
                     </div>
-                    {(item.batch_no || item.serial_no) && (
+                    {(item.batch_no || item.serial_no || item.serialBatchBundle) && (
                       <div className="flex items-center space-x-2 mt-2">
+                        {item.serialBatchBundle && (
+                          <Badge variant="secondary">Bundle: {item.serialBatchBundle}</Badge>
+                        )}
                         {item.batch_no && (
                           <Badge variant="secondary">Batch: {item.batch_no}</Badge>
                         )}
