@@ -222,7 +222,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Fetch items with proper filters - FIXED VERSION
+   * Fetch items with proper filters - CORRECTED VERSION
+   * Now properly constructs ERPNext/Frappe filter arrays
    */
   async getItems(
     filters: Record<string, any> = {},
@@ -230,22 +231,22 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     limit: number = 20,
     offset: number = 0
   ): Promise<ERPNextResponse<Item[]>> {
-    const conditions: any[] = [
-      ['disabled', '=', 0],
-      ['maintain_stock', '=', 1],
-      ['has_variants', '=', 0]
+    
+    // For text search, use the search_link API which handles OR logic properly
+    if (searchText && searchText.trim()) {
+      return this.searchItems(searchText.trim(), limit);
+    }
+
+    // Build base conditions as proper Frappe filter arrays
+    const conditions: string[][] = [
+      ['disabled', '=', '0'],
+      ['maintain_stock', '=', '1'],
+      ['has_variants', '=', '0']
     ];
 
-    // Apply extra filters correctly
+    // Apply additional filters correctly - each as separate filter array
     for (const [field, value] of Object.entries(filters)) {
-      conditions.push([field, '=', value]);
-    }
-    
-    // Apply searchText filters using OR logic
-    if (searchText) {
-      // For text search, we need to use a different approach
-      // Let's use the search_link API instead for text searches
-      return this.searchItems(searchText, limit);
+      conditions.push([field, '=', String(value)]);
     }
 
     const params = new URLSearchParams();
