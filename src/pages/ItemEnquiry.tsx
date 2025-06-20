@@ -2,10 +2,12 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Warehouse, Search, TrendingUp, AlertTriangle, Calendar, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Package, Warehouse, Search, TrendingUp, AlertTriangle, Calendar, DollarSign, Scan } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import ItemScanner from "../components/item-enquiry/ItemScanner";
 
 interface StockItem {
   itemCode: string;
@@ -25,9 +27,19 @@ const ItemEnquiry = () => {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<string>("");
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
+  const [barcode, setBarcode] = useState("");
   const { toast } = useToast();
 
   const loadItemStock = async (itemCode: string) => {
+    if (!itemCode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter an item code",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       setSelectedItem(itemCode);
@@ -88,15 +100,33 @@ const ItemEnquiry = () => {
             };
           });
         setStockItems(transformedItems);
+        
+        if (transformedItems.length === 0) {
+          toast({
+            title: "No Stock Found",
+            description: `No stock found for item: ${itemCode}`,
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Stock Loaded",
+            description: `Found stock in ${transformedItems.length} locations`,
+          });
+        }
       } else {
         setStockItems([]);
+        toast({
+          title: "No Data",
+          description: `No stock data available for item: ${itemCode}`,
+          variant: "destructive"
+        });
       }
 
     } catch (error) {
       console.error('Failed to load item stock:', error);
       toast({
         title: "Error",
-        description: "Failed to load item stock from ERPNext",
+        description: `Failed to load item stock: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
@@ -104,11 +134,25 @@ const ItemEnquiry = () => {
     }
   };
 
+  const handleBarcodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (barcode.trim()) {
+      await loadItemStock(barcode.trim());
+      setBarcode("");
+    }
+  };
+
+  const handleClear = () => {
+    setBarcode("");
+    setSelectedItem("");
+    setStockItems([]);
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: companyCurrency,
-      minimumFractionDigits: 2,
+      minimumFraction: 2,
       maximumFractionDigits: 2,
     }).format(amount);
   };
@@ -141,16 +185,35 @@ const ItemEnquiry = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ItemScanner 
-            onBarcodeScanned={loadItemStock}
-            isLoading={loading}
-          />
+          <form onSubmit={handleBarcodeSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="barcode">Item Code / Barcode</Label>
+              <Input
+                id="barcode"
+                type="text"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder="Scan or enter item code/barcode"
+                disabled={loading}
+                className="text-lg"
+              />
+            </div>
+            <div className="flex space-x-2">
+              <Button type="submit" disabled={!barcode.trim() || loading}>
+                <Scan className="w-4 h-4 mr-2" />
+                {loading ? "Searching..." : "Search"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={handleClear}>
+                Clear
+              </Button>
+            </div>
+          </form>
         </CardContent>
       </Card>
 
       {selectedItem && (
         <>
-          {/* Summary Cards - Colorful like Deliver Screen */}
+          {/* Summary Cards */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -167,7 +230,7 @@ const ItemEnquiry = () => {
                         <p className="text-sm text-blue-600 mb-1">Total Locations</p>
                         <p className="text-2xl font-bold text-blue-600">{totalItems}</p>
                       </div>
-                      <Calendar className="w-8 h-8 text-blue-600" />
+                      <Warehouse className="w-8 h-8 text-blue-600" />
                     </div>
                   </CardContent>
                 </Card>
@@ -308,7 +371,12 @@ const ItemEnquiry = () => {
         <Card>
           <CardContent className="text-center py-8">
             <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500">Select an item to view its stock levels.</p>
+            <p className="text-gray-500 mb-4">Enter an item code or scan a barcode to view stock levels.</p>
+            <div className="text-sm text-gray-400">
+              <p>• Use the search box above to enter item codes</p>
+              <p>• Scan barcodes for quick lookup</p>
+              <p>• View stock across all warehouses</p>
+            </div>
           </CardContent>
         </Card>
       )}

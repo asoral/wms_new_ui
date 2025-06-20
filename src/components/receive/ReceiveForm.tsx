@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Scan, Plus, Loader2, Trash2 } from "lucide-react";
 import { POItem, ReceiveEntry } from "../../pages/Receive";
 import { createERPNextAPI } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface ReceiveFormProps {
   poItems: POItem[];
@@ -40,6 +41,8 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
   const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
   const [loadingItemDetails, setLoadingItemDetails] = useState(false);
   const [batchEntries, setBatchEntries] = useState<BatchEntry[]>([{ batch: '', qty: 0 }]);
+  const [processingBundle, setProcessingBundle] = useState(false);
+  const { toast } = useToast();
 
   const selectedItemData = poItems.find(item => item.itemCode === formData.selectedItem);
 
@@ -62,6 +65,11 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     } catch (error) {
       console.error('Failed to fetch item details:', error);
       setItemDetails(null);
+      toast({
+        title: "Error",
+        description: "Failed to fetch item details",
+        variant: "destructive"
+      });
     } finally {
       setLoadingItemDetails(false);
     }
@@ -98,7 +106,14 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
   const handleBundleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedItemData || batchEntries.length === 0) return;
+    if (!selectedItemData || batchEntries.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select an item and add batch entries",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const hasBatch = itemDetails?.has_batch_no === 1;
     const hasSerial = itemDetails?.has_serial_no === 1;
@@ -106,35 +121,167 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     // Validate batch entries
     const validBatchEntries = batchEntries.filter(entry => entry.batch.trim() && entry.qty > 0);
     if (validBatchEntries.length === 0) {
-      alert('Please enter at least one valid batch with quantity');
+      toast({
+        title: "Error",
+        description: "Please enter at least one valid batch with quantity greater than 0",
+        variant: "destructive"
+      });
       return;
     }
+
+    // Check total quantity doesn't exceed pending quantity
+    const totalQty = validBatchEntries.reduce((sum, entry) => sum + entry.qty, 0);
+    if (totalQty > selectedItemData.pendingQty) {
+      toast({
+        title: "Error",
+        description: `Total quantity (${totalQty}) exceeds pending quantity (${selectedItemData.pendingQty})`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setProcessingBundle(true);
+    let successCount = 0;
+    let errorCount = 0;
 
     try {
       const erpnextAPI = await createERPNextAPI();
       
-      // Process each batch entry
-      for (const batchEntry of validBatchEntries) {
-        // Check if batch exists, create if not
-        if (hasBatch && erpnextAPI) {
-          await erpnextAPI.purchase.ensureBatchExists(batchEntry.batch, selectedItemData.itemCode);
-        }
+      // Process each batch entry individually
+      for (const [index, batchEntry] of validBatchEntries.entries()) {
+        try {
+          // Check if batch exists, create if not
+          if (hasBatch && erpnextAPI) {
+            const batchExists = await erpnextAPI.purchase.ensureBatchExists(batchEntry.batch, selectedItemData.itemCode);
+            if (!batchExists) {
+              toast({
+                title: "Warning",
+                description: `Failed to create/verify batch: ${batchEntry.batch}`,
+                variant: "destructive"
+              });
+              errorCount++;
+              continue;
+            }
+          }
 
-        // Create entry for this batch
-        onAddEntry({
-          itemCode: selectedItemData.itemCode,
-          itemName: selectedItemData.itemName,
-          receivedQty: batchEntry.qty,
-          warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
-          batch: hasBatch ? batchEntry.batch : undefined,
-          serial: hasSerial ? formData.serial : undefined,
-          uom: selectedItemData.uom,
-          rate: selectedItemData.rate
-        });
+          // Create entry for this batch
+          await onAddEntry({
+            itemCode: selectedItemData.itemCode,
+            itemName: selectedItemData.itemName,
+            receivedQty: batchEntry.qty,
+            warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
+            batch: hasBatch ? batchEntry.batch : undefined,
+            serial: hasSerial ? formData.serial : undefined,
+            uom: selectedItemData.uom,
+            rate: selectedItemData.rate
+          });
+
+          successCount++;
+          console.log(`Successfully processed batch entry ${index + 1}: ${batchEntry.batch} - ${batchEntry.qty}`);
+        } catch (entryError) {
+          console.error(`Error processing batch entry ${index + 1}:`, entryError);
+          errorCount++;
+          toast({
+            title: "Error",
+            description: `Failed to process batch ${batchEntry.batch}: ${entryError instanceof Error ? entryError.message : 'Unknown error'}`,
+            variant: "destructive"
+          });
+        }
       }
 
+      // Show summary toast
+      if (successCount > 0) {
+        toast({
+          title: "Bundle Processing Complete",
+          description: `Successfully processed ${successCount} batch entries${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+          variant: successCount === validBatchEntries.length ? "default" : "destructive"
+        });
+
+        // Reset form only if some entries were successful
+        setBatchEntries([{ batch: '', qty: 0 }]);
+        setFormData({
+          selectedItem: '',
+          receivedQty: 0,
+          warehouse: defaultWarehouse || '',
+          batch: '',
+          serial: ''
+        });
+        setItemDetails(null);
+      } else {
+        toast({
+          title: "Bundle Processing Failed",
+          description: "No batch entries were successfully processed",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error processing batch entries:', error);
+      toast({
+        title: "Error",
+        description: `Bundle processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingBundle(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedItemData || formData.receivedQty <= 0) {
+      toast({
+        title: "Error",
+        description: "Please select an item and enter a valid quantity",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate required fields based on item tracking
+    const hasBatch = itemDetails?.has_batch_no === 1;
+    const hasSerial = itemDetails?.has_serial_no === 1;
+
+    if (hasBatch && !formData.batch.trim()) {
+      toast({
+        title: "Error",
+        description: "Batch number is required for this item",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (hasSerial && !formData.serial.trim()) {
+      toast({
+        title: "Error",
+        description: "Serial number is required for this item",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.receivedQty > selectedItemData.pendingQty) {
+      toast({
+        title: "Error",
+        description: `Received quantity (${formData.receivedQty}) cannot exceed pending quantity (${selectedItemData.pendingQty})`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      onAddEntry({
+        itemCode: selectedItemData.itemCode,
+        itemName: selectedItemData.itemName,
+        receivedQty: formData.receivedQty,
+        warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
+        batch: formData.batch || undefined,
+        serial: formData.serial || undefined,
+        uom: selectedItemData.uom,
+        rate: selectedItemData.rate
+      });
+
       // Reset form
-      setBatchEntries([{ batch: '', qty: 0 }]);
       setFormData({
         selectedItem: '',
         receivedQty: 0,
@@ -143,51 +290,19 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
         serial: ''
       });
       setItemDetails(null);
+
+      toast({
+        title: "Success",
+        description: "Item added to receipt successfully",
+      });
     } catch (error) {
-      console.error('Error processing batch entries:', error);
-      alert('Error processing batch entries');
+      console.error('Error adding item:', error);
+      toast({
+        title: "Error",
+        description: `Failed to add item: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
     }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedItemData || formData.receivedQty <= 0) return;
-
-    // Validate required fields based on item tracking
-    const hasBatch = itemDetails?.has_batch_no === 1;
-    const hasSerial = itemDetails?.has_serial_no === 1;
-
-    if (hasBatch && !formData.batch.trim()) {
-      alert('Batch number is required for this item');
-      return;
-    }
-
-    if (hasSerial && !formData.serial.trim()) {
-      alert('Serial number is required for this item');
-      return;
-    }
-
-    onAddEntry({
-      itemCode: selectedItemData.itemCode,
-      itemName: selectedItemData.itemName,
-      receivedQty: formData.receivedQty,
-      warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
-      batch: formData.batch || undefined,
-      serial: formData.serial || undefined,
-      uom: selectedItemData.uom,
-      rate: selectedItemData.rate
-    });
-
-    // Reset form
-    setFormData({
-      selectedItem: '',
-      receivedQty: 0,
-      warehouse: defaultWarehouse || '',
-      batch: '',
-      serial: ''
-    });
-    setItemDetails(null);
   };
 
   const hasBatchTracking = itemDetails?.has_batch_no === 1;
@@ -360,6 +475,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                       placeholder="0"
                       max={selectedItemData.pendingQty}
                       min="1"
+                      step="0.01"
                       required
                     />
                   </div>
@@ -397,41 +513,54 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                   <div className="flex items-center justify-between">
                     <Label>Batch Entries</Label>
                     <div className="text-sm text-gray-600">
-                      Total Qty: {totalBundleQty}
+                      Total: {totalBundleQty} / {selectedItemData.pendingQty} {selectedItemData.uom}
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    {batchEntries.map((entry, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <Input
-                            placeholder="Batch Number"
-                            value={entry.batch}
-                            onChange={(e) => updateBatchEntry(index, 'batch', e.target.value)}
-                          />
+                  <div className="border rounded-lg">
+                    <div className="grid grid-cols-12 gap-2 p-3 bg-gray-50 border-b font-medium text-sm">
+                      <div className="col-span-6">Batch Number</div>
+                      <div className="col-span-4">Quantity</div>
+                      <div className="col-span-2">Action</div>
+                    </div>
+                    <div className="space-y-2 p-3">
+                      {batchEntries.map((entry, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-6">
+                            <Input
+                              placeholder="Enter batch number"
+                              value={entry.batch}
+                              onChange={(e) => updateBatchEntry(index, 'batch', e.target.value)}
+                              className="h-9"
+                            />
+                          </div>
+                          <div className="col-span-4">
+                            <Input
+                              type="number"
+                              placeholder="Qty"
+                              value={entry.qty || ''}
+                              onChange={(e) => updateBatchEntry(index, 'qty', Number(e.target.value) || 0)}
+                              min="0"
+                              step="0.01"
+                              className="h-9"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            {batchEntries.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeBatchEntry(index)}
+                                className="h-9 w-full"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <div className="w-24">
-                          <Input
-                            type="number"
-                            placeholder="Qty"
-                            value={entry.qty}
-                            onChange={(e) => updateBatchEntry(index, 'qty', Number(e.target.value))}
-                            min="0"
-                          />
-                        </div>
-                        {batchEntries.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeBatchEntry(index)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
 
                   <Button
@@ -448,10 +577,23 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={batchEntries.filter(e => e.batch.trim() && e.qty > 0).length === 0}
+                  disabled={
+                    processingBundle || 
+                    batchEntries.filter(e => e.batch.trim() && e.qty > 0).length === 0 ||
+                    totalBundleQty > selectedItemData.pendingQty
+                  }
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Bundle to Count
+                  {processingBundle ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing Bundle...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Bundle to Count ({batchEntries.filter(e => e.batch.trim() && e.qty > 0).length} batches)
+                    </>
+                  )}
                 </Button>
               </form>
             )}
@@ -476,6 +618,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                   placeholder="0"
                   max={selectedItemData.pendingQty}
                   min="1"
+                  step="0.01"
                   required
                 />
               </div>
@@ -483,7 +626,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={formData.receivedQty <= 0}
+                disabled={formData.receivedQty <= 0 || formData.receivedQty > selectedItemData.pendingQty}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add to Count
