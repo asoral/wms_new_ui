@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Scan, Plus, Loader2 } from "lucide-react";
 import { POItem, ReceiveEntry } from "../../pages/Receive";
 import { createERPNextAPI } from "@/services/erpnextApi";
@@ -34,6 +34,11 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
   const [inputMethod, setInputMethod] = useState<'traditional' | 'bundle'>('traditional');
   const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
   const [loadingItemDetails, setLoadingItemDetails] = useState(false);
+  const [bundleData, setBundleData] = useState({
+    batches: '',
+    serials: '',
+    qty: 0
+  });
 
   const selectedItemData = poItems.find(item => item.itemCode === formData.selectedItem);
 
@@ -49,7 +54,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     try {
       const erpnextAPI = await createERPNextAPI();
       if (erpnextAPI) {
-        const result = await erpnextAPI.getItemDetails(itemCode);
+        const result = await erpnextAPI.items.getItemDetails(itemCode);
         setItemDetails(result.data);
         console.log('Item details:', result.data);
       }
@@ -73,6 +78,79 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
       }));
       setIsScanning(false);
     }, 2000);
+  };
+
+  const handleBundleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedItemData || bundleData.qty <= 0) return;
+
+    const hasBatch = itemDetails?.has_batch_no === 1;
+    const hasSerial = itemDetails?.has_serial_no === 1;
+
+    if (hasBatch && hasSerial) {
+      // Handle both batch and serial
+      const batches = bundleData.batches.split('\n').filter(b => b.trim());
+      const serials = bundleData.serials.split('\n').filter(s => s.trim());
+      
+      // Create entries for each serial with its corresponding batch
+      serials.forEach((serial, index) => {
+        const batch = batches[Math.min(index, batches.length - 1)]; // Use last batch if fewer batches than serials
+        onAddEntry({
+          itemCode: selectedItemData.itemCode,
+          itemName: selectedItemData.itemName,
+          receivedQty: 1, // Each serial is qty 1
+          warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
+          batch: batch?.trim() || undefined,
+          serial: serial.trim(),
+          uom: selectedItemData.uom,
+          rate: selectedItemData.rate
+        });
+      });
+    } else if (hasBatch) {
+      // Handle batch only
+      const batches = bundleData.batches.split('\n').filter(b => b.trim());
+      const qtyPerBatch = Math.floor(bundleData.qty / batches.length);
+      const remainder = bundleData.qty % batches.length;
+      
+      batches.forEach((batch, index) => {
+        const qty = qtyPerBatch + (index < remainder ? 1 : 0);
+        onAddEntry({
+          itemCode: selectedItemData.itemCode,
+          itemName: selectedItemData.itemName,
+          receivedQty: qty,
+          warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
+          batch: batch.trim(),
+          uom: selectedItemData.uom,
+          rate: selectedItemData.rate
+        });
+      });
+    } else if (hasSerial) {
+      // Handle serial only
+      const serials = bundleData.serials.split('\n').filter(s => s.trim());
+      serials.forEach((serial) => {
+        onAddEntry({
+          itemCode: selectedItemData.itemCode,
+          itemName: selectedItemData.itemName,
+          receivedQty: 1, // Each serial is qty 1
+          warehouse: formData.warehouse || defaultWarehouse || selectedItemData.warehouse,
+          serial: serial.trim(),
+          uom: selectedItemData.uom,
+          rate: selectedItemData.rate
+        });
+      });
+    }
+
+    // Reset bundle form
+    setBundleData({ batches: '', serials: '', qty: 0 });
+    setFormData({
+      selectedItem: '',
+      receivedQty: 0,
+      warehouse: defaultWarehouse || '',
+      batch: '',
+      serial: ''
+    });
+    setItemDetails(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -260,61 +338,120 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
               </Button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {hasBatchTracking && (
+            {inputMethod === 'traditional' ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {hasBatchTracking && (
+                    <div>
+                      <Label htmlFor="batch">Batch Number *</Label>
+                      <Input
+                        id="batch"
+                        value={formData.batch}
+                        onChange={(e) => setFormData(prev => ({ ...prev, batch: e.target.value }))}
+                        placeholder="Enter batch number..."
+                        required
+                      />
+                    </div>
+                  )}
                   <div>
-                    <Label htmlFor="batch">Batch Number *</Label>
+                    <Label htmlFor="receivedQty">Actual Quantity *</Label>
                     <Input
-                      id="batch"
-                      value={formData.batch}
-                      onChange={(e) => setFormData(prev => ({ ...prev, batch: e.target.value }))}
-                      placeholder="Enter batch number..."
+                      id="receivedQty"
+                      type="number"
+                      value={formData.receivedQty}
+                      onChange={(e) => setFormData(prev => ({ ...prev, receivedQty: Number(e.target.value) }))}
+                      placeholder="0"
+                      max={selectedItemData.pendingQty}
+                      min="1"
                       required
                     />
                   </div>
+                </div>
+
+                {hasSerialTracking && (
+                  <div>
+                    <Label htmlFor="serial">Serial Number *</Label>
+                    <Input
+                      id="serial"
+                      value={formData.serial}
+                      onChange={(e) => setFormData(prev => ({ ...prev, serial: e.target.value }))}
+                      placeholder="Enter serial number..."
+                      required={hasSerialTracking}
+                    />
+                  </div>
                 )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={
+                    formData.receivedQty <= 0 || 
+                    (hasBatchTracking && !formData.batch.trim()) ||
+                    (hasSerialTracking && !formData.serial.trim())
+                  }
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add to Count
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleBundleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="receivedQty">Actual Quantity *</Label>
+                  <Label htmlFor="bundleQty">Total Quantity *</Label>
                   <Input
-                    id="receivedQty"
+                    id="bundleQty"
                     type="number"
-                    value={formData.receivedQty}
-                    onChange={(e) => setFormData(prev => ({ ...prev, receivedQty: Number(e.target.value) }))}
+                    value={bundleData.qty}
+                    onChange={(e) => setBundleData(prev => ({ ...prev, qty: Number(e.target.value) }))}
                     placeholder="0"
                     max={selectedItemData.pendingQty}
                     min="1"
                     required
                   />
                 </div>
-              </div>
 
-              {hasSerialTracking && inputMethod === 'traditional' && (
-                <div>
-                  <Label htmlFor="serial">Serial Number {hasSerialTracking ? '*' : '(Optional)'}</Label>
-                  <Input
-                    id="serial"
-                    value={formData.serial}
-                    onChange={(e) => setFormData(prev => ({ ...prev, serial: e.target.value }))}
-                    placeholder="Enter serial number..."
-                    required={hasSerialTracking}
-                  />
-                </div>
-              )}
+                {hasBatchTracking && (
+                  <div>
+                    <Label htmlFor="batches">Batch Numbers (one per line) *</Label>
+                    <Textarea
+                      id="batches"
+                      value={bundleData.batches}
+                      onChange={(e) => setBundleData(prev => ({ ...prev, batches: e.target.value }))}
+                      placeholder="BATCH001&#10;BATCH002&#10;BATCH003"
+                      rows={4}
+                      required
+                    />
+                  </div>
+                )}
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={
-                  formData.receivedQty <= 0 || 
-                  (hasBatchTracking && !formData.batch.trim()) ||
-                  (hasSerialTracking && !formData.serial.trim())
-                }
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add to Count
-              </Button>
-            </form>
+                {hasSerialTracking && (
+                  <div>
+                    <Label htmlFor="serials">Serial Numbers (one per line) *</Label>
+                    <Textarea
+                      id="serials"
+                      value={bundleData.serials}
+                      onChange={(e) => setBundleData(prev => ({ ...prev, serials: e.target.value }))}
+                      placeholder="SN001&#10;SN002&#10;SN003"
+                      rows={4}
+                      required
+                    />
+                  </div>
+                )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={
+                    bundleData.qty <= 0 || 
+                    (hasBatchTracking && !bundleData.batches.trim()) ||
+                    (hasSerialTracking && !bundleData.serials.trim())
+                  }
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Bundle to Count
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       )}

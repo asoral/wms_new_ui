@@ -183,6 +183,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
             <CardContent className="space-y-4">
               <ItemSelector
                 onItemSelected={handleItemSelected}
+                isLoading={false}
               />
             </CardContent>
           </Card>

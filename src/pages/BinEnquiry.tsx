@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +50,7 @@ const BinEnquiry = () => {
       const company = await getUserDefaultCompany();
       if (company) {
         try {
-          const companyDetails = await erpnextAPI.items.getCompanyDetails(company);
+          const companyDetails = await erpnextAPI.company.getCompanyDetails(company);
           if (companyDetails?.data?.default_currency) {
             setCompanyCurrency(companyDetails.data.default_currency);
           }
@@ -66,7 +67,10 @@ const BinEnquiry = () => {
         // Transform the data to match our BinItem interface with proper item names
         const transformedItems: BinItem[] = await Promise.all(
           response.data
-            .filter((item: any) => (item.actual_qty || 0) > 0) // Filter out zero stock items
+            .filter((item: any) => {
+              const actualQty = item.actual_qty || 0;
+              return actualQty > 0; // Only show items with positive stock
+            })
             .map(async (item: any) => {
               // Get item details to fetch item name
               let itemName = item.item_name || item.item_code;

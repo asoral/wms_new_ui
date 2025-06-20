@@ -307,6 +307,12 @@ const Receive = () => {
       return;
     }
     
+    // Show processing toast immediately
+    toast({
+      title: "Processing Transaction",
+      description: "Purchase receipt is being submitted. You may continue your work.",
+    });
+    
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {

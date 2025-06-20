@@ -1,49 +1,35 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Package, Warehouse, TrendingUp, AlertTriangle, Search, Camera, QrCode, Calendar, DollarSign, Clock } from "lucide-react";
+import { Package, Warehouse, Search, TrendingUp, AlertTriangle, Calendar, DollarSign } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import ItemSelector from "../components/item-enquiry/ItemSelector";
 import ItemScanner from "../components/item-enquiry/ItemScanner";
-import CameraScanner from "../components/item-enquiry/CameraScanner";
 
-export interface ItemDetails {
+interface StockItem {
   itemCode: string;
   itemName: string;
-  itemGroup: string;
-  stockUom: string;
-  description?: string;
-}
-
-export interface StockInfo {
   warehouse: string;
   qty: number;
+  uom: string;
   valuation: number;
   age: number;
-  uom: string;
   batch?: string;
   serial?: string;
-  actualQty: number;
-  reservedQty: number;
-  availableQty: number;
-  valuationRate: number;
+  binLocation?: string;
 }
 
 const ItemEnquiry = () => {
-  const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
-  const [stockInfo, setStockInfo] = useState<StockInfo[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("selector");
-  const [showCamera, setShowCamera] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<string>("");
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
   const { toast } = useToast();
 
-  const loadItemDetails = async (itemCode: string) => {
+  const loadItemStock = async (itemCode: string) => {
     try {
       setLoading(true);
-      console.log('Loading item details for:', itemCode);
+      setSelectedItem(itemCode);
       
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
@@ -59,7 +45,7 @@ const ItemEnquiry = () => {
       const company = await getUserDefaultCompany();
       if (company) {
         try {
-          const companyDetails = await erpnextAPI.items.getCompanyDetails(company);
+          const companyDetails = await erpnextAPI.company.getCompanyDetails(company);
           if (companyDetails?.data?.default_currency) {
             setCompanyCurrency(companyDetails.data.default_currency);
           }
@@ -68,58 +54,46 @@ const ItemEnquiry = () => {
         }
       }
 
-      // Get item details using the stock API (which delegates to items API)
-      const itemResult = await erpnextAPI.stock.getItemDetails(itemCode);
-      console.log('Item details result:', itemResult);
+      // Fetch item stock details
+      const response = await erpnextAPI.stock.getBinStock(itemCode);
+      console.log('Item stock response:', response);
 
-      if (itemResult.data) {
-        const item = itemResult.data;
-        setItemDetails({
-          itemCode: item.item_code || item.name || itemCode,
-          itemName: item.item_name || item.item_code || itemCode,
-          itemGroup: item.item_group || 'Default',
-          stockUom: item.stock_uom || 'Nos',
-          description: item.description || ''
-        });
+      if (response?.data) {
+        // Transform the data to match our StockItem interface
+        const transformedItems: StockItem[] = response.data
+          .filter((item: any) => (item.actual_qty || 0) > 0) // Filter out zero stock items
+          .map((item: any) => {
+            const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
+            const valuationRate = item.valuation_rate || 0;
+            const stockValue = item.stock_value || 0;
+            
+            // Use stock_value if available, otherwise calculate from qty * rate
+            let totalValuation = stockValue;
+            if (!stockValue && valuationRate && actualQty > 0) {
+              totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
+            }
 
-        // Get stock using Bin API instead of Stock Balance
-        console.log('Fetching bin stock for item:', itemCode);
-        const stockResult = await erpnextAPI.stock.getBinStock(itemCode);
-        console.log('Bin stock result:', stockResult);
-        
-        if (stockResult.data && Array.isArray(stockResult.data)) {
-          const stockData: StockInfo[] = stockResult.data.map((stock: any) => ({
-            warehouse: stock.warehouse || 'Unknown',
-            qty: stock.actual_qty || 0,
-            valuation: stock.stock_value || 0,
-            age: Math.floor(Math.random() * 120), // Placeholder for now
-            uom: item.stock_uom || 'Nos',
-            actualQty: stock.actual_qty || 0,
-            reservedQty: stock.projected_qty ? (stock.projected_qty - stock.actual_qty) : 0,
-            availableQty: stock.projected_qty || stock.actual_qty || 0,
-            valuationRate: stock.stock_value && stock.actual_qty ? (stock.stock_value / stock.actual_qty) : 0
-          }));
-          console.log('Processed stock data:', stockData);
-          setStockInfo(stockData);
-        } else {
-          console.log('No stock data found or invalid format');
-          setStockInfo([]);
-        }
+            return {
+              itemCode: item.item_code,
+              itemName: item.item_name || item.item_code,
+              warehouse: item.warehouse,
+              qty: actualQty,
+              uom: 'Nos',
+              valuation: totalValuation,
+              age: Math.floor(Math.random() * 120), // Placeholder
+              binLocation: item.warehouse
+            };
+          });
+        setStockItems(transformedItems);
       } else {
-        toast({
-          title: "Item Not Found",
-          description: `Item ${itemCode} could not be found in ERPNext.`,
-          variant: "destructive"
-        });
-        setItemDetails(null);
-        setStockInfo([]);
+        setStockItems([]);
       }
 
     } catch (error) {
-      console.error('Failed to load item details:', error);
+      console.error('Failed to load item stock:', error);
       toast({
         title: "Error",
-        description: "Failed to load item details from ERPNext",
+        description: "Failed to load item stock from ERPNext",
         variant: "destructive"
       });
     } finally {
@@ -127,38 +101,13 @@ const ItemEnquiry = () => {
     }
   };
 
-  const handleBarcodeScanned = async (barcode: string) => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      // Try to find item by barcode first
-      const barcodeResult = await erpnextAPI.stock.searchItemsByBarcode(barcode);
-      if (barcodeResult.data && barcodeResult.data.length > 0) {
-        const item = barcodeResult.data[0];
-        await loadItemDetails(item.item_code || item.name);
-      } else {
-        // If not found by barcode, try direct search
-        await loadItemDetails(barcode);
-      }
-    } catch (error) {
-      console.error('Error searching by barcode:', error);
-      await loadItemDetails(barcode);
-    }
-  };
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: companyCurrency,
-      minimumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
-  };
-
-  const getStockStatus = (qty: number) => {
-    if (qty === 0) return { color: "bg-red-100 text-red-800", label: "Out of Stock" };
-    if (qty < 10) return { color: "bg-yellow-100 text-yellow-800", label: "Low Stock" };
-    return { color: "bg-green-100 text-green-800", label: "In Stock" };
   };
 
   const getAgeColor = (age: number) => {
@@ -167,10 +116,9 @@ const ItemEnquiry = () => {
     return "bg-red-100 text-red-800";
   };
 
-  const totalStock = stockInfo.reduce((sum, stock) => sum + stock.actualQty, 0);
-  const totalValuation = stockInfo.reduce((sum, stock) => sum + stock.valuation, 0);
-  const totalWarehouses = stockInfo.length;
-  const availableStock = stockInfo.reduce((sum, stock) => sum + stock.availableQty, 0);
+  const totalItems = stockItems.length;
+  const totalQty = Math.round(stockItems.reduce((sum, item) => sum + item.qty, 0) * 100) / 100;
+  const totalValuation = Math.round(stockItems.reduce((sum, item) => sum + item.valuation, 0) * 100) / 100;
 
   return (
     <div className="container mx-auto py-6">
@@ -179,126 +127,42 @@ const ItemEnquiry = () => {
           <Package className="w-6 h-6" />
           <span>Item Enquiry</span>
         </h1>
-        <p className="text-gray-500">Search for item details and stock information.</p>
+        <p className="text-gray-500">Check the stock levels of a specific item.</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="selector" className="flex items-center space-x-2">
-            <Search className="w-4 h-4" />
-            <span>Search</span>
-          </TabsTrigger>
-          <TabsTrigger value="barcode" className="flex items-center space-x-2">
-            <QrCode className="w-4 h-4" />
-            <span>Barcode</span>
-          </TabsTrigger>
-          <TabsTrigger value="camera" className="flex items-center space-x-2">
-            <Camera className="w-4 h-4" />
-            <span>Camera</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="selector">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Search className="w-5 h-5" />
-                <span>Select Item</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ItemSelector 
-                onItemSelected={loadItemDetails}
-                isLoading={loading}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="barcode">
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Search className="w-5 h-5" />
+            <span>Select Item</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <ItemScanner 
-            onBarcodeScanned={handleBarcodeScanned}
+            onItemScanned={loadItemStock}
             isLoading={loading}
           />
-        </TabsContent>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="camera">
-          {showCamera ? (
-            <CameraScanner 
-              onBarcodeScanned={handleBarcodeScanned}
-              onClose={() => setShowCamera(false)}
-            />
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <button 
-                  onClick={() => setShowCamera(true)}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 mx-auto"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Open Camera Scanner</span>
-                </button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Item Details and Stock Summary */}
-      {itemDetails && (
-        <div className="mt-6 space-y-6">
-          {/* Item Details Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Package className="w-5 h-5" />
-                <span>Item Details</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Item Code</label>
-                  <p className="text-lg font-semibold">{itemDetails.itemCode}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Item Name</label>
-                  <p className="text-lg font-semibold">{itemDetails.itemName}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Item Group</label>
-                  <p className="text-lg font-semibold">{itemDetails.itemGroup}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">UOM</label>
-                  <p className="text-lg font-semibold">{itemDetails.stockUom}</p>
-                </div>
-              </div>
-              {itemDetails.description && (
-                <div className="mt-4">
-                  <label className="text-sm font-medium text-gray-500">Description</label>
-                  <p className="text-gray-700">{itemDetails.description}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Stock Summary - Colorful Cards like Deliver Screen */}
-          <Card>
+      {selectedItem && (
+        <>
+          {/* Summary Cards - Colorful like Deliver Screen */}
+          <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <TrendingUp className="w-5 h-5" />
-                <span>Stock Summary</span>
+                <span>Item Summary - {selectedItem}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-blue-50 border-blue-200">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-blue-600 mb-1">Total Stock</p>
-                        <p className="text-2xl font-bold text-blue-600">{totalStock}</p>
+                        <p className="text-sm text-blue-600 mb-1">Total Locations</p>
+                        <p className="text-2xl font-bold text-blue-600">{totalItems}</p>
                       </div>
                       <Calendar className="w-8 h-8 text-blue-600" />
                     </div>
@@ -309,22 +173,10 @@ const ItemEnquiry = () => {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-green-600 mb-1">Available</p>
-                        <p className="text-2xl font-bold text-green-600">{availableStock}</p>
+                        <p className="text-sm text-green-600 mb-1">Total Quantity</p>
+                        <p className="text-2xl font-bold text-green-600">{totalQty}</p>
                       </div>
                       <Package className="w-8 h-8 text-green-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-purple-50 border-purple-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-purple-600 mb-1">Warehouses</p>
-                        <p className="text-2xl font-bold text-purple-600">{totalWarehouses}</p>
-                      </div>
-                      <Warehouse className="w-8 h-8 text-purple-600" />
                     </div>
                   </CardContent>
                 </Card>
@@ -344,71 +196,62 @@ const ItemEnquiry = () => {
             </CardContent>
           </Card>
 
-          {/* Warehouse Stock Details */}
+          {/* Stock Items Table */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Warehouse className="w-5 h-5" />
-                <span>Warehouse Stock Details</span>
+                <span>Stock of {selectedItem}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {stockInfo.length === 0 ? (
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p>Loading item stock...</p>
+                </div>
+              ) : stockItems.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                  <p>No stock information available.</p>
+                  <p>No stock found for this item.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Mobile View */}
                   <div className="md:hidden space-y-4">
-                    {stockInfo.map((stock, index) => {
-                      const status = getStockStatus(stock.actualQty);
-                      return (
-                        <div key={index} className="border rounded-lg p-4 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <Warehouse className="w-4 h-4 text-gray-500" />
-                              <span className="font-medium">{stock.warehouse}</span>
+                    {stockItems.map((item, index) => (
+                      <Card key={index} className="border-l-4 border-l-green-500">
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="font-semibold text-lg">{item.itemName}</h3>
+                                <p className="text-gray-600 text-sm">Warehouse: {item.warehouse}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xl font-bold text-green-600">{item.qty}</p>
+                                <p className="text-sm text-gray-600">{item.uom}</p>
+                              </div>
                             </div>
-                            <Badge className={status.color}>{status.label}</Badge>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="text-gray-600">Quantity:</span>
-                              <p className="font-semibold">{stock.qty} {stock.uom}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Valuation:</span>
-                              <p className="font-semibold">{formatCurrency(stock.valuation)}</p>
-                            </div>
-                          </div>
 
-                          <div className="text-xs text-gray-600 space-y-1">
-                            <div>Available: {stock.availableQty} | Reserved: {stock.reservedQty}</div>
-                            <div>Rate: {formatCurrency(stock.valuationRate)}</div>
-                            <div className="flex items-center space-x-2">
-                              <span>Age:</span>
-                              <Badge className={getAgeColor(stock.age)} variant="secondary">
-                                {stock.age} days
-                              </Badge>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-600">Age:</span>
+                                <div className="mt-1">
+                                  <Badge className={getAgeColor(item.age)}>
+                                    {item.age} days
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Valuation:</span>
+                                <p className="font-semibold mt-1">{formatCurrency(item.valuation)}</p>
+                              </div>
                             </div>
                           </div>
-
-                          {(stock.batch || stock.serial) && (
-                            <div className="flex space-x-2">
-                              {stock.batch && (
-                                <Badge variant="outline">Batch: {stock.batch}</Badge>
-                              )}
-                              {stock.serial && (
-                                <Badge variant="outline">Serial: {stock.serial}</Badge>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
 
                   {/* Desktop View */}
@@ -417,49 +260,36 @@ const ItemEnquiry = () => {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="border-b">
+                            <th className="text-left p-3 font-medium text-gray-700">Item Name</th>
                             <th className="text-left p-3 font-medium text-gray-700">Warehouse</th>
                             <th className="text-right p-3 font-medium text-gray-700">Quantity</th>
+                            <th className="text-left p-3 font-medium text-gray-700">UOM</th>
+                            <th className="text-right p-3 font-medium text-gray-700">Age (Days)</th>
                             <th className="text-right p-3 font-medium text-gray-700">Valuation</th>
-                            <th className="text-center p-3 font-medium text-gray-700">Age</th>
-                            <th className="text-center p-3 font-medium text-gray-700">Status</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {stockInfo.map((stock, index) => {
-                            const status = getStockStatus(stock.actualQty);
-                            return (
-                              <tr key={index} className="border-b hover:bg-gray-50">
-                                <td className="p-3">
-                                  <div className="flex items-center space-x-2">
-                                    <Warehouse className="w-4 h-4 text-gray-500" />
-                                    <div>
-                                      <div className="font-medium">{stock.warehouse}</div>
-                                      <div className="text-xs text-gray-500">
-                                        Available: {stock.availableQty} | Reserved: {stock.reservedQty}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="p-3 text-right">
-                                  <div className="font-medium">{stock.qty} {stock.uom}</div>
-                                  <div className="text-xs text-gray-500">
-                                    Rate: {formatCurrency(stock.valuationRate)}
-                                  </div>
-                                </td>
-                                <td className="p-3 text-right">
-                                  <div className="font-medium">{formatCurrency(stock.valuation)}</div>
-                                </td>
-                                <td className="p-3 text-center">
-                                  <Badge className={getAgeColor(stock.age)} variant="secondary">
-                                    {stock.age} days
-                                  </Badge>
-                                </td>
-                                <td className="p-3 text-center">
-                                  <Badge className={status.color}>{status.label}</Badge>
-                                </td>
-                              </tr>
-                            );
-                          })}
+                          {stockItems.map((item, index) => (
+                            <tr key={index} className="border-b hover:bg-gray-50">
+                              <td className="p-3">
+                                <div className="flex items-center space-x-2">
+                                  <Package className="w-4 h-4 text-gray-500" />
+                                  <span className="font-medium">{item.itemName}</span>
+                                </div>
+                              </td>
+                              <td className="p-3 text-gray-600">{item.warehouse}</td>
+                              <td className="p-3 text-right font-semibold">{item.qty}</td>
+                              <td className="p-3">{item.uom}</td>
+                              <td className="p-3 text-right">
+                                <Badge className={getAgeColor(item.age)}>
+                                  {item.age} days
+                                </Badge>
+                              </td>
+                              <td className="p-3 text-right font-semibold">
+                                {formatCurrency(item.valuation)}
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -468,14 +298,14 @@ const ItemEnquiry = () => {
               )}
             </CardContent>
           </Card>
-        </div>
+        </>
       )}
 
-      {!loading && !itemDetails && (
-        <Card className="mt-6">
+      {!loading && !selectedItem && (
+        <Card>
           <CardContent className="text-center py-8">
             <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500">Select an item to view its stock details.</p>
+            <p className="text-gray-500">Select an item to view its stock levels.</p>
           </CardContent>
         </Card>
       )}
