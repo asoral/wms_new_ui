@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -330,6 +329,11 @@ const StockCount = () => {
 
   const itemsInReview = session ? session.entries.length : 0;
 
+  const handleFormSubmit = (items: any[]) => {
+    // This is a placeholder for when onAddEntry is not used
+    console.log('Form submitted with items:', items);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
@@ -433,7 +437,8 @@ const StockCount = () => {
                   <CardContent>
                     <StockCountForm 
                       warehouse={session.warehouse}
-                      onAddEntry={addEntry} 
+                      onAddEntry={addEntry}
+                      onSubmit={handleFormSubmit}
                     />
                   </CardContent>
                 </Card>
