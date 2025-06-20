@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,19 +9,15 @@ import { Scan, Package, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DeliveryEntry, SOItem } from "../../pages/Deliver";
 import { useToast } from "@/hooks/use-toast";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { createERPNextAPI } from "@/services/erpnextApi";
 import BatchSelector from "./BatchSelector";
+import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
 
 interface EnhancedDeliveryItemScannerProps {
   soItems: SOItem[];
   onAddEntry: (entry: DeliveryEntry) => void;
   company?: string;
   deliveryNoteName?: string;
-}
-
-interface WarehouseInfo {
-  name: string;
-  warehouse_name: string;
 }
 
 const EnhancedDeliveryItemScanner = ({ 
@@ -32,7 +29,6 @@ const EnhancedDeliveryItemScanner = ({
   const [selectedItemCode, setSelectedItemCode] = useState("");
   const [scannedCode, setScannedCode] = useState("");
   const [warehouse, setWarehouse] = useState("");
-  const [warehouses, setWarehouses] = useState<WarehouseInfo[]>([]);
   const [batchNumber, setBatchNumber] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -42,35 +38,6 @@ const EnhancedDeliveryItemScanner = ({
   const { toast } = useToast();
 
   const selectedItem = soItems.find(item => item.itemCode === selectedItemCode);
-
-  // Fetch warehouses on component mount
-  useEffect(() => {
-    fetchWarehouses();
-  }, []);
-
-  const fetchWarehouses = async () => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const defaultCompany = await getUserDefaultCompany();
-      const result = await erpnextAPI.getWarehouses(
-        [['disabled', '=', 0]], 
-        defaultCompany || undefined
-      );
-      
-      if (result.data) {
-        // Map Warehouse[] to WarehouseInfo[] with proper type handling
-        const warehouseData: WarehouseInfo[] = result.data.map((wh: any) => ({
-          name: wh.name,
-          warehouse_name: wh.warehouse_name || wh.name // Use name as fallback if warehouse_name is missing
-        }));
-        setWarehouses(warehouseData);
-      }
-    } catch (error) {
-      console.error('Error fetching warehouses:', error);
-    }
-  };
 
   // Check if item is batch/serial tracked
   const checkItemTracking = async (itemCode: string) => {
@@ -115,6 +82,10 @@ const EnhancedDeliveryItemScanner = ({
         variant: "destructive"
       });
     }
+  };
+
+  const handleWarehouseSelected = (warehouseCode: string) => {
+    setWarehouse(warehouseCode);
   };
 
   const handleOpenBatchSelector = () => {
@@ -210,7 +181,7 @@ const EnhancedDeliveryItemScanner = ({
       if (!batchNumber && !serialNumber) {
         toast({
           title: "Tracking Required",
-          description: "This item requires batch or serial number tracking. Please use the batch selector or enter manually.",
+          description: "This item requires batch or serial number tracking. Please use the batch selector.",
           variant: "destructive"
         });
         return;
@@ -315,19 +286,10 @@ const EnhancedDeliveryItemScanner = ({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Warehouse *</label>
-                  <Select value={warehouse} onValueChange={setWarehouse}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select warehouse..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {warehouses.map((wh) => (
-                        <SelectItem key={wh.name} value={wh.name}>
-                          {wh.warehouse_name || wh.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <WarehouseSelector
+                    onWarehouseSelected={handleWarehouseSelected}
+                    isLoading={loading}
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Quantity to Deliver *</label>
@@ -354,63 +316,28 @@ const EnhancedDeliveryItemScanner = ({
                     {itemDetails.hasSerial && <Badge variant="outline">Serial</Badge>}
                   </div>
                   
-                  <div className="space-y-3">
-                    {itemDetails.hasBatch && (
-                      <div className="flex space-x-2">
-                        <div className="flex-1">
-                          <label className="text-sm font-medium mb-1 block">Batch Number</label>
-                          <Input
-                            placeholder="Enter batch number"
-                            value={batchNumber}
-                            onChange={(e) => setBatchNumber(e.target.value)}
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleOpenBatchSelector}
-                            disabled={!selectedItem || !warehouse || !quantity}
-                          >
-                            Pick Serial / Batch No
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {itemDetails.hasSerial && (
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Serial Number</label>
-                        <Input
-                          placeholder="Enter serial number"
-                          value={serialNumber}
-                          onChange={(e) => setSerialNumber(e.target.value)}
-                        />
-                      </div>
-                    )}
+                  <div className="flex justify-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleOpenBatchSelector}
+                      disabled={!selectedItem || !warehouse || !quantity}
+                    >
+                      Pick Serial / Batch No
+                    </Button>
                   </div>
                 </div>
               )}
 
-              {/* Manual Batch/Serial for non-tracked items */}
-              {itemDetails && !itemDetails.hasBatch && !itemDetails.hasSerial && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Batch Number (Optional)</label>
-                    <Input
-                      placeholder="Enter batch number"
-                      value={batchNumber}
-                      onChange={(e) => setBatchNumber(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Serial Number (Optional)</label>
-                    <Input
-                      placeholder="Enter serial number"
-                      value={serialNumber}
-                      onChange={(e) => setSerialNumber(e.target.value)}
-                    />
-                  </div>
+              {/* Serial Number for non-batch tracked items */}
+              {itemDetails && itemDetails.hasSerial && !itemDetails.hasBatch && (
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Serial Number (Optional)</label>
+                  <Input
+                    placeholder="Enter serial number"
+                    value={serialNumber}
+                    onChange={(e) => setSerialNumber(e.target.value)}
+                  />
                 </div>
               )}
 
