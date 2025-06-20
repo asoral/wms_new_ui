@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -306,67 +307,69 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
             )}
           </div>
 
-          {/* Serial and Batch Bundle Section */}
+          {/* Serial and Batch Bundle Section with Tabs */}
           {hasSerialBatchTracking && selectedItemCode && warehouse && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Serial/Batch Entry Method</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setUseTraditionalEntry(!useTraditionalEntry)}
-                >
-                  {useTraditionalEntry ? 'Use Bundle' : 'Manual Entry'}
-                </Button>
-              </div>
+              <Label>Serial/Batch Entry Method</Label>
+              <Tabs 
+                value={useTraditionalEntry ? "manual" : "bundle"} 
+                onValueChange={(value) => setUseTraditionalEntry(value === "manual")}
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+                  <TabsTrigger value="bundle">Use Bundle</TabsTrigger>
+                </TabsList>
 
-              {!useTraditionalEntry ? (
-                <div className="space-y-2">
-                  <Label>Create Serial and Batch Bundle</Label>
-                  <SerialBatchBundleSelector
-                    itemCode={selectedItemCode}
-                    itemName={itemDetails.item_name || searchTerm}
-                    itemGroup={itemDetails.item_group || 'All Item Groups'}
-                    hasSerial={itemDetails.has_serial_no || false}
-                    hasBatch={itemDetails.has_batch_no || false}
-                    warehouse={warehouse}
-                    transactionType="Inward"
-                    onBundleCreated={handleBundleCreated}
-                    initialQuantity={countedQty || 1}
-                  />
-                  {selectedBundle && (
-                    <p className="text-sm text-muted-foreground">
-                      Selected Bundle: {selectedBundle}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {itemDetails.has_batch_no && (
-                    <div className="space-y-2">
-                      <Label htmlFor="batch_no">Batch No</Label>
-                      <Input
-                        id="batch_no"
-                        value={batchNo}
-                        onChange={(e) => setBatchNo(e.target.value)}
-                        placeholder="Enter batch number"
-                      />
-                    </div>
-                  )}
-                  {itemDetails.has_serial_no && (
-                    <div className="space-y-2">
-                      <Label htmlFor="serial_no">Serial No</Label>
-                      <Input
-                        id="serial_no"
-                        value={serialNo}
-                        onChange={(e) => setSerialNo(e.target.value)}
-                        placeholder="Enter serial number"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+                <TabsContent value="manual" className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {itemDetails.has_batch_no && (
+                      <div className="space-y-2">
+                        <Label htmlFor="batch_no">Batch No</Label>
+                        <Input
+                          id="batch_no"
+                          value={batchNo}
+                          onChange={(e) => setBatchNo(e.target.value)}
+                          placeholder="Enter batch number"
+                        />
+                      </div>
+                    )}
+                    {itemDetails.has_serial_no && (
+                      <div className="space-y-2">
+                        <Label htmlFor="serial_no">Serial No</Label>
+                        <Input
+                          id="serial_no"
+                          value={serialNo}
+                          onChange={(e) => setSerialNo(e.target.value)}
+                          placeholder="Enter serial number"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="bundle" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Create Serial and Batch Bundle</Label>
+                    <SerialBatchBundleSelector
+                      itemCode={selectedItemCode}
+                      itemName={itemDetails.item_name || searchTerm}
+                      itemGroup={itemDetails.item_group || 'All Item Groups'}
+                      hasSerial={itemDetails.has_serial_no || false}
+                      hasBatch={itemDetails.has_batch_no || false}
+                      warehouse={warehouse}
+                      transactionType="Inward"
+                      onBundleCreated={handleBundleCreated}
+                      initialQuantity={countedQty || 1}
+                    />
+                    {selectedBundle && (
+                      <p className="text-sm text-muted-foreground">
+                        Selected Bundle: {selectedBundle}
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           )}
 
