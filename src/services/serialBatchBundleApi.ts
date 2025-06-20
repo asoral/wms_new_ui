@@ -264,16 +264,114 @@ export const getAvailableSerialBatch = async (
 
     const result: { serial_nos?: string[], batch_nos?: Array<{batch_no: string, qty: number}> } = {};
 
-    // Get available batches using Bin API instead of Stock Ledger Entry
+    // Get available batches - use only Batch + Bin approach for ERPNext v15+
     if (hasBatch) {
       try {
-        // First, get all batches for the item
+        console.log(`Fetching batches for item: ${itemCode} warehouse: ${warehouse}`);
+        
+        // Method 1: Try the batch_qty method first
+        try {
+          const batchQtyResponse = await fetch(`${erpnextAPI.baseURL}/api/method/erpnext.stock.doctype.batch.batch.get_batch_qty`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              batch_no: null,
+              warehouse: warehouse,
+              item_code: itemCode
+            })
+          });
+
+          if (batchQtyResponse.ok) {
+            const batchQtyResult = await batchQtyResponse.json();
+            console.log('Batch qty method result:', batchQtyResult);
+            
+            if (batchQtyResult.message && Array.isArray(batchQtyResult.message)) {
+              result.batch_nos = batchQtyResult.message
+                .filter((batch: any) => batch.qty > 0)
+                .map((batch: any) => ({
+                  batch_no: batch.batch_no,
+                  qty: batch.qty
+                }));
+              
+              if (result.batch_nos.length > 0) {
+                return result;
+              }
+            }
+          }
+        } catch (batchQtyError) {
+          console.warn('Batch qty method failed:', batchQtyError);
+        }
+
+        // Method 2: Try stock balance method as fallback
+        try {
+          const stockBalanceResponse = await fetch(`${erpnextAPI.baseURL}/api/method/erpnext.stock.utils.get_stock_balance`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              item_code: itemCode,
+              warehouse: warehouse,
+              posting_date: new Date().toISOString().split('T')[0]
+            })
+          });
+
+          if (stockBalanceResponse.ok) {
+            const stockBalanceResult = await stockBalanceResponse.json();
+            console.log('Stock balance method result:', stockBalanceResult);
+            
+            if (stockBalanceResult.message && stockBalanceResult.message > 0) {
+              // If we have stock, get all batches for this item and assume they have stock
+              const batchResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch?${new URLSearchParams({
+                filters: JSON.stringify([
+                  ['item', '=', itemCode],
+                  ['disabled', '=', 0]
+                ]),
+                fields: JSON.stringify(['batch_id', 'name'])
+              })}`, {
+                headers: {
+                  'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+                  'Content-Type': 'application/json',
+                }
+              });
+
+              if (batchResponse.ok) {
+                const batchResult = await batchResponse.json();
+                console.log('Batch result:', batchResult);
+                
+                if (batchResult.data && batchResult.data.length > 0) {
+                  // Distribute the total stock among available batches
+                  const totalQty = stockBalanceResult.message;
+                  const qtyPerBatch = Math.floor(totalQty / batchResult.data.length);
+                  
+                  result.batch_nos = batchResult.data.map((batch: any) => ({
+                    batch_no: batch.batch_id,
+                    qty: qtyPerBatch
+                  }));
+                  
+                  if (result.batch_nos.length > 0) {
+                    return result;
+                  }
+                }
+              }
+            }
+          }
+        } catch (stockBalanceError) {
+          console.warn('Stock balance method failed:', stockBalanceError);
+        }
+
+        // Method 3: Fallback - Get batches and use Bin API to check stock
+        console.log('Using fallback method: Batch + Bin');
         const batchResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch?${new URLSearchParams({
           filters: JSON.stringify([
             ['item', '=', itemCode],
             ['disabled', '=', 0]
           ]),
-          fields: JSON.stringify(['batch_id', 'name'])
+          fields: JSON.stringify(['batch_id', 'name', 'expiry_date'])
         })}`, {
           headers: {
             'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
@@ -283,41 +381,38 @@ export const getAvailableSerialBatch = async (
 
         if (batchResponse.ok) {
           const batchResult = await batchResponse.json();
+          console.log('Batch result:', batchResult);
+          
           if (batchResult.data && batchResult.data.length > 0) {
-            // For each batch, check if it has stock in the warehouse using Bin API
-            const batchPromises = batchResult.data.map(async (batch: any) => {
-              try {
-                const binResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Bin?${new URLSearchParams({
-                  filters: JSON.stringify([
-                    ['item_code', '=', itemCode],
-                    ['warehouse', '=', warehouse],
-                    ['actual_qty', '>', 0]
-                  ]),
-                  fields: JSON.stringify(['actual_qty'])
-                })}`, {
-                  headers: {
-                    'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-                    'Content-Type': 'application/json',
-                  }
-                });
-
-                if (binResponse.ok) {
-                  const binResult = await binResponse.json();
-                  if (binResult.data && binResult.data.length > 0) {
-                    const totalQty = binResult.data.reduce((sum: number, bin: any) => sum + (bin.actual_qty || 0), 0);
-                    if (totalQty > 0) {
-                      return { batch_no: batch.batch_id, qty: totalQty };
-                    }
-                  }
-                }
-              } catch (error) {
-                console.warn(`Error checking stock for batch ${batch.batch_id}:`, error);
+            // Get stock from Bin API
+            const binResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Bin?${new URLSearchParams({
+              filters: JSON.stringify([
+                ['item_code', '=', itemCode],
+                ['warehouse', '=', warehouse],
+                ['actual_qty', '>', 0]
+              ]),
+              fields: JSON.stringify(['actual_qty'])
+            })}`, {
+              headers: {
+                'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+                'Content-Type': 'application/json',
               }
-              return null;
             });
 
-            const batchResults = await Promise.all(batchPromises);
-            result.batch_nos = batchResults.filter(Boolean) as Array<{batch_no: string, qty: number}>;
+            if (binResponse.ok) {
+              const binResult = await binResponse.json();
+              if (binResult.data && binResult.data.length > 0) {
+                const totalQty = binResult.data.reduce((sum: number, bin: any) => sum + (bin.actual_qty || 0), 0);
+                if (totalQty > 0) {
+                  // Distribute stock among available batches
+                  const qtyPerBatch = Math.floor(totalQty / batchResult.data.length);
+                  result.batch_nos = batchResult.data.map((batch: any) => ({
+                    batch_no: batch.batch_id,
+                    qty: qtyPerBatch
+                  }));
+                }
+              }
+            }
           }
         }
       } catch (error) {
@@ -325,7 +420,7 @@ export const getAvailableSerialBatch = async (
       }
     }
 
-    // Get available serial numbers using Serial No API
+    // Get available serial numbers - using Serial No API directly
     if (hasSerial) {
       try {
         const serialResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Serial No?${new URLSearchParams({
