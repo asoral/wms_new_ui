@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, Warehouse, Search, TrendingUp, AlertTriangle, Calendar, DollarSign } from "lucide-react";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import BinScanner from "../components/bin-enquiry/BinScanner";
 
@@ -28,6 +28,7 @@ const BinEnquiry = () => {
   const [binItems, setBinItems] = useState<BinItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedBin, setSelectedBin] = useState<string>("");
+  const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
   const { toast } = useToast();
 
   const loadBinItems = async (binCode: string) => {
@@ -45,26 +46,54 @@ const BinEnquiry = () => {
         return;
       }
 
+      // Get company currency
+      const company = await getUserDefaultCompany();
+      if (company) {
+        try {
+          const companyDetails = await erpnextAPI.getCompanyDetails(company);
+          if (companyDetails?.data?.default_currency) {
+            setCompanyCurrency(companyDetails.data.default_currency);
+          }
+        } catch (error) {
+          console.error('Failed to fetch company currency:', error);
+        }
+      }
+
       // Fetch bin stock details
       const response = await erpnextAPI.stock.getBinStock(undefined, binCode);
       console.log('Bin stock response:', response);
 
       if (response?.data) {
-        // Transform the data to match our BinItem interface
-        const transformedItems: BinItem[] = response.data.map((item: any) => ({
-          item_code: item.item_code,
-          item_name: item.item_name,
-          actual_qty: item.actual_qty,
-          valuation_rate: item.valuation_rate,
-          warehouse: item.warehouse,
-          bin: item.warehouse,
-          itemCode: item.item_code,
-          itemName: item.item_name,
-          qty: item.actual_qty,
-          uom: 'Nos',
-          age: Math.floor(Math.random() * 120), // Placeholder
-          valuation: item.actual_qty * item.valuation_rate
-        }));
+        // Transform the data to match our BinItem interface with proper item names
+        const transformedItems: BinItem[] = await Promise.all(
+          response.data.map(async (item: any) => {
+            // Get item details to fetch item name
+            let itemName = item.item_name || item.item_code;
+            try {
+              const itemDetails = await erpnextAPI.stock.getItemDetails(item.item_code);
+              if (itemDetails?.data?.item_name) {
+                itemName = itemDetails.data.item_name;
+              }
+            } catch (error) {
+              console.error('Failed to fetch item name for:', item.item_code);
+            }
+
+            return {
+              item_code: item.item_code,
+              item_name: itemName,
+              actual_qty: Math.round((item.actual_qty || 0) * 100) / 100, // Round to 2 decimal places
+              valuation_rate: item.valuation_rate || 0,
+              warehouse: item.warehouse,
+              bin: item.warehouse,
+              itemCode: item.item_code,
+              itemName: itemName,
+              qty: Math.round((item.actual_qty || 0) * 100) / 100, // Round to 2 decimal places
+              uom: 'Nos',
+              age: Math.floor(Math.random() * 120), // Placeholder
+              valuation: Math.round((item.actual_qty || 0) * (item.valuation_rate || 0) * 100) / 100
+            };
+          })
+        );
         setBinItems(transformedItems);
       } else {
         setBinItems([]);
@@ -85,8 +114,9 @@ const BinEnquiry = () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
+      currency: companyCurrency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -97,8 +127,8 @@ const BinEnquiry = () => {
   };
 
   const totalItems = binItems.length;
-  const totalQty = binItems.reduce((sum, item) => sum + (item.qty || 0), 0);
-  const totalValuation = binItems.reduce((sum, item) => sum + (item.valuation || 0), 0);
+  const totalQty = Math.round(binItems.reduce((sum, item) => sum + (item.qty || 0), 0) * 100) / 100;
+  const totalValuation = Math.round(binItems.reduce((sum, item) => sum + (item.valuation || 0), 0) * 100) / 100;
 
   return (
     <div className="container mx-auto py-6">
@@ -205,8 +235,8 @@ const BinEnquiry = () => {
                           <div className="space-y-3">
                             <div className="flex justify-between items-start">
                               <div>
-                                <h3 className="font-semibold text-lg">{item.itemCode}</h3>
-                                <p className="text-gray-600 text-sm">{item.itemName}</p>
+                                <h3 className="font-semibold text-lg">{item.item_name}</h3>
+                                <p className="text-gray-600 text-sm">{item.item_code}</p>
                               </div>
                               <div className="text-right">
                                 <p className="text-xl font-bold text-green-600">{item.qty}</p>
@@ -255,8 +285,8 @@ const BinEnquiry = () => {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="border-b">
-                            <th className="text-left p-3 font-medium text-gray-700">Item Code</th>
                             <th className="text-left p-3 font-medium text-gray-700">Item Name</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Item Code</th>
                             <th className="text-right p-3 font-medium text-gray-700">Quantity</th>
                             <th className="text-left p-3 font-medium text-gray-700">UOM</th>
                             <th className="text-right p-3 font-medium text-gray-700">Age (Days)</th>
@@ -269,10 +299,10 @@ const BinEnquiry = () => {
                               <td className="p-3">
                                 <div className="flex items-center space-x-2">
                                   <Package className="w-4 h-4 text-gray-500" />
-                                  <span className="font-medium">{item.itemCode}</span>
+                                  <span className="font-medium">{item.item_name}</span>
                                 </div>
                               </td>
-                              <td className="p-3">{item.itemName}</td>
+                              <td className="p-3 text-gray-600">{item.item_code}</td>
                               <td className="p-3 text-right font-semibold">{item.qty}</td>
                               <td className="p-3">{item.uom}</td>
                               <td className="p-3 text-right">

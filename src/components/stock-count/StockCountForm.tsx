@@ -8,7 +8,7 @@ import { Plus, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useNotification } from "@/hooks/useNotification";
 import { toast } from "sonner";
-import ItemSelector from "./ItemSelector";
+import ItemSelector from "../item-enquiry/ItemSelector";
 import SerialBatchBundleSelector from './SerialBatchBundleSelector';
 import CameraScanner from "../bin-enquiry/CameraScanner";
 import { createSerialBatchBundleFromTraditionalEntry } from '@/services/serialBatchBundleApi';
@@ -50,6 +50,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
   const [isLoadingQty, setIsLoadingQty] = useState(false);
   const [qtyError, setQtyError] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [isAddingItem, setIsAddingItem] = useState(false);
   const { showError, showSuccess, showLoading, dismiss } = useNotification();
 
   const [useBundle, setUseBundle] = useState(false);
@@ -91,6 +92,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       setIsLoadingQty(false);
     }
   };
+
   const handleBarcodeDetected = async (barcode: string) => {
     console.log('Barcode detected in StockCountForm:', barcode);
     setShowCamera(false);
@@ -103,15 +105,15 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         showError('ERPNext API not configured');
         return;
       }
-  
+
       const itemByBarcode = await erpnextAPI.getItemByBarcode(barcode);
       console.log("itemByBarcode:--->", itemByBarcode);
-  
+
       // Check if itemByBarcode.data exists and is not null/undefined
       if (itemByBarcode && itemByBarcode.data) {
         const item = itemByBarcode.data;
         console.log("got item:----->", item);
-  
+
         const itemInfo: ItemInfo = {
           item_code: item.item_code,
           item_name: item.item_name,
@@ -119,7 +121,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
           has_batch_no: item.has_batch_no || 0,
           has_serial_no: item.has_serial_no || 0,
         };
-  
+
         await handleItemSelected(itemInfo);
         showSuccess('Item found by barcode!');
       } else {
@@ -132,50 +134,9 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       dismiss(loadingToast);
     }
   };
-  
 
-  // const handleBarcodeDetected = async (barcode: string) => {
-  //   console.log('Barcode detected in StockCountForm:', barcode);
-  //   setShowCamera(false);
-    
-  //   const loadingToast = showLoading('Looking up item by barcode...');
-    
-  //   try {
-  //     const erpnextAPI = await createERPNextAPI();
-  //     if (!erpnextAPI) {
-  //       showError('ERPNext API not configured');
-  //       return;
-  //     }
-
-  //     const itemByBarcode = await erpnextAPI.getItemByBarcode(barcode);
-  //     console.log("itemByBarcode:--->",itemByBarcode)
-  //     if (itemByBarcode && itemByBarcode.data && itemByBarcode.data.length > 0) {
-  //       const item = itemByBarcode.data[0];
-  //       console.log("got item:----->",item)
-  //       const itemInfo: ItemInfo = {
-  //         item_code: item.item_code,
-  //         item_name: item.item_name,
-  //         stock_uom: item.stock_uom,
-  //         has_batch_no: item.has_batch_no || 0,
-  //         has_serial_no: item.has_serial_no || 0
-  //       };
-  //       await handleItemSelected(itemInfo);
-  //       showSuccess('Item found by barcode!');
-  //     } else {
-  //       showError('No item found with this barcode');
-  //     }
-  //   } catch (error) {
-  //     console.error('Failed to lookup item by barcode:', error);
-  //     showError('Failed to lookup item by barcode');
-  //   } finally {
-  //     dismiss(loadingToast);
-  //   }
-  // };
-
-  const handleItemSelected = async (item: ItemInfo) => {
-    console.log('Item selected, setting item data:', item);
-    
-    setSelectedItem(item);
+  const handleItemSelected = async (itemCode: string) => {
+    console.log('Item selected in StockCountForm:', itemCode);
     
     const loadingToast = showLoading('Fetching item details...');
     
@@ -186,23 +147,25 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
         return;
       }
 
-      const itemDetails = await erpnextAPI.getItemDetails(item.item_code);
+      const itemDetails = await erpnextAPI.stock.getItemDetails(itemCode);
       if (itemDetails.data) {
-        const fullItem = {
-          ...item,
-          has_batch_no: itemDetails.data.has_batch_no || 0,
-          has_serial_no: itemDetails.data.has_serial_no || 0
+        const item = itemDetails.data;
+        const itemInfo: ItemInfo = {
+          item_code: item.item_code,
+          item_name: item.item_name,
+          stock_uom: item.stock_uom,
+          has_batch_no: item.has_batch_no || 0,
+          has_serial_no: item.has_serial_no || 0
         };
-        console.log('Updated item with full details:', fullItem);
-        setSelectedItem(fullItem);
-        await fetchCurrentQty(fullItem.item_code);
+        console.log('Setting item data:', itemInfo);
+        setSelectedItem(itemInfo);
+        await fetchCurrentQty(itemInfo.item_code);
       } else {
-        console.log('Keeping original item data');
-        await fetchCurrentQty(item.item_code);
+        showError('Item details not found');
       }
     } catch (error) {
       console.error('Failed to fetch item details:', error);
-      await fetchCurrentQty(item.item_code);
+      showError('Failed to fetch item details');
     } finally {
       dismiss(loadingToast);
     }
@@ -335,6 +298,11 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       return;
     }
 
+    setIsAddingItem(true);
+    toast.info('Adding item to count...', {
+      description: 'Please wait while we process your entry'
+    });
+
     try {
       let bundleName = formData.serialBatchBundle;
 
@@ -399,10 +367,14 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
       setCurrentQty(0);
       setQtyError(null);
       
-      toast.success('Item added to count successfully');
+      toast.success('Item added to count successfully!', {
+        description: `${selectedItem.item_name} has been added to your stock count`
+      });
     } catch (error) {
       console.error('Error adding item to count:', error);
       toast.error('Failed to add item to count');
+    } finally {
+      setIsAddingItem(false);
     }
   };
 
@@ -424,7 +396,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
             <TabsContent value="manual" className="space-y-4">
               <ItemSelector 
                 onItemSelected={handleItemSelected}
-                isLoading={false}
+                isLoading={isAddingItem}
               />
               
               {/* Current Stock Info - Inline Display */}
@@ -462,7 +434,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                   <Button 
                     type="button"
                     onClick={() => setShowCamera(true)} 
-                    disabled={isScanning}
+                    disabled={isScanning || isAddingItem}
                     size="lg"
                     className="w-full"
                   >
@@ -493,6 +465,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                   variant={!useBundle ? "default" : "outline"}
                   onClick={() => setUseBundle(false)}
                   className="text-sm px-3 py-2"
+                  disabled={isAddingItem}
                 >
                   Traditional Entry
                 </Button>
@@ -501,6 +474,7 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
                   variant={useBundle ? "default" : "outline"}
                   onClick={() => setUseBundle(true)}
                   className="text-sm px-3 py-2"
+                  disabled={isAddingItem}
                 >
                   Bundle Entry
                 </Button>
@@ -533,69 +507,78 @@ const StockCountForm = ({ warehouse, onAddEntry }: StockCountFormProps) => {
               <Label htmlFor="batch">Batch Number *</Label>
               <Input
                 id="batch"
+                type="text"
                 value={formData.batch}
                 onChange={(e) => setFormData(prev => ({ ...prev, batch: e.target.value }))}
-                placeholder="Enter batch number..."
-                required
-                disabled={isCreatingBatchSerial}
+                placeholder="Enter batch number"
+                disabled={isAddingItem}
+                required={shouldShowBatch}
               />
             </div>
           )}
+          
           {shouldShowSerial && (
             <div>
               <Label htmlFor="serial">Serial Number *</Label>
               <Input
                 id="serial"
+                type="text"
                 value={formData.serial}
                 onChange={(e) => setFormData(prev => ({ ...prev, serial: e.target.value }))}
-                placeholder="Enter serial number..."
-                required
-                disabled={isCreatingBatchSerial}
+                placeholder="Enter serial number"
+                disabled={isAddingItem}
+                required={shouldShowSerial}
               />
             </div>
           )}
+          
           <div>
             <Label htmlFor="actualQty">Actual Quantity *</Label>
             <Input
               id="actualQty"
               type="number"
-              step="any"
+              min="0"
+              step="0.01"
               value={formData.actualQty}
-              onChange={(e) => setFormData(prev => ({ ...prev, actualQty: Number(e.target.value) }))}
-              placeholder="Enter actual quantity..."
+              onChange={(e) => setFormData(prev => ({ ...prev, actualQty: parseFloat(e.target.value) || 0 }))}
+              placeholder="0"
+              disabled={isAddingItem}
               required
             />
           </div>
         </div>
       )}
 
-      {/* Bundle Quantity Input */}
-      {selectedItem && useBundle && formData.serialBatchBundle && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <Label htmlFor="bundleQty">Bundle Total Quantity</Label>
-            <Input
-              id="bundleQty"
-              type="number"
-              value={formData.actualQty}
-              disabled
-              className="bg-gray-100"
-            />
-          </div>
+      {/* Simple Quantity Entry for non-batch/serial items */}
+      {selectedItem && !shouldShowBundleOption && (
+        <div>
+          <Label htmlFor="simpleQty">Actual Quantity *</Label>
+          <Input
+            id="simpleQty"
+            type="number"
+            min="0"
+            step="0.01"
+            value={formData.actualQty}
+            onChange={(e) => setFormData(prev => ({ ...prev, actualQty: parseFloat(e.target.value) || 0 }))}
+            placeholder="0"
+            disabled={isAddingItem}
+            required
+          />
         </div>
       )}
 
-      {/* Submit */}
+      {/* Submit Button */}
       {selectedItem && (
         <Button 
           type="submit" 
           className="w-full" 
-          disabled={isLoadingQty || isCreatingBatchSerial}
+          size="lg"
+          disabled={isAddingItem || isCreatingBatchSerial}
         >
-          {isCreatingBatchSerial ? (
+          {isAddingItem ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Creating Batch/Serial...
+              Adding to Count...
             </>
           ) : (
             <>

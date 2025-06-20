@@ -1,9 +1,10 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Package, Warehouse, TrendingUp, AlertTriangle, Search, Camera, QrCode, Calendar, DollarSign, Clock } from "lucide-react";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "../components/item-enquiry/ItemSelector";
 import ItemScanner from "../components/item-enquiry/ItemScanner";
@@ -37,6 +38,7 @@ const ItemEnquiry = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("selector");
   const [showCamera, setShowCamera] = useState(false);
+  const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
   const { toast } = useToast();
 
   const loadItemDetails = async (itemCode: string) => {
@@ -52,6 +54,19 @@ const ItemEnquiry = () => {
           variant: "destructive"
         });
         return;
+      }
+
+      // Get company currency
+      const company = await getUserDefaultCompany();
+      if (company) {
+        try {
+          const companyDetails = await erpnextAPI.getCompanyDetails(company);
+          if (companyDetails?.data?.default_currency) {
+            setCompanyCurrency(companyDetails.data.default_currency);
+          }
+        } catch (error) {
+          console.error('Failed to fetch company currency:', error);
+        }
       }
 
       // Get item details using the stock API (which delegates to items API)
@@ -136,7 +151,7 @@ const ItemEnquiry = () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'INR',
+      currency: companyCurrency,
       minimumFractionDigits: 0,
     }).format(amount);
   };

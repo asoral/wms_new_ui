@@ -1,8 +1,24 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, Item } from './types';
 
 export class ERPNextItemsAPI extends ERPNextBaseAPI {
+
+  /**
+   * Get company details including currency
+   */
+  async getCompanyDetails(companyName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Company/${encodeURIComponent(companyName)}`,
+      { headers: this.getHeaders() }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch company details: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return { data: result.data };
+  }
 
   /**
    * Search items using Frappe's search_link API - SIMPLIFIED VERSION
@@ -14,7 +30,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     params.append('page_length', String(limit));
     // Only use basic filters that definitely exist
     params.append('filters', JSON.stringify([
-      ['disabled', '=', 0]
+      ['disabled', '=', 0],
+      ['is_stock_item', '=', 1] // Only show stock items
     ]));
   
     console.log('Search API URL:', `${this.baseURL}/api/method/frappe.desk.search.search_link?${params.toString()}`);
@@ -59,7 +76,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   ): Promise<ERPNextResponse<Item[]>> {
     // Basic conditions that should exist in all ERPNext instances
     const conditions: string[][] = [
-      ['disabled', '=', '0']
+      ['disabled', '=', '0'],
+      ['is_stock_item', '=', '1'] // Only show stock items
     ];
 
     // Apply extra filters if provided
@@ -105,7 +123,10 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       item_group: item.item_group || 'All Item Groups'
     }));
 
-    console.log('Transformed items:', transformedItems);
+    console.log('Transforme
+
+
+d items:', transformedItems);
     return { data: transformedItems };
   }
 
@@ -231,7 +252,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
 
     // Build base conditions as proper Frappe filter arrays - only basic filters
     const conditions: string[][] = [
-      ['disabled', '=', '0']
+      ['disabled', '=', '0'],
+      ['is_stock_item', '=', '1'] // Only show stock items
     ];
 
     // Apply additional filters correctly - each as separate filter array
