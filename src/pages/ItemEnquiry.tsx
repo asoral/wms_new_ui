@@ -42,6 +42,8 @@ const ItemEnquiry = () => {
   const loadItemDetails = async (itemCode: string) => {
     try {
       setLoading(true);
+      console.log('Loading item details for:', itemCode);
+      
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -52,36 +54,42 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get item details
-      const itemResult = await erpnextAPI.stock.getItems({
-        item_code: itemCode
-      });
+      // Get item details using the items API directly
+      const itemResult = await erpnextAPI.items.getItemDetails(itemCode);
+      console.log('Item details result:', itemResult);
 
-      if (itemResult.data && itemResult.data.length > 0) {
-        const item = itemResult.data[0];
+      if (itemResult.data) {
+        const item = itemResult.data;
         setItemDetails({
-          itemCode: item.item_code || item.name,
-          itemName: item.item_name,
+          itemCode: item.item_code || item.name || itemCode,
+          itemName: item.item_name || item.item_code || itemCode,
           itemGroup: item.item_group || 'Default',
           stockUom: item.stock_uom || 'Nos',
           description: item.description || ''
         });
 
-        // Get stock balance for this item
+        // Get stock balance using the stock API
+        console.log('Fetching stock balance for item:', itemCode);
         const stockResult = await erpnextAPI.stock.getStockBalance(itemCode);
-        if (stockResult.data) {
+        console.log('Stock balance result:', stockResult);
+        
+        if (stockResult.data && Array.isArray(stockResult.data)) {
           const stockData: StockInfo[] = stockResult.data.map((stock: any) => ({
-            warehouse: stock.warehouse,
+            warehouse: stock.warehouse || 'Unknown',
             qty: stock.actual_qty || 0,
-            valuation: (stock.actual_qty || 0) * (stock.valuation_rate || 0),
-            age: Math.floor(Math.random() * 120), // Placeholder
+            valuation: stock.stock_value || 0,
+            age: Math.floor(Math.random() * 120), // Placeholder for now
             uom: item.stock_uom || 'Nos',
             actualQty: stock.actual_qty || 0,
-            reservedQty: stock.reserved_qty || 0,
-            availableQty: (stock.actual_qty || 0) - (stock.reserved_qty || 0),
-            valuationRate: stock.valuation_rate || 0
+            reservedQty: 0, // Not available in stock balance API
+            availableQty: stock.actual_qty || 0,
+            valuationRate: stock.stock_value && stock.actual_qty ? (stock.stock_value / stock.actual_qty) : 0
           }));
+          console.log('Processed stock data:', stockData);
           setStockInfo(stockData);
+        } else {
+          console.log('No stock data found or invalid format');
+          setStockInfo([]);
         }
       } else {
         toast({
@@ -111,7 +119,7 @@ const ItemEnquiry = () => {
       if (!erpnextAPI) return;
 
       // Try to find item by barcode first
-      const barcodeResult = await erpnextAPI.stock.searchItemsByBarcode(barcode);
+      const barcodeResult = await erpnextAPI.items.searchItemsByBarcode(barcode);
       if (barcodeResult.data && barcodeResult.data.length > 0) {
         const item = barcodeResult.data[0];
         await loadItemDetails(item.item_code || item.name);
