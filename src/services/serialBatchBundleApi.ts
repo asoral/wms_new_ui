@@ -264,18 +264,16 @@ export const getAvailableSerialBatch = async (
 
     const result: { serial_nos?: string[], batch_nos?: Array<{batch_no: string, qty: number}> } = {};
 
-    // Get available batches using Stock Ledger Entry
+    // Get available batches using Bin API instead of Stock Ledger Entry
     if (hasBatch) {
       try {
-        const batchResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
+        // First, get all batches for the item
+        const batchResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch?${new URLSearchParams({
           filters: JSON.stringify([
-            ['item_code', '=', itemCode],
-            ['warehouse', '=', warehouse],
-            ['batch_no', '!=', ''],
-            ['actual_qty', '>', 0]
+            ['item', '=', itemCode],
+            ['disabled', '=', 0]
           ]),
-          fields: JSON.stringify(['batch_no', 'actual_qty']),
-          group_by: 'batch_no'
+          fields: JSON.stringify(['batch_id', 'name'])
         })}`, {
           headers: {
             'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
@@ -286,17 +284,40 @@ export const getAvailableSerialBatch = async (
         if (batchResponse.ok) {
           const batchResult = await batchResponse.json();
           if (batchResult.data && batchResult.data.length > 0) {
-            const batchMap = new Map<string, number>();
-            batchResult.data.forEach((entry: any) => {
-              if (entry.batch_no) {
-                const currentQty = batchMap.get(entry.batch_no) || 0;
-                batchMap.set(entry.batch_no, currentQty + (entry.actual_qty || 0));
+            // For each batch, check if it has stock in the warehouse using Bin API
+            const batchPromises = batchResult.data.map(async (batch: any) => {
+              try {
+                const binResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Bin?${new URLSearchParams({
+                  filters: JSON.stringify([
+                    ['item_code', '=', itemCode],
+                    ['warehouse', '=', warehouse],
+                    ['actual_qty', '>', 0]
+                  ]),
+                  fields: JSON.stringify(['actual_qty'])
+                })}`, {
+                  headers: {
+                    'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+                    'Content-Type': 'application/json',
+                  }
+                });
+
+                if (binResponse.ok) {
+                  const binResult = await binResponse.json();
+                  if (binResult.data && binResult.data.length > 0) {
+                    const totalQty = binResult.data.reduce((sum: number, bin: any) => sum + (bin.actual_qty || 0), 0);
+                    if (totalQty > 0) {
+                      return { batch_no: batch.batch_id, qty: totalQty };
+                    }
+                  }
+                }
+              } catch (error) {
+                console.warn(`Error checking stock for batch ${batch.batch_id}:`, error);
               }
+              return null;
             });
-            
-            result.batch_nos = Array.from(batchMap.entries())
-              .filter(([, qty]) => qty > 0)
-              .map(([batch_no, qty]) => ({ batch_no, qty }));
+
+            const batchResults = await Promise.all(batchPromises);
+            result.batch_nos = batchResults.filter(Boolean) as Array<{batch_no: string, qty: number}>;
           }
         }
       } catch (error) {
@@ -304,15 +325,14 @@ export const getAvailableSerialBatch = async (
       }
     }
 
-    // Get available serial numbers using Stock Ledger Entry
+    // Get available serial numbers using Serial No API
     if (hasSerial) {
       try {
-        const serialResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
+        const serialResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Serial No?${new URLSearchParams({
           filters: JSON.stringify([
             ['item_code', '=', itemCode],
             ['warehouse', '=', warehouse],
-            ['serial_no', '!=', ''],
-            ['actual_qty', '>', 0]
+            ['status', '=', 'Active']
           ]),
           fields: JSON.stringify(['serial_no']),
           limit: '100'
@@ -326,15 +346,7 @@ export const getAvailableSerialBatch = async (
         if (serialResponse.ok) {
           const serialResult = await serialResponse.json();
           if (serialResult.data && serialResult.data.length > 0) {
-            const serialNos = new Set<string>();
-            serialResult.data.forEach((entry: any) => {
-              if (entry.serial_no) {
-                // Handle multiple serial numbers in one entry (comma-separated)
-                const serials = entry.serial_no.split(',').map((s: string) => s.trim()).filter(Boolean);
-                serials.forEach((serial: string) => serialNos.add(serial));
-              }
-            });
-            result.serial_nos = Array.from(serialNos);
+            result.serial_nos = serialResult.data.map((entry: any) => entry.serial_no).filter(Boolean);
           }
         }
       } catch (error) {
