@@ -176,7 +176,7 @@ const Deliver = () => {
       const company = await getUserDefaultCompany();
       console.log('Creating delivery note for company:', company);
 
-      // Get the actual sales order to get the correct customer reference and items
+      // Get the actual sales order with all item details including internal IDs
       const salesOrderResult = await erpnextAPI.sales.getSalesOrder(selectedSO.number);
       const actualCustomer = salesOrderResult.data?.customer;
       const soItems = salesOrderResult.data?.items || [];
@@ -201,6 +201,16 @@ const Deliver = () => {
           // Find the corresponding SO item to get the against_sales_order_item reference
           const soItem = soItems.find((item: any) => item.item_code === entry.itemCode);
           
+          if (!soItem) {
+            console.error(`Could not find SO item for ${entry.itemCode}`);
+          }
+
+          console.log('Mapping delivery entry:', {
+            itemCode: entry.itemCode,
+            soItemName: soItem?.name,
+            soItemIdx: soItem?.idx
+          });
+          
           return {
             item_code: entry.itemCode,
             item_name: entry.itemName,
@@ -209,7 +219,7 @@ const Deliver = () => {
             rate: entry.rate,
             uom: entry.uom,
             against_sales_order: selectedSO.number,
-            against_sales_order_item: soItem?.name || null, // This is the key field that was missing
+            so_detail: soItem?.name || null, // Use so_detail instead of against_sales_order_item
             ...(entry.batch && { batch_no: entry.batch }),
             ...(entry.serial && { serial_no: entry.serial }),
             ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })

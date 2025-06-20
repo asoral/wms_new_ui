@@ -173,7 +173,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     });
   };
 
-  // Check if item has batch or serial tracking (simplified check)
+  // Check if item has batch or serial tracking
   const hasSerialBatchTracking = selectedItem && (
     selectedItem.itemCode.toLowerCase().includes('batch') || 
     selectedItem.itemCode.toLowerCase().includes('serial') ||
@@ -299,28 +299,41 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                 </div>
               </div>
 
-              {/* Item Info Display */}
-              <div className="space-y-2">
-                <Label>Item Info</Label>
-                <div className="text-sm text-muted-foreground">
-                  <p>UOM: {selectedItem.uom}</p>
-                  <p>Pending: {selectedItem.pendingQty} {selectedItem.uom}</p>
-                  <p>Rate: ₹{selectedItem.rate}</p>
-                  {hasSerialBatchTracking && (
-                    <div className="flex gap-2 mt-1">
+              {/* Item Info Display - Improved Layout */}
+              <div className="space-y-3">
+                <Label>Item Information</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600">UOM</div>
+                    <div className="font-semibold">{selectedItem.uom}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600">Pending</div>
+                    <div className="font-semibold">{selectedItem.pendingQty} {selectedItem.uom}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600">Rate</div>
+                    <div className="font-semibold">₹{selectedItem.rate}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600">Tracking</div>
+                    <div className="flex flex-col gap-1">
                       {hasSerialTracking && (
-                        <Badge variant="outline">Serial Tracking</Badge>
+                        <Badge variant="outline" className="text-xs">Serial</Badge>
                       )}
                       {hasBatchTracking && (
-                        <Badge variant="outline">Batch Tracking</Badge>
+                        <Badge variant="outline" className="text-xs">Batch</Badge>
+                      )}
+                      {!hasSerialBatchTracking && (
+                        <Badge variant="secondary" className="text-xs">None</Badge>
                       )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
 
               {/* Serial/Batch Tracking Fields - Show relevant selector buttons */}
-              {hasSerialBatchTracking && selectedItemCode && warehouse && (
+              {hasSerialBatchTracking && selectedItemCode && warehouse && quantity && (
                 <div className="space-y-4">
                   <Label>Serial/Batch Entry Method</Label>
                   <Tabs 
