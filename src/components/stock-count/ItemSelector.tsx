@@ -115,7 +115,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
         // Filter out items with missing essential properties and transform to ItemInfo
         const validItems = itemData
           .filter(item => {
-            const isValid = item && item.item_code && item.item_name;
+            const isValid = item && (item.item_code || item.name) && (item.item_name || item.item_code || item.name);
             if (!isValid) {
               console.warn('Filtering out invalid item:', item);
             }
@@ -123,12 +123,13 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           })
           .map(item => ({
             name: item.name,
-            item_code: item.item_code,
-            item_name: item.item_name,
+            item_code: item.item_code || item.name || '',
+            item_name: item.item_name || item.item_code || item.name || '',
             stock_uom: item.stock_uom || 'Nos'
           }));
 
         console.log("valid item data:", validItems.length, "out of", itemData.length);
+        console.log('Sample items:', validItems.slice(0, 3));
         
         if (isNewSearch) {
           setItems(validItems);
@@ -195,7 +196,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     if (!searchValue) return items;
     const lowercaseSearch = searchValue.toLowerCase();
     const filtered = items.filter(item => {
-      // Search both item code and item name
+      // Search both item code and item name with null checks
       const itemCode = (item.item_code || '').toLowerCase();
       const itemName = (item.item_name || '').toLowerCase();
       return itemCode.includes(lowercaseSearch) || itemName.includes(lowercaseSearch);
@@ -265,7 +266,12 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                     {filteredItems.map((item) => {
                       const showSeparateCode = item.item_name !== item.item_code;
                       
-                      console.log('Rendering stock count item:', item.item_code, item.item_name);
+                      console.log('Rendering stock count item:', {
+                        item_code: item.item_code,
+                        item_name: item.item_name,
+                        stock_uom: item.stock_uom
+                      });
+                      
                       return (
                         <CommandItem
                           key={item.item_code}
@@ -287,13 +293,13 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                           <div className="flex items-center space-x-3 flex-1 min-w-0">
                             <Package className="w-4 h-4 text-muted-foreground shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{item.item_name}</div>
+                              <div className="font-medium truncate text-gray-900">{item.item_name}</div>
                               {showSeparateCode && (
                                 <div className="text-sm text-muted-foreground truncate">{item.item_code}</div>
                               )}
-                              <span className="text-xs px-1 py-0.5 bg-gray-100 text-gray-600 rounded mt-1 inline-block">
-                                {item.stock_uom || 'Nos'}
-                              </span>
+                              <div className="text-xs px-1 py-0.5 bg-gray-100 text-gray-600 rounded mt-1 inline-block">
+                                {item.stock_uom}
+                              </div>
                             </div>
                           </div>
                         </CommandItem>
