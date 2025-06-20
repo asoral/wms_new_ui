@@ -27,7 +27,7 @@ export interface StockInfo {
   batch?: string;
   serial?: string;
   actualQty: number;
-  reservedQty: number;
+  reserv edQty: number;
   availableQty: number;
   valuationRate: number;
 }
@@ -60,7 +60,7 @@ const ItemEnquiry = () => {
       const company = await getUserDefaultCompany();
       if (company) {
         try {
-          const companyDetails = await erpnextAPI.getCompanyDetails(company);
+          const companyDetails = await erpnextAPI.items.getCompanyDetails(company);
           if (companyDetails?.data?.default_currency) {
             setCompanyCurrency(companyDetails.data.default_currency);
           }

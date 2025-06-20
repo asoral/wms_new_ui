@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +50,7 @@ const BinEnquiry = () => {
       const company = await getUserDefaultCompany();
       if (company) {
         try {
-          const companyDetails = await erpnextAPI.getCompanyDetails(company);
+          const companyDetails = await erpnextAPI.items.getCompanyDetails(company);
           if (companyDetails?.data?.default_currency) {
             setCompanyCurrency(companyDetails.data.default_currency);
           }
@@ -77,10 +78,16 @@ const BinEnquiry = () => {
               console.error('Failed to fetch item name for:', item.item_code);
             }
 
-            // Calculate valuation rate properly
+            // Calculate quantities and valuation properly
             const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
-            const valuationRate = item.valuation_rate || (item.stock_value && actualQty > 0 ? item.stock_value / actualQty : 0);
-            const totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
+            const valuationRate = item.valuation_rate || 0;
+            const stockValue = item.stock_value || 0;
+            
+            // Use stock_value if available, otherwise calculate from qty * rate
+            let totalValuation = stockValue;
+            if (!stockValue && valuationRate && actualQty > 0) {
+              totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
+            }
 
             return {
               item_code: item.item_code,

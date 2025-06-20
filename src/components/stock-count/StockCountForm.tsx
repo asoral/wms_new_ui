@@ -25,9 +25,11 @@ interface StockCountItem {
 interface StockCountFormProps {
   onSubmit: (items: StockCountItem[]) => void;
   isLoading?: boolean;
+  warehouse?: string;
+  onAddEntry?: (entry: any) => Promise<void>;
 }
 
-const StockCountForm = ({ onSubmit, isLoading = false }: StockCountFormProps) => {
+const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: StockCountFormProps) => {
   const [selectedItems, setSelectedItems] = useState<StockCountItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedItemCode, setSelectedItemCode] = useState("");
@@ -36,9 +38,10 @@ const StockCountForm = ({ onSubmit, isLoading = false }: StockCountFormProps) =>
   const [serialNo, setSerialNo] = useState("");
   const { toast } = useToast();
 
-  const handleItemSelect = (item: Item) => {
-    setSelectedItemCode(item.item_code);
-    setSearchTerm(item.item_name);
+  const handleItemSelected = (itemCode: string) => {
+    setSelectedItemCode(itemCode);
+    // Also set the search term to show the selected item
+    setSearchTerm(itemCode);
   };
 
   const addItemToCount = async () => {
@@ -58,21 +61,35 @@ const StockCountForm = ({ onSubmit, isLoading = false }: StockCountFormProps) =>
     });
 
     try {
-      // Simulate API call or actual logic here
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // If onAddEntry is provided (from StockCount page), use it
+      if (onAddEntry) {
+        await onAddEntry({
+          itemCode: selectedItemCode,
+          itemName: searchTerm,
+          warehouse: warehouse || '',
+          currentQty: 0,
+          actualQty: countedQty,
+          uom: "Nos",
+          batch: batchNo || undefined,
+          serial: serialNo || undefined,
+        });
+      } else {
+        // Original logic for direct form usage
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const newItem: StockCountItem = {
-        item_code: selectedItemCode,
-        item_name: searchTerm,
-        current_qty: 0, // This would come from actual stock data
-        counted_qty: countedQty,
-        difference: countedQty - 0, // current_qty - counted_qty
-        uom: "Nos", // This would come from item data
-        batch_no: batchNo || undefined,
-        serial_no: serialNo || undefined,
-      };
+        const newItem: StockCountItem = {
+          item_code: selectedItemCode,
+          item_name: searchTerm,
+          current_qty: 0,
+          counted_qty: countedQty,
+          difference: countedQty - 0,
+          uom: "Nos",
+          batch_no: batchNo || undefined,
+          serial_no: serialNo || undefined,
+        };
 
-      setSelectedItems(prev => [...prev, newItem]);
+        setSelectedItems(prev => [...prev, newItem]);
+      }
       
       // Reset form
       setSelectedItemCode("");
@@ -171,7 +188,7 @@ const StockCountForm = ({ onSubmit, isLoading = false }: StockCountFormProps) =>
             </CardHeader>
             <CardContent className="space-y-4">
               <ItemSelector
-                onItemSelect={handleItemSelect}
+                onItemSelected={handleItemSelected}
                 placeholder="Search for items..."
                 className="w-full"
               />
@@ -232,8 +249,8 @@ const StockCountForm = ({ onSubmit, isLoading = false }: StockCountFormProps) =>
         </CardContent>
       </Card>
 
-      {/* Selected Items */}
-      {selectedItems.length > 0 && (
+      {/* Selected Items - Only show if not using onAddEntry */}
+      {!onAddEntry && selectedItems.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -292,15 +309,17 @@ const StockCountForm = ({ onSubmit, isLoading = false }: StockCountFormProps) =>
         </Card>
       )}
 
-      {/* Submit Button */}
-      <Button 
-        onClick={handleSubmit} 
-        className="w-full" 
-        size="lg"
-        disabled={selectedItems.length === 0 || isLoading}
-      >
-        {isLoading ? "Processing..." : `Submit Stock Count (${selectedItems.length} items)`}
-      </Button>
+      {/* Submit Button - Only show if not using onAddEntry */}
+      {!onAddEntry && (
+        <Button 
+          onClick={handleSubmit} 
+          className="w-full" 
+          size="lg"
+          disabled={selectedItems.length === 0 || isLoading}
+        >
+          {isLoading ? "Processing..." : `Submit Stock Count (${selectedItems.length} items)`}
+        </Button>
+      )}
     </div>
   );
 };

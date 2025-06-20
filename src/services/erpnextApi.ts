@@ -56,3 +56,11 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
     return null;
   }
 };
+
+// Export ERPNextAPI class for Profile page
+export { ERPNextAPI } from './erp/erpnext/index';
+
+// Add configureERPNextAPI function for Profile page
+export const configureERPNextAPI = (url: string, apiKey: string, apiSecret: string): ERPNextAPI => {
+  return new ERPNextAPI(url, apiKey, apiSecret);
+};
