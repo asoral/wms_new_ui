@@ -55,10 +55,10 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     limit: number = 20,
     page: number = 1
   ): Promise<ERPNextResponse<Item[]>> {
-    const conditions: any[] = [
-      ['disabled', '=', 0],
-      ['maintain_stock', '=', 1],
-      ['has_variants', '=', 0]
+    const conditions: string[][] = [
+      ['disabled', '=', '0'],
+      ['maintain_stock', '=', '1'],
+      ['has_variants', '=', '0']
     ];
 
     // Apply extra filters if provided
@@ -222,8 +222,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Fetch items with proper filters - CORRECTED VERSION
-   * Now properly constructs ERPNext/Frappe filter arrays
+   * Fetch items with proper filters - CORRECTED VERSION with proper Frappe filter format
+   * Now constructs filter arrays correctly without unnecessary nesting
    */
   async getItems(
     filters: Record<string, any> = {},
@@ -237,7 +237,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       return this.searchItems(searchText.trim(), limit);
     }
 
-    // Build base conditions as proper Frappe filter arrays
+    // Build base conditions as proper Frappe filter arrays - each condition is a separate array
     const conditions: string[][] = [
       ['disabled', '=', '0'],
       ['maintain_stock', '=', '1'],
@@ -250,6 +250,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     }
 
     const params = new URLSearchParams();
+    // Direct array of filter conditions - no extra nesting
     params.append('filters', JSON.stringify(conditions));
     params.append('fields', JSON.stringify([
       'name',
