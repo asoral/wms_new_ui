@@ -1,12 +1,11 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Package } from 'lucide-react';
-import { getAvailableSerialBatch, createSerialBatchBundle, SerialBatchBundleEntry } from '@/services/serialBatchBundleApi';
+import { Plus, Trash2, Package, AlertCircle } from 'lucide-react';
+import { getAvailableSerialBatch, createSerialBatchBundle, SerialBatchBundleEntry, checkBatchExists } from '@/services/serialBatchBundleApi';
 import { getUserDefaultCompany } from '@/services/erpnextApi';
 import { toast } from 'sonner';
 
@@ -44,6 +43,7 @@ const SerialBatchBundleSelector = ({
   const [availableBatches, setAvailableBatches] = useState<Array<{batch_no: string, qty: number}>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [newBatches, setNewBatches] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (itemCode && warehouse && (hasSerial || hasBatch)) {
@@ -77,6 +77,21 @@ const SerialBatchBundleSelector = ({
     }
   };
 
+  const checkAndMarkNewBatches = async (batchNo: string) => {
+    if (!batchNo) return;
+    
+    const exists = await checkBatchExists(batchNo, itemCode);
+    if (!exists) {
+      setNewBatches(prev => new Set([...prev, batchNo]));
+    } else {
+      setNewBatches(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(batchNo);
+        return newSet;
+      });
+    }
+  };
+
   const addEntry = () => {
     const newEntry: BundleEntry = { qty: 1 };
     if (hasSerial) newEntry.serial_no = '';
@@ -85,13 +100,34 @@ const SerialBatchBundleSelector = ({
   };
 
   const removeEntry = (index: number) => {
+    const removedEntry = entries[index];
+    if (removedEntry.batch_no) {
+      setNewBatches(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(removedEntry.batch_no!);
+        return newSet;
+      });
+    }
     setEntries(entries.filter((_, i) => i !== index));
   };
 
   const updateEntry = (index: number, field: keyof BundleEntry, value: string | number) => {
     const updatedEntries = [...entries];
+    const oldBatch = updatedEntries[index].batch_no;
     updatedEntries[index] = { ...updatedEntries[index], [field]: value };
     setEntries(updatedEntries);
+
+    // Check if batch is new when batch_no is updated
+    if (field === 'batch_no' && typeof value === 'string') {
+      if (oldBatch) {
+        setNewBatches(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(oldBatch);
+          return newSet;
+        });
+      }
+      checkAndMarkNewBatches(value);
+    }
   };
 
   const createBundle = async () => {
@@ -148,6 +184,8 @@ const SerialBatchBundleSelector = ({
       if (result?.data?.name) {
         toast.success('Serial and Batch Bundle created successfully');
         onBundleCreated(result.data.name, totalQty);
+        // Clear new batches set after successful creation
+        setNewBatches(new Set());
       }
     } catch (error) {
       console.error('Failed to create bundle:', error);
@@ -174,6 +212,12 @@ const SerialBatchBundleSelector = ({
           <Badge variant="outline">
             Total Qty: {getTotalQuantity()}
           </Badge>
+          {newBatches.size > 0 && (
+            <Badge variant="secondary" className="flex items-center space-x-1">
+              <AlertCircle className="w-3 h-3" />
+              <span>{newBatches.size} New Batch{newBatches.size > 1 ? 'es' : ''}</span>
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -200,7 +244,12 @@ const SerialBatchBundleSelector = ({
             
             {hasBatch && (
               <div className="flex-1">
-                <Label>Batch Number</Label>
+                <Label className="flex items-center space-x-1">
+                  <span>Batch Number</span>
+                  {entry.batch_no && newBatches.has(entry.batch_no) && (
+                    <Badge variant="outline" className="text-xs">New</Badge>
+                  )}
+                </Label>
                 <Input
                   value={entry.batch_no || ''}
                   onChange={(e) => updateEntry(index, 'batch_no', e.target.value)}
@@ -255,6 +304,18 @@ const SerialBatchBundleSelector = ({
             {isCreating ? 'Creating...' : 'Create Bundle'}
           </Button>
         </div>
+
+        {newBatches.size > 0 && (
+          <div className="text-sm text-muted-foreground p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <AlertCircle className="w-4 h-4 text-yellow-600" />
+              <span className="font-medium text-yellow-800">New Batches</span>
+            </div>
+            <p className="text-yellow-700">
+              The following batch numbers will be created automatically: {Array.from(newBatches).join(', ')}
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

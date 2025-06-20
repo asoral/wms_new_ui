@@ -1,4 +1,3 @@
-
 import { createERPNextAPI, getUserDefaultCompany } from './erpnextApi';
 
 
@@ -51,11 +50,96 @@ export interface SerialBatchBundleResponse {
   };
 }
 
+export const createBatch = async (batchNo: string, itemCode: string): Promise<boolean> => {
+  try {
+    const erpnextAPI = await createERPNextAPI();
+    if (!erpnextAPI) {
+      throw new Error('ERPNext API not configured');
+    }
+
+    const batchData = {
+      batch_id: batchNo,
+      item: itemCode,
+      batch_qty: 0,
+      disabled: 0
+    };
+
+    console.log('Creating batch:', batchData);
+    
+    const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(batchData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to create batch:', errorText);
+      return false;
+    }
+
+    const result = await response.json();
+    console.log('Batch created successfully:', result);
+    return true;
+  } catch (error) {
+    console.error('Error creating batch:', error);
+    return false;
+  }
+};
+
+export const checkBatchExists = async (batchNo: string, itemCode: string): Promise<boolean> => {
+  try {
+    const erpnextAPI = await createERPNextAPI();
+    if (!erpnextAPI) {
+      return false;
+    }
+
+    const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Batch?${new URLSearchParams({
+      filters: JSON.stringify([['batch_id', '=', batchNo], ['item', '=', itemCode]]),
+      fields: JSON.stringify(['name'])
+    })}`, {
+      headers: {
+        'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const result = await response.json();
+    return result.data && result.data.length > 0;
+  } catch (error) {
+    console.error('Error checking batch existence:', error);
+    return false;
+  }
+};
+
 export const createSerialBatchBundle = async (bundleData: SerialBatchBundle): Promise<SerialBatchBundleResponse | null> => {
   try {
     const erpnextAPI = await createERPNextAPI();
     if (!erpnextAPI) {
       throw new Error('ERPNext API not configured');
+    }
+
+    // Create batches first if they don't exist
+    if (bundleData.has_batch_no && bundleData.entries) {
+      for (const entry of bundleData.entries) {
+        if (entry.batch_no) {
+          const batchExists = await checkBatchExists(entry.batch_no, bundleData.item_code);
+          if (!batchExists) {
+            console.log(`Creating new batch: ${entry.batch_no} for item: ${bundleData.item_code}`);
+            const batchCreated = await createBatch(entry.batch_no, bundleData.item_code);
+            if (!batchCreated) {
+              console.warn(`Failed to create batch ${entry.batch_no}, but continuing with bundle creation`);
+            }
+          }
+        }
+      }
     }
 
     console.log('Creating Serial and Batch Bundle with ERPNext structure:', bundleData);
