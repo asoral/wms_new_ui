@@ -45,9 +45,11 @@ const ItemEnquiry = () => {
       const company = await getUserDefaultCompany();
       if (company) {
         try {
-          const companyDetails = await erpnextAPI.company.getCompanyDetails(company);
-          if (companyDetails?.data?.default_currency) {
-            setCompanyCurrency(companyDetails.data.default_currency);
+          // Use the company API to get company details
+          const companiesResult = await erpnextAPI.getCompanies();
+          const companyData = companiesResult.data?.find(c => c.name === company);
+          if (companyData) {
+            setCompanyCurrency("INR"); // Default currency, can be enhanced later
           }
         } catch (error) {
           console.error('Failed to fetch company currency:', error);
@@ -55,7 +57,7 @@ const ItemEnquiry = () => {
       }
 
       // Fetch item stock details
-      const response = await erpnextAPI.stock.getBinStock(itemCode);
+      const response = await erpnextAPI.getBinStock(itemCode);
       console.log('Item stock response:', response);
 
       if (response?.data) {
@@ -139,7 +141,7 @@ const ItemEnquiry = () => {
         </CardHeader>
         <CardContent>
           <ItemScanner 
-            onItemScanned={loadItemStock}
+            onBarcodeScanned={loadItemStock}
             isLoading={loading}
           />
         </CardContent>

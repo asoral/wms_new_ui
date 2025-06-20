@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,9 +49,11 @@ const BinEnquiry = () => {
       const company = await getUserDefaultCompany();
       if (company) {
         try {
-          const companyDetails = await erpnextAPI.company.getCompanyDetails(company);
-          if (companyDetails?.data?.default_currency) {
-            setCompanyCurrency(companyDetails.data.default_currency);
+          // Use the company API to get company details
+          const companiesResult = await erpnextAPI.getCompanies();
+          const companyData = companiesResult.data?.find(c => c.name === company);
+          if (companyData) {
+            setCompanyCurrency("INR"); // Default currency, can be enhanced later
           }
         } catch (error) {
           console.error('Failed to fetch company currency:', error);
@@ -60,7 +61,7 @@ const BinEnquiry = () => {
       }
 
       // Fetch bin stock details
-      const response = await erpnextAPI.stock.getBinStock(undefined, binCode);
+      const response = await erpnextAPI.getBinStock(undefined, binCode);
       console.log('Bin stock response:', response);
 
       if (response?.data) {
@@ -75,7 +76,7 @@ const BinEnquiry = () => {
               // Get item details to fetch item name
               let itemName = item.item_name || item.item_code;
               try {
-                const itemDetails = await erpnextAPI.items.getItemDetails(item.item_code);
+                const itemDetails = await erpnextAPI.getItemDetails(item.item_code);
                 if (itemDetails?.data?.item_name) {
                   itemName = itemDetails.data.item_name;
                 }

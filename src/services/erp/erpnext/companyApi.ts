@@ -17,4 +17,20 @@ export class ERPNextCompanyAPI extends ERPNextBaseAPI {
 
     return response.json();
   }
+
+  async getCompanyDetails(companyName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Company/${encodeURIComponent(companyName)}`,
+      {
+        headers: this.getHeaders(),
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch company details: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return { data: result.data };
+  }
 }

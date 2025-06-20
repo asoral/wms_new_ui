@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     try {
       const erpnextAPI = await createERPNextAPI();
       if (erpnextAPI) {
-        const result = await erpnextAPI.items.getItemDetails(itemCode);
+        const result = await erpnextAPI.getItemDetails(itemCode);
         setItemDetails(result.data);
         console.log('Item details:', result.data);
       }
@@ -108,7 +109,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
         });
       });
     } else if (hasBatch) {
-      // Handle batch only
+      // Handle batch only - allow multiple batches
       const batches = bundleData.batches.split('\n').filter(b => b.trim());
       const qtyPerBatch = Math.floor(bundleData.qty / batches.length);
       const remainder = bundleData.qty % batches.length;
@@ -126,7 +127,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
         });
       });
     } else if (hasSerial) {
-      // Handle serial only
+      // Handle serial only - allow multiple serials
       const serials = bundleData.serials.split('\n').filter(s => s.trim());
       serials.forEach((serial) => {
         onAddEntry({

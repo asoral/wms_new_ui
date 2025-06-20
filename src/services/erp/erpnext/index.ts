@@ -5,6 +5,7 @@ import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextWarehouseAPI } from './warehouseApi';
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
+import { ERPNextItemsAPI } from './itemsApi';
 import { getERPNextConfig } from '../../authService';
 
 export class ERPNextAPI {
@@ -18,6 +19,7 @@ export class ERPNextAPI {
   public material: ERPNextMaterialAPI;
   public warehouse: ERPNextWarehouseAPI;
   public purchase: ERPNextPurchaseAPI;
+  public items: ERPNextItemsAPI;
   private baseApi: ERPNextBaseAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
@@ -31,6 +33,7 @@ export class ERPNextAPI {
     this.material = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
     this.warehouse = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
     this.purchase = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
+    this.items = new ERPNextItemsAPI(baseURL, apiKey, apiSecret);
     this.baseApi = new ERPNextBaseAPI(baseURL, apiKey, apiSecret);
   }
 
