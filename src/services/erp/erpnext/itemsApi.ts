@@ -5,11 +5,8 @@ import { ERPNextResponse, Item } from './types';
 export class ERPNextItemsAPI extends ERPNextBaseAPI {
 
   /**
- * Fetch Stock Balance report data for a specific item using prepared report mechanism
- * @param itemCode Item code to fetch report for
- * @param company Company name
- * @param date (optional) Date string in YYYY-MM-DD format, defaults to today
- */
+   * Search items using Frappe's search_link API
+   */
   async searchItems(query: string, company?: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
     params.append('doctype', 'Item');
@@ -17,7 +14,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     params.append('page_length', String(limit));
     params.append('filters', JSON.stringify([
       ['Item', 'disabled', '=', 0],
-      ['Item', 'is_stock_item', '=', 1],
+      ['Item', 'maintain_stock', '=', 1],
+      ['Item', 'has_variants', '=', 0]
     ]));
   
     const response = await fetch(
@@ -47,31 +45,25 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   
     return { data: items };
   }
+
   /**
-   * Get items with pagination support
+   * Get items with pagination support using proper Frappe filters
    */
   async getItemsPaginated(
     filters?: any,
     fields?: string[],
-    company?: string,
     limit: number = 20,
     page: number = 1
   ): Promise<ERPNextResponse<Item[]>> {
     const conditions: any[] = [
-      ['is_stock_item', '=', 1],
-      ['disabled', '=', 0]
+      ['disabled', '=', 0],
+      ['maintain_stock', '=', 1],
+      ['has_variants', '=', 0]
     ];
 
-    // Apply extra filters
-    if (filters) {
-      for (const [field, value] of Object.entries(filters)) {
-        conditions.push([field, '=', value]);
-      }
-    }
-
-    // Apply company filter if provided
-    if (company) {
-      conditions.push(['company', '=', company]);
+    // Apply extra filters if provided
+    if (filters && Array.isArray(filters)) {
+      conditions.push(...filters);
     }
 
     const params = new URLSearchParams();
@@ -87,16 +79,33 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String((page - 1) * limit));
 
+    console.log('Fetching items with filters:', conditions);
+    console.log('API URL:', `${this.baseURL}/api/resource/Item?${params.toString()}`);
+
     const response = await fetch(
       `${this.baseURL}/api/resource/Item?${params.toString()}`,
       { headers: this.getHeaders() }
     );
+    
     if (!response.ok) {
       throw new Error(`Failed to fetch items: ${response.statusText}`);
     }
 
     const result = await response.json();
-    return { data: result.data || [] };
+    console.log('Raw API response:', result);
+    
+    // Transform the data to ensure proper structure
+    const transformedItems = (result.data || []).map((item: any) => ({
+      name: item.name,
+      item_code: item.item_code || item.name,
+      item_name: item.item_name || item.item_code || item.name,
+      stock_uom: item.stock_uom || 'Nos',
+      has_batch_no: item.has_batch_no || false,
+      has_serial_no: item.has_serial_no || false
+    }));
+
+    console.log('Transformed items:', transformedItems);
+    return { data: transformedItems };
   }
 
   /**
@@ -140,33 +149,23 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     }
 
     const result = await response.json();
-    return { data: result.data };
+    
+    // Transform the data to ensure proper structure
+    const transformedItem = {
+      name: result.data.name,
+      item_code: result.data.item_code || result.data.name,
+      item_name: result.data.item_name || result.data.item_code || result.data.name,
+      stock_uom: result.data.stock_uom || 'Nos',
+      has_batch_no: result.data.has_batch_no || false,
+      has_serial_no: result.data.has_serial_no || false
+    };
+    
+    return { data: transformedItem };
   }
 
   /**
-   * Lookup an item by barcode through the Item Barcode doctype
+   * Lookup an item by barcode through direct item fetch
    */
-  // async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item>> {
-  //   const params = new URLSearchParams();
-  //   params.append('fields', JSON.stringify(['parent']));
-  //   params.append('filters', JSON.stringify([['barcode', '=', barcode]]));
-
-  //   const response = await fetch(
-  //     `${this.baseURL}/api/resource/Item Barcode?${params.toString()}`,
-  //     { headers: this.getHeaders() }
-  //   );
-  //   if (!response.ok) {
-  //     throw new Error(`Failed to fetch barcode record: ${response.statusText}`);
-  //   }
-
-  //   const result = await response.json();
-  //   if (!result.data || result.data.length === 0) {
-  //     return { data: [] };
-  //   }
-
-  //   // Parent field contains the Item code
-  //   return this.getItemDetails(result.data[0].parent);
-  // }
   async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item | undefined>> {
     console.log('Fetching item by barcode:', barcode);
     try {
@@ -198,13 +197,23 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   
       const result = await response.json();
       console.log('API response data:', result);
-      return { data: result.data|| undefined };
+      
+      // Transform the data to ensure proper structure
+      const transformedItem = {
+        name: result.data.name,
+        item_code: result.data.item_code || result.data.name,
+        item_name: result.data.item_name || result.data.item_code || result.data.name,
+        stock_uom: result.data.stock_uom || 'Nos',
+        has_batch_no: result.data.has_batch_no || false,
+        has_serial_no: result.data.has_serial_no || false
+      };
+      
+      return { data: transformedItem };
     } catch (error) {
       console.error('Error in getItemByBarcode:', error);
       throw error;
     }
   }
-  
 
   /**
    * Fetch items with filters, pagination, and optional text search
@@ -216,13 +225,16 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     offset: number = 0
   ): Promise<ERPNextResponse<Item[]>> {
     const conditions: any[] = [
-      ['is_stock_item', '=', 1]
+      ['disabled', '=', 0],
+      ['maintain_stock', '=', 1],
+      ['has_variants', '=', 0]
     ];
 
     // apply extra filters
     for (const [field, value] of Object.entries(filters)) {
       conditions.push([field, '=', value]);
     }
+    
     // apply searchText filters
     if (searchText) {
       conditions.push(['item_code', 'like', `%${searchText}%`]);
@@ -251,6 +263,17 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     }
 
     const result = await response.json();
-    return { data: result.data };
+    
+    // Transform the data to ensure proper structure
+    const transformedItems = (result.data || []).map((item: any) => ({
+      name: item.name,
+      item_code: item.item_code || item.name,
+      item_name: item.item_name || item.item_code || item.name,
+      stock_uom: item.stock_uom || 'Nos',
+      has_batch_no: item.has_batch_no || false,
+      has_serial_no: item.has_serial_no || false
+    }));
+
+    return { data: transformedItems };
   }
 }

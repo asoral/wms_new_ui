@@ -97,9 +97,9 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       
       console.log("Search:", search.trim());
       if (search.trim()) {
-        result = await erpnextAPI.searchItems(search, limit);
+        result = await erpnextAPI.searchItems(search, undefined, limit);
       } else {
-        result = await erpnextAPI.getItemsPaginated([], ['item_code', 'item_name', 'stock_uom'], limit, pageToFetch);
+        result = await erpnextAPI.getItemsPaginated([], ['name', 'item_code', 'item_name', 'stock_uom'], limit, pageToFetch);
       }
       
       console.log('API result:', result);
@@ -113,7 +113,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
 
         // Filter out items with missing essential properties
         const validItems = itemData.filter(item => {
-          const isValid = item && item.item_code && item.item_name;
+          const isValid = item && (item.item_code || item.name) && (item.item_name || item.item_code || item.name);
           if (!isValid) {
             console.warn('Filtering out invalid item:', item);
           }
@@ -188,8 +188,8 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     const lowercaseSearch = searchValue.toLowerCase();
     const filtered = items.filter(item => {
       // Add null checks before calling toLowerCase
-      const itemCode = item.item_code?.toLowerCase() || '';
-      const itemName = item.item_name?.toLowerCase() || '';
+      const itemCode = (item.item_code || item.name || '').toLowerCase();
+      const itemName = (item.item_name || item.item_code || item.name || '').toLowerCase();
       return itemCode.includes(lowercaseSearch) || itemName.includes(lowercaseSearch);
     });
     console.log('Filtered items count:', filtered.length);
@@ -221,11 +221,11 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 <div className="flex-1 min-w-0 text-left">
                   <div className="truncate">
                     {selectedItem 
-                      ? selectedItem.item_code
+                      ? (selectedItem.item_code || selectedItem.name)
                       : "Search item by code or name..."
                     }
                   </div>
-                  {selectedItem && (
+                  {selectedItem && selectedItem.item_name && selectedItem.item_name !== (selectedItem.item_code || selectedItem.name) && (
                     <div className="text-sm text-muted-foreground truncate">
                       {selectedItem.item_name}
                     </div>
@@ -250,14 +250,18 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                   </CommandEmpty>
                   <CommandGroup>
                     {filteredItems.map((item) => {
-                      console.log('Rendering stock count item:', item.item_code, item.item_name);
+                      const itemCode = item.item_code || item.name || '';
+                      const itemName = item.item_name || item.item_code || item.name || '';
+                      const showItemName = itemName && itemName !== itemCode;
+                      
+                      console.log('Rendering stock count item:', itemCode, itemName);
                       return (
                         <CommandItem
-                          key={item.item_code}
-                          value={item.item_code}
+                          key={itemCode}
+                          value={itemCode}
                           onSelect={(currentValue) => {
                             console.log('Stock Count CommandItem onSelect called with:', currentValue);
-                            const selectedItemData = filteredItems.find(i => i.item_code === currentValue);
+                            const selectedItemData = filteredItems.find(i => (i.item_code || i.name) === currentValue);
                             if (selectedItemData) {
                               handleItemSelect(selectedItemData);
                             }
@@ -266,14 +270,16 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
+                              (selectedItem?.item_code || selectedItem?.name) === itemCode ? "opacity-100" : "opacity-0"
                             )}
                           />
                           <div className="flex items-center space-x-3 flex-1 min-w-0">
                             <Package className="w-4 h-4 text-muted-foreground shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{item.item_name || item.item_code}</div>
-                              <div className="text-sm text-muted-foreground truncate">{item.item_code}</div>
+                              <div className="font-medium truncate">{showItemName ? itemName : itemCode}</div>
+                              {showItemName && (
+                                <div className="text-sm text-muted-foreground truncate">{itemCode}</div>
+                              )}
                               <span className="text-xs px-1 py-0.5 bg-gray-100 text-gray-600 rounded mt-1 inline-block">
                                 {item.stock_uom || 'Nos'}
                               </span>
