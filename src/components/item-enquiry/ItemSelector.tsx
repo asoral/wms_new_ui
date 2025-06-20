@@ -44,37 +44,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     }, 300);
   }, []);
 
-  useEffect(() => {
-    loadInitialItems();
-  }, []);
-
-  const loadInitialItems = async () => {
-    try {
-      console.log('Loading initial items...');
-      const cached = await offlineStorage.getCachedData('items_initial');
-      if (cached && Array.isArray(cached) && cached.length > 0) {
-        console.log('Loaded items from cache:', cached.length);
-        setItems(cached);
-        return;
-      }
-      await fetchItems("");
-    } catch (error) {
-      console.error('Failed to load initial items:', error);
-    }
-  };
-
-  const loadCachedItems = async () => {
-    try {
-      const cached = await offlineStorage.getCachedData('items_initial');
-      if (cached && Array.isArray(cached)) {
-        console.log('Setting cached items:', cached.length);
-        setItems(cached);
-      }
-    } catch (error) {
-      console.error('Failed to load cached items:', error);
-    }
-  };
-
+  // Don't load items initially - only when user starts typing
   const fetchItems = async (search: string = "") => {
     console.log('fetchItems called with search:', search);
     setIsLoadingItems(true);
@@ -84,7 +54,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       
       if (!erpnextAPI) {
         console.error('ERPNext API not configured');
-        await loadCachedItems();
         return;
       }
 
@@ -107,35 +76,57 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           result = await erpnextAPI.searchItems(search, limit);
         }
       } else {
-        console.log('Fetching initial items');
-        result = await erpnextAPI.getItemsPaginated([], ['name', 'item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'], limit, 1);
+        // Only fetch initial items if we have a search term or user opens dropdown
+        return;
       }
       
       console.log('API result:', result);
       
       if (result && result.data && Array.isArray(result.data)) {
-        // Properly map items ensuring item_name is preserved
-        const validItems = result.data.filter(item => {
-          const isValid = item && (item.item_code || item.name) && (item.item_name || item.item_code || item.name);
+        // Get detailed item information to ensure we have proper item names
+        const itemsWithDetails = await Promise.all(
+          result.data.slice(0, limit).map(async (item) => {
+            try {
+              const detailResult = await erpnextAPI.getItemDetails(item.item_code || item.name);
+              if (detailResult.data) {
+                return {
+                  name: detailResult.data.name,
+                  item_code: detailResult.data.item_code,
+                  item_name: detailResult.data.item_name,
+                  stock_uom: detailResult.data.stock_uom || 'Nos',
+                  has_batch_no: detailResult.data.has_batch_no || false,
+                  has_serial_no: detailResult.data.has_serial_no || false
+                };
+              }
+            } catch (error) {
+              console.warn('Failed to get details for item:', item.item_code || item.name);
+            }
+            
+            // Fallback to original item data
+            return {
+              name: item.name,
+              item_code: item.item_code || item.name || '',
+              item_name: item.item_name || item.item_code || item.name || '',
+              stock_uom: item.stock_uom || 'Nos',
+              has_batch_no: item.has_batch_no || false,
+              has_serial_no: item.has_serial_no || false
+            };
+          })
+        );
+
+        const validItems = itemsWithDetails.filter(item => {
+          const isValid = item && item.item_code && item.item_name;
           if (!isValid) {
             console.warn('Filtering out invalid item:', item);
           }
           return isValid;
-        }).map(item => ({
-          name: item.name,
-          item_code: item.item_code || item.name || '',
-          // Ensure we use the actual item_name from ERPNext, not the item_code
-          item_name: item.item_name || item.item_code || item.name || '',
-          stock_uom: item.stock_uom || 'Nos',
-          has_batch_no: item.has_batch_no || false,
-          has_serial_no: item.has_serial_no || false
-        }));
+        });
         
         console.log('Setting items:', validItems.length);
         console.log('Sample items with names:', validItems.slice(0, 3).map(i => ({ code: i.item_code, name: i.item_name })));
         setItems(validItems);
 
-        const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
+        const cacheKey = `items_search_${search}`;
         await offlineStorage.cacheData(cacheKey, validItems, 300000);
       } else {
         console.log('No items found or invalid response format');
@@ -145,7 +136,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       console.error('Failed to fetch items:', error);
       
       try {
-        const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
+        const cacheKey = `items_search_${search}`;
         const cached = await offlineStorage.getCachedData(cacheKey);
         if (cached && Array.isArray(cached)) {
           console.log('Loaded fallback cached items:', cached.length);
@@ -163,7 +154,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     if (searchValue.trim()) {
       searchItems(searchValue);
     } else {
-      loadInitialItems();
+      setItems([]); // Clear items when search is empty
     }
   }, [searchValue, searchItems]);
 
@@ -237,7 +228,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
             />
             <CommandList>
               <CommandEmpty>
-                {isLoadingItems ? "Loading items..." : "No items found."}
+                {isLoadingItems ? "Loading items..." : searchValue ? "No items found." : "Start typing to search items..."}
               </CommandEmpty>
               <CommandGroup>
                 {filteredItems.map((item) => {
