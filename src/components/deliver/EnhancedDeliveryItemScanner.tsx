@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +11,7 @@ import { DeliveryEntry, SOItem } from "../../pages/Deliver";
 import { useToast } from "@/hooks/use-toast";
 import BatchSelector from "./BatchSelector";
 import SerialBatchBundleSelector from "../stock-count/SerialBatchBundleSelector";
+import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
 
 interface BatchInfo {
   batch_no: string;
@@ -180,13 +180,9 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     selectedItem.itemName.toLowerCase().includes('serial')
   );
 
-  // Available warehouses - you can expand this list
-  const availableWarehouses = [
-    "Main Store",
-    "Secondary Store", 
-    "Raw Material Store",
-    "Finished Goods Store"
-  ];
+  const handleWarehouseSelected = (warehouseCode: string) => {
+    setWarehouse(warehouseCode);
+  };
 
   return (
     <>
@@ -272,19 +268,10 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="warehouse">Warehouse *</Label>
-                  <Select value={warehouse} onValueChange={setWarehouse}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select warehouse..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableWarehouses.map((wh) => (
-                        <SelectItem key={wh} value={wh}>
-                          {wh}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <WarehouseSelector 
+                    onWarehouseSelected={handleWarehouseSelected}
+                    isLoading={false}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="quantity">Quantity to Deliver *</Label>
@@ -386,7 +373,6 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                           transactionType="Outward"
                           onBundleCreated={handleBundleCreated}
                           initialQuantity={parseInt(quantity) || 1}
-                          company={company}
                         />
                         {selectedBundle && (
                           <p className="text-sm text-muted-foreground">
