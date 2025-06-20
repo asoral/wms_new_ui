@@ -114,9 +114,38 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
       selectedItem: selectedItem?.itemCode,
       warehouse,
       quantity,
-      hasSerialBatchTracking
+      hasSerialBatchTracking,
+      company
     });
     
+    if (!selectedItem) {
+      toast({
+        title: "No Item Selected",
+        description: "Please select an item first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!warehouse) {
+      toast({
+        title: "No Warehouse Selected",
+        description: "Please select a warehouse first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!quantity) {
+      toast({
+        title: "No Quantity Entered", 
+        description: "Please enter a quantity first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('Setting showBatchSelector to true');
     setShowBatchSelector(true);
   };
 
@@ -384,6 +413,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                       variant="outline"
                       onClick={handleOpenBatchSelector}
                       className="w-full justify-start h-auto p-3"
+                      disabled={!warehouse || !quantity}
                     >
                       <div className="flex flex-col items-start">
                         <div className="flex items-center">
@@ -420,16 +450,19 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
       </div>
 
       {/* Batch Selector Modal */}
-      {showBatchSelector && selectedItem && company && (
+      {showBatchSelector && selectedItem && (
         <BatchSelector
           isOpen={showBatchSelector}
-          onClose={() => setShowBatchSelector(false)}
+          onClose={() => {
+            console.log('Closing batch selector');
+            setShowBatchSelector(false);
+          }}
           itemCode={selectedItem.itemCode}
           itemName={selectedItem.itemName}
           warehouse={warehouse}
           requiredQty={parseInt(quantity) || 1}
           onBatchesSelected={handleBatchesSelected}
-          company={company}
+          company={company || 'DIP'} // Provide fallback company
         />
       )}
     </>
