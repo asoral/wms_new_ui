@@ -53,7 +53,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
     try {
       const erpnextAPI = await createERPNextAPI();
       if (erpnextAPI) {
-        const itemResult = await erpnextAPI.getItem(itemCode);
+        const itemResult = await erpnextAPI.getItemDetails(itemCode);
         if (itemResult.data) {
           setItemDetails(itemResult.data);
           // Reset bundle selection when item changes
@@ -67,9 +67,10 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
     }
   };
 
-  const handleBundleSelected = (bundleName: string) => {
+  const handleBundleCreated = (bundleName: string, totalQty: number) => {
     setSelectedBundle(bundleName);
-    // Clear traditional entry fields when bundle is selected
+    setCountedQty(totalQty);
+    // Clear traditional entry fields when bundle is created
     setBatchNo("");
     setSerialNo("");
     setUseTraditionalEntry(false);
@@ -307,7 +308,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
             )}
           </div>
 
-          {/* Serial and Batch Bundle Selection */}
+          {/* Serial and Batch Bundle Section */}
           {hasSerialBatchTracking && selectedItemCode && warehouse && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -324,13 +325,17 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
 
               {!useTraditionalEntry ? (
                 <div className="space-y-2">
-                  <Label>Select Serial and Batch Bundle</Label>
+                  <Label>Create Serial and Batch Bundle</Label>
                   <SerialBatchBundleSelector
                     itemCode={selectedItemCode}
+                    itemName={itemDetails.item_name || searchTerm}
+                    itemGroup={itemDetails.item_group || 'All Item Groups'}
+                    hasSerial={itemDetails.has_serial_no || false}
+                    hasBatch={itemDetails.has_batch_no || false}
                     warehouse={warehouse}
-                    onBundleSelected={handleBundleSelected}
-                    hasSerial={itemDetails.has_serial_no}
-                    hasBatch={itemDetails.has_batch_no}
+                    transactionType="Inward"
+                    onBundleCreated={handleBundleCreated}
+                    initialQuantity={countedQty || 1}
                   />
                   {selectedBundle && (
                     <p className="text-sm text-muted-foreground">
