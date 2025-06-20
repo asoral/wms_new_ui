@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, Item } from './types';
 
@@ -92,7 +93,9 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       'item_code',
       'item_name',
       'stock_uom',
-      'item_group'
+      'item_group',
+      'has_batch_no',
+      'has_serial_no'
     ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String((page - 1) * limit));
@@ -144,7 +147,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Fetch detailed item record
+   * Fetch detailed item record with tracking information
    */
   async getItemDetails(itemCode: string): Promise<ERPNextResponse<Item>> {
     const params = new URLSearchParams({
@@ -153,7 +156,9 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
         'item_code',
         'item_name',
         'stock_uom',
-        'item_group'
+        'item_group',
+        'has_batch_no',
+        'has_serial_no'
       ])
     });
 
@@ -193,7 +198,9 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
           'item_code',
           'item_name',
           'stock_uom',
-          'item_group'
+          'item_group',
+          'has_batch_no',
+          'has_serial_no'
         ]),
       });
   
@@ -265,7 +272,9 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       'item_code',
       'item_name',
       'stock_uom',
-      'item_group'
+      'item_group',
+      'has_batch_no',
+      'has_serial_no'
     ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String(offset));

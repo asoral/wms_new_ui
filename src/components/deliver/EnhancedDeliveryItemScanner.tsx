@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import BatchSelector from "./BatchSelector";
 import SerialBatchBundleSelector from "../stock-count/SerialBatchBundleSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
+import { createERPNextAPI } from "@/services/erpnextApi";
 
 interface BatchInfo {
   batch_no: string;
@@ -20,6 +21,11 @@ interface BatchInfo {
   available_qty?: number;
   expiry_date?: string;
   serial_and_batch_bundle?: string;
+}
+
+interface ItemTrackingInfo {
+  has_batch_no: boolean;
+  has_serial_no: boolean;
 }
 
 interface EnhancedDeliveryItemScannerProps {
@@ -39,9 +45,49 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
   const [selectedBatches, setSelectedBatches] = useState<BatchInfo[]>([]);
   const [useTraditionalEntry, setUseTraditionalEntry] = useState(true);
   const [selectedBundle, setSelectedBundle] = useState("");
+  const [itemTrackingInfo, setItemTrackingInfo] = useState<ItemTrackingInfo | null>(null);
+  const [loadingTracking, setLoadingTracking] = useState(false);
   const { toast } = useToast();
 
   const selectedItem = soItems.find(item => item.itemCode === selectedItemCode);
+
+  // Fetch item tracking information from ERPNext when item is selected
+  useEffect(() => {
+    const fetchItemTrackingInfo = async () => {
+      if (!selectedItemCode) {
+        setItemTrackingInfo(null);
+        return;
+      }
+
+      setLoadingTracking(true);
+      try {
+        const erpnextAPI = await createERPNextAPI();
+        if (erpnextAPI) {
+          console.log('Fetching tracking info for item:', selectedItemCode);
+          const itemDetails = await erpnextAPI.items.getItemDetails(selectedItemCode);
+          console.log('Item details from ERPNext:', itemDetails.data);
+          
+          setItemTrackingInfo({
+            has_batch_no: itemDetails.data.has_batch_no || false,
+            has_serial_no: itemDetails.data.has_serial_no || false
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching item tracking info:', error);
+        // Fallback to pattern matching if API fails
+        setItemTrackingInfo({
+          has_batch_no: selectedItemCode.toLowerCase().includes('batch') || 
+                        Boolean(selectedItemCode.match(/^(BAT|BATCH|BHG)/i)),
+          has_serial_no: selectedItemCode.toLowerCase().includes('serial') || 
+                         Boolean(selectedItemCode.match(/^(SER|SERIAL)/i))
+        });
+      } finally {
+        setLoadingTracking(false);
+      }
+    };
+
+    fetchItemTrackingInfo();
+  }, [selectedItemCode]);
 
   const handleScanItem = () => {
     // Find item by scanned code
@@ -173,27 +219,9 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     });
   };
 
-  // Improved tracking detection - check for actual tracking requirements
-  // In a real scenario, this would come from ERPNext item master data
-  // For now, we'll use more comprehensive detection logic
-  const hasSerialTracking = selectedItem && (
-    selectedItem.itemCode.toLowerCase().includes('serial') ||
-    selectedItem.itemName.toLowerCase().includes('serial') ||
-    // Add more patterns that indicate serial tracking
-    Boolean(selectedItem.itemCode.match(/^(SER|SERIAL)/i)) ||
-    Boolean(selectedItem.itemName.match(/serial/i))
-  );
-
-  const hasBatchTracking = selectedItem && (
-    selectedItem.itemCode.toLowerCase().includes('batch') ||
-    selectedItem.itemName.toLowerCase().includes('batch') ||
-    // Add more patterns that indicate batch tracking
-    Boolean(selectedItem.itemCode.match(/^(BAT|BATCH|BHG)/i)) ||
-    Boolean(selectedItem.itemName.match(/batch/i)) ||
-    // Common batch tracking patterns - BHG (Batch Group) is common in ERPNext
-    Boolean(selectedItem.itemCode.match(/BHG\d+/i))
-  );
-
+  // Use actual tracking information from ERPNext
+  const hasSerialTracking = itemTrackingInfo?.has_serial_no || false;
+  const hasBatchTracking = itemTrackingInfo?.has_batch_no || false;
   const hasSerialBatchTracking = hasSerialTracking || hasBatchTracking;
 
   const handleWarehouseSelected = (warehouseCode: string) => {
@@ -307,20 +335,28 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                 <div className="mt-4 pt-4 border-t border-blue-200">
                   <Label className="text-sm font-medium text-blue-800 mb-2 block">Item Tracking</Label>
                   <div className="flex gap-2">
-                    {hasSerialTracking && (
-                      <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
-                        Serial Tracking
-                      </Badge>
-                    )}
-                    {hasBatchTracking && (
-                      <Badge variant="default" className="bg-orange-100 text-orange-800 border-orange-300">
-                        Batch Tracking
-                      </Badge>
-                    )}
-                    {!hasSerialBatchTracking && (
+                    {loadingTracking ? (
                       <Badge variant="secondary" className="bg-gray-100 text-gray-600">
-                        No Tracking
+                        Loading tracking info...
                       </Badge>
+                    ) : (
+                      <>
+                        {hasSerialTracking && (
+                          <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+                            Serial Tracking
+                          </Badge>
+                        )}
+                        {hasBatchTracking && (
+                          <Badge variant="default" className="bg-orange-100 text-orange-800 border-orange-300">
+                            Batch Tracking
+                          </Badge>
+                        )}
+                        {!hasSerialBatchTracking && (
+                          <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+                            No Tracking
+                          </Badge>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -349,7 +385,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
               </div>
 
               {/* Serial/Batch Selection - Only show if item has tracking and required fields are filled */}
-              {hasSerialBatchTracking && selectedItemCode && warehouse && quantity && (
+              {hasSerialBatchTracking && selectedItemCode && warehouse && quantity && !loadingTracking && (
                 <div className="space-y-4">
                   <Label>Serial/Batch Entry Method</Label>
                   <Tabs 
