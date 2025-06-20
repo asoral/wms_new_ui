@@ -114,7 +114,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       console.log('API result:', result);
       
       if (result && result.data && Array.isArray(result.data)) {
-        // Filter out items with missing essential properties and log them
+        // Properly map items ensuring item_name is preserved
         const validItems = result.data.filter(item => {
           const isValid = item && (item.item_code || item.name) && (item.item_name || item.item_code || item.name);
           if (!isValid) {
@@ -124,14 +124,15 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
         }).map(item => ({
           name: item.name,
           item_code: item.item_code || item.name || '',
+          // Ensure we use the actual item_name from ERPNext, not the item_code
           item_name: item.item_name || item.item_code || item.name || '',
           stock_uom: item.stock_uom || 'Nos',
           has_batch_no: item.has_batch_no || false,
           has_serial_no: item.has_serial_no || false
         }));
         
-        console.log('Setting items:', validItems.length, 'out of', result.data.length);
-        console.log('Sample items:', validItems.slice(0, 3));
+        console.log('Setting items:', validItems.length);
+        console.log('Sample items with names:', validItems.slice(0, 3).map(i => ({ code: i.item_code, name: i.item_name })));
         setItems(validItems);
 
         const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
@@ -178,7 +179,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     if (!searchValue) return items;
     const lowercaseSearch = searchValue.toLowerCase();
     const filtered = items.filter(item => {
-      // Search both item code and item name with null checks
       const itemCode = (item.item_code || '').toLowerCase();
       const itemName = (item.item_name || '').toLowerCase();
       return itemCode.includes(lowercaseSearch) || itemName.includes(lowercaseSearch);
@@ -203,9 +203,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
             aria-expanded={open}
             className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
             disabled={isLoading || isLoadingItems}
-            onClick={() => {
-              console.log('Popover trigger clicked. Current open state:', open);
-            }}
           >
             <div className="flex-1 min-w-0 text-left">
               {selectedItem ? (
@@ -249,7 +246,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                   console.log('Rendering item:', {
                     item_code: item.item_code,
                     item_name: item.item_name,
-                    stock_uom: item.stock_uom
+                    showSeparateCode
                   });
                   
                   return (
