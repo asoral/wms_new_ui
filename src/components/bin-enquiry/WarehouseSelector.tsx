@@ -74,7 +74,8 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      let filters = [['is_group', '=', '0']];
+      // Use basic filters without is_group which might not be permitted
+      let filters: any[] = [];
       
       if (search.trim()) {
         filters.push(['warehouse_name', 'like', `%${search}%`]);
@@ -181,7 +182,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[60]" align="start">
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[100]" align="start">
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search warehouses..." 
@@ -205,7 +206,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                       {filteredWarehouses.map((warehouse) => (
                         <CommandItem
                           key={warehouse.name}
-                          value={warehouse.name}
                           onSelect={() => handleWarehouseSelect(warehouse)}
                         >
                           <Check

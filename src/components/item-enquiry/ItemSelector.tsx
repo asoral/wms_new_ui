@@ -105,7 +105,8 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
         }
       } else {
         console.log('Fetching initial items');
-        result = await erpnextAPI.getItemsPaginated(undefined, undefined, limit, 1);
+        // Use basic filters without maintain_stock or is_template
+        result = await erpnextAPI.getItemsPaginated([], ['item_code', 'item_name', 'stock_uom', 'has_batch_no', 'has_serial_no'], limit, 1);
       }
       
       console.log('API result:', result);
@@ -188,7 +189,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-50" align="start">
+        <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[100]" align="start">
           <Command shouldFilter={false}>
             <CommandInput 
               placeholder="Search by item code, name or barcode..." 
@@ -203,7 +204,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 {filteredItems.map((item) => (
                   <CommandItem
                     key={item.item_code}
-                    value={item.item_code}
                     onSelect={() => handleItemSelect(item)}
                   >
                     <Check
