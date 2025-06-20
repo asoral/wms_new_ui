@@ -50,7 +50,15 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
       .eq('id', user.id)
       .single();
 
-    return profile?.erpnext_default_company || null;
+    const defaultCompany = profile?.erpnext_default_company;
+    
+    if (!defaultCompany) {
+      console.warn('No default company found in user profile. User should set this in Profile settings.');
+      // Return null so the calling code can handle the missing company appropriately
+      return null;
+    }
+
+    return defaultCompany;
   } catch (error) {
     console.error('Failed to get user default company:', error);
     return null;

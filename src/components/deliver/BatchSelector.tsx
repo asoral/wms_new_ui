@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search } from 'lucide-react';
-import { getAvailableSerialBatch, createSerialBatchBundle } from '@/services/serialBatchBundleApi';
+import { getAvailableSerialBatch, createSerialBatchBundle, getUserDefaultCompany } from '@/services/serialBatchBundleApi';
 import { useToast } from '@/hooks/use-toast';
 
 interface BatchInfo {
@@ -26,7 +26,7 @@ interface BatchSelectorProps {
   warehouse: string;
   requiredQty: number;
   onBatchesSelected: (batches: BatchInfo[]) => void;
-  company?: string; // Add company prop
+  company?: string;
 }
 
 const BatchSelector = ({ 
@@ -37,7 +37,7 @@ const BatchSelector = ({
   warehouse, 
   requiredQty,
   onBatchesSelected,
-  company // Add company prop
+  company
 }: BatchSelectorProps) => {
   const [availableBatches, setAvailableBatches] = useState<BatchInfo[]>([]);
   const [selectedBatches, setSelectedBatches] = useState<BatchInfo[]>([]);
@@ -208,12 +208,15 @@ const BatchSelector = ({
   const createSerialBatchBundleForBatches = async (batches: BatchInfo[]) => {
     setCreatingBundle(true);
     try {
-      if (!company) {
-        throw new Error('Company information is required but not provided');
-      }
-
       console.log('Creating serial batch bundle for batches:', batches);
-      console.log('Using company:', company);
+      
+      // Get the correct company name from user profile
+      const userCompany = await getUserDefaultCompany();
+      console.log('Using company from user profile:', userCompany);
+
+      if (!userCompany) {
+        throw new Error('No default company found in user profile. Please set up your default company in Profile settings.');
+      }
 
       const bundleEntries = batches.map(batch => ({
         batch_no: batch.batch_no,
@@ -227,7 +230,7 @@ const BatchSelector = ({
       }));
 
       const bundleData = {
-        company: company, // Use the company prop passed from the sales order
+        company: userCompany, // Use the company from user profile instead
         item_code: itemCode,
         item_name: itemName,
         item_group: '', // Will be filled by ERPNext
