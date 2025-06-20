@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +40,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
   const [batchNo, setBatchNo] = useState("");
   const [serialNo, setSerialNo] = useState("");
   const [selectedBundle, setSelectedBundle] = useState("");
-  const [useTraditionalEntry, setUseTraditionalEntry] = useState(false);
+  const [useTraditionalEntry, setUseTraditionalEntry] = useState(true); // Default to true for manual entry
   const [itemDetails, setItemDetails] = useState<any>(null);
   const { toast } = useToast();
 
@@ -70,10 +69,10 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
   const handleBundleCreated = (bundleName: string, totalQty: number) => {
     setSelectedBundle(bundleName);
     setCountedQty(totalQty);
-    // Clear traditional entry fields when bundle is created
-    setBatchNo("");
-    setSerialNo("");
-    setUseTraditionalEntry(false);
+    toast({
+      title: "Bundle Created",
+      description: `Serial and Batch Bundle created: ${bundleName}`,
+    });
   };
 
   const addItemToCount = async () => {
@@ -166,7 +165,6 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
       setBatchNo("");
       setSerialNo("");
       setSelectedBundle("");
-      setUseTraditionalEntry(false);
       setItemDetails(null);
 
       toast({
