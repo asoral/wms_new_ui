@@ -173,23 +173,28 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     });
   };
 
-  // Check if item has batch or serial tracking
-  const hasSerialBatchTracking = selectedItem && (
-    selectedItem.itemCode.toLowerCase().includes('batch') || 
+  // Improved tracking detection - check for actual tracking requirements
+  // In a real scenario, this would come from ERPNext item master data
+  // For now, we'll use more comprehensive detection logic
+  const hasSerialTracking = selectedItem && (
     selectedItem.itemCode.toLowerCase().includes('serial') ||
-    selectedItem.itemName.toLowerCase().includes('batch') ||
-    selectedItem.itemName.toLowerCase().includes('serial')
+    selectedItem.itemName.toLowerCase().includes('serial') ||
+    // Add more patterns that indicate serial tracking
+    selectedItem.itemCode.match(/^(SER|SERIAL)/i) ||
+    selectedItem.itemName.match(/serial/i)
   );
 
   const hasBatchTracking = selectedItem && (
     selectedItem.itemCode.toLowerCase().includes('batch') ||
-    selectedItem.itemName.toLowerCase().includes('batch')
+    selectedItem.itemName.toLowerCase().includes('batch') ||
+    // Add more patterns that indicate batch tracking
+    selectedItem.itemCode.match(/^(BAT|BATCH|BHG)/i) ||
+    selectedItem.itemName.match(/batch/i) ||
+    // Common batch tracking patterns
+    selectedItem.itemCode.match(/BHG\d+/i)
   );
 
-  const hasSerialTracking = selectedItem && (
-    selectedItem.itemCode.toLowerCase().includes('serial') ||
-    selectedItem.itemName.toLowerCase().includes('serial')
-  );
+  const hasSerialBatchTracking = hasSerialTracking || hasBatchTracking;
 
   const handleWarehouseSelected = (warehouseCode: string) => {
     setWarehouse(warehouseCode);
@@ -276,7 +281,51 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                 <span>Item Details</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              {/* Item Info Display - Improved Layout */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-blue-800">Item Code</Label>
+                    <div className="font-semibold text-blue-900">{selectedItem.itemCode}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-blue-800">Item Name</Label>
+                    <div className="font-medium text-blue-900 text-sm">{selectedItem.itemName}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-blue-800">Pending Qty</Label>
+                    <div className="font-semibold text-blue-900">{selectedItem.pendingQty} {selectedItem.uom}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-blue-800">Rate</Label>
+                    <div className="font-semibold text-blue-900">₹{selectedItem.rate}</div>
+                  </div>
+                </div>
+                
+                {/* Tracking Information */}
+                <div className="mt-4 pt-4 border-t border-blue-200">
+                  <Label className="text-sm font-medium text-blue-800 mb-2 block">Item Tracking</Label>
+                  <div className="flex gap-2">
+                    {hasSerialTracking && (
+                      <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+                        Serial Tracking
+                      </Badge>
+                    )}
+                    {hasBatchTracking && (
+                      <Badge variant="default" className="bg-orange-100 text-orange-800 border-orange-300">
+                        Batch Tracking
+                      </Badge>
+                    )}
+                    {!hasSerialBatchTracking && (
+                      <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+                        No Tracking
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <WarehouseSelector 
@@ -299,40 +348,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                 </div>
               </div>
 
-              {/* Item Info Display - Improved Layout */}
-              <div className="space-y-3">
-                <Label>Item Information</Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-sm text-gray-600">UOM</div>
-                    <div className="font-semibold">{selectedItem.uom}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm text-gray-600">Pending</div>
-                    <div className="font-semibold">{selectedItem.pendingQty} {selectedItem.uom}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm text-gray-600">Rate</div>
-                    <div className="font-semibold">₹{selectedItem.rate}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm text-gray-600">Tracking</div>
-                    <div className="flex flex-col gap-1">
-                      {hasSerialTracking && (
-                        <Badge variant="outline" className="text-xs">Serial</Badge>
-                      )}
-                      {hasBatchTracking && (
-                        <Badge variant="outline" className="text-xs">Batch</Badge>
-                      )}
-                      {!hasSerialBatchTracking && (
-                        <Badge variant="secondary" className="text-xs">None</Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Serial/Batch Tracking Fields - Show relevant selector buttons */}
+              {/* Serial/Batch Selection - Only show if item has tracking and required fields are filled */}
               {hasSerialBatchTracking && selectedItemCode && warehouse && quantity && (
                 <div className="space-y-4">
                   <Label>Serial/Batch Entry Method</Label>
@@ -342,46 +358,61 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                     className="w-full"
                   >
                     <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+                      <TabsTrigger value="manual">Pick Serial / Batch No</TabsTrigger>
                       <TabsTrigger value="bundle">Use Bundle</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="manual" className="space-y-4">
                       <div className="space-y-4">
-                        {/* Only show batch selector if item has batch tracking */}
+                        {/* Batch Selection - ERPNext style */}
                         {hasBatchTracking && (
                           <div className="space-y-2">
-                            <Label htmlFor="batch_no">Batch Number</Label>
+                            <Label>Select Batch No</Label>
                             <Button
                               variant="outline"
                               onClick={handleOpenBatchSelector}
-                              disabled={!selectedItem || !warehouse || !quantity}
-                              className="w-full justify-start"
+                              className="w-full justify-start h-auto p-3"
                             >
-                              <Package className="w-4 h-4 mr-2" />
-                              {batchNumber || "Select Batch"}
+                              <div className="flex flex-col items-start">
+                                <div className="flex items-center">
+                                  <Package className="w-4 h-4 mr-2" />
+                                  <span className="font-medium">
+                                    {batchNumber || "Pick Serial / Batch No"}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground mt-1">
+                                  Select from available batches in {warehouse}
+                                </span>
+                              </div>
                             </Button>
                           </div>
                         )}
                         
-                        {/* Only show serial selector if item has serial tracking */}
+                        {/* Serial Selection */}
                         {hasSerialTracking && (
                           <div className="space-y-2">
-                            <Label htmlFor="serial_no">Serial Number</Label>
+                            <Label>Select Serial No</Label>
                             <Button
                               variant="outline"
                               onClick={() => {
-                                // TODO: Implement serial selector similar to batch selector
                                 toast({
                                   title: "Feature Coming Soon",
                                   description: "Serial number selector will be available soon",
                                 });
                               }}
-                              disabled={!selectedItem || !warehouse || !quantity}
-                              className="w-full justify-start"
+                              className="w-full justify-start h-auto p-3"
                             >
-                              <Package className="w-4 h-4 mr-2" />
-                              {serialNumber || "Select Serial"}
+                              <div className="flex flex-col items-start">
+                                <div className="flex items-center">
+                                  <Package className="w-4 h-4 mr-2" />
+                                  <span className="font-medium">
+                                    {serialNumber || "Pick Serial / Batch No"}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground mt-1">
+                                  Select from available serials in {warehouse}
+                                </span>
+                              </div>
                             </Button>
                           </div>
                         )}
