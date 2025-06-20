@@ -54,8 +54,8 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get item details using the items API directly
-      const itemResult = await erpnextAPI.items.getItemDetails(itemCode);
+      // Get item details using the stock API (which delegates to items API)
+      const itemResult = await erpnextAPI.stock.getItemDetails(itemCode);
       console.log('Item details result:', itemResult);
 
       if (itemResult.data) {
@@ -119,7 +119,7 @@ const ItemEnquiry = () => {
       if (!erpnextAPI) return;
 
       // Try to find item by barcode first
-      const barcodeResult = await erpnextAPI.items.searchItemsByBarcode(barcode);
+      const barcodeResult = await erpnextAPI.stock.searchItemsByBarcode(barcode);
       if (barcodeResult.data && barcodeResult.data.length > 0) {
         const item = barcodeResult.data[0];
         await loadItemDetails(item.item_code || item.name);
