@@ -55,7 +55,7 @@ const EnhancedDeliveryItemScanner = ({
       if (!erpnextAPI) return;
 
       const defaultCompany = await getUserDefaultCompany();
-      const result = await erpnextAPI.warehouses.getWarehouses(
+      const result = await erpnextAPI.getWarehouses(
         [['disabled', '=', 0]], 
         defaultCompany || undefined
       );
@@ -74,7 +74,7 @@ const EnhancedDeliveryItemScanner = ({
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return { hasBatch: false, hasSerial: false };
 
-      const result = await erpnextAPI.items.getItemDetails(itemCode);
+      const result = await erpnextAPI.getItemDetails(itemCode);
       return {
         hasBatch: result.data?.has_batch_no === 1,
         hasSerial: result.data?.has_serial_no === 1
