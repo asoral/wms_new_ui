@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, Item } from './types';
 
@@ -123,10 +124,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       item_group: item.item_group || 'All Item Groups'
     }));
 
-    console.log('Transforme
-
-
-d items:', transformedItems);
+    console.log('Transformed items:', transformedItems);
     return { data: transformedItems };
   }
 

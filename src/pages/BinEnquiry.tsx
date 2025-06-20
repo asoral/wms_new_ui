@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +69,7 @@ const BinEnquiry = () => {
             // Get item details to fetch item name
             let itemName = item.item_name || item.item_code;
             try {
-              const itemDetails = await erpnextAPI.stock.getItemDetails(item.item_code);
+              const itemDetails = await erpnextAPI.items.getItemDetails(item.item_code);
               if (itemDetails?.data?.item_name) {
                 itemName = itemDetails.data.item_name;
               }
@@ -78,19 +77,24 @@ const BinEnquiry = () => {
               console.error('Failed to fetch item name for:', item.item_code);
             }
 
+            // Calculate valuation rate properly
+            const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
+            const valuationRate = item.valuation_rate || (item.stock_value && actualQty > 0 ? item.stock_value / actualQty : 0);
+            const totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
+
             return {
               item_code: item.item_code,
               item_name: itemName,
-              actual_qty: Math.round((item.actual_qty || 0) * 100) / 100, // Round to 2 decimal places
-              valuation_rate: item.valuation_rate || 0,
+              actual_qty: actualQty,
+              valuation_rate: valuationRate,
               warehouse: item.warehouse,
               bin: item.warehouse,
               itemCode: item.item_code,
               itemName: itemName,
-              qty: Math.round((item.actual_qty || 0) * 100) / 100, // Round to 2 decimal places
+              qty: actualQty,
               uom: 'Nos',
               age: Math.floor(Math.random() * 120), // Placeholder
-              valuation: Math.round((item.actual_qty || 0) * (item.valuation_rate || 0) * 100) / 100
+              valuation: totalValuation
             };
           })
         );
