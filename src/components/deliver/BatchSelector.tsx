@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search } from 'lucide-react';
-import { getAvailableSerialBatch } from '@/services/serialBatchBundleApi';
+import { getAvailableSerialBatch, createSerialBatchBundle, getUserDefaultCompany } from '@/services/serialBatchBundleApi';
 import { useToast } from '@/hooks/use-toast';
 
 interface BatchInfo {
@@ -22,6 +23,7 @@ interface BatchSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   itemCode: string;
+  itemName: string;
   warehouse: string;
   requiredQty: number;
   onBatchesSelected: (batches: BatchInfo[]) => void;
@@ -30,7 +32,8 @@ interface BatchSelectorProps {
 const BatchSelector = ({ 
   isOpen, 
   onClose, 
-  itemCode, 
+  itemCode,
+  itemName, 
   warehouse, 
   requiredQty,
   onBatchesSelected 
@@ -41,6 +44,7 @@ const BatchSelector = ({
   const [fetchMethod, setFetchMethod] = useState<'FIFO' | 'LIFO' | 'FEFO'>('FEFO');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [creatingBundle, setCreatingBundle] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -58,16 +62,13 @@ const BatchSelector = ({
     try {
       console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
 
-      // Use the existing getAvailableSerialBatch function from serialBatchBundleApi
       const result = await getAvailableSerialBatch(itemCode, warehouse, false, true);
-      
       console.log('getAvailableSerialBatch result:', result);
       
       if (result.batch_nos && Array.isArray(result.batch_nos)) {
-        // Convert the batch data to the expected format
         const batchData = result.batch_nos.map((batch: any) => ({
           batch_no: batch.batch_no,
-          qty: 0, // Selected quantity starts at 0
+          qty: 0,
           available_qty: batch.qty || 0,
           expiry_date: batch.expiry_date || null
         })).filter((batch: BatchInfo) => batch.available_qty && batch.available_qty > 0);
@@ -80,6 +81,11 @@ const BatchSelector = ({
             title: "No Batches Available",
             description: `No batches found with available stock in warehouse: ${warehouse}`,
             variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Batches Loaded",
+            description: `Found ${batchData.length} batches with available stock`,
           });
         }
       } else {
@@ -94,8 +100,8 @@ const BatchSelector = ({
     } catch (error) {
       console.error('Error fetching batches:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch available batches",
+        title: "Error Loading Batches",
+        description: "Failed to fetch available batches. Please try again.",
         variant: "destructive"
       });
       setAvailableBatches([]);
@@ -150,16 +156,16 @@ const BatchSelector = ({
         });
       } else {
         toast({
-          title: "No Batches Available",
-          description: "No batches with sufficient stock found",
+          title: "No Suitable Batches",
+          description: "No batches with sufficient stock found for auto-selection",
           variant: "destructive"
         });
       }
     } catch (error) {
       console.error('Error auto-fetching batches:', error);
       toast({
-        title: "Error",
-        description: "Failed to auto-fetch batches",
+        title: "Auto-Selection Failed",
+        description: "Failed to auto-select batches. Please select manually.",
         variant: "destructive"
       });
     } finally {
@@ -198,19 +204,100 @@ const BatchSelector = ({
     return selectedBatches.reduce((sum, batch) => sum + batch.qty, 0);
   };
 
-  const handleConfirm = () => {
+  const createSerialBatchBundleForBatches = async (batches: BatchInfo[]) => {
+    setCreatingBundle(true);
+    try {
+      const company = await getUserDefaultCompany();
+      if (!company) {
+        throw new Error('No default company found. Please configure your ERPNext settings.');
+      }
+
+      console.log('Creating serial batch bundle for batches:', batches);
+
+      const bundleEntries = batches.map(batch => ({
+        batch_no: batch.batch_no,
+        qty: batch.qty,
+        warehouse: warehouse,
+        delivered_qty: 0,
+        incoming_rate: 0,
+        outgoing_rate: 0,
+        stock_value_difference: 0,
+        is_outward: 1
+      }));
+
+      const bundleData = {
+        company: company,
+        item_code: itemCode,
+        item_name: itemName,
+        item_group: '', // Will be filled by ERPNext
+        has_serial_no: 0,
+        has_batch_no: 1,
+        warehouse: warehouse,
+        type_of_transaction: 'Outward' as const,
+        total_qty: batches.reduce((sum, batch) => sum + batch.qty, 0),
+        avg_rate: 0,
+        total_amount: 0,
+        posting_date: new Date().toISOString().split('T')[0],
+        posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+        voucher_type: 'Delivery Note',
+        entries: bundleEntries
+      };
+
+      console.log('Creating Serial and Batch Bundle with data:', bundleData);
+
+      const result = await createSerialBatchBundle(bundleData);
+      
+      if (result?.data?.name) {
+        toast({
+          title: "Bundle Created Successfully",
+          description: `Serial and Batch Bundle ${result.data.name} created for delivery`,
+        });
+
+        // Update batches with bundle reference
+        const updatedBatches = batches.map(batch => ({
+          ...batch,
+          serial_and_batch_bundle: result.data.name
+        }));
+
+        return updatedBatches;
+      } else {
+        throw new Error('Failed to create bundle - no bundle name returned');
+      }
+    } catch (error) {
+      console.error('Error creating serial batch bundle:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      toast({
+        title: "Bundle Creation Failed",
+        description: `Failed to create Serial and Batch Bundle: ${errorMessage}`,
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setCreatingBundle(false);
+    }
+  };
+
+  const handleConfirm = async () => {
     const validBatches = selectedBatches.filter(batch => batch.batch_no && batch.qty > 0);
     if (validBatches.length === 0) {
       toast({
-        title: "No Batches Selected",
-        description: "Please select at least one batch with quantity",
+        title: "No Valid Batches",
+        description: "Please select at least one batch with a valid batch number and quantity",
         variant: "destructive"
       });
       return;
     }
 
-    onBatchesSelected(validBatches);
-    onClose();
+    try {
+      // Create Serial and Batch Bundle for the selected batches
+      const batchesWithBundle = await createSerialBatchBundleForBatches(validBatches);
+      onBatchesSelected(batchesWithBundle);
+      onClose();
+    } catch (error) {
+      // Error is already handled in createSerialBatchBundleForBatches
+      console.error('Failed to confirm batches:', error);
+    }
   };
 
   const filteredBatches = availableBatches.filter(batch =>
@@ -221,7 +308,7 @@ const BatchSelector = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Select Batch No</DialogTitle>
+          <DialogTitle>Select Batch No - {itemCode}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -394,11 +481,11 @@ const BatchSelector = ({
 
           {/* Action Buttons */}
           <div className="flex justify-between pt-4">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} disabled={creatingBundle}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm}>
-              Add Batch Nos
+            <Button onClick={handleConfirm} disabled={creatingBundle || selectedBatches.length === 0}>
+              {creatingBundle ? 'Creating Bundle...' : 'Add Batch Nos'}
             </Button>
           </div>
         </div>
