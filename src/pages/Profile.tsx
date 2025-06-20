@@ -155,7 +155,7 @@ const Profile = () => {
       const result = await testAPI.getItems({
         maintain_stock: 1,
         is_template: 1
-      }, ["name", "item_name"]);
+      }, undefined, 20, 0);
 
       // Map items to correct shape for selector (ERPNext might return item_code instead of name)
       const mapped =
