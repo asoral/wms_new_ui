@@ -1,5 +1,6 @@
-import { ERPNextAPI } from './erp/erpnext/api';
-import { supabase } from './supabase';
+
+import { ERPNextAPI } from './erp/erpnext/index';
+import { supabase } from '../integrations/supabase/client';
 
 export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
   try {
@@ -26,11 +27,6 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
       profile.erpnext_api_key,
       profile.erpnext_api_secret
     );
-
-    // Add the getCompanyDetails method
-    api.getCompanyDetails = async (companyName: string) => {
-      return await api.items.getCompanyDetails(companyName);
-    };
 
     return api;
   } catch (error) {
