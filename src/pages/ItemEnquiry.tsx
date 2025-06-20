@@ -152,7 +152,7 @@ const ItemEnquiry = () => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: companyCurrency,
-      minimumFraction: 2,
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
   };
