@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,7 +26,7 @@ export interface StockInfo {
   batch?: string;
   serial?: string;
   actualQty: number;
-  reserv edQty: number;
+  reservedQty: number;
   availableQty: number;
   valuationRate: number;
 }
