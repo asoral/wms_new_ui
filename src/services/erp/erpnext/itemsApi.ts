@@ -5,19 +5,20 @@ import { ERPNextResponse, Item } from './types';
 export class ERPNextItemsAPI extends ERPNextBaseAPI {
 
   /**
-   * Search items using Frappe's search_link API
+   * Search items using Frappe's search_link API - SIMPLIFIED VERSION
    */
   async searchItems(query: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
     const params = new URLSearchParams();
     params.append('doctype', 'Item');
     params.append('txt', query);
     params.append('page_length', String(limit));
+    // Only use basic filters that definitely exist
     params.append('filters', JSON.stringify([
-      ['Item', 'disabled', '=', 0],
-      ['Item', 'maintain_stock', '=', 1],
-      ['Item', 'has_variants', '=', 0]
+      ['disabled', '=', 0]
     ]));
   
+    console.log('Search API URL:', `${this.baseURL}/api/method/frappe.desk.search.search_link?${params.toString()}`);
+
     const response = await fetch(
       `${this.baseURL}/api/method/frappe.desk.search.search_link?${params.toString()}`,
       { headers: this.getHeaders() }
@@ -28,6 +29,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     }
   
     const result = await response.json();
+    console.log('Search API response:', result);
   
     if (!Array.isArray(result.message)) {
       throw new Error("Unexpected API response format");
@@ -47,7 +49,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Get items with pagination support using proper Frappe filters
+   * Get items with pagination support - SIMPLIFIED VERSION
    */
   async getItemsPaginated(
     filters?: any,
@@ -55,10 +57,9 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     limit: number = 20,
     page: number = 1
   ): Promise<ERPNextResponse<Item[]>> {
+    // Basic conditions that should exist in all ERPNext instances
     const conditions: string[][] = [
-      ['disabled', '=', '0'],
-      ['maintain_stock', '=', '1'],
-      ['has_variants', '=', '0']
+      ['disabled', '=', '0']
     ];
 
     // Apply extra filters if provided
@@ -73,14 +74,12 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       'item_code',
       'item_name',
       'stock_uom',
-      'has_batch_no',
-      'has_serial_no',
       'item_group'
     ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String((page - 1) * limit));
 
-    console.log('Fetching items with filters:', conditions);
+    console.log('Fetching items with conditions:', conditions);
     console.log('API URL:', `${this.baseURL}/api/resource/Item?${params.toString()}`);
 
     const response = await fetch(
@@ -127,7 +126,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Fetch detailed item record, including batch/serial flags and barcodes
+   * Fetch detailed item record
    */
   async getItemDetails(itemCode: string): Promise<ERPNextResponse<Item>> {
     const params = new URLSearchParams({
@@ -136,10 +135,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
         'item_code',
         'item_name',
         'stock_uom',
-        'has_batch_no',
-        'has_serial_no',
-        'item_group',
-        'barcodes'
+        'item_group'
       ])
     });
 
@@ -179,10 +175,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
           'item_code',
           'item_name',
           'stock_uom',
-          'has_batch_no',
-          'has_serial_no',
-          'item_group',
-          'barcodes'
+          'item_group'
         ]),
       });
   
@@ -222,8 +215,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Fetch items with proper filters - CORRECTED VERSION with proper Frappe filter format
-   * Now constructs filter arrays correctly without unnecessary nesting
+   * Fetch items with proper filters - SIMPLIFIED VERSION without problematic fields
    */
   async getItems(
     filters: Record<string, any> = {},
@@ -237,11 +229,9 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       return this.searchItems(searchText.trim(), limit);
     }
 
-    // Build base conditions as proper Frappe filter arrays - each condition is a separate array
+    // Build base conditions as proper Frappe filter arrays - only basic filters
     const conditions: string[][] = [
-      ['disabled', '=', '0'],
-      ['maintain_stock', '=', '1'],
-      ['has_variants', '=', '0']
+      ['disabled', '=', '0']
     ];
 
     // Apply additional filters correctly - each as separate filter array
@@ -250,15 +240,12 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     }
 
     const params = new URLSearchParams();
-    // Direct array of filter conditions - no extra nesting
     params.append('filters', JSON.stringify(conditions));
     params.append('fields', JSON.stringify([
       'name',
       'item_code',
       'item_name',
       'stock_uom',
-      'has_batch_no',
-      'has_serial_no',
       'item_group'
     ]));
     params.append('limit_page_length', String(limit));
