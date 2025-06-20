@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -180,6 +181,16 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     selectedItem.itemName.toLowerCase().includes('serial')
   );
 
+  const hasBatchTracking = selectedItem && (
+    selectedItem.itemCode.toLowerCase().includes('batch') ||
+    selectedItem.itemName.toLowerCase().includes('batch')
+  );
+
+  const hasSerialTracking = selectedItem && (
+    selectedItem.itemCode.toLowerCase().includes('serial') ||
+    selectedItem.itemName.toLowerCase().includes('serial')
+  );
+
   const handleWarehouseSelected = (warehouseCode: string) => {
     setWarehouse(warehouseCode);
   };
@@ -297,10 +308,10 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                   <p>Rate: ₹{selectedItem.rate}</p>
                   {hasSerialBatchTracking && (
                     <div className="flex gap-2 mt-1">
-                      {selectedItem.itemCode.toLowerCase().includes('serial') && (
+                      {hasSerialTracking && (
                         <Badge variant="outline">Serial Tracking</Badge>
                       )}
-                      {selectedItem.itemCode.toLowerCase().includes('batch') && (
+                      {hasBatchTracking && (
                         <Badge variant="outline">Batch Tracking</Badge>
                       )}
                     </div>
@@ -308,7 +319,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                 </div>
               </div>
 
-              {/* Serial/Batch Entry Method - only show if item has tracking */}
+              {/* Serial/Batch Tracking Fields - Only show relevant fields with Select buttons only */}
               {hasSerialBatchTracking && selectedItemCode && warehouse && (
                 <div className="space-y-4">
                   <Label>Serial/Batch Entry Method</Label>
@@ -323,38 +334,42 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                     </TabsList>
 
                     <TabsContent value="manual" className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {selectedItem.itemCode.toLowerCase().includes('batch') && (
+                      <div className="space-y-4">
+                        {/* Only show batch field if item has batch tracking */}
+                        {hasBatchTracking && (
                           <div className="space-y-2">
-                            <Label htmlFor="batch_no">Batch No</Label>
-                            <div className="flex space-x-2">
-                              <Input
-                                id="batch_no"
-                                value={batchNumber}
-                                onChange={(e) => setBatchNumber(e.target.value)}
-                                placeholder="Enter batch number"
-                              />
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleOpenBatchSelector}
-                                disabled={!selectedItem || !warehouse || !quantity}
-                              >
-                                <Package className="w-4 h-4 mr-1" />
-                                Select
-                              </Button>
-                            </div>
+                            <Label htmlFor="batch_no">Batch Number</Label>
+                            <Button
+                              variant="outline"
+                              onClick={handleOpenBatchSelector}
+                              disabled={!selectedItem || !warehouse || !quantity}
+                              className="w-full justify-start"
+                            >
+                              <Package className="w-4 h-4 mr-2" />
+                              {batchNumber || "Select Batch"}
+                            </Button>
                           </div>
                         )}
-                        {selectedItem.itemCode.toLowerCase().includes('serial') && (
+                        
+                        {/* Only show serial field if item has serial tracking */}
+                        {hasSerialTracking && (
                           <div className="space-y-2">
-                            <Label htmlFor="serial_no">Serial No</Label>
-                            <Input
-                              id="serial_no"
-                              value={serialNumber}
-                              onChange={(e) => setSerialNumber(e.target.value)}
-                              placeholder="Enter serial number"
-                            />
+                            <Label htmlFor="serial_no">Serial Number</Label>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                // TODO: Implement serial selector similar to batch selector
+                                toast({
+                                  title: "Feature Coming Soon",
+                                  description: "Serial number selector will be available soon",
+                                });
+                              }}
+                              disabled={!selectedItem || !warehouse || !quantity}
+                              className="w-full justify-start"
+                            >
+                              <Package className="w-4 h-4 mr-2" />
+                              {serialNumber || "Select Serial"}
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -367,8 +382,8 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                           itemCode={selectedItem.itemCode}
                           itemName={selectedItem.itemName}
                           itemGroup="All Item Groups"
-                          hasSerial={selectedItem.itemCode.toLowerCase().includes('serial')}
-                          hasBatch={selectedItem.itemCode.toLowerCase().includes('batch')}
+                          hasSerial={hasSerialTracking}
+                          hasBatch={hasBatchTracking}
                           warehouse={warehouse}
                           transactionType="Outward"
                           onBundleCreated={handleBundleCreated}
@@ -382,41 +397,6 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                       </div>
                     </TabsContent>
                   </Tabs>
-                </div>
-              )}
-
-              {/* Simple batch/serial fields for non-tracked items or when no tracking detected */}
-              {!hasSerialBatchTracking && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="batch">Batch Number</Label>
-                    <div className="flex space-x-2">
-                      <Input
-                        id="batch"
-                        value={batchNumber}
-                        onChange={(e) => setBatchNumber(e.target.value)}
-                        placeholder="Enter batch number (optional)"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleOpenBatchSelector}
-                        disabled={!selectedItem || !warehouse || !quantity}
-                      >
-                        <Package className="w-4 h-4 mr-1" />
-                        Select
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="serial">Serial Number</Label>
-                    <Input
-                      id="serial"
-                      value={serialNumber}
-                      onChange={(e) => setSerialNumber(e.target.value)}
-                      placeholder="Enter serial number (optional)"
-                    />
-                  </div>
                 </div>
               )}
 
