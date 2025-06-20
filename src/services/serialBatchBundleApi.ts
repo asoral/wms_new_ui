@@ -1,3 +1,4 @@
+
 import { createERPNextAPI, getUserDefaultCompany } from './erpnextApi';
 
 
@@ -261,27 +262,87 @@ export const getAvailableSerialBatch = async (
       throw new Error('ERPNext API not configured');
     }
 
-    const params = new URLSearchParams({
-      item_code: itemCode,
-      warehouse: warehouse,
-      has_serial_no: hasSerial ? '1' : '0',
-      has_batch_no: hasBatch ? '1' : '0'
-    });
+    const result: { serial_nos?: string[], batch_nos?: Array<{batch_no: string, qty: number}> } = {};
 
-    const response = await fetch(`${erpnextAPI.baseURL}/api/method/erpnext.stock.serial_batch_bundle.get_serial_or_batch_nos?${params}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-        'Content-Type': 'application/json',
+    // Get available batches using Stock Ledger Entry
+    if (hasBatch) {
+      try {
+        const batchResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
+          filters: JSON.stringify([
+            ['item_code', '=', itemCode],
+            ['warehouse', '=', warehouse],
+            ['batch_no', '!=', ''],
+            ['actual_qty', '>', 0]
+          ]),
+          fields: JSON.stringify(['batch_no', 'actual_qty']),
+          group_by: 'batch_no'
+        })}`, {
+          headers: {
+            'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (batchResponse.ok) {
+          const batchResult = await batchResponse.json();
+          if (batchResult.data && batchResult.data.length > 0) {
+            const batchMap = new Map<string, number>();
+            batchResult.data.forEach((entry: any) => {
+              if (entry.batch_no) {
+                const currentQty = batchMap.get(entry.batch_no) || 0;
+                batchMap.set(entry.batch_no, currentQty + (entry.actual_qty || 0));
+              }
+            });
+            
+            result.batch_nos = Array.from(batchMap.entries())
+              .filter(([, qty]) => qty > 0)
+              .map(([batch_no, qty]) => ({ batch_no, qty }));
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch batch data:', error);
       }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to get available serial/batch: ${response.statusText}`);
     }
 
-    const result = await response.json();
-    return result.message || {};
+    // Get available serial numbers using Stock Ledger Entry
+    if (hasSerial) {
+      try {
+        const serialResponse = await fetch(`${erpnextAPI.baseURL}/api/resource/Stock Ledger Entry?${new URLSearchParams({
+          filters: JSON.stringify([
+            ['item_code', '=', itemCode],
+            ['warehouse', '=', warehouse],
+            ['serial_no', '!=', ''],
+            ['actual_qty', '>', 0]
+          ]),
+          fields: JSON.stringify(['serial_no']),
+          limit: '100'
+        })}`, {
+          headers: {
+            'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (serialResponse.ok) {
+          const serialResult = await serialResponse.json();
+          if (serialResult.data && serialResult.data.length > 0) {
+            const serialNos = new Set<string>();
+            serialResult.data.forEach((entry: any) => {
+              if (entry.serial_no) {
+                // Handle multiple serial numbers in one entry (comma-separated)
+                const serials = entry.serial_no.split(',').map((s: string) => s.trim()).filter(Boolean);
+                serials.forEach((serial: string) => serialNos.add(serial));
+              }
+            });
+            result.serial_nos = Array.from(serialNos);
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch serial data:', error);
+      }
+    }
+
+    return result;
   } catch (error) {
     console.error('Error getting available serial/batch:', error);
     return {};
