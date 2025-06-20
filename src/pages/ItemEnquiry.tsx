@@ -7,7 +7,6 @@ import { Package, Warehouse, TrendingUp, AlertTriangle, Calendar, DollarSign, Ca
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "@/components/item-enquiry/ItemSelector";
-import ItemScanner from "@/components/item-enquiry/ItemScanner";
 import CameraScanner from "@/components/item-enquiry/CameraScanner";
 
 interface StockItem {
@@ -196,11 +195,6 @@ const ItemEnquiry = () => {
             </div>
           </CardContent>
         </Card>
-
-        <ItemScanner 
-          onBarcodeScanned={loadItemStock}
-          isLoading={loading}
-        />
       </div>
 
       {selectedItem && (
@@ -366,7 +360,7 @@ const ItemEnquiry = () => {
             <p className="text-gray-500 mb-4">Select an item using the dropdown or scan a barcode to view stock levels.</p>
             <div className="text-sm text-gray-400">
               <p>• Use the item selector dropdown for quick selection</p>
-              <p>• Scan barcodes for instant lookup</p>
+              <p>• Use the camera to scan barcodes for instant lookup</p>
               <p>• View stock across all warehouses</p>
             </div>
           </CardContent>
