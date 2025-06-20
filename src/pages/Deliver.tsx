@@ -434,7 +434,7 @@ const Deliver = () => {
                     <td className="p-3 border text-sm font-medium">{item.itemCode}</td>
                     <td className="p-3 border text-sm">{item.itemName}</td>
                     <td className="p-3 border text-sm">{item.orderedQty} {item.uom}</td>
-                    <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td
+                    <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td>
                     <td className="p-3 border text-sm">{item.pendingQty} {item.uom}</td>
                     <td className="p-3 border text-sm">
                       <Badge variant={item.pendingQty > 0 ? "default" : "secondary"}>
