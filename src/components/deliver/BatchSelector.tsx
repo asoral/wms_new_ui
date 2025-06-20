@@ -27,6 +27,7 @@ interface BatchSelectorProps {
   requiredQty: number;
   onBatchesSelected: (batches: BatchInfo[]) => void;
   company?: string;
+  deliveryNoteName?: string; // Add delivery note reference
 }
 
 const BatchSelector = ({ 
@@ -37,7 +38,8 @@ const BatchSelector = ({
   warehouse, 
   requiredQty,
   onBatchesSelected,
-  company
+  company,
+  deliveryNoteName // Add delivery note reference
 }: BatchSelectorProps) => {
   const [availableBatches, setAvailableBatches] = useState<BatchInfo[]>([]);
   const [selectedBatches, setSelectedBatches] = useState<BatchInfo[]>([]);
@@ -230,7 +232,7 @@ const BatchSelector = ({
       }));
 
       const bundleData = {
-        company: userCompany, // Use the company from user profile instead
+        company: userCompany,
         item_code: itemCode,
         item_name: itemName,
         item_group: '', // Will be filled by ERPNext
@@ -244,6 +246,7 @@ const BatchSelector = ({
         posting_date: new Date().toISOString().split('T')[0],
         posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
         voucher_type: 'Delivery Note',
+        voucher_no: deliveryNoteName || '', // Link to delivery note if available
         entries: bundleEntries
       };
 

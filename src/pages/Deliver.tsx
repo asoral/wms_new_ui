@@ -25,7 +25,7 @@ export interface SalesOrder {
   id?: string;
   expectedDelivery?: string;
   percentDelivered?: number;
-  company?: string; // Add company field
+  company?: string;
 }
 
 export interface SOItem {
@@ -142,8 +142,156 @@ const Deliver = () => {
     });
   };
 
-  const addDeliveryEntry = (entry: DeliveryEntry) => {
+  const createDraftDeliveryNote = async (firstEntry: DeliveryEntry): Promise<string | null> => {
+    if (!selectedSO) return null;
+
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured');
+      }
+
+      const company = await getUserDefaultCompany();
+      console.log('Creating draft delivery note for company:', company);
+
+      // Get the actual sales order with all item details
+      const salesOrderResult = await erpnextAPI.sales.getSalesOrder(selectedSO.number);
+      const actualCustomer = salesOrderResult.data?.customer;
+      const soItems = salesOrderResult.data?.items || [];
+
+      if (!actualCustomer) {
+        throw new Error('Could not find customer from sales order');
+      }
+
+      // Find the corresponding SO item
+      const soItem = soItems.find((item: any) => item.item_code === firstEntry.itemCode);
+
+      // Create delivery note data in draft status
+      const deliveryData = {
+        customer: actualCustomer,
+        company: company,
+        posting_date: new Date().toISOString().split('T')[0],
+        set_posting_time: 1,
+        docstatus: 0, // Draft status
+        items: [{
+          item_code: firstEntry.itemCode,
+          item_name: firstEntry.itemName,
+          qty: firstEntry.qtyToDeliver,
+          warehouse: firstEntry.warehouse,
+          rate: firstEntry.rate,
+          uom: firstEntry.uom,
+          against_sales_order: selectedSO.number,
+          so_detail: soItem?.name || null,
+          ...(firstEntry.batch && { batch_no: firstEntry.batch }),
+          ...(firstEntry.serial && { serial_no: firstEntry.serial }),
+          ...(firstEntry.serial_batch_bundle && { serial_and_batch_bundle: firstEntry.serial_batch_bundle })
+        }]
+      };
+
+      console.log('Creating draft delivery note with data:', deliveryData);
+
+      const result = await erpnextAPI.sales.createDeliveryNote(deliveryData);
+      console.log('Draft delivery note created:', result);
+
+      const deliveryNoteName = result.data?.name;
+      if (deliveryNoteName) {
+        toast({
+          title: "Draft Created",
+          description: `Draft delivery note ${deliveryNoteName} created successfully!`,
+        });
+        return deliveryNoteName;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error creating draft delivery note:', error);
+      toast({
+        title: "Error",
+        description: `Failed to create draft delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+
+  const addItemToDraftDeliveryNote = async (entry: DeliveryEntry, deliveryNoteName: string) => {
+    if (!selectedSO) return;
+
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured');
+      }
+
+      // Get current delivery note
+      const currentDNResult = await erpnextAPI.sales.getDeliveryNotes([['name', '=', deliveryNoteName]]);
+      if (!currentDNResult.data || currentDNResult.data.length === 0) {
+        throw new Error('Could not find delivery note');
+      }
+
+      const currentDN = currentDNResult.data[0];
+      
+      // Get the actual sales order with all item details
+      const salesOrderResult = await erpnextAPI.sales.getSalesOrder(selectedSO.number);
+      const soItems = salesOrderResult.data?.items || [];
+
+      // Find the corresponding SO item
+      const soItem = soItems.find((item: any) => item.item_code === entry.itemCode);
+
+      // Add new item to existing items
+      const newItem = {
+        item_code: entry.itemCode,
+        item_name: entry.itemName,
+        qty: entry.qtyToDeliver,
+        warehouse: entry.warehouse,
+        rate: entry.rate,
+        uom: entry.uom,
+        against_sales_order: selectedSO.number,
+        so_detail: soItem?.name || null,
+        ...(entry.batch && { batch_no: entry.batch }),
+        ...(entry.serial && { serial_no: entry.serial }),
+        ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })
+      };
+
+      const updatedItems = [...(currentDN.items || []), newItem];
+
+      // Update delivery note with new item
+      const updateData = {
+        ...currentDN,
+        items: updatedItems
+      };
+
+      await erpnextAPI.sales.updateDeliveryNote(deliveryNoteName, updateData);
+      
+      toast({
+        title: "Item Added",
+        description: `Item added to draft delivery note ${deliveryNoteName}`,
+      });
+
+    } catch (error) {
+      console.error('Error adding item to draft delivery note:', error);
+      toast({
+        title: "Error",
+        description: `Failed to add item to delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const addDeliveryEntry = async (entry: DeliveryEntry) => {
     console.log('Adding delivery entry:', entry);
+    
+    // If this is the first entry and no draft delivery note exists, create one
+    if (deliveryEntries.length === 0 && !currentDeliveryNote) {
+      const draftName = await createDraftDeliveryNote(entry);
+      if (draftName) {
+        setCurrentDeliveryNote(draftName);
+      }
+    } else if (currentDeliveryNote) {
+      // Add item to existing draft delivery note
+      await addItemToDraftDeliveryNote(entry, currentDeliveryNote);
+    }
+
     setDeliveryEntries(prev => [...prev, entry]);
   };
 
@@ -152,10 +300,10 @@ const Deliver = () => {
   };
 
   const submitDeliveryNote = async () => {
-    if (!selectedSO || deliveryEntries.length === 0) {
+    if (!selectedSO || !currentDeliveryNote) {
       toast({
-        title: "No Items to Deliver",
-        description: "Please add items to deliver first.",
+        title: "No Draft to Submit",
+        description: "Please add items to create a draft delivery note first.",
         variant: "destructive"
       });
       return;
@@ -173,78 +321,17 @@ const Deliver = () => {
         return;
       }
 
-      const company = await getUserDefaultCompany();
-      console.log('Creating delivery note for company:', company);
-
-      // Get the actual sales order with all item details including internal IDs
-      const salesOrderResult = await erpnextAPI.sales.getSalesOrder(selectedSO.number);
-      const actualCustomer = salesOrderResult.data?.customer;
-      const soItems = salesOrderResult.data?.items || [];
-
-      if (!actualCustomer) {
-        toast({
-          title: "Error",
-          description: "Could not find customer from sales order",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Create delivery note data in draft status with proper sales order references
-      const deliveryData = {
-        customer: actualCustomer,
-        company: company,
-        posting_date: new Date().toISOString().split('T')[0],
-        set_posting_time: 1,
-        docstatus: 0, // Draft status
-        items: deliveryEntries.map(entry => {
-          // Find the corresponding SO item to get the against_sales_order_item reference
-          const soItem = soItems.find((item: any) => item.item_code === entry.itemCode);
-          
-          if (!soItem) {
-            console.error(`Could not find SO item for ${entry.itemCode}`);
-          }
-
-          console.log('Mapping delivery entry:', {
-            itemCode: entry.itemCode,
-            soItemName: soItem?.name,
-            soItemIdx: soItem?.idx
-          });
-          
-          return {
-            item_code: entry.itemCode,
-            item_name: entry.itemName,
-            qty: entry.qtyToDeliver,
-            warehouse: entry.warehouse,
-            rate: entry.rate,
-            uom: entry.uom,
-            against_sales_order: selectedSO.number,
-            so_detail: soItem?.name || null, // Use so_detail instead of against_sales_order_item
-            ...(entry.batch && { batch_no: entry.batch }),
-            ...(entry.serial && { serial_no: entry.serial }),
-            ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })
-          };
-        })
+      // Submit the draft delivery note (change docstatus to 1)
+      const submitData = {
+        docstatus: 1
       };
 
-      console.log('Delivery note data:', deliveryData);
-
-      if (currentDeliveryNote) {
-        // Update existing delivery note
-        await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, deliveryData);
-        toast({
-          title: "Success",
-          description: `Draft delivery note ${currentDeliveryNote} updated successfully!`,
-        });
-      } else {
-        // Create new delivery note
-        const result = await erpnextAPI.sales.createDeliveryNote(deliveryData);
-        console.log('Delivery note created:', result);
-        toast({
-          title: "Success",
-          description: `Draft delivery note ${result.data?.name} created successfully!`,
-        });
-      }
+      await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, submitData);
+      
+      toast({
+        title: "Success",
+        description: `Delivery note ${currentDeliveryNote} submitted successfully!`,
+      });
       
       // Reset form
       setDeliveryEntries([]);
@@ -259,7 +346,7 @@ const Deliver = () => {
       console.error('Error submitting delivery note:', error);
       toast({
         title: "Error",
-        description: `Failed to create delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: `Failed to submit delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
@@ -379,7 +466,7 @@ const Deliver = () => {
               {currentDeliveryNote && (
                 <Badge variant="secondary">DN: {currentDeliveryNote}</Badge>
               )}
-              <Button onClick={submitDeliveryNote} disabled={!selectedSO || loading || deliveryEntries.length === 0}>
+              <Button onClick={submitDeliveryNote} disabled={!currentDeliveryNote || loading}>
                 <Package className="w-4 h-4 mr-2" />
                 {loading ? 'Submitting...' : 'Submit Delivery Note'}
               </Button>
@@ -459,7 +546,8 @@ const Deliver = () => {
                 <EnhancedDeliveryItemScanner 
                   soItems={selectedSO.items}
                   onAddEntry={addDeliveryEntry}
-                  company={selectedSO.company} // Pass company from selected sales order
+                  company={selectedSO.company}
+                  deliveryNoteName={currentDeliveryNote || undefined}
                 />
 
                 {/* Sales Order Items Display */}
@@ -486,7 +574,7 @@ const Deliver = () => {
                           >
                             Back to Add Items
                           </Button>
-                          <Button onClick={submitDeliveryNote} disabled={loading}>
+                          <Button onClick={submitDeliveryNote} disabled={loading || !currentDeliveryNote}>
                             {loading ? 'Submitting...' : 'Submit Delivery Note'}
                           </Button>
                         </div>

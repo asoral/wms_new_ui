@@ -5,84 +5,62 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scan, Package, ScanLine, Search } from "lucide-react";
+import { Scan, Package, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { DeliveryEntry, SOItem } from "../../pages/Deliver";
 import { useToast } from "@/hooks/use-toast";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import BatchSelector from "./BatchSelector";
-import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
-import { createERPNextAPI } from "@/services/erpnextApi";
-
-interface BatchInfo {
-  batch_no: string;
-  qty: number;
-  available_qty?: number;
-  expiry_date?: string;
-  serial_and_batch_bundle?: string;
-}
-
-interface ItemTrackingInfo {
-  has_batch_no: boolean;
-  has_serial_no: boolean;
-}
 
 interface EnhancedDeliveryItemScannerProps {
   soItems: SOItem[];
   onAddEntry: (entry: DeliveryEntry) => void;
   company?: string;
+  deliveryNoteName?: string; // Add delivery note reference
 }
 
-const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedDeliveryItemScannerProps) => {
+const EnhancedDeliveryItemScanner = ({ 
+  soItems, 
+  onAddEntry, 
+  company,
+  deliveryNoteName // Add delivery note reference
+}: EnhancedDeliveryItemScannerProps) => {
   const [selectedItemCode, setSelectedItemCode] = useState("");
   const [scannedCode, setScannedCode] = useState("");
   const [warehouse, setWarehouse] = useState("");
+  const [batchNumber, setBatchNumber] = useState("");
+  const [serialNumber, setSerialNumber] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [showBatchSelector, setShowBatchSelector] = useState(false);
-  const [selectedBatches, setSelectedBatches] = useState<BatchInfo[]>([]);
-  const [selectedBundle, setSelectedBundle] = useState("");
-  const [itemTrackingInfo, setItemTrackingInfo] = useState<ItemTrackingInfo | null>(null);
-  const [loadingTracking, setLoadingTracking] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [itemDetails, setItemDetails] = useState<any>(null);
+  const [isBatchSelectorOpen, setIsBatchSelectorOpen] = useState(false);
   const { toast } = useToast();
 
   const selectedItem = soItems.find(item => item.itemCode === selectedItemCode);
 
-  // Fetch item tracking information from ERPNext when item is selected
+  // Check if item is batch/serial tracked
+  const checkItemTracking = async (itemCode: string) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return { hasBatch: false, hasSerial: false };
+
+      const result = await erpnextAPI.items.getItem(itemCode);
+      return {
+        hasBatch: result.data?.has_batch_no === 1,
+        hasSerial: result.data?.has_serial_no === 1
+      };
+    } catch (error) {
+      console.error('Error checking item tracking:', error);
+      return { hasBatch: false, hasSerial: false };
+    }
+  };
+
   useEffect(() => {
-    const fetchItemTrackingInfo = async () => {
-      if (!selectedItemCode) {
-        setItemTrackingInfo(null);
-        return;
-      }
-
-      setLoadingTracking(true);
-      try {
-        const erpnextAPI = await createERPNextAPI();
-        if (erpnextAPI) {
-          console.log('Fetching tracking info for item:', selectedItemCode);
-          const itemDetails = await erpnextAPI.items.getItemDetails(selectedItemCode);
-          console.log('Item details from ERPNext:', itemDetails.data);
-          
-          setItemTrackingInfo({
-            has_batch_no: Boolean(itemDetails.data.has_batch_no),
-            has_serial_no: Boolean(itemDetails.data.has_serial_no)
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching item tracking info:', error);
-        // Fallback to pattern matching if API fails
-        setItemTrackingInfo({
-          has_batch_no: Boolean(selectedItemCode.toLowerCase().includes('batch') || 
-                        Boolean(selectedItemCode.match(/^(BAT|BATCH|BHG)/i))),
-          has_serial_no: Boolean(selectedItemCode.toLowerCase().includes('serial') || 
-                         Boolean(selectedItemCode.match(/^(SER|SERIAL)/i)))
-        });
-      } finally {
-        setLoadingTracking(false);
-      }
-    };
-
-    fetchItemTrackingInfo();
+    if (selectedItemCode) {
+      checkItemTracking(selectedItemCode).then(tracking => {
+        setItemDetails({ ...tracking });
+      });
+    }
   }, [selectedItemCode]);
 
   const handleScanItem = () => {
@@ -94,6 +72,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     
     if (foundItem) {
       setSelectedItemCode(foundItem.itemCode);
+      setWarehouse(foundItem.warehouse || ""); // Auto-fill warehouse from SO
       setScannedCode("");
     } else {
       toast({
@@ -104,20 +83,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     }
   };
 
-  const handleItemSelected = (itemCode: string) => {
-    setSelectedItemCode(itemCode);
-    setScannedCode(itemCode);
-  };
-
   const handleOpenBatchSelector = () => {
-    console.log('Opening batch selector for:', {
-      selectedItem: selectedItem?.itemCode,
-      warehouse,
-      quantity,
-      hasSerialBatchTracking,
-      company
-    });
-    
     if (!selectedItem) {
       toast({
         title: "No Item Selected",
@@ -136,52 +102,53 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
       return;
     }
 
-    if (!quantity) {
+    if (!quantity || parseInt(quantity) <= 0) {
       toast({
-        title: "No Quantity Entered", 
-        description: "Please enter a quantity first",
+        title: "Invalid Quantity",
+        description: "Please enter a valid quantity first",
         variant: "destructive"
       });
       return;
     }
 
-    console.log('Setting showBatchSelector to true');
-    setShowBatchSelector(true);
+    setIsBatchSelectorOpen(true);
   };
 
-  const handleBatchesSelected = (batches: BatchInfo[]) => {
-    setSelectedBatches(batches);
-    setShowBatchSelector(false);
+  const handleBatchesSelected = (batches: any[]) => {
+    console.log('Batches selected:', batches);
     
-    // Add entries for each selected batch
-    batches.forEach(batch => {
-      if (selectedItem) {
-        const entry: DeliveryEntry = {
-          itemCode: selectedItem.itemCode,
-          itemName: selectedItem.itemName,
-          warehouse: warehouse,
-          batch: batch.batch_no,
-          qtyToDeliver: batch.qty,
-          actualQty: batch.qty,
-          rate: selectedItem.rate,
-          uom: selectedItem.uom,
-          serial_batch_bundle: batch.serial_and_batch_bundle
-        };
-        onAddEntry(entry);
-      }
-    });
+    // Use the first batch's bundle reference
+    const bundleRef = batches.length > 0 ? batches[0].serial_and_batch_bundle : undefined;
+    
+    if (selectedItem && warehouse && quantity) {
+      const entry: DeliveryEntry = {
+        itemCode: selectedItem.itemCode,
+        itemName: selectedItem.itemName,
+        warehouse: warehouse,
+        batch: batches.length > 0 ? batches.map(b => b.batch_no).join(', ') : batchNumber,
+        serial: serialNumber || undefined,
+        qtyToDeliver: parseInt(quantity),
+        actualQty: parseInt(quantity),
+        rate: selectedItem.rate,
+        uom: selectedItem.uom,
+        serial_batch_bundle: bundleRef
+      };
 
-    // Reset form
-    setSelectedItemCode("");
-    setWarehouse("");
-    setQuantity("");
-    setSelectedBatches([]);
-    setSelectedBundle("");
+      onAddEntry(entry);
+      
+      // Reset form
+      setSelectedItemCode("");
+      setWarehouse("");
+      setBatchNumber("");
+      setSerialNumber("");
+      setQuantity("");
+      setItemDetails(null);
 
-    toast({
-      title: "Batches Added",
-      description: `${batches.length} batch entries added to delivery`,
-    });
+      toast({
+        title: "Item Added",
+        description: `${quantity} ${selectedItem.uom} of ${selectedItem.itemCode} added to delivery with batch tracking`,
+      });
+    }
   };
 
   const handleAddItem = () => {
@@ -204,25 +171,28 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
       return;
     }
 
-    // If item has tracking, user must use batch selector
-    if (hasSerialBatchTracking) {
-      toast({
-        title: "Batch/Serial Selection Required",
-        description: "This item requires batch/serial selection. Please use 'Pick Serial / Batch No' button.",
-        variant: "destructive"
-      });
-      return;
+    // Check if item requires batch/serial tracking
+    if (itemDetails?.hasBatch || itemDetails?.hasSerial) {
+      if (!batchNumber && !serialNumber) {
+        toast({
+          title: "Tracking Required",
+          description: "This item requires batch or serial number tracking. Please use the batch selector or enter manually.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     const entry: DeliveryEntry = {
       itemCode: selectedItem.itemCode,
       itemName: selectedItem.itemName,
       warehouse: warehouse,
+      batch: batchNumber || undefined,
+      serial: serialNumber || undefined,
       qtyToDeliver: qty,
       actualQty: qty,
       rate: selectedItem.rate,
-      uom: selectedItem.uom,
-      serial_batch_bundle: selectedBundle || undefined
+      uom: selectedItem.uom
     };
 
     onAddEntry(entry);
@@ -230,8 +200,10 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     // Reset form
     setSelectedItemCode("");
     setWarehouse("");
+    setBatchNumber("");
+    setSerialNumber("");
     setQuantity("");
-    setSelectedBundle("");
+    setItemDetails(null);
 
     toast({
       title: "Item Added",
@@ -239,232 +211,218 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     });
   };
 
-  // Use actual tracking information from ERPNext
-  const hasSerialTracking = itemTrackingInfo?.has_serial_no || false;
-  const hasBatchTracking = itemTrackingInfo?.has_batch_no || false;
-  const hasSerialBatchTracking = hasSerialTracking || hasBatchTracking;
-
-  const handleWarehouseSelected = (warehouseCode: string) => {
-    setWarehouse(warehouseCode);
-  };
-
   return (
     <>
-      <div className="space-y-6">
-        {/* Scan Items Section */}
-        <Tabs defaultValue="scan" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="scan" className="flex items-center space-x-2">
-              <ScanLine className="w-4 h-4" />
-              <span>Scan Item</span>
-            </TabsTrigger>
-            <TabsTrigger value="search" className="flex items-center space-x-2">
-              <Search className="w-4 h-4" />
-              <span>Search Item</span>
-            </TabsTrigger>
-          </TabsList>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Package className="w-5 h-5" />
+            <span>Scan & Add Items</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Tabs defaultValue="manual" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+              <TabsTrigger value="scan">Scan Item</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="scan" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <ScanLine className="w-5 h-5" />
-                  <span>Scan Item Barcode</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="barcode">Barcode</Label>
-                  <Input
-                    id="barcode"
-                    value={scannedCode}
-                    onChange={(e) => setScannedCode(e.target.value)}
-                    placeholder="Scan or enter barcode"
-                    className="text-lg"
-                    onKeyPress={(e) => e.key === 'Enter' && handleScanItem()}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="search" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Search className="w-5 h-5" />
-                  <span>Search Item</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="itemSelect">Item Code / Name</Label>
-                  <Select value={selectedItemCode} onValueChange={handleItemSelected}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an item to deliver..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {soItems.filter(item => item.pendingQty > 0).map((item) => (
-                        <SelectItem key={item.itemCode} value={item.itemCode}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{item.itemCode}</span>
-                            <span className="text-xs text-gray-500">{item.itemName}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        {/* Item Details Form */}
-        {selectedItem && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Package className="w-5 h-5" />
-                <span>Item Details</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Item Info Display - Improved Layout */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-sm font-medium text-blue-800">Item Code</Label>
-                    <div className="font-semibold text-blue-900">{selectedItem.itemCode}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm font-medium text-blue-800">Item Name</Label>
-                    <div className="font-medium text-blue-900 text-sm">{selectedItem.itemName}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm font-medium text-blue-800">Pending Qty</Label>
-                    <div className="font-semibold text-blue-900">{selectedItem.pendingQty} {selectedItem.uom}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm font-medium text-blue-800">Rate</Label>
-                    <div className="font-semibold text-blue-900">₹{selectedItem.rate}</div>
-                  </div>
-                </div>
-                
-                {/* Tracking Information */}
-                <div className="mt-4 pt-4 border-t border-blue-200">
-                  <Label className="text-sm font-medium text-blue-800 mb-2 block">Item Tracking</Label>
-                  <div className="flex gap-2">
-                    {loadingTracking ? (
-                      <Badge variant="secondary" className="bg-gray-100 text-gray-600">
-                        Loading tracking info...
-                      </Badge>
-                    ) : (
-                      <>
-                        {hasSerialTracking && (
-                          <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
-                            Serial Tracking
-                          </Badge>
-                        )}
-                        {hasBatchTracking && (
-                          <Badge variant="default" className="bg-orange-100 text-orange-800 border-orange-300">
-                            Batch Tracking
-                          </Badge>
-                        )}
-                        {!hasSerialBatchTracking && (
-                          <Badge variant="secondary" className="bg-gray-100 text-gray-600">
-                            No Tracking
-                          </Badge>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
+            <TabsContent value="scan" className="space-y-4">
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Scan item code or barcode"
+                  value={scannedCode}
+                  onChange={(e) => setScannedCode(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleScanItem()}
+                />
+                <Button onClick={handleScanItem} disabled={!scannedCode}>
+                  <Scan className="w-4 h-4" />
+                </Button>
               </div>
+            </TabsContent>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <WarehouseSelector 
-                    onWarehouseSelected={handleWarehouseSelected}
-                    isLoading={false}
+            <TabsContent value="manual" className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Item Code / Name</label>
+                <Select value={selectedItemCode} onValueChange={setSelectedItemCode}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an item to deliver..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {soItems.filter(item => item.pendingQty > 0).map((item) => (
+                      <SelectItem key={item.itemCode} value={item.itemCode}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{item.itemCode}</span>
+                          <span className="text-xs text-gray-500">{item.itemName}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {selectedItem && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Warehouse *</label>
+                  <Input
+                    placeholder="Scan or enter warehouse"
+                    value={warehouse}
+                    onChange={(e) => setWarehouse(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity to Deliver *</Label>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Quantity to Deliver *</label>
                   <Input
-                    id="quantity"
                     type="number"
+                    placeholder="Enter quantity"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="0"
                     min="1"
                     max={selectedItem.pendingQty}
-                    step="0.01"
                   />
                 </div>
               </div>
 
-              {/* Serial/Batch Selection - ERPNext Style */}
-              {hasSerialBatchTracking && selectedItemCode && !loadingTracking && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Serial/Batch Entry Method</Label>
-                    <Button
-                      variant="outline"
-                      onClick={handleOpenBatchSelector}
-                      className="w-full justify-start h-auto p-3"
-                      disabled={!warehouse || !quantity}
-                    >
-                      <div className="flex flex-col items-start">
-                        <div className="flex items-center">
-                          <Package className="w-4 h-4 mr-2" />
-                          <span className="font-medium">
-                            Pick Serial / Batch No
-                          </span>
+              {/* Tracking Information */}
+              {itemDetails && (itemDetails.hasBatch || itemDetails.hasSerial) && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <AlertCircle className="w-4 h-4 text-yellow-600" />
+                    <span className="text-sm font-medium text-yellow-800">
+                      This item requires tracking:
+                    </span>
+                    {itemDetails.hasBatch && <Badge variant="outline">Batch</Badge>}
+                    {itemDetails.hasSerial && <Badge variant="outline">Serial</Badge>}
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {itemDetails.hasBatch && (
+                      <div className="flex space-x-2">
+                        <div className="flex-1">
+                          <label className="text-sm font-medium mb-1 block">Batch Number</label>
+                          <Input
+                            placeholder="Enter batch number"
+                            value={batchNumber}
+                            onChange={(e) => setBatchNumber(e.target.value)}
+                          />
                         </div>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          Select from available {hasBatchTracking ? 'batches' : 'serial numbers'} in {warehouse || 'selected warehouse'}
-                        </span>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleOpenBatchSelector}
+                            disabled={!selectedItem || !warehouse || !quantity}
+                          >
+                            Pick Serial / Batch No
+                          </Button>
+                        </div>
                       </div>
-                    </Button>
-                    {selectedBundle && (
-                      <p className="text-sm text-muted-foreground">
-                        Selected Bundle: {selectedBundle}
-                      </p>
+                    )}
+                    
+                    {itemDetails.hasSerial && (
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Serial Number</label>
+                        <Input
+                          placeholder="Enter serial number"
+                          value={serialNumber}
+                          onChange={(e) => setSerialNumber(e.target.value)}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
               )}
 
+              {/* Manual Batch/Serial for non-tracked items */}
+              {itemDetails && !itemDetails.hasBatch && !itemDetails.hasSerial && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Batch Number (Optional)</label>
+                    <Input
+                      placeholder="Enter batch number"
+                      value={batchNumber}
+                      onChange={(e) => setBatchNumber(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Serial Number (Optional)</label>
+                    <Input
+                      placeholder="Enter serial number"
+                      value={serialNumber}
+                      onChange={(e) => setSerialNumber(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Item Details */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium mb-2">Item Details</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                  <div>
+                    <span className="text-gray-600">Name:</span>
+                    <div className="font-medium">{selectedItem.itemName}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Pending:</span>
+                    <div className="font-medium">{selectedItem.pendingQty} {selectedItem.uom}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Rate:</span>
+                    <div className="font-medium">₹{selectedItem.rate.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">UOM:</span>
+                    <div className="font-medium">{selectedItem.uom}</div>
+                  </div>
+                </div>
+                
+                {itemDetails && (
+                  <div className="mt-2 flex space-x-4">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs text-gray-600">Batch Tracking:</span>
+                      <Badge variant={itemDetails.hasBatch ? "default" : "secondary"} className="text-xs">
+                        {itemDetails.hasBatch ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs text-gray-600">Serial Tracking:</span>
+                      <Badge variant={itemDetails.hasSerial ? "default" : "secondary"} className="text-xs">
+                        {itemDetails.hasSerial ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Button 
                 onClick={handleAddItem} 
                 className="w-full"
-                disabled={!warehouse || !quantity}
+                disabled={!warehouse || !quantity || loading}
               >
-                <Package className="w-4 h-4 mr-2" />
-                Add Item to Delivery
+                {loading ? 'Adding...' : 'Add Item to Delivery'}
               </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Batch Selector Modal */}
-      {showBatchSelector && selectedItem && (
-        <BatchSelector
-          isOpen={showBatchSelector}
-          onClose={() => {
-            console.log('Closing batch selector');
-            setShowBatchSelector(false);
-          }}
-          itemCode={selectedItem.itemCode}
-          itemName={selectedItem.itemName}
-          warehouse={warehouse}
-          requiredQty={parseInt(quantity) || 1}
-          onBatchesSelected={handleBatchesSelected}
-          company={company || 'DIP'} // Provide fallback company
-        />
-      )}
+      <BatchSelector
+        isOpen={isBatchSelectorOpen}
+        onClose={() => setIsBatchSelectorOpen(false)}
+        itemCode={selectedItem?.itemCode || ""}
+        itemName={selectedItem?.itemName || ""}
+        warehouse={warehouse}
+        requiredQty={parseInt(quantity) || 1}
+        onBatchesSelected={handleBatchesSelected}
+        company={company || ""}
+        deliveryNoteName={deliveryNoteName} // Pass delivery note reference
+      />
     </>
   );
 };
