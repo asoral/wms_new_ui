@@ -68,10 +68,10 @@ const ItemEnquiry = () => {
           description: item.description || ''
         });
 
-        // Get stock balance using the stock API
-        console.log('Fetching stock balance for item:', itemCode);
-        const stockResult = await erpnextAPI.stock.getStockBalance(itemCode);
-        console.log('Stock balance result:', stockResult);
+        // Get stock using Bin API instead of Stock Balance
+        console.log('Fetching bin stock for item:', itemCode);
+        const stockResult = await erpnextAPI.stock.getBinStock(itemCode);
+        console.log('Bin stock result:', stockResult);
         
         if (stockResult.data && Array.isArray(stockResult.data)) {
           const stockData: StockInfo[] = stockResult.data.map((stock: any) => ({
@@ -81,8 +81,8 @@ const ItemEnquiry = () => {
             age: Math.floor(Math.random() * 120), // Placeholder for now
             uom: item.stock_uom || 'Nos',
             actualQty: stock.actual_qty || 0,
-            reservedQty: 0, // Not available in stock balance API
-            availableQty: stock.actual_qty || 0,
+            reservedQty: stock.projected_qty ? (stock.projected_qty - stock.actual_qty) : 0,
+            availableQty: stock.projected_qty || stock.actual_qty || 0,
             valuationRate: stock.stock_value && stock.actual_qty ? (stock.stock_value / stock.actual_qty) : 0
           }));
           console.log('Processed stock data:', stockData);
