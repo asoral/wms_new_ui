@@ -21,9 +21,10 @@ interface BatchInfo {
 interface EnhancedDeliveryItemScannerProps {
   soItems: SOItem[];
   onAddEntry: (entry: DeliveryEntry) => void;
+  company?: string; // Add company prop
 }
 
-const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryItemScannerProps) => {
+const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedDeliveryItemScannerProps) => {
   const [selectedItemCode, setSelectedItemCode] = useState("");
   const [scannedCode, setScannedCode] = useState("");
   const [warehouse, setWarehouse] = useState("");
@@ -298,6 +299,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
           warehouse={warehouse}
           requiredQty={parseInt(quantity)}
           onBatchesSelected={handleBatchesSelected}
+          company={company} // Pass company prop
         />
       )}
     </>

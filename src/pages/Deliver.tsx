@@ -25,6 +25,7 @@ export interface SalesOrder {
   id?: string;
   expectedDelivery?: string;
   percentDelivered?: number;
+  company?: string; // Add company field
 }
 
 export interface SOItem {
@@ -448,6 +449,7 @@ const Deliver = () => {
                 <EnhancedDeliveryItemScanner 
                   soItems={selectedSO.items}
                   onAddEntry={addDeliveryEntry}
+                  company={selectedSO.company} // Pass company from selected sales order
                 />
 
                 {/* Sales Order Items Display */}

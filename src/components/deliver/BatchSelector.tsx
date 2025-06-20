@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search } from 'lucide-react';
-import { getAvailableSerialBatch, createSerialBatchBundle, getUserDefaultCompany } from '@/services/serialBatchBundleApi';
+import { getAvailableSerialBatch, createSerialBatchBundle } from '@/services/serialBatchBundleApi';
 import { useToast } from '@/hooks/use-toast';
 
 interface BatchInfo {
@@ -27,6 +26,7 @@ interface BatchSelectorProps {
   warehouse: string;
   requiredQty: number;
   onBatchesSelected: (batches: BatchInfo[]) => void;
+  company?: string; // Add company prop
 }
 
 const BatchSelector = ({ 
@@ -36,7 +36,8 @@ const BatchSelector = ({
   itemName, 
   warehouse, 
   requiredQty,
-  onBatchesSelected 
+  onBatchesSelected,
+  company // Add company prop
 }: BatchSelectorProps) => {
   const [availableBatches, setAvailableBatches] = useState<BatchInfo[]>([]);
   const [selectedBatches, setSelectedBatches] = useState<BatchInfo[]>([]);
@@ -207,12 +208,12 @@ const BatchSelector = ({
   const createSerialBatchBundleForBatches = async (batches: BatchInfo[]) => {
     setCreatingBundle(true);
     try {
-      const company = await getUserDefaultCompany();
       if (!company) {
-        throw new Error('No default company found. Please configure your ERPNext settings.');
+        throw new Error('Company information is required but not provided');
       }
 
       console.log('Creating serial batch bundle for batches:', batches);
+      console.log('Using company:', company);
 
       const bundleEntries = batches.map(batch => ({
         batch_no: batch.batch_no,
@@ -226,7 +227,7 @@ const BatchSelector = ({
       }));
 
       const bundleData = {
-        company: company,
+        company: company, // Use the company prop passed from the sales order
         item_code: itemCode,
         item_name: itemName,
         item_group: '', // Will be filled by ERPNext
