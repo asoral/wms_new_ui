@@ -29,7 +29,6 @@ const EnhancedDeliveryItemScanner = ({
   const [selectedItemCode, setSelectedItemCode] = useState("");
   const [scannedCode, setScannedCode] = useState("");
   const [warehouse, setWarehouse] = useState("");
-  const [batchNumber, setBatchNumber] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [quantity, setQuantity] = useState("");
   const [loading, setLoading] = useState(false);
@@ -130,7 +129,7 @@ const EnhancedDeliveryItemScanner = ({
         itemCode: selectedItem.itemCode,
         itemName: selectedItem.itemName,
         warehouse: warehouse,
-        batch: batches.length > 0 ? batches.map(b => b.batch_no).join(', ') : batchNumber,
+        batch: batches.length > 0 ? batches.map(b => b.batch_no).join(', ') : undefined,
         serial: serialNumber || undefined,
         qtyToDeliver: parseInt(quantity),
         actualQty: parseInt(quantity),
@@ -144,7 +143,6 @@ const EnhancedDeliveryItemScanner = ({
       // Reset form
       setSelectedItemCode("");
       setWarehouse("");
-      setBatchNumber("");
       setSerialNumber("");
       setQuantity("");
       setItemDetails(null);
@@ -178,21 +176,19 @@ const EnhancedDeliveryItemScanner = ({
 
     // Check if item requires batch/serial tracking
     if (itemDetails?.hasBatch || itemDetails?.hasSerial) {
-      if (!batchNumber && !serialNumber) {
-        toast({
-          title: "Tracking Required",
-          description: "This item requires batch or serial number tracking. Please use the batch selector.",
-          variant: "destructive"
-        });
-        return;
-      }
+      toast({
+        title: "Tracking Required",
+        description: "This item requires batch or serial number tracking. Please use the batch selector.",
+        variant: "destructive"
+      });
+      return;
     }
 
     const entry: DeliveryEntry = {
       itemCode: selectedItem.itemCode,
       itemName: selectedItem.itemName,
       warehouse: warehouse,
-      batch: batchNumber || undefined,
+      batch: undefined,
       serial: serialNumber || undefined,
       qtyToDeliver: qty,
       actualQty: qty,
@@ -205,7 +201,6 @@ const EnhancedDeliveryItemScanner = ({
     // Reset form
     setSelectedItemCode("");
     setWarehouse("");
-    setBatchNumber("");
     setSerialNumber("");
     setQuantity("");
     setItemDetails(null);
@@ -303,31 +298,6 @@ const EnhancedDeliveryItemScanner = ({
                   />
                 </div>
               </div>
-
-              {/* Tracking Information */}
-              {itemDetails && (itemDetails.hasBatch || itemDetails.hasSerial) && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <AlertCircle className="w-4 h-4 text-yellow-600" />
-                    <span className="text-sm font-medium text-yellow-800">
-                      This item requires tracking:
-                    </span>
-                    {itemDetails.hasBatch && <Badge variant="outline">Batch</Badge>}
-                    {itemDetails.hasSerial && <Badge variant="outline">Serial</Badge>}
-                  </div>
-                  
-                  <div className="flex justify-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleOpenBatchSelector}
-                      disabled={!selectedItem || !warehouse || !quantity}
-                    >
-                      Pick Serial / Batch No
-                    </Button>
-                  </div>
-                </div>
-              )}
 
               {/* Serial Number for non-batch tracked items */}
               {itemDetails && itemDetails.hasSerial && !itemDetails.hasBatch && (

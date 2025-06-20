@@ -166,6 +166,30 @@ const Deliver = () => {
       // Find the corresponding SO item
       const soItem = soItems.find((item: any) => item.item_code === firstEntry.itemCode);
 
+      // Prepare item data - don't include batch_no if we have a serial_batch_bundle
+      const itemData: any = {
+        item_code: firstEntry.itemCode,
+        item_name: firstEntry.itemName,
+        qty: firstEntry.qtyToDeliver,
+        warehouse: firstEntry.warehouse,
+        rate: firstEntry.rate,
+        uom: firstEntry.uom,
+        against_sales_order: selectedSO.number,
+        so_detail: soItem?.name || null
+      };
+
+      // Only add batch/serial info if no bundle reference exists
+      if (firstEntry.serial_batch_bundle) {
+        itemData.serial_and_batch_bundle = firstEntry.serial_batch_bundle;
+      } else {
+        if (firstEntry.batch) {
+          itemData.batch_no = firstEntry.batch;
+        }
+        if (firstEntry.serial) {
+          itemData.serial_no = firstEntry.serial;
+        }
+      }
+
       // Create delivery note data in draft status
       const deliveryData = {
         customer: actualCustomer,
@@ -173,19 +197,7 @@ const Deliver = () => {
         posting_date: new Date().toISOString().split('T')[0],
         set_posting_time: 1,
         docstatus: 0, // Draft status
-        items: [{
-          item_code: firstEntry.itemCode,
-          item_name: firstEntry.itemName,
-          qty: firstEntry.qtyToDeliver,
-          warehouse: firstEntry.warehouse,
-          rate: firstEntry.rate,
-          uom: firstEntry.uom,
-          against_sales_order: selectedSO.number,
-          so_detail: soItem?.name || null,
-          ...(firstEntry.batch && { batch_no: firstEntry.batch }),
-          ...(firstEntry.serial && { serial_no: firstEntry.serial }),
-          ...(firstEntry.serial_batch_bundle && { serial_and_batch_bundle: firstEntry.serial_batch_bundle })
-        }]
+        items: [itemData]
       };
 
       console.log('Creating draft delivery note with data:', deliveryData);
@@ -238,8 +250,8 @@ const Deliver = () => {
       // Find the corresponding SO item
       const soItem = soItems.find((item: any) => item.item_code === entry.itemCode);
 
-      // Add new item to existing items
-      const newItem = {
+      // Prepare new item data - don't include batch_no if we have a serial_batch_bundle
+      const newItemData: any = {
         item_code: entry.itemCode,
         item_name: entry.itemName,
         qty: entry.qtyToDeliver,
@@ -247,13 +259,22 @@ const Deliver = () => {
         rate: entry.rate,
         uom: entry.uom,
         against_sales_order: selectedSO.number,
-        so_detail: soItem?.name || null,
-        ...(entry.batch && { batch_no: entry.batch }),
-        ...(entry.serial && { serial_no: entry.serial }),
-        ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })
+        so_detail: soItem?.name || null
       };
 
-      const updatedItems = [...(currentDN.items || []), newItem];
+      // Only add batch/serial info if no bundle reference exists
+      if (entry.serial_batch_bundle) {
+        newItemData.serial_and_batch_bundle = entry.serial_batch_bundle;
+      } else {
+        if (entry.batch) {
+          newItemData.batch_no = entry.batch;
+        }
+        if (entry.serial) {
+          newItemData.serial_no = entry.serial;
+        }
+      }
+
+      const updatedItems = [...(currentDN.items || []), newItemData];
 
       // Update delivery note with new item
       const updateData = {
