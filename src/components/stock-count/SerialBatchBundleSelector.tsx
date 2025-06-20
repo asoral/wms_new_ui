@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -177,6 +178,7 @@ const SerialBatchBundleSelector = ({
         total_amount: 0,
         posting_date: new Date().toISOString().split('T')[0],
         posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+        voucher_type: 'Stock Reconciliation', // Add the missing voucher_type field
         entries: bundleEntries
       };
 
