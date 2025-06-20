@@ -111,19 +111,28 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           return;
         }
 
-        console.log("item data:", itemData.length);
+        // Filter out items with missing essential properties
+        const validItems = itemData.filter(item => {
+          const isValid = item && item.item_code && item.item_name;
+          if (!isValid) {
+            console.warn('Filtering out invalid item:', item);
+          }
+          return isValid;
+        });
+
+        console.log("valid item data:", validItems.length, "out of", itemData.length);
         
         if (isNewSearch) {
-          setItems(itemData);
+          setItems(validItems);
           setCurrentPage(1);
           
           const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
-          await offlineStorage.cacheData(cacheKey, itemData, 300000);
+          await offlineStorage.cacheData(cacheKey, validItems, 300000);
         } else {
-          setItems(prev => [...prev, ...itemData]);
+          setItems(prev => [...prev, ...validItems]);
         }
         
-        setHasMore(itemData.length === limit);
+        setHasMore(validItems.length === limit);
         
         if (!isNewSearch) {
           setCurrentPage(prev => prev + 1);
@@ -177,10 +186,12 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     console.log('Filtering items. Total items:', items.length, 'Search value:', searchValue);
     if (!searchValue) return items;
     const lowercaseSearch = searchValue.toLowerCase();
-    const filtered = items.filter(item => 
-      item.item_code.toLowerCase().includes(lowercaseSearch) ||
-      item.item_name.toLowerCase().includes(lowercaseSearch)
-    );
+    const filtered = items.filter(item => {
+      // Add null checks before calling toLowerCase
+      const itemCode = item.item_code?.toLowerCase() || '';
+      const itemName = item.item_name?.toLowerCase() || '';
+      return itemCode.includes(lowercaseSearch) || itemName.includes(lowercaseSearch);
+    });
     console.log('Filtered items count:', filtered.length);
     return filtered;
   }, [items, searchValue]);

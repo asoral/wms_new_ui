@@ -116,11 +116,20 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       console.log('API result:', result);
       
       if (result && result.data && Array.isArray(result.data)) {
-        console.log('Setting items:', result.data.length);
-        setItems(result.data);
+        // Filter out items with missing essential properties and log them
+        const validItems = result.data.filter(item => {
+          const isValid = item && item.item_code && item.item_name;
+          if (!isValid) {
+            console.warn('Filtering out invalid item:', item);
+          }
+          return isValid;
+        });
+        
+        console.log('Setting items:', validItems.length, 'out of', result.data.length);
+        setItems(validItems);
 
         const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
-        await offlineStorage.cacheData(cacheKey, result.data, 300000);
+        await offlineStorage.cacheData(cacheKey, validItems, 300000);
       } else {
         console.log('No items found or invalid response format');
         setItems([]);
@@ -162,10 +171,12 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     console.log('Filtering items. Total items:', items.length, 'Search value:', searchValue);
     if (!searchValue) return items;
     const lowercaseSearch = searchValue.toLowerCase();
-    const filtered = items.filter(item => 
-      item.item_code.toLowerCase().includes(lowercaseSearch) ||
-      item.item_name.toLowerCase().includes(lowercaseSearch)
-    );
+    const filtered = items.filter(item => {
+      // Add null checks before calling toLowerCase
+      const itemCode = item.item_code?.toLowerCase() || '';
+      const itemName = item.item_name?.toLowerCase() || '';
+      return itemCode.includes(lowercaseSearch) || itemName.includes(lowercaseSearch);
+    });
     console.log('Filtered items count:', filtered.length);
     return filtered;
   }, [items, searchValue]);
