@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DeliveryEntry, SOItem } from "../../pages/Deliver";
 import { useToast } from "@/hooks/use-toast";
 import BatchSelector from "./BatchSelector";
+import SerialBatchBundleSelector from "../stock-count/SerialBatchBundleSelector";
 
 interface BatchInfo {
   batch_no: string;
@@ -34,6 +35,8 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
   const [quantity, setQuantity] = useState("");
   const [showBatchSelector, setShowBatchSelector] = useState(false);
   const [selectedBatches, setSelectedBatches] = useState<BatchInfo[]>([]);
+  const [useTraditionalEntry, setUseTraditionalEntry] = useState(true);
+  const [selectedBundle, setSelectedBundle] = useState("");
   const { toast } = useToast();
 
   const selectedItem = soItems.find(item => item.itemCode === selectedItemCode);
@@ -105,6 +108,15 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     });
   };
 
+  const handleBundleCreated = (bundleName: string, totalQty: number) => {
+    setSelectedBundle(bundleName);
+    setQuantity(totalQty.toString());
+    toast({
+      title: "Bundle Created",
+      description: `Serial and Batch Bundle created: ${bundleName}`,
+    });
+  };
+
   const handleAddItem = () => {
     if (!selectedItem || !warehouse || !quantity) {
       toast({
@@ -129,12 +141,13 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
       itemCode: selectedItem.itemCode,
       itemName: selectedItem.itemName,
       warehouse: warehouse,
-      batch: batchNumber || undefined,
-      serial: serialNumber || undefined,
+      batch: useTraditionalEntry ? batchNumber || undefined : undefined,
+      serial: useTraditionalEntry ? serialNumber || undefined : undefined,
       qtyToDeliver: qty,
       actualQty: qty,
       rate: selectedItem.rate,
-      uom: selectedItem.uom
+      uom: selectedItem.uom,
+      serial_batch_bundle: selectedBundle || undefined
     };
 
     onAddEntry(entry);
@@ -145,12 +158,21 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     setBatchNumber("");
     setSerialNumber("");
     setQuantity("");
+    setSelectedBundle("");
 
     toast({
       title: "Item Added",
       description: `${qty} ${selectedItem.uom} of ${selectedItem.itemCode} added to delivery`,
     });
   };
+
+  // Check if item has batch or serial tracking (simplified check)
+  const hasSerialBatchTracking = selectedItem && (
+    selectedItem.itemCode.toLowerCase().includes('batch') || 
+    selectedItem.itemCode.toLowerCase().includes('serial') ||
+    selectedItem.itemName.toLowerCase().includes('batch') ||
+    selectedItem.itemName.toLowerCase().includes('serial')
+  );
 
   return (
     <>
@@ -225,35 +247,109 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Batch Number</label>
-                  <div className="flex space-x-2">
+              {/* Serial/Batch Entry Method Section - only show if item has tracking */}
+              {hasSerialBatchTracking && selectedItem && warehouse && (
+                <div className="space-y-4">
+                  <label className="text-sm font-medium mb-1 block">Serial/Batch Entry Method</label>
+                  <Tabs 
+                    value={useTraditionalEntry ? "manual" : "bundle"} 
+                    onValueChange={(value) => setUseTraditionalEntry(value === "manual")}
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+                      <TabsTrigger value="bundle">Use Bundle</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="manual" className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Batch Number</label>
+                          <div className="flex space-x-2">
+                            <Input
+                              placeholder="Enter batch number"
+                              value={batchNumber}
+                              onChange={(e) => setBatchNumber(e.target.value)}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleOpenBatchSelector}
+                              disabled={!selectedItem || !warehouse || !quantity}
+                            >
+                              <Package className="w-4 h-4 mr-1" />
+                              Select
+                            </Button>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Serial Number</label>
+                          <Input
+                            placeholder="Enter serial number"
+                            value={serialNumber}
+                            onChange={(e) => setSerialNumber(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="bundle" className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium mb-1 block">Create Serial and Batch Bundle</label>
+                        <SerialBatchBundleSelector
+                          itemCode={selectedItem.itemCode}
+                          itemName={selectedItem.itemName}
+                          itemGroup="All Item Groups"
+                          hasSerial={selectedItem.itemCode.toLowerCase().includes('serial')}
+                          hasBatch={selectedItem.itemCode.toLowerCase().includes('batch')}
+                          warehouse={warehouse}
+                          transactionType="Outward"
+                          onBundleCreated={handleBundleCreated}
+                          initialQuantity={parseInt(quantity) || 1}
+                        />
+                        {selectedBundle && (
+                          <p className="text-sm text-muted-foreground">
+                            Selected Bundle: {selectedBundle}
+                          </p>
+                        )}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              )}
+
+              {/* Regular batch/serial fields for non-tracked items or when using manual entry */}
+              {(!hasSerialBatchTracking || useTraditionalEntry) && !hasSerialBatchTracking && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Batch Number</label>
+                    <div className="flex space-x-2">
+                      <Input
+                        placeholder="Enter batch number"
+                        value={batchNumber}
+                        onChange={(e) => setBatchNumber(e.target.value)}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenBatchSelector}
+                        disabled={!selectedItem || !warehouse || !quantity}
+                      >
+                        <Package className="w-4 h-4 mr-1" />
+                        Select
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Serial Number</label>
                     <Input
-                      placeholder="Enter batch number"
-                      value={batchNumber}
-                      onChange={(e) => setBatchNumber(e.target.value)}
+                      placeholder="Enter serial number"
+                      value={serialNumber}
+                      onChange={(e) => setSerialNumber(e.target.value)}
                     />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleOpenBatchSelector}
-                      disabled={!selectedItem || !warehouse || !quantity}
-                    >
-                      <Package className="w-4 h-4 mr-1" />
-                      Select
-                    </Button>
                   </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Serial Number</label>
-                  <Input
-                    placeholder="Enter serial number"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                </div>
-              </div>
+              )}
 
               {/* Item Details */}
               <div className="bg-gray-50 rounded-lg p-4">
@@ -276,6 +372,16 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                     <div className="font-medium">{selectedItem.uom}</div>
                   </div>
                 </div>
+                {hasSerialBatchTracking && (
+                  <div className="flex gap-2 mt-2">
+                    {selectedItem.itemCode.toLowerCase().includes('serial') && (
+                      <Badge variant="outline">Serial Tracking</Badge>
+                    )}
+                    {selectedItem.itemCode.toLowerCase().includes('batch') && (
+                      <Badge variant="outline">Batch Tracking</Badge>
+                    )}
+                  </div>
+                )}
               </div>
 
               <Button 
