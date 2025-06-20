@@ -25,44 +25,38 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ItemInfo | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchValue, setSearchValue] = useState("");
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
       setOpen(false);
     };
   }, []);
 
-  // Debounced search function
   const searchItems = useMemo(() => {
     let timeoutId: NodeJS.Timeout;
     
-    return (searchValue: string, isNewSearch: boolean = false) => {
+    return (searchTerm: string, isNewSearch: boolean = false) => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        fetchItems(searchValue, isNewSearch);
+        fetchItems(searchTerm, isNewSearch);
       }, 300);
     };
   }, []);
 
-  // Load initial items and cached items
   useEffect(() => {
     loadInitialItems();
   }, []);
 
   const loadInitialItems = async () => {
     try {
-      // First try to load from cache
       const cached = await offlineStorage.getCachedData('items_page_1');
       if (cached && Array.isArray(cached) && cached.length > 0) {
         setItems(cached);
         return;
       }
-
-      // If no cache, fetch from API
       await fetchItems("", true);
     } catch (error) {
       console.error('Failed to load initial items:', error);
@@ -80,7 +74,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     }
   };
 
-  // Fetch items with search and pagination
   const fetchItems = async (search: string = "", isNewSearch: boolean = false) => {
     setIsLoadingItems(true);
     
@@ -89,7 +82,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       
       if (!erpnextAPI) {
         console.error('ERPNext API not configured');
-        // Try to load from cache if API is not available
         await loadCachedItems();
         return;
       }
@@ -101,21 +93,17 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       
       console.log("Search:", search.trim());
       if (search.trim()) {
-        // Use search method for better performance
         result = await erpnextAPI.searchItems(search, limit);
       } else {
-        // Use paginated method for initial load
         result = await erpnextAPI.getItemsPaginated(undefined, ['item_code', 'item_name', 'stock_uom'], limit, pageToFetch);
       }
       
       if (result.data) {
-        // const itemData = result.data;
         const itemData = Array.isArray(result.data) ? result.data : [];
         if (!Array.isArray(result.data)) {
           console.error("Invalid data format:", result.data);
           return;
         }
-        
 
         console.log("item data:----->",itemData)
         
@@ -123,14 +111,12 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           setItems(itemData);
           setCurrentPage(1);
           
-          // Cache the results
           const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
-          await offlineStorage.cacheData(cacheKey, itemData, 300000); // 5 minutes
+          await offlineStorage.cacheData(cacheKey, itemData, 300000);
         } else {
           setItems(prev => [...prev, ...itemData]);
         }
         
-        // Check if there are more items
         setHasMore(itemData.length === limit);
         
         if (!isNewSearch) {
@@ -144,7 +130,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     } catch (error) {
       console.error('Failed to fetch items:', error);
       
-      // Try to load from cache on error
       try {
         const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
         const cached = await offlineStorage.getCachedData(cacheKey);
@@ -159,14 +144,13 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     }
   };
 
-  // Handle search term changes
   useEffect(() => {
-    if (searchTerm.trim()) {
-      searchItems(searchTerm, true);
+    if (searchValue.trim()) {
+      searchItems(searchValue, true);
     } else {
       loadInitialItems();
     }
-  }, [searchTerm, searchItems]);
+  }, [searchValue, searchItems]);
 
   const handleItemSelect = (item: ItemInfo) => {
     setSelectedItem(item);
@@ -176,9 +160,18 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
 
   const loadMoreItems = () => {
     if (hasMore && !isLoadingItems) {
-      fetchItems(searchTerm, false);
+      fetchItems(searchValue, false);
     }
   };
+
+  const filteredItems = useMemo(() => {
+    if (!searchValue) return items;
+    const lowercaseSearch = searchValue.toLowerCase();
+    return items.filter(item => 
+      item.item_code.toLowerCase().includes(lowercaseSearch) ||
+      item.item_name.toLowerCase().includes(lowercaseSearch)
+    );
+  }, [items, searchValue]);
 
   return (
     <div className="space-y-4">
@@ -210,22 +203,22 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg" align="start">
-              <Command>
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[60]" align="start">
+              <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search items..." 
-                  value={searchTerm}
-                  onValueChange={setSearchTerm}
+                  value={searchValue}
+                  onValueChange={setSearchValue}
                 />
                 <CommandList>
                   <CommandEmpty>
                     {isLoadingItems ? "Loading items..." : "No items found."}
                   </CommandEmpty>
                   <CommandGroup>
-                    {items.map((item) => (
+                    {filteredItems.map((item) => (
                       <CommandItem
                         key={item.item_code}
-                        value={`${item.item_code} ${item.item_name}`}
+                        value={item.item_code}
                         onSelect={() => handleItemSelect(item)}
                       >
                         <Check

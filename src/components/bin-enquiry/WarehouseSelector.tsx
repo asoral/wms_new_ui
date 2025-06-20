@@ -26,7 +26,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState<WarehouseInfo | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchValue, setSearchValue] = useState("");
 
   useEffect(() => {
     return () => {
@@ -74,7 +74,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      // Build search filters using correct Frappe format
       let filters = [['is_group', '=', '0']];
       
       if (search.trim()) {
@@ -88,7 +87,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       
       console.log('API filters:', filters);
       
-      // Use the new warehouse API with proper parameter handling
       const result = await erpnextAPI.getWarehouses(filters);
       console.log('API result:', result);
       
@@ -130,19 +128,28 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (searchTerm !== undefined) {
-        fetchWarehouses(searchTerm);
+      if (searchValue !== undefined) {
+        fetchWarehouses(searchValue);
       }
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  }, [searchValue]);
 
   const handleWarehouseSelect = (warehouse: WarehouseInfo) => {
     setSelectedWarehouse(warehouse);
     setOpen(false);
     onWarehouseSelected(warehouse.name);
   };
+
+  const filteredWarehouses = useMemo(() => {
+    if (!searchValue) return warehouses;
+    const lowercaseSearch = searchValue.toLowerCase();
+    return warehouses.filter(warehouse => 
+      warehouse.name.toLowerCase().includes(lowercaseSearch) ||
+      warehouse.warehouse_name.toLowerCase().includes(lowercaseSearch)
+    );
+  }, [warehouses, searchValue]);
 
   return (
     <div className="space-y-4">
@@ -174,12 +181,12 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg" align="start">
-              <Command>
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[60]" align="start">
+              <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search warehouses..." 
-                  value={searchTerm}
-                  onValueChange={setSearchTerm}
+                  value={searchValue}
+                  onValueChange={setSearchValue}
                 />
                 <CommandList>
                   <CommandEmpty>
@@ -193,12 +200,12 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                       </div>
                     </CommandGroup>
                   )}
-                  {!isLoadingWarehouses && warehouses.length > 0 && (
+                  {!isLoadingWarehouses && filteredWarehouses.length > 0 && (
                     <CommandGroup>
-                      {warehouses.map((warehouse) => (
+                      {filteredWarehouses.map((warehouse) => (
                         <CommandItem
                           key={warehouse.name}
-                          value={`${warehouse.name} ${warehouse.warehouse_name}`}
+                          value={warehouse.name}
                           onSelect={() => handleWarehouseSelect(warehouse)}
                         >
                           <Check

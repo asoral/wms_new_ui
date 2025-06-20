@@ -28,39 +28,33 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchValue, setSearchValue] = useState("");
   const timeoutRef = useRef<NodeJS.Timeout>();
   
-  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
       setOpen(false);
     };
   }, []);
 
-  // Debounced search function
-  const searchItems = useCallback((searchValue: string) => {
+  const searchItems = useCallback((searchTerm: string) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
-      fetchItems(searchValue);
+      fetchItems(searchTerm);
     }, 300);
   }, []);
 
-  // Load initial items and cached items
   useEffect(() => {
     loadInitialItems();
   }, []);
 
   const loadInitialItems = async () => {
     try {
-      // First try to load from cache
       const cached = await offlineStorage.getCachedData('items_initial');
       if (cached && Array.isArray(cached) && cached.length > 0) {
         setItems(cached);
         return;
       }
-
-      // If no cache, fetch from API
       await fetchItems("");
     } catch (error) {
       console.error('Failed to load initial items:', error);
@@ -78,7 +72,6 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     }
   };
 
-  // Fetch items with search
   const fetchItems = async (search: string = "") => {
     setIsLoadingItems(true);
     
@@ -98,21 +91,16 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
       let result;
       if (search.trim()) {
         console.log('Searching items with term:', search);
-        // Check if search term looks like a barcode (numeric or alphanumeric)
         if (/^[0-9]+$/.test(search) || search.length > 10) {
-          // Try barcode search first
           try {
             result = await erpnextAPI.searchItemsByBarcode(search);
             if (!result.data || result.data.length === 0) {
-              // If barcode search fails, try regular search
               result = await erpnextAPI.searchItems(search, limit);
             }
           } catch (error) {
-            // Fallback to regular search
             result = await erpnextAPI.searchItems(search, limit);
           }
         } else {
-          // Regular text search
           result = await erpnextAPI.searchItems(search, limit);
         }
       } else {
@@ -127,16 +115,14 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           setItems(result.data);
         }
 
-        // Cache the results
         const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
-        await offlineStorage.cacheData(cacheKey, result.data, 300000); // 5 minutes
+        await offlineStorage.cacheData(cacheKey, result.data, 300000);
       } else {
         setItems([]);
       }
     } catch (error) {
       console.error('Failed to fetch items:', error);
       
-      // Try to load from cache on error
       try {
         const cacheKey = search.trim() ? `items_search_${search}` : 'items_initial';
         const cached = await offlineStorage.getCachedData(cacheKey);
@@ -151,20 +137,28 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
     }
   };
 
-  // Handle search term changes
   useEffect(() => {
-    if (searchTerm.trim()) {
-      searchItems(searchTerm);
+    if (searchValue.trim()) {
+      searchItems(searchValue);
     } else {
       loadInitialItems();
     }
-  }, [searchTerm, searchItems]);
+  }, [searchValue, searchItems]);
 
   const handleItemSelect = (item: Item) => {
     setSelectedItem(item);
     setOpen(false);
     onItemSelected(item.item_code);
   };
+
+  const filteredItems = useMemo(() => {
+    if (!searchValue) return items;
+    const lowercaseSearch = searchValue.toLowerCase();
+    return items.filter(item => 
+      item.item_code.toLowerCase().includes(lowercaseSearch) ||
+      item.item_name.toLowerCase().includes(lowercaseSearch)
+    );
+  }, [items, searchValue]);
 
   return (
     <div className="space-y-2">
@@ -195,21 +189,21 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-50" align="start">
-          <Command>
+          <Command shouldFilter={false}>
             <CommandInput 
               placeholder="Search by item code, name or barcode..." 
-              value={searchTerm}
-              onValueChange={setSearchTerm}
+              value={searchValue}
+              onValueChange={setSearchValue}
             />
             <CommandList>
               <CommandEmpty>
                 {isLoadingItems ? "Loading items..." : "No items found."}
               </CommandEmpty>
               <CommandGroup>
-                {items.map((item) => (
+                {filteredItems.map((item) => (
                   <CommandItem
                     key={item.item_code}
-                    value={`${item.item_code} ${item.item_name}`}
+                    value={item.item_code}
                     onSelect={() => handleItemSelect(item)}
                   >
                     <Check
