@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Search, Package, ScanLine, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "../item-enquiry/ItemSelector";
-import { Item } from "@/services/erp/erpnext/types";
 
 interface StockCountItem {
   item_code: string;
@@ -40,7 +39,6 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
 
   const handleItemSelected = (itemCode: string) => {
     setSelectedItemCode(itemCode);
-    // Also set the search term to show the selected item
     setSearchTerm(itemCode);
   };
 
@@ -54,14 +52,12 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
       return;
     }
 
-    // Show loading toast
     toast({
       title: "Adding Item",
       description: "Item is being added to the count...",
     });
 
     try {
-      // If onAddEntry is provided (from StockCount page), use it
       if (onAddEntry) {
         await onAddEntry({
           itemCode: selectedItemCode,
@@ -74,7 +70,6 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
           serial: serialNo || undefined,
         });
       } else {
-        // Original logic for direct form usage
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         const newItem: StockCountItem = {
@@ -91,7 +86,6 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
         setSelectedItems(prev => [...prev, newItem]);
       }
       
-      // Reset form
       setSelectedItemCode("");
       setSearchTerm("");
       setCountedQty(0);
@@ -189,8 +183,6 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
             <CardContent className="space-y-4">
               <ItemSelector
                 onItemSelected={handleItemSelected}
-                placeholder="Search for items..."
-                className="w-full"
               />
             </CardContent>
           </Card>

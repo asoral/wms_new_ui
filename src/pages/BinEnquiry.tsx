@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,44 +65,46 @@ const BinEnquiry = () => {
       if (response?.data) {
         // Transform the data to match our BinItem interface with proper item names
         const transformedItems: BinItem[] = await Promise.all(
-          response.data.map(async (item: any) => {
-            // Get item details to fetch item name
-            let itemName = item.item_name || item.item_code;
-            try {
-              const itemDetails = await erpnextAPI.items.getItemDetails(item.item_code);
-              if (itemDetails?.data?.item_name) {
-                itemName = itemDetails.data.item_name;
+          response.data
+            .filter((item: any) => (item.actual_qty || 0) > 0) // Filter out zero stock items
+            .map(async (item: any) => {
+              // Get item details to fetch item name
+              let itemName = item.item_name || item.item_code;
+              try {
+                const itemDetails = await erpnextAPI.items.getItemDetails(item.item_code);
+                if (itemDetails?.data?.item_name) {
+                  itemName = itemDetails.data.item_name;
+                }
+              } catch (error) {
+                console.error('Failed to fetch item name for:', item.item_code);
               }
-            } catch (error) {
-              console.error('Failed to fetch item name for:', item.item_code);
-            }
 
-            // Calculate quantities and valuation properly
-            const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
-            const valuationRate = item.valuation_rate || 0;
-            const stockValue = item.stock_value || 0;
-            
-            // Use stock_value if available, otherwise calculate from qty * rate
-            let totalValuation = stockValue;
-            if (!stockValue && valuationRate && actualQty > 0) {
-              totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
-            }
+              // Calculate quantities and valuation properly
+              const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
+              const valuationRate = item.valuation_rate || 0;
+              const stockValue = item.stock_value || 0;
+              
+              // Use stock_value if available, otherwise calculate from qty * rate
+              let totalValuation = stockValue;
+              if (!stockValue && valuationRate && actualQty > 0) {
+                totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
+              }
 
-            return {
-              item_code: item.item_code,
-              item_name: itemName,
-              actual_qty: actualQty,
-              valuation_rate: valuationRate,
-              warehouse: item.warehouse,
-              bin: item.warehouse,
-              itemCode: item.item_code,
-              itemName: itemName,
-              qty: actualQty,
-              uom: 'Nos',
-              age: Math.floor(Math.random() * 120), // Placeholder
-              valuation: totalValuation
-            };
-          })
+              return {
+                item_code: item.item_code,
+                item_name: itemName,
+                actual_qty: actualQty,
+                valuation_rate: valuationRate,
+                warehouse: item.warehouse,
+                bin: item.warehouse,
+                itemCode: item.item_code,
+                itemName: itemName,
+                qty: actualQty,
+                uom: 'Nos',
+                age: Math.floor(Math.random() * 120), // Placeholder
+                valuation: totalValuation
+              };
+            })
         );
         setBinItems(transformedItems);
       } else {
