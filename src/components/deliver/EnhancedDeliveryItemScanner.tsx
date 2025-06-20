@@ -180,18 +180,18 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     selectedItem.itemCode.toLowerCase().includes('serial') ||
     selectedItem.itemName.toLowerCase().includes('serial') ||
     // Add more patterns that indicate serial tracking
-    selectedItem.itemCode.match(/^(SER|SERIAL)/i) ||
-    selectedItem.itemName.match(/serial/i)
+    Boolean(selectedItem.itemCode.match(/^(SER|SERIAL)/i)) ||
+    Boolean(selectedItem.itemName.match(/serial/i))
   );
 
   const hasBatchTracking = selectedItem && (
     selectedItem.itemCode.toLowerCase().includes('batch') ||
     selectedItem.itemName.toLowerCase().includes('batch') ||
     // Add more patterns that indicate batch tracking
-    selectedItem.itemCode.match(/^(BAT|BATCH|BHG)/i) ||
-    selectedItem.itemName.match(/batch/i) ||
-    // Common batch tracking patterns
-    selectedItem.itemCode.match(/BHG\d+/i)
+    Boolean(selectedItem.itemCode.match(/^(BAT|BATCH|BHG)/i)) ||
+    Boolean(selectedItem.itemName.match(/batch/i)) ||
+    // Common batch tracking patterns - BHG (Batch Group) is common in ERPNext
+    Boolean(selectedItem.itemCode.match(/BHG\d+/i))
   );
 
   const hasSerialBatchTracking = hasSerialTracking || hasBatchTracking;
