@@ -73,9 +73,9 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
         // Fallback to pattern matching if API fails
         setItemTrackingInfo({
           has_batch_no: Boolean(selectedItemCode.toLowerCase().includes('batch') || 
-                        selectedItemCode.match(/^(BAT|BATCH|BHG)/i)),
+                        Boolean(selectedItemCode.match(/^(BAT|BATCH|BHG)/i))),
           has_serial_no: Boolean(selectedItemCode.toLowerCase().includes('serial') || 
-                         selectedItemCode.match(/^(SER|SERIAL)/i))
+                         Boolean(selectedItemCode.match(/^(SER|SERIAL)/i)))
         });
       } finally {
         setLoadingTracking(false);
@@ -110,14 +110,13 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
   };
 
   const handleOpenBatchSelector = () => {
-    if (!selectedItem || !warehouse || !quantity) {
-      toast({
-        title: "Missing Information",
-        description: "Please select item, warehouse, and quantity first",
-        variant: "destructive"
-      });
-      return;
-    }
+    console.log('Opening batch selector for:', {
+      selectedItem: selectedItem?.itemCode,
+      warehouse,
+      quantity,
+      hasSerialBatchTracking
+    });
+    
     setShowBatchSelector(true);
   };
 
@@ -377,7 +376,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
               </div>
 
               {/* Serial/Batch Selection - ERPNext Style */}
-              {hasSerialBatchTracking && selectedItemCode && warehouse && quantity && !loadingTracking && (
+              {hasSerialBatchTracking && selectedItemCode && !loadingTracking && (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Serial/Batch Entry Method</Label>
@@ -394,7 +393,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                           </span>
                         </div>
                         <span className="text-xs text-muted-foreground mt-1">
-                          Select from available {hasBatchTracking ? 'batches' : 'serial numbers'} in {warehouse}
+                          Select from available {hasBatchTracking ? 'batches' : 'serial numbers'} in {warehouse || 'selected warehouse'}
                         </span>
                       </div>
                     </Button>
@@ -428,7 +427,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
           itemCode={selectedItem.itemCode}
           itemName={selectedItem.itemName}
           warehouse={warehouse}
-          requiredQty={parseInt(quantity)}
+          requiredQty={parseInt(quantity) || 1}
           onBatchesSelected={handleBatchesSelected}
           company={company}
         />
