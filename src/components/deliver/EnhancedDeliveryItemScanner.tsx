@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scan, Package } from "lucide-react";
+import { Scan, Package, ScanLine, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { DeliveryEntry, SOItem } from "../../pages/Deliver";
 import { useToast } from "@/hooks/use-toast";
 import BatchSelector from "./BatchSelector";
@@ -58,6 +59,11 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
         variant: "destructive"
       });
     }
+  };
+
+  const handleItemSelected = (itemCode: string) => {
+    setSelectedItemCode(itemCode);
+    setScannedCode(itemCode);
   };
 
   const handleOpenBatchSelector = () => {
@@ -174,83 +180,151 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
     selectedItem.itemName.toLowerCase().includes('serial')
   );
 
+  // Available warehouses - you can expand this list
+  const availableWarehouses = [
+    "Main Store",
+    "Secondary Store", 
+    "Raw Material Store",
+    "Finished Goods Store"
+  ];
+
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Item</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Tabs defaultValue="manual" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-              <TabsTrigger value="scan">Scan Item</TabsTrigger>
-            </TabsList>
+      <div className="space-y-6">
+        {/* Scan Items Section */}
+        <Tabs defaultValue="scan" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="scan" className="flex items-center space-x-2">
+              <ScanLine className="w-4 h-4" />
+              <span>Scan Item</span>
+            </TabsTrigger>
+            <TabsTrigger value="search" className="flex items-center space-x-2">
+              <Search className="w-4 h-4" />
+              <span>Search Item</span>
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="scan" className="space-y-4">
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Scan item code or barcode"
-                  value={scannedCode}
-                  onChange={(e) => setScannedCode(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleScanItem()}
-                />
-                <Button onClick={handleScanItem} disabled={!scannedCode}>
-                  <Scan className="w-4 h-4" />
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="manual" className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Item Code / Name</label>
-                <Select value={selectedItemCode} onValueChange={setSelectedItemCode}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an item to deliver..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {soItems.filter(item => item.pendingQty > 0).map((item) => (
-                      <SelectItem key={item.itemCode} value={item.itemCode}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{item.itemCode}</span>
-                          <span className="text-xs text-gray-500">{item.itemName}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          {selectedItem && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Warehouse *</label>
+          <TabsContent value="scan" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <ScanLine className="w-5 h-5" />
+                  <span>Scan Item Barcode</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="barcode">Barcode</Label>
                   <Input
-                    placeholder="Scan or enter warehouse"
-                    value={warehouse}
-                    onChange={(e) => setWarehouse(e.target.value)}
+                    id="barcode"
+                    value={scannedCode}
+                    onChange={(e) => setScannedCode(e.target.value)}
+                    placeholder="Scan or enter barcode"
+                    className="text-lg"
+                    onKeyPress={(e) => e.key === 'Enter' && handleScanItem()}
                   />
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="search" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Search className="w-5 h-5" />
+                  <span>Search Item</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Quantity to Deliver *</label>
+                  <Label htmlFor="itemSelect">Item Code / Name</Label>
+                  <Select value={selectedItemCode} onValueChange={handleItemSelected}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an item to deliver..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {soItems.filter(item => item.pendingQty > 0).map((item) => (
+                        <SelectItem key={item.itemCode} value={item.itemCode}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{item.itemCode}</span>
+                            <span className="text-xs text-gray-500">{item.itemName}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Item Details Form */}
+        {selectedItem && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Package className="w-5 h-5" />
+                <span>Item Details</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="warehouse">Warehouse *</Label>
+                  <Select value={warehouse} onValueChange={setWarehouse}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select warehouse..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableWarehouses.map((wh) => (
+                        <SelectItem key={wh} value={wh}>
+                          {wh}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">Quantity to Deliver *</Label>
                   <Input
+                    id="quantity"
                     type="number"
-                    placeholder="Enter quantity"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="0"
                     min="1"
                     max={selectedItem.pendingQty}
+                    step="0.01"
                   />
                 </div>
               </div>
 
-              {/* Serial/Batch Entry Method Section - only show if item has tracking */}
-              {hasSerialBatchTracking && selectedItem && warehouse && (
+              {/* Item Info Display */}
+              <div className="space-y-2">
+                <Label>Item Info</Label>
+                <div className="text-sm text-muted-foreground">
+                  <p>UOM: {selectedItem.uom}</p>
+                  <p>Pending: {selectedItem.pendingQty} {selectedItem.uom}</p>
+                  <p>Rate: ₹{selectedItem.rate}</p>
+                  {hasSerialBatchTracking && (
+                    <div className="flex gap-2 mt-1">
+                      {selectedItem.itemCode.toLowerCase().includes('serial') && (
+                        <Badge variant="outline">Serial Tracking</Badge>
+                      )}
+                      {selectedItem.itemCode.toLowerCase().includes('batch') && (
+                        <Badge variant="outline">Batch Tracking</Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Serial/Batch Entry Method - only show if item has tracking */}
+              {hasSerialBatchTracking && selectedItemCode && warehouse && (
                 <div className="space-y-4">
-                  <label className="text-sm font-medium mb-1 block">Serial/Batch Entry Method</label>
+                  <Label>Serial/Batch Entry Method</Label>
                   <Tabs 
                     value={useTraditionalEntry ? "manual" : "bundle"} 
                     onValueChange={(value) => setUseTraditionalEntry(value === "manual")}
@@ -262,40 +336,46 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                     </TabsList>
 
                     <TabsContent value="manual" className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium mb-1 block">Batch Number</label>
-                          <div className="flex space-x-2">
-                            <Input
-                              placeholder="Enter batch number"
-                              value={batchNumber}
-                              onChange={(e) => setBatchNumber(e.target.value)}
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleOpenBatchSelector}
-                              disabled={!selectedItem || !warehouse || !quantity}
-                            >
-                              <Package className="w-4 h-4 mr-1" />
-                              Select
-                            </Button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedItem.itemCode.toLowerCase().includes('batch') && (
+                          <div className="space-y-2">
+                            <Label htmlFor="batch_no">Batch No</Label>
+                            <div className="flex space-x-2">
+                              <Input
+                                id="batch_no"
+                                value={batchNumber}
+                                onChange={(e) => setBatchNumber(e.target.value)}
+                                placeholder="Enter batch number"
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleOpenBatchSelector}
+                                disabled={!selectedItem || !warehouse || !quantity}
+                              >
+                                <Package className="w-4 h-4 mr-1" />
+                                Select
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-1 block">Serial Number</label>
-                          <Input
-                            placeholder="Enter serial number"
-                            value={serialNumber}
-                            onChange={(e) => setSerialNumber(e.target.value)}
-                          />
-                        </div>
+                        )}
+                        {selectedItem.itemCode.toLowerCase().includes('serial') && (
+                          <div className="space-y-2">
+                            <Label htmlFor="serial_no">Serial No</Label>
+                            <Input
+                              id="serial_no"
+                              value={serialNumber}
+                              onChange={(e) => setSerialNumber(e.target.value)}
+                              placeholder="Enter serial number"
+                            />
+                          </div>
+                        )}
                       </div>
                     </TabsContent>
 
                     <TabsContent value="bundle" className="space-y-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium mb-1 block">Create Serial and Batch Bundle</label>
+                        <Label>Create Serial and Batch Bundle</Label>
                         <SerialBatchBundleSelector
                           itemCode={selectedItem.itemCode}
                           itemName={selectedItem.itemName}
@@ -306,6 +386,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                           transactionType="Outward"
                           onBundleCreated={handleBundleCreated}
                           initialQuantity={parseInt(quantity) || 1}
+                          company={company}
                         />
                         {selectedBundle && (
                           <p className="text-sm text-muted-foreground">
@@ -318,16 +399,17 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                 </div>
               )}
 
-              {/* Regular batch/serial fields for non-tracked items or when using manual entry */}
-              {(!hasSerialBatchTracking || useTraditionalEntry) && !hasSerialBatchTracking && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Batch Number</label>
+              {/* Simple batch/serial fields for non-tracked items or when no tracking detected */}
+              {!hasSerialBatchTracking && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="batch">Batch Number</Label>
                     <div className="flex space-x-2">
                       <Input
-                        placeholder="Enter batch number"
+                        id="batch"
                         value={batchNumber}
                         onChange={(e) => setBatchNumber(e.target.value)}
+                        placeholder="Enter batch number (optional)"
                       />
                       <Button
                         variant="outline"
@@ -340,61 +422,30 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                       </Button>
                     </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Serial Number</label>
+                  <div className="space-y-2">
+                    <Label htmlFor="serial">Serial Number</Label>
                     <Input
-                      placeholder="Enter serial number"
+                      id="serial"
                       value={serialNumber}
                       onChange={(e) => setSerialNumber(e.target.value)}
+                      placeholder="Enter serial number (optional)"
                     />
                   </div>
                 </div>
               )}
-
-              {/* Item Details */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium mb-2">Item Details</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                  <div>
-                    <span className="text-gray-600">Name:</span>
-                    <div className="font-medium">{selectedItem.itemName}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Pending:</span>
-                    <div className="font-medium">{selectedItem.pendingQty} {selectedItem.uom}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Rate:</span>
-                    <div className="font-medium">₹{selectedItem.rate.toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">UOM:</span>
-                    <div className="font-medium">{selectedItem.uom}</div>
-                  </div>
-                </div>
-                {hasSerialBatchTracking && (
-                  <div className="flex gap-2 mt-2">
-                    {selectedItem.itemCode.toLowerCase().includes('serial') && (
-                      <Badge variant="outline">Serial Tracking</Badge>
-                    )}
-                    {selectedItem.itemCode.toLowerCase().includes('batch') && (
-                      <Badge variant="outline">Batch Tracking</Badge>
-                    )}
-                  </div>
-                )}
-              </div>
 
               <Button 
                 onClick={handleAddItem} 
                 className="w-full"
                 disabled={!warehouse || !quantity}
               >
+                <Package className="w-4 h-4 mr-2" />
                 Add Item to Delivery
               </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Batch Selector Modal */}
       {showBatchSelector && selectedItem && (
