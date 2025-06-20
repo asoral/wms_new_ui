@@ -319,7 +319,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                 </div>
               </div>
 
-              {/* Serial/Batch Tracking Fields - Only show relevant fields with Select buttons only */}
+              {/* Serial/Batch Tracking Fields - Show relevant selector buttons */}
               {hasSerialBatchTracking && selectedItemCode && warehouse && (
                 <div className="space-y-4">
                   <Label>Serial/Batch Entry Method</Label>
@@ -335,7 +335,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
 
                     <TabsContent value="manual" className="space-y-4">
                       <div className="space-y-4">
-                        {/* Only show batch field if item has batch tracking */}
+                        {/* Only show batch selector if item has batch tracking */}
                         {hasBatchTracking && (
                           <div className="space-y-2">
                             <Label htmlFor="batch_no">Batch Number</Label>
@@ -351,7 +351,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
                           </div>
                         )}
                         
-                        {/* Only show serial field if item has serial tracking */}
+                        {/* Only show serial selector if item has serial tracking */}
                         {hasSerialTracking && (
                           <div className="space-y-2">
                             <Label htmlFor="serial_no">Serial Number</Label>
@@ -414,7 +414,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry, company }: EnhancedD
       </div>
 
       {/* Batch Selector Modal */}
-      {showBatchSelector && selectedItem && (
+      {showBatchSelector && selectedItem && company && (
         <BatchSelector
           isOpen={showBatchSelector}
           onClose={() => setShowBatchSelector(false)}
