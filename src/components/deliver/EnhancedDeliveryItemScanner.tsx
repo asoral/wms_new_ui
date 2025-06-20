@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -61,7 +60,12 @@ const EnhancedDeliveryItemScanner = ({
       );
       
       if (result.data) {
-        setWarehouses(result.data);
+        // Map Warehouse[] to WarehouseInfo[] with proper type handling
+        const warehouseData: WarehouseInfo[] = result.data.map((wh: any) => ({
+          name: wh.name,
+          warehouse_name: wh.warehouse_name || wh.name // Use name as fallback if warehouse_name is missing
+        }));
+        setWarehouses(warehouseData);
       }
     } catch (error) {
       console.error('Error fetching warehouses:', error);
