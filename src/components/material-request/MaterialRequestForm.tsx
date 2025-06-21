@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -284,57 +285,57 @@ const MaterialRequestForm = () => {
                         <SelectItem key={item.item_code} value={item.item_code}>
                           {item.item_name} ({item.item_code})
                         </SelectItem>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="required_qty">Required Quantity</Label>
+                  <Input
+                    type="number"
+                    id="required_qty"
+                    name="required_qty"
+                    value={newItem.required_qty}
+                    onChange={handleNewItemChange}
+                    placeholder="Required Quantity"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="uom">UOM</Label>
+                  <Input
+                    type="text"
+                    id="uom"
+                    name="uom"
+                    value={newItem.uom}
+                    onChange={handleNewItemChange}
+                    placeholder="UOM"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="warehouse">Warehouse</Label>
+                  <Select
+                    value={newItem.warehouse}
+                    onValueChange={(value) =>
+                      setNewItem((prev) => ({ ...prev, warehouse: value }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((warehouse) => (
+                        <SelectItem key={warehouse} value={warehouse}>
+                          {warehouse}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="required_qty">Required Quantity</Label>
-                <Input
-                  type="number"
-                  id="required_qty"
-                  name="required_qty"
-                  value={newItem.required_qty}
-                  onChange={handleNewItemChange}
-                  placeholder="Required Quantity"
-                />
-              </div>
-              <div>
-                <Label htmlFor="uom">UOM</Label>
-                <Input
-                  type="text"
-                  id="uom"
-                  name="uom"
-                  value={newItem.uom}
-                  onChange={handleNewItemChange}
-                  placeholder="UOM"
-                />
-              </div>
-              <div>
-                <Label htmlFor="warehouse">Warehouse</Label>
-                <Select
-                  value={newItem.warehouse}
-                  onValueChange={(value) =>
-                    setNewItem((prev) => ({ ...prev, warehouse: value }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select warehouse" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses.map((warehouse) => (
-                      <SelectItem key={warehouse} value={warehouse}>
-                        {warehouse}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Button type="button" variant="secondary" onClick={handleAddItem} className="mt-4">
+                Add Item
+              </Button>
             </div>
-            <Button type="button" variant="secondary" onClick={handleAddItem}>
-              Add Item
-            </Button>
 
             {/* Submit Button */}
             <Button type="submit" disabled={loading}>
