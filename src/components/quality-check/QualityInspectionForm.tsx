@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,7 +71,6 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
         id: Date.now().toString() + index,
         parameter: template.parameter,
         specification: template.specification,
-        acceptanceValue: template.acceptanceCriteria,
         acceptanceCriteria: template.acceptanceCriteria,
         reading: "",
         value: "",
@@ -96,9 +96,9 @@ const updateParameterReading = (id: string, reading: string) => {
         if (match && !isNaN(value)) {
           const min = parseFloat(match[1]);
           const max = parseFloat(match[2]);
-          status = value >= min && value <= max ? "Pass" : "Fail";
+          status = value >= min && value <= max ? "Accepted" : "Rejected";
         } else {
-          status = reading ? "Pass" : "Pending"; // fallback
+          status = reading ? "Accepted" : "Pending"; // fallback
         }
 
         return { ...param, reading, value: reading, status };
@@ -114,7 +114,6 @@ const updateParameterReading = (id: string, reading: string) => {
       id: Date.now().toString(),
       parameter: "Custom Parameter",
       specification: "",
-      acceptanceValue: "",
       acceptanceCriteria: "",
       reading: "",
       value: "",
@@ -145,8 +144,8 @@ const updateParameterReading = (id: string, reading: string) => {
 
   const selectedItem = mockItems.find(item => item.code === formData.itemCode);
   const overallResult = parameters.length > 0 ? 
-    (parameters.every(p => p.status === "Pass") ? "Accepted" : 
-     parameters.some(p => p.status === "Fail") ? "Rejected" : "Pending") : "Pending";
+    (parameters.every(p => p.status === "Accepted") ? "Pass" : 
+     parameters.some(p => p.status === "Rejected") ? "Fail" : "Pending") : "Pending";
 
   return (
     <div className="space-y-6">
@@ -290,8 +289,8 @@ const updateParameterReading = (id: string, reading: string) => {
                       <div className="flex items-center justify-between">
                         <Badge 
                           className={
-                            parameter.status === "Pass" ? "bg-green-100 text-green-800" :
-                            parameter.status === "Fail" ? "bg-red-100 text-red-800" :
+                            parameter.status === "Accepted" ? "bg-green-100 text-green-800" :
+                            parameter.status === "Rejected" ? "bg-red-100 text-red-800" :
                             "bg-gray-100 text-gray-800"
                           }
                         >
@@ -326,8 +325,8 @@ const updateParameterReading = (id: string, reading: string) => {
               <span className="font-medium">Overall Result:</span>
               <Badge 
                 className={
-                  overallResult === "Accepted" ? "bg-green-100 text-green-800" :
-                  overallResult === "Rejected" ? "bg-red-100 text-red-800" :
+                  overallResult === "Pass" ? "bg-green-100 text-green-800" :
+                  overallResult === "Fail" ? "bg-red-100 text-red-800" :
                   "bg-gray-100 text-gray-800"
                 }
               >

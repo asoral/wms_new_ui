@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,16 +140,16 @@ const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
                 <span className="font-medium text-gray-600">Bin:</span>
                 <p className="text-gray-900">{currentItem.bin}</p>
               </div>
-              {currentItem.batchNo && (
+              {currentItem.batch && (
                 <div>
                   <span className="font-medium text-gray-600">Batch:</span>
-                  <p className="text-gray-900">{currentItem.batchNo}</p>
+                  <p className="text-gray-900">{currentItem.batch}</p>
                 </div>
               )}
-              {currentItem.serialNo && (
+              {currentItem.serial && (
                 <div>
                   <span className="font-medium text-gray-600">Serial:</span>
-                  <p className="text-gray-900">{currentItem.serialNo}</p>
+                  <p className="text-gray-900">{currentItem.serial}</p>
                 </div>
               )}
               <div>

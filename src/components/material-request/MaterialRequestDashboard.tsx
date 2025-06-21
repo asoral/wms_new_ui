@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,17 +49,11 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
       if (recentRequestsResult.data) {
         setRecentRequests(recentRequestsResult.data);
         
-        // Calculate stats with correct ERPNext statuses
+        // Calculate stats
         const total = recentRequestsResult.data.length;
-        const pending = recentRequestsResult.data.filter((req: any) => 
-          req.status === 'Pending' || req.status === 'Draft' || req.status === 'Submitted'
-        ).length;
-        const approved = recentRequestsResult.data.filter((req: any) => 
-          req.status === 'Ordered' || req.status === 'Issued' || req.status === 'Transferred' || req.status === 'Received'
-        ).length;
-        const rejected = recentRequestsResult.data.filter((req: any) => 
-          req.status === 'Cancelled' || req.status === 'Stopped'
-        ).length;
+        const pending = recentRequestsResult.data.filter((req: any) => req.status === 'Pending' || req.status === 'Draft').length;
+        const approved = recentRequestsResult.data.filter((req: any) => req.status === 'Ordered' || req.status === 'Issued').length;
+        const rejected = recentRequestsResult.data.filter((req: any) => req.status === 'Cancelled').length;
 
         setStats({
           totalRequests: total,
@@ -85,14 +80,9 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
       case "Draft": return "bg-gray-100 text-gray-800";
       case "Submitted": 
       case "Pending": return "bg-blue-100 text-blue-800";
-      case "Partially Ordered": 
-      case "Partially Received": return "bg-yellow-100 text-yellow-800";
-      case "Ordered":
-      case "Issued":
-      case "Transferred":
-      case "Received": return "bg-green-100 text-green-800";
-      case "Cancelled":
-      case "Stopped": return "bg-red-100 text-red-800";
+      case "Partially Ordered": return "bg-yellow-100 text-yellow-800";
+      case "Ordered": return "bg-green-100 text-green-800";
+      case "Cancelled": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };

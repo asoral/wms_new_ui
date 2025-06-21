@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,11 +123,11 @@ const PalletDepalletizer = ({ pallet }: PalletDepalletizerProps) => {
                   <div className="flex flex-wrap gap-2 mt-1">
                     <span className="text-sm font-medium">{item.qty} {item.uom}</span>
                     <span className="text-sm text-gray-600">{item.warehouse}</span>
-                    {item.batchNo && (
-                      <Badge variant="outline" className="text-xs">Batch: {item.batchNo}</Badge>
+                    {item.batch && (
+                      <Badge variant="outline" className="text-xs">Batch: {item.batch}</Badge>
                     )}
-                    {item.serialNo && (
-                      <Badge variant="outline" className="text-xs">Serial: {item.serialNo}</Badge>
+                    {item.serial && (
+                      <Badge variant="outline" className="text-xs">Serial: {item.serial}</Badge>
                     )}
                   </div>
                 </div>

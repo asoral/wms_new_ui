@@ -11,23 +11,7 @@ import MaterialRequestList from "@/components/material-request/MaterialRequestLi
 import MaterialRequestFormImproved from "@/components/material-request/MaterialRequestFormImproved";
 
 export type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture" | "Customer Provided";
-
-// Updated statuses to match ERPNext v15
-export type MaterialRequestStatus = 
-  | "Draft" 
-  | "Submitted" 
-  | "Stopped" 
-  | "Cancelled" 
-  | "Pending" 
-  | "Partially Ordered" 
-  | "Partially Received" 
-  | "Ordered" 
-  | "Issued" 
-  | "Transferred" 
-  | "Received";
-
-// Transfer Status only for Material Transfer purpose
-export type MaterialRequestTransferStatus = "Not Started" | "In Transit" | "Completed";
+export type MaterialRequestStatus = "Draft" | "Submitted" | "Stopped" | "Cancelled" | "Pending" | "Partially Ordered" | "Partially Received" | "Ordered" | "Issued" | "Transferred" | "Received";
 
 export interface MaterialRequestItem {
   itemCode: string;
@@ -49,7 +33,6 @@ export interface MaterialRequest {
   name: string;
   purpose: MaterialRequestPurpose;
   status: MaterialRequestStatus;
-  transferStatus?: MaterialRequestTransferStatus; // Only for Material Transfer
   transactionDate: string;
   requiredBy?: string;
   requestedBy: string;

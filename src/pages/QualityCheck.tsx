@@ -1,139 +1,145 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Shield } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import QualityDashboard from "@/components/quality-check/QualityDashboard";
-import QualityInspectionList from "@/components/quality-check/QualityInspectionList";
-import QualityInspectionForm from "@/components/quality-check/QualityInspectionForm";
-import HelpSection from "@/components/ui/help-section";
-
-export type InspectionType = "Incoming" | "Outgoing" | "In Process";
-export type InspectionStatus = "Draft" | "Submitted" | "Accepted" | "Rejected";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { TestTube, RefreshCcw, CheckCircle, XCircle, Clock, BarChart3 } from "lucide-react";
+import QualityDashboard from "../components/quality-check/QualityDashboard";
+import QualityInspectionList from "../components/quality-check/QualityInspectionList";
+import QualityInspectionForm from "../components/quality-check/QualityInspectionForm";
 
 export interface QualityParameter {
   id: string;
   parameter: string;
   specification: string;
-  acceptanceValue: string;
   acceptanceCriteria: string;
-  status: "Pass" | "Fail" | "Pending";
-  actualValue?: string;
   reading?: string;
-  value?: string;
+  value: string;
+  numericValue?: number;
+  status: "Accepted" | "Rejected" | "Pending";
   remarks?: string;
 }
 
 export interface QualityInspection {
   id: string;
-  name: string;
-  inspectionType: InspectionType;
+  number: string;
   itemCode: string;
   itemName: string;
-  batchNo?: string;
   batchSerial?: string;
-  serialNo?: string;
-  qty: number;
-  uom: string;
+  warehouse: string;
+  inspectionType: "Incoming" | "In-Process" | "Final" | "Customer Return";
+  status: "Draft" | "Submitted" | "Cancelled";
+  createdDate: string;
+  inspectedBy?: string;
   inspectionDate: string;
-  inspector: string;
-  inspectedBy: string;
-  status: InspectionStatus;
-  parameters: QualityParameter[];
-  overallResult: "Accepted" | "Rejected" | "Pending";
+  overallResult?: "Pass" | "Fail" | "Pending";
   remarks?: string;
+  parameters: QualityParameter[];
 }
 
+export type InspectionType = "Incoming" | "In-Process" | "Final" | "Customer Return";
+
 const QualityCheckPage = () => {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "list" | "form">("dashboard");
+  const [currentView, setCurrentView] = useState<"dashboard" | "list" | "create">("dashboard");
   const [selectedInspection, setSelectedInspection] = useState<QualityInspection | null>(null);
-  const [inspections, setInspections] = useState<QualityInspection[]>([]);
 
-  const handleCreateNew = () => {
-    setSelectedInspection(null);
-    setActiveTab("form");
-  };
-
-  const handleEditInspection = (inspection: QualityInspection) => {
-    setSelectedInspection(inspection);
-    setActiveTab("form");
+  const dashboardData = {
+    qcWaiting: 8,
+    qcFailed: 3,
+    qcCompleted: 45,
+    qcTesting: 12,
+    successRate: 92.5,
+    mostTestedItem: "Raw Material A",
+    mostRejectedItem: "Component B"
   };
 
   const handleBackToDashboard = () => {
-    setActiveTab("dashboard");
+    setCurrentView("dashboard");
     setSelectedInspection(null);
   };
 
   const handleBackToList = () => {
-    setActiveTab("list");
+    setCurrentView("list");
     setSelectedInspection(null);
   };
 
-  const showHelp = activeTab === "dashboard" && inspections.length === 0;
+  const handleViewInspections = () => {
+    setCurrentView("list");
+  };
+
+  const handleCreateInspection = () => {
+    setCurrentView("create");
+    setSelectedInspection(null);
+  };
+
+  const handleEditInspection = (inspection: QualityInspection) => {
+    setSelectedInspection(inspection);
+    setCurrentView("create");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div className="flex items-center space-x-3">
-            <Shield className="w-6 h-6 text-blue-600" />
+            <TestTube className="w-6 h-6 text-purple-600" />
             <h1 className="text-2xl font-bold text-gray-900">Quality Check</h1>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="icon">
+              <RefreshCcw className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
-        {/* Help Section */}
-        <div className="mb-6">
-          <HelpSection
-            show={showHelp}
-            icon={<Shield className="w-12 h-12" />}
-            title="Manage Quality Inspections"
-            description="Perform quality checks and inspections for incoming and outgoing materials."
-            steps={[
-              "Create quality inspection templates",
-              "Select items for inspection",
-              "Record measurement values",
-              "Accept or reject based on criteria"
-            ]}
-          />
-        </div>
-
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "dashboard" | "list" | "form")} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="list">Inspections</TabsTrigger>
-            <TabsTrigger value="form">New Inspection</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="dashboard">
+        {/* Content */}
+        {currentView === "dashboard" && (
+          <div className="space-y-6">
             <QualityDashboard 
-              onCreateNew={handleCreateNew}
-              onViewList={() => setActiveTab("list")}
+              data={dashboardData}
+              onViewInspections={handleViewInspections}
+              onCreateInspection={handleCreateInspection}
             />
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="list">
+        {currentView === "list" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <h2 className="text-xl font-semibold">Quality Inspections</h2>
+              <div className="flex space-x-2">
+                <Button onClick={handleCreateInspection}>
+                  New Inspection
+                </Button>
+                <Button variant="outline" onClick={handleBackToDashboard}>
+                  Back to Dashboard
+                </Button>
+              </div>
+            </div>
             <QualityInspectionList 
-              onCreateNew={handleCreateNew}
-              onEditInspection={handleEditInspection}
-              onBackToDashboard={handleBackToDashboard}
+              onCreateNew={handleCreateInspection}
+              onEditInspection={handleEditInspection} 
             />
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="form">
+        {currentView === "create" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <h2 className="text-xl font-semibold">
+                {selectedInspection ? "Edit Inspection" : "Create Quality Inspection"}
+              </h2>
+              <Button variant="outline" onClick={handleBackToList}>
+                Back to List
+              </Button>
+            </div>
             <QualityInspectionForm 
-              editingInspection={selectedInspection}
-              onBack={selectedInspection ? handleBackToList : handleBackToDashboard}
-              onSave={() => {
-                if (selectedInspection) {
-                  handleBackToList();
-                } else {
-                  handleBackToDashboard();
-                }
-              }}
+              inspection={selectedInspection}
+              onBack={() => handleBackToList()}
             />
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
     </div>
   );

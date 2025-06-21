@@ -1,105 +1,146 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ClipboardList } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import PickListSelection from "@/components/picking/PickListSelection";
-import PickingProcess from "@/components/picking/PickingProcess";
-import HelpSection from "@/components/ui/help-section";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Package, Plus, RefreshCcw } from "lucide-react";
+import PickListSelection from "../components/picking/PickListSelection";
+import PickListDetails from "../components/picking/PickListDetails";
+import PickingProcess from "../components/picking/PickingProcess";
 
-export type PickListStatus = "Draft" | "Open" | "Completed" | "Cancelled";
-export type PickListPurpose = "Delivery" | "Material Issue" | "Material Transfer";
+export type PickListStatus = "draft" | "in-progress" | "completed";
+export type PickListPurpose = "Material Transfer" | "Delivery" | "Transfer for Manufacturing";
 
 export interface PickListItem {
   id: string;
-  itemCode: string;
-  itemName: string;
   code: string;
   name: string;
-  qty: number;
+  warehouse: string;
+  bin: string;
+  batch?: string;
+  serial?: string;
   requiredQty: number;
   pickedQty: number;
-  uom: string;
-  warehouse: string;
-  bin?: string;
-  batchNo?: string;
-  serialNo?: string;
   status: "pending" | "partial" | "completed";
 }
 
 export interface PickList {
   id: string;
-  name: string;
   number: string;
+  purpose: PickListPurpose;
+  relatedDocument: string;
   status: PickListStatus;
   createdDate: string;
-  createdBy: string;
   items: PickListItem[];
-  company: string;
-  purpose?: PickListPurpose;
-  relatedDocument?: string;
 }
 
 const PickListPage = () => {
-  const [activeTab, setActiveTab] = useState<"selection" | "process">("selection");
+  const [currentStep, setCurrentStep] = useState<"selection" | "details" | "picking">("selection");
   const [selectedPickList, setSelectedPickList] = useState<PickList | null>(null);
-  const [pickLists, setPickLists] = useState<PickList[]>([]);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   const handleSelectPickList = (pickList: PickList) => {
     setSelectedPickList(pickList);
-    setActiveTab("process");
+    setCurrentStep("details");
+  };
+
+  const handleCreateNew = () => {
+    setIsCreatingNew(true);
+    setCurrentStep("details");
+  };
+
+  const handleStartPicking = (pickList: PickList) => {
+    setSelectedPickList(pickList);
+    setCurrentStep("picking");
   };
 
   const handleBackToSelection = () => {
+    setCurrentStep("selection");
     setSelectedPickList(null);
-    setActiveTab("selection");
+    setIsCreatingNew(false);
   };
 
-  const showHelp = activeTab === "selection" && pickLists.length === 0;
+  const handleBackToDetails = () => {
+    setCurrentStep("details");
+  };
+
+  const renderStepIndicator = () => (
+    <div className="flex items-center justify-center space-x-4 mb-6">
+      <div className={`flex items-center ${currentStep === "selection" ? "text-blue-600" : "text-gray-400"}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+          currentStep === "selection" ? "bg-blue-600 text-white" : "bg-gray-200"
+        }`}>
+          1
+        </div>
+        <span className="ml-2 text-sm font-medium">Select</span>
+      </div>
+      
+      <ArrowRight className="w-4 h-4 text-gray-400" />
+      
+      <div className={`flex items-center ${currentStep === "details" ? "text-blue-600" : "text-gray-400"}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+          currentStep === "details" ? "bg-blue-600 text-white" : "bg-gray-200"
+        }`}>
+          2
+        </div>
+        <span className="ml-2 text-sm font-medium">Details</span>
+      </div>
+      
+      <ArrowRight className="w-4 h-4 text-gray-400" />
+      
+      <div className={`flex items-center ${currentStep === "picking" ? "text-blue-600" : "text-gray-400"}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+          currentStep === "picking" ? "bg-blue-600 text-white" : "bg-gray-200"
+        }`}>
+          3
+        </div>
+        <span className="ml-2 text-sm font-medium">Pick</span>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <ClipboardList className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Pick Lists</h1>
+            <Package className="w-6 h-6 text-blue-600" />
+            <h1 className="text-2xl font-bold text-gray-900">Pick List</h1>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="icon">
+              <RefreshCcw className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
-        {/* Help Section */}
-        <div className="mb-6">
-          <HelpSection
-            show={showHelp}
-            icon={<ClipboardList className="w-12 h-12" />}
-            title="Manage Pick Lists"
-            description="Select and process pick lists for efficient order fulfillment."
-            steps={[
-              "Select a pick list from available orders",
-              "Review items and their locations",
-              "Pick items using barcode scanning",
-              "Mark items as picked and complete the process"
-            ]}
+        {/* Step Indicator */}
+        {renderStepIndicator()}
+
+        {/* Content */}
+        {currentStep === "selection" && (
+          <PickListSelection 
+            onSelectPickList={handleSelectPickList}
+            onCreateNew={handleCreateNew}
           />
-        </div>
+        )}
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "selection" | "process")} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="selection">Pick List Selection</TabsTrigger>
-            <TabsTrigger value="process" disabled={!selectedPickList}>Picking Process</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="selection">
-            <PickListSelection onSelectPickList={handleSelectPickList} />
-          </TabsContent>
+        {currentStep === "details" && (
+          <PickListDetails
+            pickList={selectedPickList}
+            isCreatingNew={isCreatingNew}
+            onStartPicking={handleStartPicking}
+            onBack={handleBackToSelection}
+          />
+        )}
 
-          <TabsContent value="process">
-            {selectedPickList && (
-              <PickingProcess pickList={selectedPickList} onBack={handleBackToSelection} />
-            )}
-          </TabsContent>
-        </Tabs>
+        {currentStep === "picking" && selectedPickList && (
+          <PickingProcess
+            pickList={selectedPickList}
+            onBack={handleBackToDetails}
+          />
+        )}
       </div>
     </div>
   );
