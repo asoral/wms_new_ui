@@ -14,11 +14,13 @@ export interface PickListItem {
   itemCode: string;
   itemName: string;
   qty: number;
+  pickedQty?: number;
   uom: string;
   warehouse: string;
   bin?: string;
   batchNo?: string;
   serialNo?: string;
+  status?: "pending" | "picked" | "partially_picked";
 }
 
 export interface PickList {
