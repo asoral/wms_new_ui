@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +25,7 @@ import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
 interface MaterialRequestListProps {
-  onCreateNew: (purpose: MaterialRequestPurpose) => void;
+  onCreateNew: (MaterialRequestPurpose) => void;
   onEditRequest: (request: MaterialRequest) => void;
   onBackToDashboard: () => void;
 }
@@ -101,9 +100,14 @@ const MaterialRequestList = ({ onCreateNew, onEditRequest, onBackToDashboard }: 
       case "Draft": return "bg-gray-100 text-gray-800";
       case "Submitted": 
       case "Pending": return "bg-blue-100 text-blue-800";
-      case "Partially Ordered": return "bg-yellow-100 text-yellow-800";
-      case "Ordered": return "bg-green-100 text-green-800";
-      case "Cancelled": return "bg-red-100 text-red-800";
+      case "Partially Ordered": 
+      case "Partially Received": return "bg-yellow-100 text-yellow-800";
+      case "Ordered":
+      case "Issued":
+      case "Transferred":
+      case "Received": return "bg-green-100 text-green-800";
+      case "Cancelled":
+      case "Stopped": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -145,7 +149,11 @@ const MaterialRequestList = ({ onCreateNew, onEditRequest, onBackToDashboard }: 
                 <SelectItem value="Submitted">Submitted</SelectItem>
                 <SelectItem value="Pending">Pending</SelectItem>
                 <SelectItem value="Ordered">Ordered</SelectItem>
+                <SelectItem value="Issued">Issued</SelectItem>
+                <SelectItem value="Transferred">Transferred</SelectItem>
+                <SelectItem value="Received">Received</SelectItem>
                 <SelectItem value="Cancelled">Cancelled</SelectItem>
+                <SelectItem value="Stopped">Stopped</SelectItem>
               </SelectContent>
             </Select>
 

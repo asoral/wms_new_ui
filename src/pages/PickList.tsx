@@ -1,59 +1,54 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ClipboardList, ArrowLeft } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PickListSelection from "@/components/picking/PickListSelection";
 import PickingProcess from "@/components/picking/PickingProcess";
-import PickListDetails from "@/components/picking/PickListDetails";
 import HelpSection from "@/components/ui/help-section";
+
+export type PickListStatus = "Draft" | "Open" | "Completed" | "Cancelled";
+export type PickListPurpose = "Delivery" | "Material Issue" | "Material Transfer";
 
 export interface PickListItem {
   itemCode: string;
   itemName: string;
   qty: number;
-  pickedQty: number;
   uom: string;
   warehouse: string;
-  binLocation?: string;
-  serialNo?: string;
+  bin?: string;
   batchNo?: string;
+  serialNo?: string;
 }
 
 export interface PickList {
   id: string;
-  number: string;
-  customer?: string;
-  salesOrder?: string;
-  status: "Draft" | "Open" | "Completed" | "Cancelled";
+  name: string;
+  status: PickListStatus;
   createdDate: string;
+  createdBy: string;
   items: PickListItem[];
-  totalItems: number;
-  pickedItems: number;
-  completionPercentage: number;
+  company: string;
+  purpose?: PickListPurpose;
+  relatedDocument?: string;
 }
 
 const PickListPage = () => {
-  const [currentView, setCurrentView] = useState<"selection" | "picking" | "details">("selection");
+  const [activeTab, setActiveTab] = useState<"selection" | "process">("selection");
   const [selectedPickList, setSelectedPickList] = useState<PickList | null>(null);
   const [pickLists, setPickLists] = useState<PickList[]>([]);
 
   const handleSelectPickList = (pickList: PickList) => {
     setSelectedPickList(pickList);
-    setCurrentView("details");
-  };
-
-  const handleStartPicking = (pickList: PickList) => {
-    setSelectedPickList(pickList);
-    setCurrentView("picking");
+    setActiveTab("process");
   };
 
   const handleBackToSelection = () => {
-    setCurrentView("selection");
     setSelectedPickList(null);
+    setActiveTab("selection");
   };
 
-  const showHelp = currentView === "selection" && pickLists.length === 0;
+  const showHelp = activeTab === "selection" && pickLists.length === 0;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -61,24 +56,8 @@ const PickListPage = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            {currentView !== "selection" && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={handleBackToSelection}
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-            )}
             <ClipboardList className="w-6 h-6 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Pick List</h1>
-              {selectedPickList && (
-                <p className="text-sm text-gray-600">
-                  {selectedPickList.number} - {selectedPickList.customer}
-                </p>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Pick Lists</h1>
           </div>
         </div>
 
@@ -87,59 +66,33 @@ const PickListPage = () => {
           <HelpSection
             show={showHelp}
             icon={<ClipboardList className="w-12 h-12" />}
-            title="Manage Picking Operations"
-            description="Organize and execute warehouse picking tasks efficiently."
+            title="Manage Pick Lists"
+            description="Select and process pick lists for efficient order fulfillment."
             steps={[
-              "View available pick lists from sales orders",
-              "Select a pick list to view item details",
-              "Start picking process with guided workflow",
-              "Update quantities and complete the pick list"
+              "Select a pick list from available orders",
+              "Review items and their locations",
+              "Pick items using barcode scanning",
+              "Mark items as picked and complete the process"
             ]}
           />
         </div>
 
-        {/* Content */}
-        {currentView === "selection" && (
-          <PickListSelection 
-            onSelectPickList={handleSelectPickList}
-            onStartPicking={handleStartPicking}
-          />
-        )}
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "selection" | "process")} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="selection">Pick List Selection</TabsTrigger>
+            <TabsTrigger value="process" disabled={!selectedPickList}>Picking Process</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="selection">
+            <PickListSelection onSelectPickList={handleSelectPickList} />
+          </TabsContent>
 
-        {currentView === "details" && selectedPickList && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Pick List Details</h2>
-              <div className="flex space-x-2">
-                <Button 
-                  onClick={() => handleStartPicking(selectedPickList)}
-                  disabled={selectedPickList.status === "Completed"}
-                >
-                  Start Picking
-                </Button>
-                <Button variant="outline" onClick={handleBackToSelection}>
-                  Back to List
-                </Button>
-              </div>
-            </div>
-            <PickListDetails pickList={selectedPickList} />
-          </div>
-        )}
-
-        {currentView === "picking" && selectedPickList && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Picking Process</h2>
-              <Button variant="outline" onClick={handleBackToSelection}>
-                Back to List
-              </Button>
-            </div>
-            <PickingProcess 
-              pickList={selectedPickList}
-              onComplete={handleBackToSelection}
-            />
-          </div>
-        )}
+          <TabsContent value="process">
+            {selectedPickList && (
+              <PickingProcess pickList={selectedPickList} onBack={handleBackToSelection} />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
