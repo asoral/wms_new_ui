@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,50 +13,111 @@ import {
   TrendingUp,
   Package
 } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface MaterialRequestDashboardProps {
   onCreateNew: (purpose: string) => void;
   onViewList: () => void;
 }
 
-const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDashboardProps) => {
-  // Mock statistics - in real app, fetch from ERPNext
-  const stats = {
-    draft: 5,
-    submitted: 12,
-    partiallyOrdered: 3,
-    ordered: 8,
-    cancelled: 2
-  };
+interface MaterialRequestSummary {
+  name: string;
+  title?: string;
+  material_request_type: string;
+  status: string;
+  transaction_date: string;
+  requested_by: string;
+}
 
-  const recentRequests = [
-    {
-      name: "MAT-REQ-2024-001",
-      purpose: "Purchase",
-      status: "Draft",
-      requestedBy: "John Doe",
-      date: "2024-01-15"
-    },
-    {
-      name: "MAT-REQ-2024-002", 
-      purpose: "Material Transfer",
-      status: "Submitted",
-      requestedBy: "Jane Smith",
-      date: "2024-01-14"
-    },
-    {
-      name: "MAT-REQ-2024-003",
-      purpose: "Material Issue",
-      status: "Partially Ordered",
-      requestedBy: "Mike Johnson",
-      date: "2024-01-13"
+const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDashboardProps) => {
+  const [stats, setStats] = useState({
+    draft: 0,
+    submitted: 0,
+    partiallyOrdered: 0,
+    ordered: 0,
+    cancelled: 0
+  });
+  const [recentRequests, setRecentRequests] = useState<MaterialRequestSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        console.warn('ERPNext API not configured');
+        return;
+      }
+
+      const company = await getUserDefaultCompany();
+      
+      // Fetch recent material requests (last 5)
+      const recentResult = await erpnextAPI.getMaterialRequests(
+        [['docstatus', '!=', 2]], // Exclude cancelled
+        company || undefined,
+        5
+      );
+
+      if (recentResult.data) {
+        setRecentRequests(recentResult.data);
+      }
+
+      // Fetch all material requests for stats
+      const allResult = await erpnextAPI.getMaterialRequests(
+        undefined,
+        company || undefined,
+        1000
+      );
+
+      if (allResult.data) {
+        const statsData = allResult.data.reduce((acc, req) => {
+          switch (req.status) {
+            case 'Draft':
+              acc.draft++;
+              break;
+            case 'Submitted':
+            case 'Pending':
+              acc.submitted++;
+              break;
+            case 'Partially Ordered':
+              acc.partiallyOrdered++;
+              break;
+            case 'Ordered':
+              acc.ordered++;
+              break;
+            case 'Cancelled':
+              acc.cancelled++;
+              break;
+          }
+          return acc;
+        }, { draft: 0, submitted: 0, partiallyOrdered: 0, ordered: 0, cancelled: 0 });
+
+        setStats(statsData);
+      }
+
+    } catch (error) {
+      console.error('Error fetching material request data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch material request data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Draft": return "bg-gray-100 text-gray-800";
-      case "Submitted": return "bg-blue-100 text-blue-800";
+      case "Submitted": 
+      case "Pending": return "bg-blue-100 text-blue-800";
       case "Partially Ordered": return "bg-yellow-100 text-yellow-800";
       case "Ordered": return "bg-green-100 text-green-800";
       case "Cancelled": return "bg-red-100 text-red-800";
@@ -167,25 +228,35 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {recentRequests.map((request) => (
-              <div key={request.name} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <FileText className="w-4 h-4 text-blue-600" />
-                  <div>
-                    <div className="font-medium">{request.name}</div>
-                    <div className="text-sm text-gray-500">{request.purpose} • {request.requestedBy}</div>
+          {loading ? (
+            <div className="text-center py-4">Loading recent requests...</div>
+          ) : recentRequests.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">No recent material requests found</div>
+          ) : (
+            <div className="space-y-3">
+              {recentRequests.map((request) => (
+                <div key={request.name} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <div className="font-medium">{request.name}</div>
+                      <div className="text-sm text-gray-500">
+                        {request.material_request_type} • {request.requested_by}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge className={getStatusColor(request.status)}>
+                      {request.status}
+                    </Badge>
+                    <span className="text-sm text-gray-500">
+                      {new Date(request.transaction_date).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge className={getStatusColor(request.status)}>
-                    {request.status}
-                  </Badge>
-                  <span className="text-sm text-gray-500">{request.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

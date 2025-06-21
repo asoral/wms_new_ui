@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, ArrowLeft } from "lucide-react";
@@ -7,7 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Import components
 import MaterialRequestDashboard from "@/components/material-request/MaterialRequestDashboard";
 import MaterialRequestList from "@/components/material-request/MaterialRequestList";
-import MaterialRequestForm from "@/components/material-request/MaterialRequestForm";
+// Import the new improved form
+import MaterialRequestFormImproved from "@/components/material-request/MaterialRequestFormImproved";
 
 export type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture" | "Customer Provided";
 export type MaterialRequestStatus = "Draft" | "Submitted" | "Stopped" | "Cancelled" | "Pending" | "Partially Ordered" | "Partially Received" | "Ordered" | "Issued" | "Transferred" | "Received";
@@ -96,7 +96,7 @@ const MaterialRequest = () => {
       
       case "form":
         return selectedPurpose ? (
-          <MaterialRequestForm
+          <MaterialRequestFormImproved
             purpose={selectedPurpose}
             editingRequest={editingRequest}
             onBack={editingRequest ? handleBackToList : handleBackToDashboard}

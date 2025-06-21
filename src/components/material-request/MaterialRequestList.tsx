@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Plus, 
   Search, 
-  Filter, 
   MoreHorizontal,
   FileText,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  RefreshCw
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -22,6 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MaterialRequest, MaterialRequestPurpose, MaterialRequestStatus } from "@/pages/MaterialRequest";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface MaterialRequestListProps {
   onCreateNew: (purpose: MaterialRequestPurpose) => void;
@@ -33,63 +35,80 @@ const MaterialRequestList = ({ onCreateNew, onEditRequest, onBackToDashboard }: 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [purposeFilter, setPurposeFilter] = useState<string>("all");
+  const [requests, setRequests] = useState<MaterialRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-  // Mock data - using correct property names from MaterialRequest interface
-  const mockRequests: MaterialRequest[] = [
-    {
-      id: "1",
-      name: "MAT-REQ-2024-001",
-      purpose: "Purchase",
-      status: "Draft",
-      transactionDate: "2024-01-15",
-      requestedBy: "John Doe",
-      company: "Test Company",
-      priority: "Medium",
-      items: [
-        {
-          itemCode: "ITM-001",
-          itemName: "Steel Rod 12mm",
-          qty: 100,
-          uom: "Nos",
-          rate: 50
-        }
-      ],
-      totalValue: 5000
-    },
-    {
-      id: "2",
-      name: "MAT-REQ-2024-002",
-      purpose: "Material Transfer",
-      status: "Submitted",
-      transactionDate: "2024-01-14",
-      requestedBy: "Jane Smith",
-      company: "Test Company",
-      priority: "High",
-      items: [
-        {
-          itemCode: "ITM-002",
-          itemName: "Cement 50kg",
-          qty: 50,
-          uom: "Bags",
-          fromWarehouse: "Main Store",
-          toWarehouse: "Site Store"
-        }
-      ]
+  useEffect(() => {
+    fetchMaterialRequests();
+  }, []);
+
+  const fetchMaterialRequests = async () => {
+    setLoading(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const company = await getUserDefaultCompany();
+      
+      const result = await erpnextAPI.getMaterialRequests(
+        undefined,
+        company || undefined,
+        100
+      );
+
+      if (result.data) {
+        // Transform ERPNext data to our MaterialRequest format
+        const transformedData: MaterialRequest[] = result.data.map((req: any) => ({
+          id: req.name,
+          name: req.name,
+          title: req.title || req.name,
+          purpose: req.material_request_type as MaterialRequestPurpose,
+          status: req.status as MaterialRequestStatus,
+          transactionDate: req.transaction_date,
+          requiredBy: req.required_by,
+          requestedBy: req.requested_by,
+          company: req.company,
+          priority: "Medium", // Default since ERPNext might not have this field
+          items: [], // Will be loaded when needed
+          remarks: req.remarks
+        }));
+        
+        setRequests(transformedData);
+      }
+
+    } catch (error) {
+      console.error('Error fetching material requests:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch material requests",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const getStatusColor = (status: MaterialRequestStatus) => {
     switch (status) {
       case "Draft": return "bg-gray-100 text-gray-800";
-      case "Submitted": return "bg-blue-100 text-blue-800";
-      case "Pending": return "bg-yellow-100 text-yellow-800";
+      case "Submitted": 
+      case "Pending": return "bg-blue-100 text-blue-800";
+      case "Partially Ordered": return "bg-yellow-100 text-yellow-800";
       case "Ordered": return "bg-green-100 text-green-800";
       case "Cancelled": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };
 
-  const filteredRequests = mockRequests.filter(request => {
+  const filteredRequests = requests.filter(request => {
     const matchesSearch = request.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          request.requestedBy.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || request.status === statusFilter;
@@ -142,6 +161,10 @@ const MaterialRequestList = ({ onCreateNew, onEditRequest, onBackToDashboard }: 
                 <SelectItem value="Manufacture">Manufacture</SelectItem>
               </SelectContent>
             </Select>
+
+            <Button variant="outline" size="icon" onClick={fetchMaterialRequests} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
@@ -172,7 +195,16 @@ const MaterialRequestList = ({ onCreateNew, onEditRequest, onBackToDashboard }: 
 
       {/* Material Requests List */}
       <div className="grid gap-4">
-        {filteredRequests.length === 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <div className="flex items-center justify-center space-x-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Loading material requests...</span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : filteredRequests.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center">
               <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -230,17 +262,17 @@ const MaterialRequestList = ({ onCreateNew, onEditRequest, onBackToDashboard }: 
                   </div>
                   <div>
                     <span className="text-gray-500">Date:</span>
-                    <p className="font-medium">{request.transactionDate}</p>
+                    <p className="font-medium">{new Date(request.transactionDate).toLocaleDateString()}</p>
                   </div>
                   <div>
-                    <span className="text-gray-500">Items:</span>
-                    <p className="font-medium">{request.items.length} item(s)</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Total Value:</span>
+                    <span className="text-gray-500">Required By:</span>
                     <p className="font-medium">
-                      {request.totalValue ? `₹${request.totalValue.toLocaleString()}` : 'N/A'}
+                      {request.requiredBy ? new Date(request.requiredBy).toLocaleDateString() : 'N/A'}
                     </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Company:</span>
+                    <p className="font-medium">{request.company}</p>
                   </div>
                 </div>
               </CardContent>

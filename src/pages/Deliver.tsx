@@ -607,18 +607,24 @@ const Deliver = () => {
             <Truck className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Deliver</h1>
           </div>
-          {selectedSO && (
-            <div className="flex items-center space-x-2">
-              <Badge variant="outline">{selectedSO.number}</Badge>
-              {currentDeliveryNote && (
-                <Badge variant="secondary">DN: {currentDeliveryNote}</Badge>
-              )}
-              <Button onClick={submitDeliveryNote} disabled={!currentDeliveryNote || loading}>
-                <Package className="w-4 h-4 mr-2" />
-                {loading ? 'Submitting...' : 'Submit Delivery Note'}
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center space-x-2">
+            {/* View Sales Orders button - always visible */}
+            <Button variant="outline" onClick={() => setActiveTab("dashboard")}>
+              View Sales Orders
+            </Button>
+            {selectedSO && (
+              <>
+                <Badge variant="outline">{selectedSO.number}</Badge>
+                {currentDeliveryNote && (
+                  <Badge variant="secondary">DN: {currentDeliveryNote}</Badge>
+                )}
+                <Button onClick={submitDeliveryNote} disabled={!currentDeliveryNote || loading}>
+                  <Package className="w-4 h-4 mr-2" />
+                  {loading ? 'Submitting...' : 'Submit Delivery Note'}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
