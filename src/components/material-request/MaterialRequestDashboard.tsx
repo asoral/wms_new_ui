@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Clock, CheckCircle, XCircle, ShoppingCart, ArrowRightLeft, Package, RefreshCw, Wrench } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ShoppingCart, ArrowRightLeft, Package, RefreshCw, Wrench, AlertTriangle, Pause, Truck, Archive } from "lucide-react";
 import MaterialRequestStatusChecker from "@/components/material-request/MaterialRequestStatusChecker";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -18,10 +18,17 @@ interface MaterialRequestDashboardProps {
 const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: MaterialRequestDashboardProps) => {
   const [stats, setStats] = useState({
     totalRequests: 0,
+    draftRequests: 0,
+    submittedRequests: 0,
     pendingRequests: 0,
-    approvedRequests: 0,
-    rejectedRequests: 0,
-    draftRequests: 0
+    partiallyOrderedRequests: 0,
+    orderedRequests: 0,
+    issuedRequests: 0,
+    transferredRequests: 0,
+    receivedRequests: 0,
+    cancelledRequests: 0,
+    stoppedRequests: 0,
+    partiallyReceivedRequests: 0
   });
   const [recentRequests, setRecentRequests] = useState<any[]>([]);
   const [draftRequests, setDraftRequests] = useState<any[]>([]);
@@ -43,11 +50,11 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
 
       const company = await getUserDefaultCompany();
       
-      // Fetch recent material requests
+      // Fetch recent material requests with more fields
       const recentRequestsResult = await erpnextAPI.getMaterialRequests(
         undefined,
         company || undefined,
-        20
+        50
       );
 
       if (recentRequestsResult.data) {
@@ -57,19 +64,33 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
         const drafts = recentRequestsResult.data.filter((req: any) => req.docstatus === 0);
         setDraftRequests(drafts);
         
-        // Calculate stats
+        // Calculate stats based on correct ERPNext statuses
         const total = recentRequestsResult.data.length;
-        const pending = recentRequestsResult.data.filter((req: any) => req.status === 'Pending' || req.status === 'Submitted').length;
-        const approved = recentRequestsResult.data.filter((req: any) => req.status === 'Ordered' || req.status === 'Issued').length;
-        const rejected = recentRequestsResult.data.filter((req: any) => req.status === 'Cancelled').length;
         const draft = drafts.length;
+        const submitted = recentRequestsResult.data.filter((req: any) => req.status === 'Submitted').length;
+        const pending = recentRequestsResult.data.filter((req: any) => req.status === 'Pending').length;
+        const partiallyOrdered = recentRequestsResult.data.filter((req: any) => req.status === 'Partially Ordered').length;
+        const ordered = recentRequestsResult.data.filter((req: any) => req.status === 'Ordered').length;
+        const issued = recentRequestsResult.data.filter((req: any) => req.status === 'Issued').length;
+        const transferred = recentRequestsResult.data.filter((req: any) => req.status === 'Transferred').length;
+        const received = recentRequestsResult.data.filter((req: any) => req.status === 'Received').length;
+        const cancelled = recentRequestsResult.data.filter((req: any) => req.status === 'Cancelled').length;
+        const stopped = recentRequestsResult.data.filter((req: any) => req.status === 'Stopped').length;
+        const partiallyReceived = recentRequestsResult.data.filter((req: any) => req.status === 'Partially Received').length;
 
         setStats({
           totalRequests: total,
+          draftRequests: draft,
+          submittedRequests: submitted,
           pendingRequests: pending,
-          approvedRequests: approved,
-          rejectedRequests: rejected,
-          draftRequests: draft
+          partiallyOrderedRequests: partiallyOrdered,
+          orderedRequests: ordered,
+          issuedRequests: issued,
+          transferredRequests: transferred,
+          receivedRequests: received,
+          cancelledRequests: cancelled,
+          stoppedRequests: stopped,
+          partiallyReceivedRequests: partiallyReceived
         });
       }
 
@@ -100,7 +121,7 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
           purpose: draftDetails.data.material_request_type as MaterialRequestPurpose,
           status: "Draft",
           transactionDate: draftDetails.data.transaction_date,
-          requestedBy: draftDetails.data.owner || "Current User",
+          requestedBy: draftDetails.data.owner || draftDetails.data.requested_by || "Current User",
           company: draftDetails.data.company,
           items: draftDetails.data.items?.map((item: any) => ({
             itemCode: item.item_code,
@@ -130,13 +151,48 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Draft": return "bg-gray-100 text-gray-800";
-      case "Submitted": 
-      case "Pending": return "bg-blue-100 text-blue-800";
-      case "Partially Ordered": return "bg-yellow-100 text-yellow-800";
+      case "Submitted": return "bg-blue-100 text-blue-800";
+      case "Pending": return "bg-yellow-100 text-yellow-800";
+      case "Partially Ordered": return "bg-orange-100 text-orange-800";
       case "Ordered": return "bg-green-100 text-green-800";
+      case "Issued": return "bg-green-100 text-green-800";
+      case "Transferred": return "bg-green-100 text-green-800";
+      case "Received": return "bg-green-100 text-green-800";
+      case "Partially Received": return "bg-lime-100 text-lime-800";
       case "Cancelled": return "bg-red-100 text-red-800";
+      case "Stopped": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
     }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "Draft": return FileText;
+      case "Submitted": return Clock;
+      case "Pending": return Clock;
+      case "Partially Ordered": return ShoppingCart;
+      case "Ordered": return CheckCircle;
+      case "Issued": return Package;
+      case "Transferred": return ArrowRightLeft;
+      case "Received": return Archive;
+      case "Partially Received": return Truck;
+      case "Cancelled": return XCircle;
+      case "Stopped": return Pause;
+      default: return FileText;
+    }
+  };
+
+  const formatRequestInfo = (request: any) => {
+    const itemCount = request.items?.length || 0;
+    const requestedBy = request.owner || request.requested_by || 'Unknown';
+    const date = new Date(request.transaction_date).toLocaleDateString();
+    
+    return {
+      itemCount,
+      requestedBy,
+      date,
+      subtitle: `${request.material_request_type} • ${itemCount} item${itemCount !== 1 ? 's' : ''} • ${requestedBy}`
+    };
   };
 
   return (
@@ -190,63 +246,75 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="p-2 bg-blue-100 rounded-lg mr-4">
-              <FileText className="w-6 h-6 text-blue-600" />
+          <CardContent className="flex items-center p-4">
+            <div className="p-2 bg-blue-100 rounded-lg mr-3">
+              <FileText className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.totalRequests}</p>
-              <p className="text-sm text-gray-600">Total Requests</p>
+              <p className="text-xl font-bold">{stats.totalRequests}</p>
+              <p className="text-xs text-gray-600">Total</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="p-2 bg-gray-100 rounded-lg mr-4">
-              <FileText className="w-6 h-6 text-gray-600" />
+          <CardContent className="flex items-center p-4">
+            <div className="p-2 bg-gray-100 rounded-lg mr-3">
+              <FileText className="w-5 h-5 text-gray-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.draftRequests}</p>
-              <p className="text-sm text-gray-600">Drafts</p>
+              <p className="text-xl font-bold">{stats.draftRequests}</p>
+              <p className="text-xs text-gray-600">Draft</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="p-2 bg-yellow-100 rounded-lg mr-4">
-              <Clock className="w-6 h-6 text-yellow-600" />
+          <CardContent className="flex items-center p-4">
+            <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+              <Clock className="w-5 h-5 text-yellow-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.pendingRequests}</p>
-              <p className="text-sm text-gray-600">Pending</p>
+              <p className="text-xl font-bold">{stats.pendingRequests}</p>
+              <p className="text-xs text-gray-600">Pending</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="p-2 bg-green-100 rounded-lg mr-4">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+          <CardContent className="flex items-center p-4">
+            <div className="p-2 bg-green-100 rounded-lg mr-3">
+              <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.approvedRequests}</p>
-              <p className="text-sm text-gray-600">Approved</p>
+              <p className="text-xl font-bold">{stats.orderedRequests + stats.issuedRequests + stats.transferredRequests + stats.receivedRequests}</p>
+              <p className="text-xs text-gray-600">Completed</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="p-2 bg-red-100 rounded-lg mr-4">
-              <XCircle className="w-6 h-6 text-red-600" />
+          <CardContent className="flex items-center p-4">
+            <div className="p-2 bg-orange-100 rounded-lg mr-3">
+              <AlertTriangle className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.rejectedRequests}</p>
-              <p className="text-sm text-gray-600">Rejected</p>
+              <p className="text-xl font-bold">{stats.partiallyOrderedRequests + stats.partiallyReceivedRequests}</p>
+              <p className="text-xs text-gray-600">Partial</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center p-4">
+            <div className="p-2 bg-red-100 rounded-lg mr-3">
+              <XCircle className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{stats.cancelledRequests + stats.stoppedRequests}</p>
+              <p className="text-xs text-gray-600">Cancelled</p>
             </div>
           </CardContent>
         </Card>
@@ -260,33 +328,33 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {draftRequests.map((request, index) => (
-                <div 
-                  key={index} 
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                  onClick={() => handleDraftClick(request.name, request.material_request_type)}
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="p-2 bg-gray-50 rounded-lg">
-                      <FileText className="w-4 h-4 text-gray-600" />
+              {draftRequests.map((request, index) => {
+                const info = formatRequestInfo(request);
+                const StatusIcon = getStatusIcon("Draft");
+                return (
+                  <div 
+                    key={index} 
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleDraftClick(request.name, request.material_request_type)}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <StatusIcon className="w-4 h-4 text-gray-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium">{request.name}</h4>
+                        <p className="text-sm text-gray-600">{info.subtitle}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-medium">{request.name}</h4>
-                      <p className="text-sm text-gray-600">
-                        {request.material_request_type} • {request.owner || 'Unknown'}
-                      </p>
+                    <div className="flex items-center space-x-2">
+                      <Badge className="bg-gray-100 text-gray-800">
+                        Draft
+                      </Badge>
+                      <span className="text-sm text-gray-500">{info.date}</span>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge className="bg-gray-100 text-gray-800">
-                      Draft
-                    </Badge>
-                    <span className="text-sm text-gray-500">
-                      {new Date(request.transaction_date).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -313,29 +381,29 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
             </div>
           ) : (
             <div className="space-y-4">
-              {recentRequests.slice(0, 5).map((request, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-2 bg-blue-50 rounded-lg">
-                      <FileText className="w-4 h-4 text-blue-600" />
+              {recentRequests.slice(0, 8).map((request, index) => {
+                const info = formatRequestInfo(request);
+                const StatusIcon = getStatusIcon(request.status);
+                return (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-2 bg-blue-50 rounded-lg">
+                        <StatusIcon className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium">{request.name}</h4>
+                        <p className="text-sm text-gray-600">{info.subtitle}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-medium">{request.name}</h4>
-                      <p className="text-sm text-gray-600">
-                        {request.material_request_type} • {request.owner || 'Unknown'}
-                      </p>
+                    <div className="flex items-center space-x-2">
+                      <Badge className={getStatusColor(request.status)}>
+                        {request.status}
+                      </Badge>
+                      <span className="text-sm text-gray-500">{info.date}</span>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge className={getStatusColor(request.status)}>
-                      {request.status}
-                    </Badge>
-                    <span className="text-sm text-gray-500">
-                      {new Date(request.transaction_date).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
