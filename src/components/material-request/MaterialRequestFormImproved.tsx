@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -296,7 +295,7 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                         <Label>UOM</Label>
                         <UOMSelector
                           value={item.uom}
-                          onValue
+                          onValueChange={(uom) => updateItem(index, 'uom', uom)}
                           disabled={!item.itemCode}
                         />
                       </div>

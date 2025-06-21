@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Import components
 import DeliverDashboard from "@/components/deliver/DeliverDashboard";
-import DeliveryForm from "@/components/deliver/DeliveryForm";
 import DeliverySalesOrderList from "@/components/deliver/DeliverySalesOrderList";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -72,6 +71,7 @@ export interface SalesOrder {
   totalValue: number;
   percentDelivered?: number;
   items: SOItem[];
+  per_delivered?: number;
 }
 
 export interface DeliveryEntry {
@@ -95,7 +95,7 @@ export interface DashboardData {
 }
 
 const Deliver = () => {
-  const [currentView, setCurrentView] = useState<"dashboard" | "form" | "salesOrderList">("dashboard");
+  const [currentView, setCurrentView] = useState<"dashboard" | "salesOrderList">("dashboard");
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrderOption | null>(null);
   const [editingDeliveryNote, setEditingDeliveryNote] = useState<DeliveryNote | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -176,13 +176,21 @@ const Deliver = () => {
   const handleSelectSalesOrder = (salesOrder: SalesOrderOption) => {
     setSelectedSalesOrder(salesOrder);
     setEditingDeliveryNote(null);
-    setCurrentView("form");
+    // For now, just show selection - actual delivery form implementation would go here
+    toast({
+      title: "Sales Order Selected",
+      description: `Selected ${salesOrder.label} for delivery processing`,
+    });
   };
 
   const handleEditDeliveryNote = (deliveryNote: DeliveryNote) => {
     setEditingDeliveryNote(deliveryNote);
     setSelectedSalesOrder(null);
-    setCurrentView("form");
+    // Delivery note editing would be implemented here
+    toast({
+      title: "Delivery Note Selected",
+      description: `Selected ${deliveryNote.name} for editing`,
+    });
   };
 
   const handleBackToDashboard = () => {
@@ -220,19 +228,6 @@ const Deliver = () => {
           </div>
         );
       
-      case "form":
-        return selectedSalesOrder ? (
-          <DeliveryForm
-            selectedSalesOrder={selectedSalesOrder}
-            onBack={handleBackToDashboard}
-            onSave={() => {
-              // After saving, refresh dashboard and go back
-              fetchDashboardData();
-              handleBackToDashboard();
-            }}
-          />
-        ) : null;
-      
       default:
         return null;
     }
@@ -256,12 +251,12 @@ const Deliver = () => {
             <Truck className="w-6 h-6 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Deliver</h1>
-              {currentView === "form" && selectedSalesOrder && (
+              {selectedSalesOrder && (
                 <p className="text-sm text-gray-600">
-                  Creating delivery for {selectedSalesOrder.label}
+                  Selected: {selectedSalesOrder.label}
                 </p>
               )}
-              {currentView === "form" && editingDeliveryNote && (
+              {editingDeliveryNote && (
                 <p className="text-sm text-gray-600">
                   Editing delivery note {editingDeliveryNote.name}
                 </p>
