@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Save } from "lucide-react";
+import { Plus, Trash2, Save, Check } from "lucide-react";
 import { MaterialRequestPurpose, MaterialRequestItem, MaterialRequest } from "@/pages/MaterialRequest";
 import ItemSelector from "../item-enquiry/ItemSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
@@ -47,7 +47,7 @@ const MaterialRequestFormImproved = ({
   });
   const { toast } = useToast();
 
-  const addItem = () => {
+  const addNewItemRow = () => {
     setItems([
       ...items,
       {
@@ -91,11 +91,6 @@ const MaterialRequestFormImproved = ({
         };
         setItems(updatedItems);
         
-        // Create draft when first item is added
-        if (!draftRequest && items[0].itemCode === "") {
-          await createDraft(updatedItems);
-        }
-        
         toast({
           title: "Item Details Loaded",
           description: `Item ${itemDetails.data.item_name} details loaded successfully`,
@@ -113,23 +108,59 @@ const MaterialRequestFormImproved = ({
     }
   };
 
-  const createDraft = async (currentItems: MaterialRequestItem[]) => {
+  const addItemToRequest = async (index: number) => {
+    const item = items[index];
+    
+    if (!item.itemCode || item.qty <= 0) {
+      toast({
+        title: "Error",
+        description: "Please select an item and enter a valid quantity",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // If no draft exists, create one
+      if (!draftRequest) {
+        await createDraft([item]);
+      } else {
+        // Update existing draft
+        await updateDraft([...draftRequest.items, item]);
+      }
+      
+      toast({
+        title: "Item Added",
+        description: `${item.itemName} added to material request`,
+      });
+      
+    } catch (error) {
+      console.error('Error adding item to request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add item to request",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createDraft = async (itemsToAdd: MaterialRequestItem[]) => {
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
       const company = await getUserDefaultCompany();
       
-      const validItems = currentItems.filter(item => item.itemCode && item.itemCode.trim() !== "");
-      
-      if (validItems.length === 0) return;
-
       const materialRequestData = {
         material_request_type: purpose,
         transaction_date: new Date().toISOString().split('T')[0],
         company: company,
         docstatus: 0, // Draft status
-        items: validItems.map(item => ({
+        items: itemsToAdd.map(item => ({
           item_code: item.itemCode,
           qty: item.qty || 1,
           uom: item.uom,
@@ -154,7 +185,7 @@ const MaterialRequestFormImproved = ({
           transactionDate: new Date().toISOString().split('T')[0],
           requestedBy: "Current User",
           company: company || "",
-          items: validItems,
+          items: itemsToAdd,
           remarks: formData.remarks
         };
         
@@ -167,21 +198,23 @@ const MaterialRequestFormImproved = ({
       }
     } catch (error) {
       console.error('Error creating draft:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create draft material request",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleSaveDraft = async () => {
+  const updateDraft = async (updatedItems: MaterialRequestItem[]) => {
     if (!draftRequest) return;
     
-    setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "");
-      
       const updateData = {
-        items: validItems.map(item => ({
+        items: updatedItems.map(item => ({
           item_code: item.itemCode,
           qty: item.qty,
           uom: item.uom,
@@ -194,6 +227,28 @@ const MaterialRequestFormImproved = ({
       };
 
       await erpnextAPI.updateMaterialRequest(draftRequest.name, updateData);
+      
+      // Update local draft state
+      const updatedDraft = {
+        ...draftRequest,
+        items: updatedItems,
+        remarks: formData.remarks
+      };
+      onDraftCreated(updatedDraft);
+      
+    } catch (error) {
+      console.error('Error updating draft:', error);
+      throw error;
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!draftRequest) return;
+    
+    setLoading(true);
+    try {
+      const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "");
+      await updateDraft(validItems);
       
       toast({
         title: "Draft Saved",
@@ -268,9 +323,9 @@ const MaterialRequestFormImproved = ({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Items</CardTitle>
-            <Button type="button" onClick={addItem} size="sm">
+            <Button type="button" onClick={addNewItemRow} size="sm">
               <Plus className="w-4 h-4 mr-2" />
-              Add Item
+              Add Item Row
             </Button>
           </CardHeader>
           <CardContent>
@@ -284,7 +339,10 @@ const MaterialRequestFormImproved = ({
                   onItemSelected={(itemCode) => handleItemSelected(index, itemCode)}
                   onUpdateItem={updateItem}
                   onRemoveItem={removeItem}
+                  onAddToRequest={() => addItemToRequest(index)}
                   canRemove={items.length > 1}
+                  loading={loading}
+                  isInDraft={draftRequest?.items.some(draftItem => draftItem.itemCode === item.itemCode) || false}
                 />
               ))}
             </div>
@@ -306,7 +364,7 @@ const MaterialRequestFormImproved = ({
             <Button 
               type="button" 
               onClick={onReviewAndSubmit} 
-              disabled={!draftRequest || items.filter(item => item.itemCode).length === 0}
+              disabled={!draftRequest}
               className="w-full sm:w-auto"
             >
               Review & Submit
@@ -325,7 +383,10 @@ interface ItemFormRowProps {
   onItemSelected: (itemCode: string) => void;
   onUpdateItem: (index: number, field: keyof MaterialRequestItem, value: any) => void;
   onRemoveItem: (index: number) => void;
+  onAddToRequest: () => void;
   canRemove: boolean;
+  loading: boolean;
+  isInDraft: boolean;
 }
 
 const ItemFormRow = ({ 
@@ -335,23 +396,45 @@ const ItemFormRow = ({
   onItemSelected, 
   onUpdateItem, 
   onRemoveItem, 
-  canRemove 
+  onAddToRequest,
+  canRemove,
+  loading,
+  isInDraft
 }: ItemFormRowProps) => {
   return (
     <div className="border rounded-lg p-4 space-y-4">
       <div className="flex justify-between items-start">
         <h4 className="font-medium">Item {index + 1}</h4>
-        {canRemove && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => onRemoveItem(index)}
-            className="text-red-600 hover:text-red-700"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        )}
+        <div className="flex space-x-2">
+          {!isInDraft && (
+            <Button
+              type="button"
+              onClick={onAddToRequest}
+              disabled={!item.itemCode || item.qty <= 0 || loading}
+              size="sm"
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              {loading ? 'Adding...' : 'Add Item'}
+            </Button>
+          )}
+          {isInDraft && (
+            <span className="text-sm text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
+              Added to Request
+            </span>
+          )}
+          {canRemove && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => onRemoveItem(index)}
+              className="text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-4">
