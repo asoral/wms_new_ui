@@ -3,11 +3,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Warehouse, TrendingUp, AlertTriangle, Calendar, DollarSign, Camera } from "lucide-react";
+import { Package, Warehouse, TrendingUp, AlertTriangle, Calendar, DollarSign } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import ItemSelector from "@/components/item-enquiry/ItemSelector";
-import CameraScanner from "@/components/item-enquiry/CameraScanner";
+import ItemScanner from "@/components/item-enquiry/ItemScanner";
 
 interface StockItem {
   itemCode: string;
@@ -27,7 +26,6 @@ const ItemEnquiry = () => {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<string>("");
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
-  const [showCameraScanner, setShowCameraScanner] = useState(false);
   const { toast } = useToast();
 
   const loadItemStock = async (itemCode: string) => {
@@ -171,24 +169,15 @@ const ItemEnquiry = () => {
             <CardTitle>Select Item</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ItemSelector 
-              onItemSelected={loadItemStock}
+            <ItemScanner 
+              onItemScanned={loadItemStock}
               isLoading={loading}
             />
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowCameraScanner(true)}
-                className="flex-1"
-              >
-                <Camera className="w-4 h-4 mr-2" />
-                Camera
-              </Button>
+            <div className="flex justify-end">
               <Button 
                 type="button" 
                 variant="secondary" 
                 onClick={handleClear}
-                className="flex-1"
               >
                 Clear
               </Button>
@@ -365,16 +354,6 @@ const ItemEnquiry = () => {
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {showCameraScanner && (
-        <CameraScanner
-          onBarcodeScanned={(barcode) => {
-            setShowCameraScanner(false);
-            loadItemStock(barcode);
-          }}
-          onClose={() => setShowCameraScanner(false)}
-        />
       )}
     </div>
   );
