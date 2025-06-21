@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeliverDashboard from "@/components/deliver/DeliverDashboard";
 import DeliverySalesOrderList from "@/components/deliver/DeliverySalesOrderList";
 import EnhancedDeliveryItemScanner from "@/components/deliver/EnhancedDeliveryItemScanner";
+import SOItemsDisplay from "@/components/deliver/SOItemsDisplay";
 import DeliveryProcess from "@/components/deliver/DeliveryProcess";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -188,6 +189,9 @@ const Deliver = () => {
 
       const company = await getUserDefaultCompany();
 
+      // First, get the full sales order details to include items
+      const salesOrderDetails = await erpnextAPI.sales.getSalesOrder(salesOrder.value);
+      
       const deliveryNoteData = {
         doctype: "Delivery Note",
         customer: salesOrder.customer,
@@ -196,7 +200,17 @@ const Deliver = () => {
         set_posting_time: 0,
         posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
         docstatus: 0, // Draft
-        items: [],
+        items: salesOrderDetails.data.items?.map((item: any) => ({
+          item_code: item.item_code,
+          item_name: item.item_name,
+          qty: 0, // Will be updated when items are scanned
+          rate: item.rate,
+          amount: 0,
+          warehouse: item.warehouse,
+          uom: item.uom,
+          against_sales_order: salesOrder.value,
+          so_detail: item.name
+        })) || [],
         territory: "All Territories",
         currency: "INR",
         selling_price_list: "Standard Selling",
@@ -379,6 +393,14 @@ const Deliver = () => {
                 </div>
               </div>
             </div>
+
+            {/* Sales Order Items Display */}
+            {selectedSalesOrder.items && (
+              <SOItemsDisplay
+                items={selectedSalesOrder.items}
+                title={`Items in ${selectedSalesOrder.value}`}
+              />
+            )}
 
             {/* Item Scanner */}
             {selectedSalesOrder.items && (
