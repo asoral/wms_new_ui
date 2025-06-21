@@ -11,6 +11,7 @@ import ItemSelector from "../item-enquiry/ItemSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import UOMSelector from "./UOMSelector";
 
 interface MaterialRequestFormImprovedProps {
   purpose: MaterialRequestPurpose;
@@ -65,12 +66,14 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
   };
 
   const handleItemSelected = async (index: number, itemCode: string) => {
+    console.log('Item selected:', itemCode);
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
       const itemDetails = await erpnextAPI.getItemDetails(itemCode);
       if (itemDetails.data) {
+        console.log('Item details:', itemDetails.data);
         updateItem(index, 'itemCode', itemCode);
         updateItem(index, 'itemName', itemDetails.data.item_name || itemCode);
         updateItem(index, 'uom', itemDetails.data.stock_uom || 'Nos');
@@ -267,6 +270,14 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                       isLoading={false}
                     />
 
+                    {/* Show selected item name */}
+                    {item.itemName && (
+                      <div className="p-2 bg-gray-50 rounded">
+                        <span className="text-sm text-gray-600">Selected: </span>
+                        <span className="font-medium">{item.itemName}</span>
+                      </div>
+                    )}
+
                     {/* Quantity and UOM */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
@@ -282,23 +293,11 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                       </div>
                       <div>
                         <Label>UOM</Label>
-                        <Select
+                        <UOMSelector
                           value={item.uom}
                           onValueChange={(value) => updateItem(index, 'uom', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Nos">Nos</SelectItem>
-                            <SelectItem value="Kg">Kg</SelectItem>
-                            <SelectItem value="Liters">Liters</SelectItem>
-                            <SelectItem value="Meters">Meters</SelectItem>
-                            <SelectItem value="Bags">Bags</SelectItem>
-                            <SelectItem value="Box">Box</SelectItem>
-                            <SelectItem value="Set">Set</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          disabled={!item.itemCode}
+                        />
                       </div>
                       <div>
                         <Label>Required By</Label>
@@ -328,7 +327,6 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                           <Label>Warehouse</Label>
                           <WarehouseSelector
                             onWarehouseSelected={(warehouse) => updateItem(index, 'warehouse', warehouse)}
-                            placeholder="Select warehouse"
                           />
                         </div>
                       </div>

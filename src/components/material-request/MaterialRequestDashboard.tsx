@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import MaterialRequestStatusChecker from "./MaterialRequestStatusChecker";
 
 interface MaterialRequestDashboardProps {
   onCreateNew: (purpose: string) => void;
@@ -68,11 +68,11 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
         // Transform the data to match MaterialRequestSummary interface
         const transformedRequests: MaterialRequestSummary[] = recentResult.data.map(req => ({
           name: req.name,
-          title: req.title,
-          material_request_type: req.material_request_type || req.purpose || 'Purchase',
+          title: req.title || req.name,
+          material_request_type: req.material_request_type || 'Purchase',
           status: req.status,
-          transaction_date: req.transaction_date || req.transactionDate,
-          requested_by: req.requested_by || req.requestedBy || 'System'
+          transaction_date: req.transaction_date,
+          requested_by: req.requested_by || 'System'
         }));
         setRecentRequests(transformedRequests);
       }
@@ -178,6 +178,9 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
           </CardContent>
         </Card>
       </div>
+
+      {/* Status Checker */}
+      <MaterialRequestStatusChecker />
 
       {/* Create New Material Request */}
       <Card>
