@@ -133,12 +133,12 @@ const StockCount = () => {
       const result = await erpnextAPI.createStockReconciliation(stockReconciliationData);
       console.log('Stock Reconciliation creation result:', result);
       
-      if (result && result.data && result.data.name) {
+      if (result && result.data && typeof result.data === 'object' && 'name' in result.data) {
         console.log('Stock Reconciliation created successfully:', result.data.name);
         toast.success('Stock Reconciliation created successfully!', {
           description: `Document: ${result.data.name}`
         });
-        return result.data.name;
+        return result.data.name as string;
       } else {
         console.error('Failed to create Stock Reconciliation - no name in response:', result);
         toast.error('Failed to create Stock Reconciliation - Invalid response');

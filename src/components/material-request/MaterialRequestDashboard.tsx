@@ -1,8 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FileText, Clock, CheckCircle, XCircle, ShoppingCart, ArrowRightLeft, Package, RefreshCw } from "lucide-react";
-import { MaterialRequestStatusChecker } from "@/components/material-request/MaterialRequestStatusChecker";
+import MaterialRequestStatusChecker from "@/components/material-request/MaterialRequestStatusChecker";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -208,7 +210,7 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
                     <div>
                       <h4 className="font-medium">{request.name}</h4>
                       <p className="text-sm text-gray-600">
-                        {request.material_request_type} • {request.requested_by || 'Unknown'}
+                        {request.material_request_type} • {request.owner || 'Unknown'}
                       </p>
                     </div>
                   </div>

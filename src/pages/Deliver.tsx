@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Import components
 import DeliverDashboard from "@/components/deliver/DeliverDashboard";
 import DeliveryForm from "@/components/deliver/DeliveryForm";
-import DeliveryNotesList from "@/components/deliver/DeliveryNotesList";
 import DeliverySalesOrderList from "@/components/deliver/DeliverySalesOrderList";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -81,6 +80,7 @@ export interface DeliveryEntry {
   warehouse: string;
   batch?: string;
   serial?: string;
+  serial_batch_bundle?: string;
   qtyToDeliver: number;
   actualQty: number;
   rate: number;
@@ -95,7 +95,7 @@ export interface DashboardData {
 }
 
 const Deliver = () => {
-  const [currentView, setCurrentView] = useState<"dashboard" | "form" | "list" | "salesOrderList">("dashboard");
+  const [currentView, setCurrentView] = useState<"dashboard" | "form" | "salesOrderList">("dashboard");
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrderOption | null>(null);
   const [editingDeliveryNote, setEditingDeliveryNote] = useState<DeliveryNote | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -191,12 +191,6 @@ const Deliver = () => {
     setEditingDeliveryNote(null);
   };
 
-  const handleBackToList = () => {
-    setCurrentView("list");
-    setSelectedSalesOrder(null);
-    setEditingDeliveryNote(null);
-  };
-
   const handleViewSalesOrders = () => {
     setCurrentView("salesOrderList");
   };
@@ -226,29 +220,15 @@ const Deliver = () => {
           </div>
         );
       
-      case "list":
-        return (
-          <DeliveryNotesList
-            onCreateNew={() => setCurrentView("dashboard")}
-            onEditDeliveryNote={handleEditDeliveryNote}
-            onBackToDashboard={handleBackToDashboard}
-          />
-        );
-      
       case "form":
-        return selectedSalesOrder || editingDeliveryNote ? (
+        return selectedSalesOrder ? (
           <DeliveryForm
-            salesOrder={selectedSalesOrder}
-            editingDeliveryNote={editingDeliveryNote}
-            onBack={editingDeliveryNote ? handleBackToList : handleBackToDashboard}
+            selectedSalesOrder={selectedSalesOrder}
+            onBack={handleBackToDashboard}
             onSave={() => {
               // After saving, refresh dashboard and go back
               fetchDashboardData();
-              if (editingDeliveryNote) {
-                handleBackToList();
-              } else {
-                handleBackToDashboard();
-              }
+              handleBackToDashboard();
             }}
           />
         ) : null;
@@ -268,10 +248,7 @@ const Deliver = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={currentView === "form" ? 
-                  (editingDeliveryNote ? handleBackToList : handleBackToDashboard) : 
-                  handleBackToDashboard
-                }
+                onClick={handleBackToDashboard}
               >
                 <ArrowLeft className="w-4 h-4" />
               </Button>
