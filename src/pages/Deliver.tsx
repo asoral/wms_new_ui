@@ -103,6 +103,7 @@ const Deliver = () => {
   const [currentStep, setCurrentStep] = useState<"dashboard" | "deliverItems" | "reviewSubmit">("dashboard");
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrderOption | null>(null);
   const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
+  const [currentDeliveryNote, setCurrentDeliveryNote] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     todaysDelivery: 0,
     totalDeliveries: 0,
@@ -178,10 +179,71 @@ const Deliver = () => {
     }
   };
 
-  const handleSelectSalesOrder = (salesOrder: SalesOrderOption) => {
+  const createDraftDeliveryNote = async (salesOrder: SalesOrderOption) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured');
+      }
+
+      const company = await getUserDefaultCompany();
+
+      const deliveryNoteData = {
+        doctype: "Delivery Note",
+        customer: salesOrder.customer,
+        company: company,
+        posting_date: new Date().toISOString().split('T')[0],
+        set_posting_time: 0,
+        posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+        docstatus: 0, // Draft
+        items: [],
+        territory: "All Territories",
+        currency: "INR",
+        selling_price_list: "Standard Selling",
+        ignore_pricing_rule: 1
+      };
+
+      console.log('Creating draft delivery note:', deliveryNoteData);
+
+      const result = await erpnextAPI.sales.createDeliveryNote(deliveryNoteData);
+      
+      if (result.data && result.data.name) {
+        setCurrentDeliveryNote(result.data.name);
+        console.log('Draft delivery note created:', result.data.name);
+        
+        toast({
+          title: "Draft Created",
+          description: `Draft delivery note ${result.data.name} created successfully`,
+        });
+
+        return result.data.name;
+      }
+    } catch (error) {
+      console.error('Error creating draft delivery note:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create draft delivery note",
+        variant: "destructive"
+      });
+    }
+    return null;
+  };
+
+  const handleSelectSalesOrder = async (salesOrder: SalesOrderOption) => {
     console.log('Sales order selected:', salesOrder);
     setSelectedSalesOrder(salesOrder);
     setDeliveryEntries([]);
+    
+    // Create draft delivery note if not already a draft
+    if (!salesOrder.isDraft) {
+      const draftName = await createDraftDeliveryNote(salesOrder);
+      if (draftName) {
+        setCurrentDeliveryNote(draftName);
+      }
+    } else {
+      setCurrentDeliveryNote(salesOrder.draftName || null);
+    }
+    
     setCurrentStep("deliverItems");
     
     toast({
@@ -198,6 +260,7 @@ const Deliver = () => {
     setCurrentStep("dashboard");
     setSelectedSalesOrder(null);
     setDeliveryEntries([]);
+    setCurrentDeliveryNote(null);
   };
 
   const handleViewSalesOrders = () => {
@@ -220,6 +283,63 @@ const Deliver = () => {
     setCurrentStep("reviewSubmit");
   };
 
+  const handleSubmitDeliveryNote = async () => {
+    if (!currentDeliveryNote || deliveryEntries.length === 0) {
+      toast({
+        title: "Cannot Submit",
+        description: "No delivery note or items to submit",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured');
+      }
+
+      // Update the draft delivery note with items
+      const deliveryItems = deliveryEntries.map(entry => ({
+        item_code: entry.itemCode,
+        item_name: entry.itemName,
+        qty: entry.qtyToDeliver,
+        rate: entry.rate,
+        amount: entry.qtyToDeliver * entry.rate,
+        warehouse: entry.warehouse,
+        uom: entry.uom,
+        ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })
+      }));
+
+      const updateData = {
+        items: deliveryItems,
+        docstatus: 1 // Submit the delivery note
+      };
+
+      await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, updateData);
+
+      toast({
+        title: "Delivery Note Submitted",
+        description: `Delivery note ${currentDeliveryNote} has been submitted successfully`,
+      });
+
+      // Reset and go back to dashboard
+      handleBackToDashboard();
+      fetchDashboardData(); // Refresh dashboard data
+
+    } catch (error) {
+      console.error('Error submitting delivery note:', error);
+      toast({
+        title: "Submission Error",
+        description: "Failed to submit delivery note",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const renderTabContent = () => {
     switch (currentStep) {
       case "dashboard":
@@ -240,7 +360,7 @@ const Deliver = () => {
             {/* Sales Order Info */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="font-medium text-blue-900 mb-2">Selected Sales Order</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <span className="text-gray-600">Order:</span>
                   <div className="font-medium">{selectedSalesOrder.value}</div>
@@ -253,6 +373,10 @@ const Deliver = () => {
                   <span className="text-gray-600">Amount:</span>
                   <div className="font-medium">₹{selectedSalesOrder.grand_total.toLocaleString()}</div>
                 </div>
+                <div>
+                  <span className="text-gray-600">Draft DN:</span>
+                  <div className="font-medium text-green-600">{currentDeliveryNote || 'Creating...'}</div>
+                </div>
               </div>
             </div>
 
@@ -262,7 +386,7 @@ const Deliver = () => {
                 soItems={selectedSalesOrder.items}
                 onAddEntry={handleAddDeliveryEntry}
                 company={getUserDefaultCompany()?.toString()}
-                deliveryNoteName={selectedSalesOrder.isDraft ? selectedSalesOrder.draftName : undefined}
+                deliveryNoteName={currentDeliveryNote || undefined}
               />
             )}
 
@@ -280,6 +404,7 @@ const Deliver = () => {
                         <th className="text-left p-2">Quantity</th>
                         <th className="text-left p-2">UOM</th>
                         <th className="text-left p-2">Rate</th>
+                        <th className="text-left p-2">Bundle</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -291,6 +416,9 @@ const Deliver = () => {
                           <td className="p-2">{entry.qtyToDeliver}</td>
                           <td className="p-2">{entry.uom}</td>
                           <td className="p-2">₹{entry.rate}</td>
+                          <td className="p-2 text-xs text-gray-500">
+                            {entry.serial_batch_bundle || '-'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -314,7 +442,7 @@ const Deliver = () => {
             {/* Summary */}
             <div className="bg-white border rounded-lg p-4">
               <h3 className="font-medium mb-4">Delivery Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
                 <div>
                   <span className="text-gray-600">Sales Order:</span>
                   <div className="font-medium">{selectedSalesOrder?.value}</div>
@@ -326,6 +454,10 @@ const Deliver = () => {
                 <div>
                   <span className="text-gray-600">Total Items:</span>
                   <div className="font-medium">{deliveryEntries.length}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Draft DN:</span>
+                  <div className="font-medium text-green-600">{currentDeliveryNote}</div>
                 </div>
               </div>
 
@@ -339,6 +471,7 @@ const Deliver = () => {
                       <th className="text-left p-3">Quantity</th>
                       <th className="text-left p-3">Rate</th>
                       <th className="text-left p-3">Amount</th>
+                      <th className="text-left p-3">Bundle</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -350,6 +483,7 @@ const Deliver = () => {
                         <td className="p-3">{entry.qtyToDeliver} {entry.uom}</td>
                         <td className="p-3">₹{entry.rate}</td>
                         <td className="p-3">₹{(entry.qtyToDeliver * entry.rate).toLocaleString()}</td>
+                        <td className="p-3 text-xs text-gray-500">{entry.serial_batch_bundle || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -358,8 +492,8 @@ const Deliver = () => {
             </div>
 
             <div className="flex justify-center">
-              <Button size="lg" className="px-8">
-                Submit Delivery Note
+              <Button size="lg" className="px-8" onClick={handleSubmitDeliveryNote} disabled={isLoading}>
+                {isLoading ? 'Submitting...' : 'Submit Delivery Note'}
               </Button>
             </div>
           </div>
@@ -382,6 +516,7 @@ const Deliver = () => {
               {selectedSalesOrder && (
                 <p className="text-sm text-gray-600">
                   Selected: {selectedSalesOrder.label}
+                  {currentDeliveryNote && <span className="text-green-600 ml-2">• DN: {currentDeliveryNote}</span>}
                 </p>
               )}
             </div>
@@ -402,7 +537,12 @@ const Deliver = () => {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="dashboard" disabled>Dashboard</TabsTrigger>
               <TabsTrigger value="deliverItems">Deliver Items</TabsTrigger>
-              <TabsTrigger value="reviewSubmit" disabled={deliveryEntries.length === 0}>Review & Submit</TabsTrigger>
+              <TabsTrigger value="reviewSubmit" disabled={deliveryEntries.length === 0} className="relative">
+                Review & Submit
+                {deliveryEntries.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="deliverItems" className="mt-6">
