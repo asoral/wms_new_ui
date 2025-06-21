@@ -12,6 +12,7 @@ import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import UOMSelector from "./UOMSelector";
+import SerialBatchBundleSelector from "../stock-count/SerialBatchBundleSelector";
 
 interface MaterialRequestFormImprovedProps {
   purpose: MaterialRequestPurpose;
@@ -66,25 +67,43 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
   };
 
   const handleItemSelected = async (index: number, itemCode: string) => {
-    console.log('Item selected:', itemCode);
+    console.log('Item selected for material request:', itemCode);
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
       const itemDetails = await erpnextAPI.getItemDetails(itemCode);
       if (itemDetails.data) {
-        console.log('Item details:', itemDetails.data);
+        console.log('Item details fetched:', itemDetails.data);
         updateItem(index, 'itemCode', itemCode);
         updateItem(index, 'itemName', itemDetails.data.item_name || itemCode);
         updateItem(index, 'uom', itemDetails.data.stock_uom || 'Nos');
-        // Set description from item details
         updateItem(index, 'description', itemDetails.data.description || '');
+        
+        toast({
+          title: "Item Details Loaded",
+          description: `Item ${itemDetails.data.item_name} details loaded successfully`,
+        });
       }
     } catch (error) {
       console.error('Error fetching item details:', error);
       updateItem(index, 'itemCode', itemCode);
       updateItem(index, 'itemName', itemCode);
+      toast({
+        title: "Warning",
+        description: "Item selected but details could not be loaded",
+        variant: "destructive"
+      });
     }
+  };
+
+  const handleBundleCreated = (index: number, bundleName: string, totalQty: number) => {
+    updateItem(index, 'serialBatchBundle', bundleName);
+    updateItem(index, 'qty', totalQty);
+    toast({
+      title: "Bundle Created",
+      description: `Serial and Batch Bundle created: ${bundleName}`,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,16 +118,12 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
 
       const company = await getUserDefaultCompany();
       
-      // Validate items - ensure itemCode exists and qty is greater than 0
       const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0);
-      console.log('Valid items:', validItems);
-      console.log('All items:', items);
       
       if (validItems.length === 0) {
         throw new Error('Please add at least one item with valid item code and quantity greater than 0');
       }
 
-      // Prepare material request data
       const materialRequestData = {
         material_request_type: purpose,
         transaction_date: new Date().toISOString().split('T')[0],
@@ -228,104 +243,17 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
           <CardContent>
             <div className="space-y-6">
               {items.map((item, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-medium">Item {index + 1}</h4>
-                    {items.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeItem(index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Item Selection */}
-                    <ItemSelector
-                      onItemSelected={(itemCode) => handleItemSelected(index, itemCode)}
-                      isLoading={false}
-                    />
-
-                    {/* Show selected item name */}
-                    {item.itemName && (
-                      <div className="p-2 bg-gray-50 rounded">
-                        <span className="text-sm text-gray-600">Selected: </span>
-                        <span className="font-medium">{item.itemName}</span>
-                      </div>
-                    )}
-
-                    {/* Item Description */}
-                    <div>
-                      <Label>Description</Label>
-                      <Textarea
-                        value={item.description || ""}
-                        onChange={(e) => updateItem(index, 'description', e.target.value)}
-                        placeholder="Item description..."
-                        rows={2}
-                      />
-                    </div>
-
-                    {/* Quantity and UOM */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label>Quantity *</Label>
-                        <Input
-                          type="number"
-                          value={item.qty}
-                          onChange={(e) => updateItem(index, 'qty', parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <Label>UOM</Label>
-                        <UOMSelector
-                          value={item.uom}
-                          onValueChange={(uom) => updateItem(index, 'uom', uom)}
-                          disabled={!item.itemCode}
-                        />
-                      </div>
-                      <div>
-                        <Label>Required By</Label>
-                        <Input
-                          type="date"
-                          value={item.requiredBy || ""}
-                          onChange={(e) => updateItem(index, 'requiredBy', e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Additional fields for Purchase */}
-                    {purpose === "Purchase" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Expected Rate</Label>
-                          <Input
-                            type="number"
-                            value={item.rate || ""}
-                            onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            min="0"
-                            step="0.01"
-                          />
-                        </div>
-                        <div>
-                          <Label>Warehouse</Label>
-                          <WarehouseSelector
-                            onWarehouseSelected={(warehouse) => updateItem(index, 'warehouse', warehouse)}
-                            isLoading={false}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ItemFormRow 
+                  key={index}
+                  item={item}
+                  index={index}
+                  purpose={purpose}
+                  onItemSelected={(itemCode) => handleItemSelected(index, itemCode)}
+                  onUpdateItem={updateItem}
+                  onRemoveItem={removeItem}
+                  onBundleCreated={(bundleName, totalQty) => handleBundleCreated(index, bundleName, totalQty)}
+                  canRemove={items.length > 1}
+                />
               ))}
             </div>
           </CardContent>
@@ -342,6 +270,189 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
           </Button>
         </div>
       </form>
+    </div>
+  );
+};
+
+interface ItemFormRowProps {
+  item: MaterialRequestItem;
+  index: number;
+  purpose: MaterialRequestPurpose;
+  onItemSelected: (itemCode: string) => void;
+  onUpdateItem: (index: number, field: keyof MaterialRequestItem, value: any) => void;
+  onRemoveItem: (index: number) => void;
+  onBundleCreated: (bundleName: string, totalQty: number) => void;
+  canRemove: boolean;
+}
+
+const ItemFormRow = ({ 
+  item, 
+  index, 
+  purpose, 
+  onItemSelected, 
+  onUpdateItem, 
+  onRemoveItem, 
+  onBundleCreated,
+  canRemove 
+}: ItemFormRowProps) => {
+  const [itemDetails, setItemDetails] = useState<any>(null);
+
+  // Fetch item details when item code changes
+  useEffect(() => {
+    const fetchItemDetails = async () => {
+      if (item.itemCode) {
+        try {
+          const erpnextAPI = await createERPNextAPI();
+          if (erpnextAPI) {
+            const details = await erpnextAPI.getItemDetails(item.itemCode);
+            if (details.data) {
+              setItemDetails(details.data);
+              console.log('Item details for tracking check:', details.data);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching item details for tracking:', error);
+        }
+      }
+    };
+
+    fetchItemDetails();
+  }, [item.itemCode]);
+
+  const hasSerialBatchTracking = itemDetails && (itemDetails.has_serial_no || itemDetails.has_batch_no);
+
+  return (
+    <div className="border rounded-lg p-4 space-y-4">
+      <div className="flex justify-between items-start">
+        <h4 className="font-medium">Item {index + 1}</h4>
+        {canRemove && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => onRemoveItem(index)}
+            className="text-red-600 hover:text-red-700"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        {/* Item Selection */}
+        <div>
+          <Label>Item Code / Name *</Label>
+          <ItemSelector
+            onItemSelected={onItemSelected}
+            isLoading={false}
+          />
+        </div>
+
+        {/* Show selected item info */}
+        {item.itemName && (
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="text-sm">
+              <div className="font-medium text-blue-900">{item.itemName}</div>
+              <div className="text-blue-700">Code: {item.itemCode}</div>
+              {itemDetails && (
+                <div className="flex gap-2 mt-1">
+                  {itemDetails.has_serial_no && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Serial Tracking</span>}
+                  {itemDetails.has_batch_no && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Batch Tracking</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Item Description */}
+        <div>
+          <Label>Description</Label>
+          <Textarea
+            value={item.description || ""}
+            onChange={(e) => onUpdateItem(index, 'description', e.target.value)}
+            placeholder="Item description..."
+            rows={2}
+          />
+        </div>
+
+        {/* Quantity and UOM */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label>Quantity *</Label>
+            <Input
+              type="number"
+              value={item.qty}
+              onChange={(e) => onUpdateItem(index, 'qty', parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div>
+            <Label>UOM</Label>
+            <UOMSelector
+              value={item.uom}
+              onValueChange={(uom) => onUpdateItem(index, 'uom', uom)}
+              disabled={false}
+            />
+          </div>
+          <div>
+            <Label>Required By</Label>
+            <Input
+              type="date"
+              value={item.requiredBy || ""}
+              onChange={(e) => onUpdateItem(index, 'requiredBy', e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Serial and Batch Bundle for tracked items */}
+        {hasSerialBatchTracking && item.itemCode && (
+          <div className="space-y-2">
+            <Label>Serial and Batch Bundle</Label>
+            <SerialBatchBundleSelector
+              itemCode={item.itemCode}
+              itemName={item.itemName || item.itemCode}
+              itemGroup={itemDetails?.item_group || 'All Item Groups'}
+              hasSerial={itemDetails?.has_serial_no || false}
+              hasBatch={itemDetails?.has_batch_no || false}
+              warehouse={item.warehouse || ''}
+              transactionType="Inward"
+              onBundleCreated={onBundleCreated}
+              initialQuantity={item.qty || 1}
+            />
+            {item.serialBatchBundle && (
+              <p className="text-sm text-muted-foreground">
+                Selected Bundle: {item.serialBatchBundle}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Additional fields for Purchase */}
+        {purpose === "Purchase" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Expected Rate</Label>
+              <Input
+                type="number"
+                value={item.rate || ""}
+                onChange={(e) => onUpdateItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div>
+              <Label>Warehouse</Label>
+              <WarehouseSelector
+                onWarehouseSelected={(warehouse) => onUpdateItem(index, 'warehouse', warehouse)}
+                isLoading={false}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

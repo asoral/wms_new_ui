@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronDown } from "lucide-react";
@@ -15,7 +14,8 @@ interface UOMSelectorProps {
 
 const commonUOMs = [
   "Nos", "Kg", "Liters", "Meters", "Bags", "Box", "Set", "Pieces", "Grams", 
-  "Tonnes", "Feet", "Inches", "Yards", "Dozen", "Pair", "Roll", "Sheet"
+  "Tonnes", "Feet", "Inches", "Yards", "Dozen", "Pair", "Roll", "Sheet",
+  "Cubic Meter", "Square Meter", "Milliliters", "Pounds", "Ounces"
 ];
 
 const UOMSelector = ({ value, onValueChange, disabled }: UOMSelectorProps) => {
@@ -25,6 +25,12 @@ const UOMSelector = ({ value, onValueChange, disabled }: UOMSelectorProps) => {
   const filteredUOMs = commonUOMs.filter(uom =>
     uom.toLowerCase().includes(searchValue.toLowerCase())
   );
+
+  const handleSelect = (selectedUom: string) => {
+    console.log('UOM selected:', selectedUom);
+    onValueChange(selectedUom);
+    setOpen(false);
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -40,23 +46,23 @@ const UOMSelector = ({ value, onValueChange, disabled }: UOMSelectorProps) => {
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
-        <Command>
+      <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[9999]" align="start">
+        <Command shouldFilter={false}>
           <CommandInput 
             placeholder="Search UOMs..." 
             value={searchValue}
             onValueChange={setSearchValue}
           />
           <CommandList>
-            <CommandEmpty>No UOM found.</CommandEmpty>
+            <CommandEmpty>
+              {searchValue ? "No UOM found." : "Start typing to search UOMs..."}
+            </CommandEmpty>
             <CommandGroup>
               {filteredUOMs.map((uom) => (
                 <CommandItem
                   key={uom}
-                  onSelect={() => {
-                    onValueChange(uom);
-                    setOpen(false);
-                  }}
+                  value={uom}
+                  onSelect={() => handleSelect(uom)}
                 >
                   <Check
                     className={cn(

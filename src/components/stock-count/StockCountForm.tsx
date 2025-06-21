@@ -10,7 +10,7 @@ import { Trash2, Plus, Search, Package, ScanLine, CheckCircle } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "../item-enquiry/ItemSelector";
 import SerialBatchBundleSelector from "./SerialBatchBundleSelector";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { createSerialBatchBundleFromTraditionalEntry } from "@/services/serialBatchBundleApi";
 
 interface StockCountItem {
@@ -41,11 +41,12 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
   const [batchNo, setBatchNo] = useState("");
   const [serialNo, setSerialNo] = useState("");
   const [selectedBundle, setSelectedBundle] = useState("");
-  const [useTraditionalEntry, setUseTraditionalEntry] = useState(true); // Default to true for manual entry
+  const [useTraditionalEntry, setUseTraditionalEntry] = useState(true);
   const [itemDetails, setItemDetails] = useState<any>(null);
   const { toast } = useToast();
 
   const handleItemSelected = async (itemCode: string) => {
+    console.log('Item selected for stock count:', itemCode);
     setSelectedItemCode(itemCode);
     setSearchTerm(itemCode);
     
@@ -55,6 +56,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
       if (erpnextAPI) {
         const itemResult = await erpnextAPI.getItemDetails(itemCode);
         if (itemResult.data) {
+          console.log('Item details loaded for stock count:', itemResult.data);
           setItemDetails(itemResult.data);
           // Reset bundle selection when item changes
           setSelectedBundle("");
@@ -63,7 +65,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
         }
       }
     } catch (error) {
-      console.error('Error fetching item details:', error);
+      console.error('Error fetching item details for stock count:', error);
     }
   };
 
@@ -86,6 +88,15 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
       return;
     }
 
+    if (countedQty === 0) {
+      toast({
+        title: "Invalid Quantity",
+        description: "Please enter a valid quantity greater than 0.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     toast({
       title: "Adding Item",
       description: "Item is being added to the count...",
@@ -97,6 +108,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
       // If using traditional entry and item has serial/batch tracking, create bundle
       if (useTraditionalEntry && itemDetails && (itemDetails.has_serial_no || itemDetails.has_batch_no) && (batchNo || serialNo)) {
         try {
+          console.log('Creating bundle for traditional entry');
           serialBatchBundle = await createSerialBatchBundleFromTraditionalEntry(
             selectedItemCode,
             itemDetails.item_name || searchTerm,
@@ -160,6 +172,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
         setSelectedItems(prev => [...prev, newItem]);
       }
       
+      // Reset form
       setSelectedItemCode("");
       setSearchTerm("");
       setCountedQty(0);
@@ -174,7 +187,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
         variant: "default"
       });
     } catch (error) {
-      console.error('Error adding item:', error);
+      console.error('Error adding item to stock count:', error);
       toast({
         title: "Error",
         description: "Failed to add item to count.",
@@ -209,6 +222,7 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
       return;
     }
 
+    console.log('Submitting stock count with items:', selectedItems);
     onSubmit(selectedItems);
   };
 
@@ -216,17 +230,34 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="scan" className="w-full">
+      <Tabs defaultValue="search" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="scan" className="flex items-center space-x-2">
-            <ScanLine className="w-4 h-4" />
-            <span>Scan Item</span>
-          </TabsTrigger>
           <TabsTrigger value="search" className="flex items-center space-x-2">
             <Search className="w-4 h-4" />
             <span>Search Item</span>
           </TabsTrigger>
+          <TabsTrigger value="scan" className="flex items-center space-x-2">
+            <ScanLine className="w-4 h-4" />
+            <span>Scan Item</span>
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="search" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Search className="w-5 h-5" />
+                <span>Search Item</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ItemSelector
+                onItemSelected={handleItemSelected}
+                isLoading={false}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="scan" className="space-y-4">
           <Card>
@@ -245,57 +276,35 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Scan or enter barcode"
                   className="text-lg"
+                  onKeyPress={async (e) => {
+                    if (e.key === 'Enter' && searchTerm) {
+                      await handleItemSelected(searchTerm);
+                    }
+                  }}
                 />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="search" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Search className="w-5 h-5" />
-                <span>Search Item</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ItemSelector
-                onItemSelected={handleItemSelected}
-                isLoading={false}
-              />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
       {/* Item Details Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Package className="w-5 h-5" />
-            <span>Item Details</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="counted_qty">Counted Quantity</Label>
-              <Input
-                id="counted_qty"
-                type="number"
-                value={countedQty}
-                onChange={(e) => setCountedQty(Number(e.target.value))}
-                placeholder="0"
-                min="0"
-                step="0.01"
-              />
-            </div>
+      {selectedItemCode && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Package className="w-5 h-5" />
+              <span>Item Details</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Show selected item info */}
             {itemDetails && (
-              <div className="space-y-2">
-                <Label>Item Info</Label>
-                <div className="text-sm text-muted-foreground">
-                  <p>UOM: {itemDetails.stock_uom || 'Nos'}</p>
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="text-sm">
+                  <div className="font-medium text-blue-900">{itemDetails.item_name}</div>
+                  <div className="text-blue-700">Code: {selectedItemCode}</div>
+                  <div className="text-blue-600">UOM: {itemDetails.stock_uom}</div>
                   {hasSerialBatchTracking && (
                     <div className="flex gap-2 mt-1">
                       {itemDetails.has_serial_no && <Badge variant="outline">Serial Tracking</Badge>}
@@ -305,84 +314,99 @@ const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: 
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Serial and Batch Bundle Section with Tabs */}
-          {hasSerialBatchTracking && selectedItemCode && warehouse && (
-            <div className="space-y-4">
-              <Label>Serial/Batch Entry Method</Label>
-              <Tabs 
-                value={useTraditionalEntry ? "manual" : "bundle"} 
-                onValueChange={(value) => setUseTraditionalEntry(value === "manual")}
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-                  <TabsTrigger value="bundle">Use Bundle</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="manual" className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {itemDetails.has_batch_no && (
-                      <div className="space-y-2">
-                        <Label htmlFor="batch_no">Batch No</Label>
-                        <Input
-                          id="batch_no"
-                          value={batchNo}
-                          onChange={(e) => setBatchNo(e.target.value)}
-                          placeholder="Enter batch number"
-                        />
-                      </div>
-                    )}
-                    {itemDetails.has_serial_no && (
-                      <div className="space-y-2">
-                        <Label htmlFor="serial_no">Serial No</Label>
-                        <Input
-                          id="serial_no"
-                          value={serialNo}
-                          onChange={(e) => setSerialNo(e.target.value)}
-                          placeholder="Enter serial number"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="bundle" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Create Serial and Batch Bundle</Label>
-                    <SerialBatchBundleSelector
-                      itemCode={selectedItemCode}
-                      itemName={itemDetails.item_name || searchTerm}
-                      itemGroup={itemDetails.item_group || 'All Item Groups'}
-                      hasSerial={itemDetails.has_serial_no || false}
-                      hasBatch={itemDetails.has_batch_no || false}
-                      warehouse={warehouse}
-                      transactionType="Inward"
-                      onBundleCreated={handleBundleCreated}
-                      initialQuantity={countedQty || 1}
-                    />
-                    {selectedBundle && (
-                      <p className="text-sm text-muted-foreground">
-                        Selected Bundle: {selectedBundle}
-                      </p>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="counted_qty">Counted Quantity *</Label>
+                <Input
+                  id="counted_qty"
+                  type="number"
+                  value={countedQty}
+                  onChange={(e) => setCountedQty(Number(e.target.value))}
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
             </div>
-          )}
 
-          <Button 
-            onClick={addItemToCount} 
-            className="w-full"
-            disabled={!selectedItemCode}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add to Count
-          </Button>
-        </CardContent>
-      </Card>
+            {/* Serial and Batch Bundle Section with Tabs */}
+            {hasSerialBatchTracking && selectedItemCode && warehouse && (
+              <div className="space-y-4">
+                <Label>Serial/Batch Entry Method</Label>
+                <Tabs 
+                  value={useTraditionalEntry ? "manual" : "bundle"} 
+                  onValueChange={(value) => setUseTraditionalEntry(value === "manual")}
+                  className="w-full"
+                >
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+                    <TabsTrigger value="bundle">Use Bundle</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="manual" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {itemDetails.has_batch_no && (
+                        <div className="space-y-2">
+                          <Label htmlFor="batch_no">Batch No</Label>
+                          <Input
+                            id="batch_no"
+                            value={batchNo}
+                            onChange={(e) => setBatchNo(e.target.value)}
+                            placeholder="Enter batch number"
+                          />
+                        </div>
+                      )}
+                      {itemDetails.has_serial_no && (
+                        <div className="space-y-2">
+                          <Label htmlFor="serial_no">Serial No</Label>
+                          <Input
+                            id="serial_no"
+                            value={serialNo}
+                            onChange={(e) => setSerialNo(e.target.value)}
+                            placeholder="Enter serial number"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="bundle" className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Create Serial and Batch Bundle</Label>
+                      <SerialBatchBundleSelector
+                        itemCode={selectedItemCode}
+                        itemName={itemDetails.item_name || searchTerm}
+                        itemGroup={itemDetails.item_group || 'All Item Groups'}
+                        hasSerial={itemDetails.has_serial_no || false}
+                        hasBatch={itemDetails.has_batch_no || false}
+                        warehouse={warehouse}
+                        transactionType="Inward"
+                        onBundleCreated={handleBundleCreated}
+                        initialQuantity={countedQty || 1}
+                      />
+                      {selectedBundle && (
+                        <p className="text-sm text-muted-foreground">
+                          Selected Bundle: {selectedBundle}
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
+
+            <Button 
+              onClick={addItemToCount} 
+              className="w-full"
+              disabled={!selectedItemCode || countedQty <= 0}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add to Count
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Selected Items - Only show if not using onAddEntry */}
       {!onAddEntry && selectedItems.length > 0 && (
