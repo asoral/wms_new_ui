@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Truck, ArrowLeft } from "lucide-react";
@@ -189,9 +188,7 @@ const Deliver = () => {
 
       const company = await getUserDefaultCompany();
 
-      // First, get the full sales order details to include items
-      const salesOrderDetails = await erpnextAPI.sales.getSalesOrder(salesOrder.value);
-      
+      // Create a minimal draft delivery note without items
       const deliveryNoteData = {
         doctype: "Delivery Note",
         customer: salesOrder.customer,
@@ -200,17 +197,7 @@ const Deliver = () => {
         set_posting_time: 0,
         posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
         docstatus: 0, // Draft
-        items: salesOrderDetails.data.items?.map((item: any) => ({
-          item_code: item.item_code,
-          item_name: item.item_name,
-          qty: 0, // Will be updated when items are scanned
-          rate: item.rate,
-          amount: 0,
-          warehouse: item.warehouse,
-          uom: item.uom,
-          against_sales_order: salesOrder.value,
-          so_detail: item.name
-        })) || [],
+        items: [], // Empty items array - will be populated when items are added
         territory: "All Territories",
         currency: "INR",
         selling_price_list: "Standard Selling",
