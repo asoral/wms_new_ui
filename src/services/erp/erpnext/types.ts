@@ -1,4 +1,3 @@
-
 // ERPNext API Types
 export interface ERPNextConfig {
   baseURL: string;
@@ -112,6 +111,17 @@ export interface MaterialRequest {
   status: string;
   transaction_date?: string;
   required_date?: string;
+}
+
+export interface MaterialRequestItem {
+  item_code: string;
+  qty: number;
+  uom: string;
+  warehouse?: string;
+  rate?: number;
+  schedule_date?: string;
+  description?: string;
+  serial_batch_bundle?: string;
 }
 
 export interface StockEntry {

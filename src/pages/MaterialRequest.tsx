@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, ArrowLeft } from "lucide-react";
@@ -26,6 +25,7 @@ export interface MaterialRequestItem {
   description?: string;
   brand?: string;
   itemGroup?: string;
+  serialBatchBundle?: string;
 }
 
 export interface MaterialRequest {

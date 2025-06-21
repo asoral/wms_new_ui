@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -144,6 +143,7 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
 
           if (item.rate) itemData.rate = item.rate;
           if (item.requiredBy) itemData.schedule_date = item.requiredBy;
+          if (item.serialBatchBundle) itemData.serial_batch_bundle = item.serialBatchBundle;
 
           return itemData;
         }),
