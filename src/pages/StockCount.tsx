@@ -1,9 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clipboard, RefreshCcw, Plus, FileText } from "lucide-react";
+import { Clipboard, RefreshCcw, Plus } from "lucide-react";
 import StockCountForm from "../components/stock-count/StockCountForm";
 import StockCountTable from "../components/stock-count/StockCountTable";
 import StockCountSummary from "../components/stock-count/StockCountSummary";
@@ -12,6 +11,19 @@ import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
 export type StockCountStatus = "draft" | "in_progress" | "completed" | "cancelled";
+
+export interface StockCountEntry {
+  itemCode: string;
+  itemName: string;
+  warehouse: string;
+  currentQty: number;
+  actualQty: number;
+  difference: number;
+  uom: string;
+  status: 'matched' | 'variance' | 'new';
+  batch?: string;
+  serial?: string;
+}
 
 export interface StockCountItem {
   itemCode: string;
@@ -54,6 +66,7 @@ const StockCount = () => {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         console.warn('ERPNext API not configured');
+        setStockCounts([]);
         return;
       }
 
@@ -91,6 +104,7 @@ const StockCount = () => {
         description: "Failed to fetch stock counts from ERPNext",
         variant: "destructive"
       });
+      setStockCounts([]);
     } finally {
       setIsLoading(false);
     }
