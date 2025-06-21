@@ -1,11 +1,11 @@
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Scan, Check, AlertTriangle, Package } from "lucide-react";
+import { ArrowLeft, Package, Scan, CheckCircle, AlertCircle, Camera, BarChart3 } from "lucide-react";
 import { PickList, PickListItem } from "../../pages/PickList";
 
 interface PickingProcessProps {
@@ -14,210 +14,257 @@ interface PickingProcessProps {
 }
 
 const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
-  const [items, setItems] = useState<PickListItem[]>(pickList.items);
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [scannedCode, setScannedCode] = useState("");
+  const [enteredQty, setEnteredQty] = useState("");
+  const [items, setItems] = useState<PickListItem[]>(pickList.items);
 
   const currentItem = items[currentItemIndex];
-  const completedItems = items.filter(item => item.status === "picked").length;
-  const progress = (completedItems / items.length) * 100;
+  const totalItems = items.length;
+  const completedItems = items.filter(item => item.status === "completed").length;
 
-  const updateItemStatus = (index: number, pickedQty: number) => {
-    const updatedItems = [...items];
-    const item = updatedItems[index];
-    
-    item.pickedQty = pickedQty;
-    if (pickedQty >= item.requiredQty) {
-      item.status = "picked";
-    } else if (pickedQty > 0) {
-      item.status = "partially_picked";
-    } else {
-      item.status = "pending";
-    }
-    
-    setItems(updatedItems);
-  };
-
-  const handleScan = () => {
-    if (scannedCode === currentItem.itemCode) {
-      updateItemStatus(currentItemIndex, currentItem.requiredQty);
-      if (currentItemIndex < items.length - 1) {
-        setCurrentItemIndex(currentItemIndex + 1);
+  const handleScanSubmit = () => {
+    if (scannedCode === currentItem.code && enteredQty) {
+      const qty = parseInt(enteredQty);
+      if (qty > 0 && qty <= currentItem.requiredQty) {
+        // Update item status
+        const updatedItems = [...items];
+        updatedItems[currentItemIndex] = {
+          ...currentItem,
+          pickedQty: qty,
+          status: qty === currentItem.requiredQty ? "completed" : "partial"
+        };
+        setItems(updatedItems);
+        
+        // Move to next item if this one is completed
+        if (qty === currentItem.requiredQty && currentItemIndex < totalItems - 1) {
+          setCurrentItemIndex(currentItemIndex + 1);
+          setScannedCode("");
+          setEnteredQty("");
+        }
       }
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentItemIndex > 0) {
+      setCurrentItemIndex(currentItemIndex - 1);
       setScannedCode("");
+      setEnteredQty("");
     }
   };
 
-  const handleManualPick = (quantity: number) => {
-    updateItemStatus(currentItemIndex, quantity);
-    if (currentItemIndex < items.length - 1) {
+  const handleSkipItem = () => {
+    if (currentItemIndex < totalItems - 1) {
       setCurrentItemIndex(currentItemIndex + 1);
+      setScannedCode("");
+      setEnteredQty("");
     }
   };
 
-  const handleComplete = () => {
-    console.log("Pick list completed:", pickList.name);
-    onBack();
-  };
-
-  const getStatusColor = (status: string) => {
+  const getItemStatusColor = (status: string) => {
     switch (status) {
-      case "picked": return "bg-green-100 text-green-800";
-      case "partially_picked": return "bg-yellow-100 text-yellow-800";
-      default: return "bg-gray-100 text-gray-800";
+      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'partial': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'pending': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
+
+  const isCodeMatch = scannedCode === currentItem.code;
+  const isValidQty = enteredQty && parseInt(enteredQty) > 0 && parseInt(enteredQty) <= currentItem.requiredQty;
 
   return (
     <div className="space-y-6">
-      {/* Progress Header */}
-      <Card>
+      {/* Header with Back Button */}
+      <div className="flex items-center justify-between">
+        <Button variant="outline" onClick={onBack} className="flex items-center space-x-2">
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Details</span>
+        </Button>
+        
+        <div className="flex items-center space-x-4">
+          <Badge variant="outline" className="text-sm">
+            {pickList.number}
+          </Badge>
+          <Badge className="bg-blue-100 text-blue-800">
+            {completedItems}/{totalItems} Items
+          </Badge>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="bg-white p-4 rounded-lg border">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-600">Progress</span>
+          <span className="text-sm text-gray-600">{Math.round((completedItems / totalItems) * 100)}%</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${(completedItems / totalItems) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Current Item Card */}
+      <Card className="border-l-4 border-l-blue-500">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Picking Progress</span>
-            <Badge variant="outline">{completedItems}/{items.length} Items</Badge>
+            <div className="flex items-center space-x-2">
+              <Package className="w-5 h-5 text-blue-600" />
+              <span>Item {currentItemIndex + 1} of {totalItems}</span>
+            </div>
+            <Badge className={getItemStatusColor(currentItem.status)}>
+              {currentItem.status}
+            </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Progress value={progress} className="mb-2" />
-          <p className="text-sm text-gray-600">{progress.toFixed(0)}% Complete</p>
-        </CardContent>
-      </Card>
-
-      {/* Current Item */}
-      {currentItem && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Package className="w-5 h-5" />
-              <span>Current Item ({currentItemIndex + 1} of {items.length})</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CardContent className="space-y-4">
+          {/* Item Details */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <h3 className="font-medium text-lg">{currentItem.itemCode}</h3>
-                <p className="text-gray-600">{currentItem.itemName}</p>
+                <span className="font-medium text-gray-600">Item Code:</span>
+                <p className="text-lg font-mono text-gray-900">{currentItem.code}</p>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-600">Required</p>
-                <p className="text-2xl font-bold">{currentItem.requiredQty} {currentItem.uom}</p>
+              <div>
+                <span className="font-medium text-gray-600">Item Name:</span>
+                <p className="text-gray-900">{currentItem.name}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Warehouse:</span>
+                <p className="text-gray-900">{currentItem.warehouse}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Bin:</span>
+                <p className="text-gray-900">{currentItem.bin}</p>
+              </div>
+              {currentItem.batch && (
+                <div>
+                  <span className="font-medium text-gray-600">Batch:</span>
+                  <p className="text-gray-900">{currentItem.batch}</p>
+                </div>
+              )}
+              {currentItem.serial && (
+                <div>
+                  <span className="font-medium text-gray-600">Serial:</span>
+                  <p className="text-gray-900">{currentItem.serial}</p>
+                </div>
+              )}
+              <div>
+                <span className="font-medium text-gray-600">Required Qty:</span>
+                <p className="text-gray-900">{currentItem.requiredQty}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Picked Qty:</span>
+                <p className="text-gray-900">{currentItem.pickedQty}</p>
               </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Warehouse</p>
-                <p className="font-medium">{currentItem.warehouse}</p>
-              </div>
-              {currentItem.bin && (
-                <div>
-                  <p className="text-sm text-gray-600">Bin</p>
-                  <p className="font-medium">{currentItem.bin}</p>
-                </div>
-              )}
-              {currentItem.batchNo && (
-                <div>
-                  <p className="text-sm text-gray-600">Batch</p>
-                  <Badge variant="outline">{currentItem.batchNo}</Badge>
-                </div>
-              )}
-              {currentItem.serialNo && (
-                <div>
-                  <p className="text-sm text-gray-600">Serial</p>
-                  <Badge variant="outline">{currentItem.serialNo}</Badge>
-                </div>
-              )}
-            </div>
-
-            {/* Picking Actions */}
-            <div className="space-y-4">
+          {/* Scanning Section */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="scan">Scan Item Code</Label>
               <div className="flex space-x-2">
-                <Input
-                  placeholder="Scan item code"
-                  value={scannedCode}
-                  onChange={(e) => setScannedCode(e.target.value)}
-                  className="flex-1"
-                />
-                <Button onClick={handleScan} disabled={!scannedCode}>
-                  <Scan className="w-4 h-4 mr-2" />
-                  Scan
+                <div className="relative flex-1">
+                  <Scan className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    id="scan"
+                    value={scannedCode}
+                    onChange={(e) => setScannedCode(e.target.value)}
+                    placeholder="Scan or enter item code"
+                    className={`pl-10 ${isCodeMatch ? 'border-green-500' : scannedCode ? 'border-red-500' : ''}`}
+                  />
+                </div>
+                <Button variant="outline" size="icon">
+                  <Camera className="w-4 h-4" />
                 </Button>
               </div>
-
-              <div className="flex space-x-2">
-                <Input
-                  type="number"
-                  placeholder="Picked quantity"
-                  className="flex-1"
-                  id="pickedQty"
-                />
-                <Button 
-                  onClick={() => {
-                    const input = document.getElementById("pickedQty") as HTMLInputElement;
-                    const qty = parseInt(input?.value || "0");
-                    handleManualPick(qty);
-                    if (input) input.value = "";
-                  }}
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  Confirm
-                </Button>
-              </div>
-
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => handleManualPick(currentItem.requiredQty)}
-              >
-                Pick Full Quantity ({currentItem.requiredQty} {currentItem.uom})
-              </Button>
+              {scannedCode && (
+                <div className="flex items-center space-x-2 text-sm">
+                  {isCodeMatch ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-green-600">Code matches!</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <span className="text-red-600">Code doesn't match. Expected: {currentItem.code}</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Items Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Picking Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {items.map((item, index) => (
-              <div key={index} className={`flex items-center justify-between p-3 border rounded-lg ${
-                index === currentItemIndex ? 'border-blue-500 bg-blue-50' : ''
-              }`}>
-                <div className="flex-1">
-                  <h4 className="font-medium">{item.itemCode}</h4>
-                  <p className="text-sm text-gray-600">{item.itemName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm">
-                    {item.pickedQty || 0}/{item.requiredQty} {item.uom}
-                  </p>
-                  <Badge className={getStatusColor(item.status)}>
-                    {item.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
+            <div className="space-y-2">
+              <Label htmlFor="qty">Enter Quantity</Label>
+              <Input
+                id="qty"
+                type="number"
+                value={enteredQty}
+                onChange={(e) => setEnteredQty(e.target.value)}
+                placeholder="Enter picked quantity"
+                max={currentItem.requiredQty}
+                min="1"
+                className={isValidQty ? 'border-green-500' : enteredQty ? 'border-red-500' : ''}
+              />
+              {enteredQty && !isValidQty && (
+                <p className="text-sm text-red-600">
+                  Quantity must be between 1 and {currentItem.requiredQty}
+                </p>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Actions */}
-      <div className="flex justify-between space-x-4">
-        <Button variant="outline" onClick={onBack}>
-          Back
-        </Button>
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
         <Button 
-          onClick={handleComplete}
-          disabled={completedItems < items.length}
+          variant="outline" 
+          onClick={handlePrevious}
+          disabled={currentItemIndex === 0}
+          className="flex items-center space-x-2"
         >
-          Complete Picking
+          <ArrowLeft className="w-4 h-4" />
+          <span>Previous</span>
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          onClick={handleSkipItem}
+          disabled={currentItemIndex === totalItems - 1}
+          className="flex items-center space-x-2"
+        >
+          <span>Skip Item</span>
+        </Button>
+        
+        <Button 
+          onClick={handleScanSubmit}
+          disabled={!isCodeMatch || !isValidQty}
+          className="flex items-center space-x-2 flex-1"
+        >
+          <CheckCircle className="w-4 h-4" />
+          <span>Confirm Pick</span>
         </Button>
       </div>
+
+      {/* Completion Check */}
+      {completedItems === totalItems && (
+        <Card className="border-green-500 bg-green-50">
+          <CardContent className="p-6 text-center">
+            <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-green-900 mb-2">Picking Complete!</h3>
+            <p className="text-green-700 mb-4">All items have been successfully picked.</p>
+            <Button className="bg-green-600 hover:bg-green-700">
+              Complete Pick List
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

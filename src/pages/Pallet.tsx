@@ -16,7 +16,6 @@ export interface PalletItem {
   uom: string;
   batchNo?: string;
   serialNo?: string;
-  warehouse?: string;
 }
 
 export interface Pallet {
@@ -31,20 +30,6 @@ export interface Pallet {
 const PalletPage = () => {
   const [activeTab, setActiveTab] = useState<"creator" | "scanner" | "mover" | "depalletizer">("creator");
   const [pallets, setPallets] = useState<Pallet[]>([]);
-  const [selectedPallet, setSelectedPallet] = useState<Pallet | null>(null);
-
-  const handlePalletScanned = (palletCode: string) => {
-    // Mock pallet lookup - in real app this would fetch from API
-    const mockPallet: Pallet = {
-      id: palletCode,
-      name: palletCode,
-      status: "Active",
-      createdDate: new Date().toISOString(),
-      location: "Warehouse A",
-      items: []
-    };
-    setSelectedPallet(mockPallet);
-  };
 
   const showHelp = activeTab === "creator" && pallets.length === 0;
 
@@ -57,6 +42,22 @@ const PalletPage = () => {
             <Package className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Pallet Management</h1>
           </div>
+        </div>
+
+        {/* Help Section */}
+        <div className="mb-6">
+          <HelpSection
+            show={showHelp}
+            icon={<Package className="w-12 h-12" />}
+            title="Manage Pallets"
+            description="Create, move, and manage pallets for efficient warehouse operations."
+            steps={[
+              "Create new pallets by adding items",
+              "Scan pallets to view contents",
+              "Move pallets between locations",
+              "Depalletize to break down pallets"
+            ]}
+          />
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "creator" | "scanner" | "mover" | "depalletizer")} className="w-full">
@@ -72,33 +73,17 @@ const PalletPage = () => {
           </TabsContent>
 
           <TabsContent value="scanner">
-            <PalletScanner onPalletScanned={handlePalletScanned} />
+            <PalletScanner />
           </TabsContent>
 
           <TabsContent value="mover">
-            <PalletMover pallet={selectedPallet} />
+            <PalletMover />
           </TabsContent>
 
           <TabsContent value="depalletizer">
-            <PalletDepalletizer pallet={selectedPallet} />
+            <PalletDepalletizer />
           </TabsContent>
         </Tabs>
-
-        {/* Help Section - moved to bottom */}
-        <div className="mt-8">
-          <HelpSection
-            show={showHelp}
-            icon={<Package className="w-12 h-12" />}
-            title="Manage Pallets"
-            description="Create, move, and manage pallets for efficient warehouse operations."
-            steps={[
-              "Create new pallets by adding items",
-              "Scan pallets to view contents",
-              "Move pallets between locations",
-              "Depalletize to break down pallets"
-            ]}
-          />
-        </div>
       </div>
     </div>
   );

@@ -72,6 +72,22 @@ const PackingPage = () => {
           </div>
         </div>
 
+        {/* Help Section */}
+        <div className="mb-6">
+          <HelpSection
+            show={showHelp}
+            icon={<Package2 className="w-12 h-12" />}
+            title="Create Packing Slips"
+            description="Generate packing documentation for shipments."
+            steps={[
+              "Select delivery notes ready for packing",
+              "Generate packing slips with item details",
+              "Include package weights and dimensions",
+              "Print shipping labels and documentation"
+            ]}
+          />
+        </div>
+
         {/* Content */}
         {currentView === "list" && (
           <PackingSlipList onCreateNew={handleCreateNew} />
@@ -91,22 +107,6 @@ const PackingPage = () => {
             />
           </div>
         )}
-
-        {/* Help Section - moved to bottom */}
-        <div className="mt-8">
-          <HelpSection
-            show={showHelp}
-            icon={<Package2 className="w-12 h-12" />}
-            title="Create Packing Slips"
-            description="Generate packing documentation for shipments."
-            steps={[
-              "Select delivery notes ready for packing",
-              "Generate packing slips with item details",
-              "Include package weights and dimensions",
-              "Print shipping labels and documentation"
-            ]}
-          />
-        </div>
       </div>
     </div>
   );
