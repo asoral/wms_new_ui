@@ -2,11 +2,10 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ScanBarcode } from "lucide-react";
 import { POItem } from "../../pages/Receive";
 import CameraScanner from "../item-enquiry/CameraScanner";
+import ItemSelector from "../item-enquiry/ItemSelector";
 
 interface ReceiveItemScannerProps {
   poItems: POItem[];
@@ -17,14 +16,20 @@ interface ReceiveItemScannerProps {
 const ReceiveItemScanner = ({ poItems, onItemScanned, isLoading }: ReceiveItemScannerProps) => {
   const [activeTab, setActiveTab] = useState("manual");
   const [showCamera, setShowCamera] = useState(false);
-  const [selectedItem, setSelectedItem] = useState("");
 
   // Filter to only show items with pending quantity
   const availableItems = poItems.filter(item => item.pendingQty > 0);
 
   const handleItemSelected = (itemCode: string) => {
-    setSelectedItem(itemCode);
-    onItemScanned(itemCode);
+    // Check if the selected item is in the PO and has pending quantity
+    const matchingItem = availableItems.find(item => item.itemCode === itemCode);
+    
+    if (matchingItem) {
+      onItemScanned(itemCode);
+    } else {
+      // If not found in PO items, still pass it to parent to handle
+      onItemScanned(itemCode);
+    }
   };
 
   const handleBarcodeScanned = (code: string) => {
@@ -66,30 +71,10 @@ const ReceiveItemScanner = ({ poItems, onItemScanned, isLoading }: ReceiveItemSc
         </TabsList>
 
         <TabsContent value="manual" className="mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="item-select">Item Code / Name</Label>
-            <Select 
-              value={selectedItem} 
-              onValueChange={handleItemSelected}
-              disabled={isLoading}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select an item to receive..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availableItems.map((item) => (
-                  <SelectItem key={item.itemCode} value={item.itemCode}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{item.itemName}</span>
-                      <span className="text-sm text-gray-500">
-                        {item.itemCode} - Pending: {item.pendingQty} {item.uom}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <ItemSelector 
+            onItemSelected={handleItemSelected}
+            isLoading={isLoading}
+          />
         </TabsContent>
 
         <TabsContent value="scan" className="mt-4">
