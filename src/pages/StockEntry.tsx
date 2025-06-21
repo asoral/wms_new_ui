@@ -90,21 +90,6 @@ const StockEntry = () => {
           </TabsList>
           
           <TabsContent value="list">
-            {/* Help Section */}
-            <div className="mb-6">
-              <HelpSection
-                show={showHelp}
-                icon={<Database className="w-12 h-12" />}
-                title="Manage Stock Movements"
-                description="Record all types of inventory transactions and movements."
-                steps={[
-                  "Choose the type of stock entry to create",
-                  "Add items and specify quantities",
-                  "Set source and destination warehouses",
-                  "Submit to update inventory levels"
-                ]}
-              />
-            </div>
             <StockEntryList onCreateNew={handleCreateNew} />
           </TabsContent>
 
@@ -114,6 +99,22 @@ const StockEntry = () => {
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Help Section - moved to bottom */}
+        <div className="mt-8">
+          <HelpSection
+            show={showHelp}
+            icon={<Database className="w-12 h-12" />}
+            title="Manage Stock Movements"
+            description="Record all types of inventory transactions and movements."
+            steps={[
+              "Choose the type of stock entry to create",
+              "Add items and specify quantities",
+              "Set source and destination warehouses",
+              "Submit to update inventory levels"
+            ]}
+          />
+        </div>
       </div>
     </div>
   );

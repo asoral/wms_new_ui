@@ -63,22 +63,6 @@ const PickListPage = () => {
           </div>
         </div>
 
-        {/* Help Section */}
-        <div className="mb-6">
-          <HelpSection
-            show={showHelp}
-            icon={<ClipboardList className="w-12 h-12" />}
-            title="Manage Pick Lists"
-            description="Select and process pick lists for efficient order fulfillment."
-            steps={[
-              "Select a pick list from available orders",
-              "Review items and their locations",
-              "Pick items using barcode scanning",
-              "Mark items as picked and complete the process"
-            ]}
-          />
-        </div>
-
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "selection" | "process")} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="selection">Pick List Selection</TabsTrigger>
@@ -95,6 +79,22 @@ const PickListPage = () => {
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Help Section - moved to bottom */}
+        <div className="mt-8">
+          <HelpSection
+            show={showHelp}
+            icon={<ClipboardList className="w-12 h-12" />}
+            title="Manage Pick Lists"
+            description="Select and process pick lists for efficient order fulfillment."
+            steps={[
+              "Select a pick list from available orders",
+              "Review items and their locations",
+              "Pick items using barcode scanning",
+              "Mark items as picked and complete the process"
+            ]}
+          />
+        </div>
       </div>
     </div>
   );

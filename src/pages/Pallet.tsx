@@ -44,22 +44,6 @@ const PalletPage = () => {
           </div>
         </div>
 
-        {/* Help Section */}
-        <div className="mb-6">
-          <HelpSection
-            show={showHelp}
-            icon={<Package className="w-12 h-12" />}
-            title="Manage Pallets"
-            description="Create, move, and manage pallets for efficient warehouse operations."
-            steps={[
-              "Create new pallets by adding items",
-              "Scan pallets to view contents",
-              "Move pallets between locations",
-              "Depalletize to break down pallets"
-            ]}
-          />
-        </div>
-
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "creator" | "scanner" | "mover" | "depalletizer")} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="creator">Create Pallet</TabsTrigger>
@@ -84,6 +68,22 @@ const PalletPage = () => {
             <PalletDepalletizer />
           </TabsContent>
         </Tabs>
+
+        {/* Help Section - moved to bottom */}
+        <div className="mt-8">
+          <HelpSection
+            show={showHelp}
+            icon={<Package className="w-12 h-12" />}
+            title="Manage Pallets"
+            description="Create, move, and manage pallets for efficient warehouse operations."
+            steps={[
+              "Create new pallets by adding items",
+              "Scan pallets to view contents",
+              "Move pallets between locations",
+              "Depalletize to break down pallets"
+            ]}
+          />
+        </div>
       </div>
     </div>
   );

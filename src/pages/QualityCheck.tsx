@@ -75,22 +75,6 @@ const QualityCheckPage = () => {
           </div>
         </div>
 
-        {/* Help Section */}
-        <div className="mb-6">
-          <HelpSection
-            show={showHelp}
-            icon={<Shield className="w-12 h-12" />}
-            title="Manage Quality Inspections"
-            description="Perform quality checks and inspections for incoming and outgoing materials."
-            steps={[
-              "Create quality inspection templates",
-              "Select items for inspection",
-              "Record measurement values",
-              "Accept or reject based on criteria"
-            ]}
-          />
-        </div>
-
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "dashboard" | "list" | "form")} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
@@ -127,6 +111,22 @@ const QualityCheckPage = () => {
             />
           </TabsContent>
         </Tabs>
+
+        {/* Help Section - moved to bottom */}
+        <div className="mt-8">
+          <HelpSection
+            show={showHelp}
+            icon={<Shield className="w-12 h-12" />}
+            title="Manage Quality Inspections"
+            description="Perform quality checks and inspections for incoming and outgoing materials."
+            steps={[
+              "Create quality inspection templates",
+              "Select items for inspection",
+              "Record measurement values",
+              "Accept or reject based on criteria"
+            ]}
+          />
+        </div>
       </div>
     </div>
   );

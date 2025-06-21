@@ -35,7 +35,8 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   };
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full">
+      <h2 className="text-xl font-semibold mb-4">Select Item</h2>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="manual" className="flex items-center space-x-2">
