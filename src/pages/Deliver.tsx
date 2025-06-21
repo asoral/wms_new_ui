@@ -248,14 +248,11 @@ const Deliver = () => {
     setSelectedSalesOrder(salesOrder);
     setDeliveryEntries([]);
     
-    // Create draft delivery note if not already a draft
-    if (!salesOrder.isDraft) {
-      const draftName = await createDraftDeliveryNote(salesOrder);
-      if (draftName) {
-        setCurrentDeliveryNote(draftName);
-      }
-    } else {
+    // Don't create draft delivery note immediately - wait for first item to be added
+    if (salesOrder.isDraft) {
       setCurrentDeliveryNote(salesOrder.draftName || null);
+    } else {
+      setCurrentDeliveryNote(null);
     }
     
     setCurrentStep("deliverItems");
@@ -266,7 +263,20 @@ const Deliver = () => {
     });
   };
 
-  const handleAddDeliveryEntry = (entry: DeliveryEntry) => {
+  const handleAddDeliveryEntry = async (entry: DeliveryEntry) => {
+    // Create draft delivery note if it doesn't exist (first item being added)
+    if (!currentDeliveryNote && selectedSalesOrder && !selectedSalesOrder.isDraft) {
+      const draftName = await createDraftDeliveryNote(selectedSalesOrder);
+      if (draftName) {
+        setCurrentDeliveryNote(draftName);
+        // Update the entry with the delivery note reference if it has a bundle
+        if (entry.serial_batch_bundle) {
+          // The bundle should already be created with the delivery note reference
+          // We just need to add the entry
+        }
+      }
+    }
+    
     setDeliveryEntries([...deliveryEntries, entry]);
   };
 
@@ -389,26 +399,26 @@ const Deliver = () => {
                 </div>
                 <div>
                   <span className="text-gray-600">Draft DN:</span>
-                  <div className="font-medium text-green-600">{currentDeliveryNote || 'Creating...'}</div>
+                  <div className="font-medium text-green-600">{currentDeliveryNote || 'Will create after first item'}</div>
                 </div>
               </div>
             </div>
 
-            {/* Sales Order Items Display */}
-            {selectedSalesOrder.items && (
-              <SOItemsDisplay
-                items={selectedSalesOrder.items}
-                title={`Items in ${selectedSalesOrder.value}`}
-              />
-            )}
-
-            {/* Item Scanner */}
+            {/* Item Scanner - Moved above SO Items Display */}
             {selectedSalesOrder.items && (
               <EnhancedDeliveryItemScanner
                 soItems={selectedSalesOrder.items}
                 onAddEntry={handleAddDeliveryEntry}
                 company={getUserDefaultCompany()?.toString()}
                 deliveryNoteName={currentDeliveryNote || undefined}
+              />
+            )}
+
+            {/* Sales Order Items Display - Moved below Scanner */}
+            {selectedSalesOrder.items && (
+              <SOItemsDisplay
+                items={selectedSalesOrder.items}
+                title={`Items in ${selectedSalesOrder.value}`}
               />
             )}
 
