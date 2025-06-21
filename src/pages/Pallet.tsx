@@ -1,11 +1,11 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Package } from "lucide-react";
+import { Package, ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PalletCreator from "@/components/pallet/PalletCreator";
-import PalletDepalletizer from "@/components/pallet/PalletDepalletizer";
 import PalletMover from "@/components/pallet/PalletMover";
+import PalletDepalletizer from "@/components/pallet/PalletDepalletizer";
 import PalletScanner from "@/components/pallet/PalletScanner";
 import HelpSection from "@/components/ui/help-section";
 
@@ -20,18 +20,24 @@ export interface PalletItem {
 
 export interface Pallet {
   id: string;
-  name: string;
+  palletId: string;
+  location: string;
   status: "Active" | "Moved" | "Depalletized";
   createdDate: string;
-  location: string;
   items: PalletItem[];
+  totalWeight?: number;
+  dimensions?: {
+    length: number;
+    width: number;
+    height: number;
+  };
 }
 
 const PalletPage = () => {
-  const [activeTab, setActiveTab] = useState<"creator" | "scanner" | "mover" | "depalletizer">("creator");
+  const [activeTab, setActiveTab] = useState<"create" | "move" | "depalletize" | "scan">("create");
   const [pallets, setPallets] = useState<Pallet[]>([]);
 
-  const showHelp = activeTab === "creator" && pallets.length === 0;
+  const showHelp = pallets.length === 0 && activeTab === "create";
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -49,39 +55,40 @@ const PalletPage = () => {
           <HelpSection
             show={showHelp}
             icon={<Package className="w-12 h-12" />}
-            title="Manage Pallets"
-            description="Create, move, and manage pallets for efficient warehouse operations."
+            title="Manage Pallet Operations"
+            description="Create, move, and organize pallets for efficient warehouse operations."
             steps={[
-              "Create new pallets by adding items",
-              "Scan pallets to view contents",
-              "Move pallets between locations",
-              "Depalletize to break down pallets"
+              "Create new pallets and add items to them",
+              "Move pallets between warehouse locations",
+              "Depalletize to break down pallet contents",
+              "Scan existing pallets to view details"
             ]}
           />
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "creator" | "scanner" | "mover" | "depalletizer")} className="w-full">
+        {/* Content */}
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="creator">Create Pallet</TabsTrigger>
-            <TabsTrigger value="scanner">Scan Pallet</TabsTrigger>
-            <TabsTrigger value="mover">Move Pallet</TabsTrigger>
-            <TabsTrigger value="depalletizer">Depalletize</TabsTrigger>
+            <TabsTrigger value="create">Create Pallet</TabsTrigger>
+            <TabsTrigger value="move">Move Pallet</TabsTrigger>
+            <TabsTrigger value="depalletize">Depalletize</TabsTrigger>
+            <TabsTrigger value="scan">Scan Pallet</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="creator">
+          <TabsContent value="create" className="mt-6">
             <PalletCreator />
           </TabsContent>
 
-          <TabsContent value="scanner">
-            <PalletScanner />
-          </TabsContent>
-
-          <TabsContent value="mover">
+          <TabsContent value="move" className="mt-6">
             <PalletMover />
           </TabsContent>
 
-          <TabsContent value="depalletizer">
+          <TabsContent value="depalletize" className="mt-6">
             <PalletDepalletizer />
+          </TabsContent>
+
+          <TabsContent value="scan" className="mt-6">
+            <PalletScanner />
           </TabsContent>
         </Tabs>
       </div>
