@@ -1,7 +1,8 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
-import { ERPNextStockAPI from './stockApi';
+import { ERPNextStockAPI } from './stockApi';
 import { ERPNextItemAPI } from './itemApi';
 import { ERPNextMaterialAPI } from './materialApi';
 
