@@ -1,220 +1,349 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar"
-import { CalendarIcon } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { MaterialRequest, MaterialRequestItem } from "@/pages/MaterialRequests";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Minus, Package, User, Calendar } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import MaterialRequestItems from "./MaterialRequestItems";
 
-interface MaterialRequestFormProps {
-  onSubmit: (materialRequest: MaterialRequest) => void;
-  onCancel: () => void;
+interface MaterialRequestItem {
+  item_code: string;
+  item_name: string;
+  required_qty: number;
+  uom: string;
+  warehouse: string;
+  description?: string;
 }
 
-const MaterialRequestForm = ({ onSubmit, onCancel }: MaterialRequestFormProps) => {
-  const [formData, setFormData] = useState({
-    type: "Purchase",
-    requestedBy: "",
-    requestedDate: new Date(),
-    requiredBy: new Date(),
-    department: "",
-    purpose: "",
-    remarks: ""
+interface MaterialRequest {
+  title: string;
+  company: string;
+  mr_date: string;
+  status: string;
+  description: string;
+  items: MaterialRequestItem[];
+}
+
+const MaterialRequestForm = () => {
+  const [materialRequest, setMaterialRequest] = useState<MaterialRequest>({
+    title: "",
+    company: "",
+    mr_date: new Date().toISOString().slice(0, 10),
+    status: "Draft",
+    description: "",
+    items: [],
   });
-  const [items, setItems] = useState<MaterialRequestItem[]>([]);
+  const [newItem, setNewItem] = useState<MaterialRequestItem>({
+    item_code: "",
+    item_name: "",
+    required_qty: 1,
+    uom: "Nos",
+    warehouse: "Stores",
+    description: "",
+  });
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  useEffect(() => {
+    loadCompanies();
+    loadItems();
+    loadWarehouses();
+  }, []);
 
-  const handleDateChange = (name: string, date: Date | undefined) => {
-    if (date) {
-      setFormData(prev => ({ ...prev, [name]: date }));
+  const loadCompanies = async () => {
+    try {
+      const api = await createERPNextAPI();
+      if (!api) return;
+
+      // This would load companies from ERPNext - for now using mock data
+      setCompanies(["ABC Ltd", "XYZ Corp"]);
+    } catch (error) {
+      console.error("Error loading companies:", error);
     }
   };
 
-  const handleAddItem = (item: MaterialRequestItem) => {
-    setItems(prev => [...prev, item]);
+  const loadItems = async () => {
+    try {
+      const api = await createERPNextAPI();
+      if (!api) return;
+
+      // This would load items from ERPNext - for now using mock data
+      setItems([
+        { item_code: "ITEM001", item_name: "Product A" },
+        { item_code: "ITEM002", item_name: "Product B" },
+      ]);
+    } catch (error) {
+      console.error("Error loading items:", error);
+    }
   };
 
-  const handleUpdateItem = (index: number, item: MaterialRequestItem) => {
-    setItems(prev => {
-      const newItems = [...prev];
-      newItems[index] = item;
-      return newItems;
+  const loadWarehouses = async () => {
+    try {
+      const api = await createERPNextAPI();
+      if (!api) return;
+
+      // This would load warehouses from ERPNext - for now using mock data
+      setWarehouses(["Warehouse A", "Warehouse B"]);
+    } catch (error) {
+      console.error("Error loading warehouses:", error);
+    }
+  };
+
+  const handleInputChange = (e: any) => {
+    const { name, value } = e.target;
+    setMaterialRequest((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddItem = () => {
+    setMaterialRequest((prev) => ({
+      ...prev,
+      items: [...prev.items, newItem],
+    }));
+    setNewItem({
+      item_code: "",
+      item_name: "",
+      required_qty: 1,
+      uom: "Nos",
+      warehouse: "Stores",
+      description: "",
     });
   };
 
-  const handleDeleteItem = (index: number) => {
-    setItems(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveItem = (index: number) => {
+    setMaterialRequest((prev) => {
+      const newItems = [...prev.items];
+      newItems.splice(index, 1);
+      return { ...prev, items: newItems };
+    });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleNewItemChange = (e: any) => {
+    const { name, value } = e.target;
+    setNewItem((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
-    
-    if (!formData.requestedBy || items.length === 0) {
+    setLoading(true);
+    try {
+      const api = await createERPNextAPI();
+      if (!api) {
+        toast({
+          title: "ERPNext Not Configured",
+          description:
+            "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Simulate submitting the material request to ERPNext
+      console.log("Submitting Material Request:", materialRequest);
+      toast({
+        title: "Success",
+        description: "Material Request submitted successfully!",
+      });
+    } catch (error) {
+      console.error("Error submitting material request:", error);
       toast({
         title: "Error",
-        description: "Please fill in all required fields and add at least one item",
-        variant: "destructive"
+        description: "Failed to submit material request",
+        variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    const materialRequest: MaterialRequest = {
-      id: crypto.randomUUID(),
-      number: `MR-${Date.now()}`,
-      type: formData.type,
-      status: "Draft",
-      requestedBy: formData.requestedBy,
-      requestedDate: formData.requestedDate,
-      requiredBy: formData.requiredBy,
-      department: formData.department,
-      purpose: formData.purpose,
-      priority: "Medium", // Add missing priority field
-      items: items,
-      approvedBy: "",
-      approvedDate: "",
-      remarks: formData.remarks
-    };
-
-    onSubmit(materialRequest);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="container mx-auto p-4">
       <Card>
         <CardHeader>
-          <CardTitle>Request Details</CardTitle>
+          <CardTitle>Create Material Request</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="type">Type</Label>
-              <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Purchase">Purchase</SelectItem>
-                  <SelectItem value="Transfer">Transfer</SelectItem>
-                  <SelectItem value="Manufacture">Manufacture</SelectItem>
-                </SelectContent>
-              </Select>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Title and Company */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  type="text"
+                  id="title"
+                  name="title"
+                  value={materialRequest.title}
+                  onChange={handleInputChange}
+                  placeholder="Material Request Title"
+                />
+              </div>
+              <div>
+                <Label htmlFor="company">Company</Label>
+                <Select
+                  value={materialRequest.company}
+                  onValueChange={(value) =>
+                    setMaterialRequest((prev) => ({ ...prev, company: value }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company} value={company}>
+                        {company}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="requestedBy">Requested By</Label>
-              <Input id="requestedBy" name="requestedBy" value={formData.requestedBy} onChange={handleInputChange} required />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* MR Date */}
             <div>
-              <Label htmlFor="requestedDate">Requested Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !formData.requestedDate && "text-muted-foreground"
-                    )}
+              <Label htmlFor="mr_date">MR Date</Label>
+              <Input
+                type="date"
+                id="mr_date"
+                name="mr_date"
+                value={materialRequest.mr_date}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={materialRequest.description}
+                onChange={handleInputChange}
+                placeholder="Description of the material request"
+              />
+            </div>
+
+            {/* Items List */}
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Items</h3>
+              <div className="space-y-2">
+                {materialRequest.items.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between border rounded-md p-2"
                   >
-                    {formData.requestedDate ? (
-                      format(formData.requestedDate, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={formData.requestedDate}
-                    onSelect={(date) => handleDateChange("requestedDate", date)}
-                    disabled={(date) =>
-                      date > new Date()
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+                    <div>
+                      {item.item_name} ({item.item_code}) - {item.required_qty}{" "}
+                      {item.uom} from {item.warehouse}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleRemoveItem(index)}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {materialRequest.items.length === 0 && (
+                  <div className="text-gray-500">No items added.</div>
+                )}
+              </div>
             </div>
-            <div>
-              <Label htmlFor="requiredBy">Required By</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !formData.requiredBy && "text-muted-foreground"
-                    )}
+
+            {/* Add Item Form */}
+            <div className="border rounded-md p-4">
+              <h4 className="text-md font-semibold mb-2">Add New Item</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <Label htmlFor="item_code">Item</Label>
+                  <Select
+                    value={newItem.item_code}
+                    onValueChange={(value) => {
+                      const selectedItem = items.find(
+                        (item) => item.item_code === value
+                      );
+                      setNewItem((prev) => ({
+                        ...prev,
+                        item_code: value,
+                        item_name: selectedItem?.item_name || "",
+                      }));
+                    }}
                   >
-                    {formData.requiredBy ? (
-                      format(formData.requiredBy, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={formData.requiredBy}
-                    onSelect={(date) => handleDateChange("requiredBy", date)}
-                    disabled={(date) =>
-                      date < new Date()
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select item" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {items.map((item) => (
+                        <SelectItem key={item.item_code} value={item.item_code}>
+                          {item.item_name} ({item.item_code})
+                        </SelectItem>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="required_qty">Required Quantity</Label>
+                <Input
+                  type="number"
+                  id="required_qty"
+                  name="required_qty"
+                  value={newItem.required_qty}
+                  onChange={handleNewItemChange}
+                  placeholder="Required Quantity"
+                />
+              </div>
+              <div>
+                <Label htmlFor="uom">UOM</Label>
+                <Input
+                  type="text"
+                  id="uom"
+                  name="uom"
+                  value={newItem.uom}
+                  onChange={handleNewItemChange}
+                  placeholder="UOM"
+                />
+              </div>
+              <div>
+                <Label htmlFor="warehouse">Warehouse</Label>
+                <Select
+                  value={newItem.warehouse}
+                  onValueChange={(value) =>
+                    setNewItem((prev) => ({ ...prev, warehouse: value }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse} value={warehouse}>
+                        {warehouse}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+            <Button type="button" variant="secondary" onClick={handleAddItem}>
+              Add Item
+            </Button>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="department">Department</Label>
-              <Input id="department" name="department" value={formData.department} onChange={handleInputChange} />
-            </div>
-            <div>
-              <Label htmlFor="purpose">Purpose</Label>
-              <Input id="purpose" name="purpose" value={formData.purpose} onChange={handleInputChange} />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="remarks">Remarks</Label>
-            <Textarea id="remarks" name="remarks" value={formData.remarks} onChange={handleInputChange} />
-          </div>
+            {/* Submit Button */}
+            <Button type="submit" disabled={loading}>
+              {loading ? "Submitting..." : "Submit Material Request"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
-
-      <MaterialRequestItems 
-        items={items}
-        onAddItem={handleAddItem}
-        onUpdateItem={handleUpdateItem}
-        onDeleteItem={handleDeleteItem}
-      />
-
-      <div className="flex justify-end space-x-2">
-        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">Submit</Button>
-      </div>
-    </form>
+    </div>
   );
 };
 

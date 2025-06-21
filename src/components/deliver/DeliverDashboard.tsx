@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +67,7 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
             customer: so.customer,
             customer_name: so.customer_name,
             delivery_date: so.delivery_date,
-            grand_total: so.grand_total,
+            grand_total: so.grand_total || 0,
             status: so.status
           }));
           setSalesOrders(transformedSalesOrders);
@@ -168,7 +169,7 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
                   </div>
                   <div>
                     <span className="text-gray-500">Amount:</span>
-                    <p className="font-medium">₹{selectedSalesOrder.grand_total.toLocaleString()}</p>
+                    <p className="font-medium">₹{(selectedSalesOrder.grand_total || 0).toLocaleString()}</p>
                   </div>
                   <div>
                     <span className="text-gray-500">Status:</span>
@@ -187,7 +188,7 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
         </CardContent>
       </Card>
 
-      {/* Quick Actions - Remove the duplicate View Sales Orders button */}
+      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
