@@ -7,13 +7,15 @@ import { FileText, Clock, CheckCircle, XCircle, ShoppingCart, ArrowRightLeft, Pa
 import MaterialRequestStatusChecker from "@/components/material-request/MaterialRequestStatusChecker";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { MaterialRequest, MaterialRequestPurpose } from "@/pages/MaterialRequest";
 
 interface MaterialRequestDashboardProps {
-  onCreateNew: (purpose: string) => void;
+  onCreateNew: (purpose: MaterialRequestPurpose) => void;
   onViewList: () => void;
+  onEditDraft?: (draft: MaterialRequest) => void;
 }
 
-const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDashboardProps) => {
+const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: MaterialRequestDashboardProps) => {
   const [stats, setStats] = useState({
     totalRequests: 0,
     pendingRequests: 0,
@@ -80,6 +82,48 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDraftClick = async (draftName: string, draftType: string) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI || !onEditDraft) return;
+
+      // Fetch full draft details
+      const draftDetails = await erpnextAPI.getMaterialRequest(draftName);
+      
+      if (draftDetails.data) {
+        const draft: MaterialRequest = {
+          id: draftDetails.data.name,
+          name: draftDetails.data.name,
+          purpose: draftDetails.data.material_request_type as MaterialRequestPurpose,
+          status: "Draft",
+          transactionDate: draftDetails.data.transaction_date,
+          requestedBy: draftDetails.data.owner || "Current User",
+          company: draftDetails.data.company,
+          items: draftDetails.data.items?.map((item: any) => ({
+            itemCode: item.item_code,
+            itemName: item.item_name || item.item_code,
+            qty: item.qty,
+            uom: item.uom,
+            description: item.description || '',
+            warehouse: item.warehouse,
+            rate: item.rate,
+            requiredBy: item.schedule_date
+          })) || [],
+          remarks: draftDetails.data.remarks || ''
+        };
+
+        onEditDraft(draft);
+      }
+    } catch (error) {
+      console.error('Error fetching draft details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load draft details",
+        variant: "destructive"
+      });
     }
   };
 
@@ -217,7 +261,11 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
           <CardContent>
             <div className="space-y-4">
               {draftRequests.map((request, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                <div 
+                  key={index} 
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                  onClick={() => handleDraftClick(request.name, request.material_request_type)}
+                >
                   <div className="flex items-center space-x-4">
                     <div className="p-2 bg-gray-50 rounded-lg">
                       <FileText className="w-4 h-4 text-gray-600" />

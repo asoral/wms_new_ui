@@ -57,6 +57,12 @@ const MaterialRequest = () => {
     setActiveTab("create");
   };
 
+  const handleEditDraft = (draft: MaterialRequest) => {
+    setSelectedPurpose(draft.purpose);
+    setDraftRequest(draft);
+    setActiveTab("create");
+  };
+
   const handleDraftCreated = (draft: MaterialRequest) => {
     setDraftRequest(draft);
   };
@@ -113,6 +119,7 @@ const MaterialRequest = () => {
             <MaterialRequestDashboard
               onCreateNew={handleCreateNew}
               onViewList={() => {}}
+              onEditDraft={handleEditDraft}
             />
           </TabsContent>
 

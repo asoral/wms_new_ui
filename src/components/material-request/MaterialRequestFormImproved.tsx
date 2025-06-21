@@ -165,9 +165,9 @@ const MaterialRequestFormImproved = ({
           qty: item.qty || 1,
           uom: item.uom,
           description: item.description || '',
-          warehouse: item.warehouse,
-          rate: item.rate,
-          schedule_date: item.requiredBy
+          warehouse: purpose === "Purchase" ? item.warehouse : undefined,
+          rate: purpose === "Purchase" ? item.rate : undefined,
+          schedule_date: item.requiredBy || new Date().toISOString().split('T')[0]
         })),
         remarks: formData.remarks
       };
@@ -219,9 +219,9 @@ const MaterialRequestFormImproved = ({
           qty: item.qty,
           uom: item.uom,
           description: item.description || '',
-          warehouse: item.warehouse,
-          rate: item.rate,
-          schedule_date: item.requiredBy
+          warehouse: purpose === "Purchase" ? item.warehouse : undefined,
+          rate: purpose === "Purchase" ? item.rate : undefined,
+          schedule_date: item.requiredBy || new Date().toISOString().split('T')[0]
         })),
         remarks: formData.remarks
       };
@@ -446,16 +446,6 @@ const ItemFormRow = ({
             isLoading={false}
           />
         </div>
-
-        {/* Show selected item info */}
-        {item.itemName && (
-          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="text-sm">
-              <div className="font-medium text-blue-900">{item.itemName}</div>
-              <div className="text-blue-700">Code: {item.itemCode}</div>
-            </div>
-          </div>
-        )}
 
         {/* Item Description */}
         <div>
