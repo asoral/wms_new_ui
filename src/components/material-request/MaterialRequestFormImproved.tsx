@@ -81,10 +81,15 @@ const MaterialRequestFormImproved = ({
       const itemDetails = await erpnextAPI.getItemDetails(itemCode);
       if (itemDetails.data) {
         console.log('Item details fetched:', itemDetails.data);
-        updateItem(index, 'itemCode', itemCode);
-        updateItem(index, 'itemName', itemDetails.data.item_name || itemCode);
-        updateItem(index, 'uom', itemDetails.data.stock_uom || 'Nos');
-        updateItem(index, 'description', itemDetails.data.description || '');
+        const updatedItems = [...items];
+        updatedItems[index] = {
+          ...updatedItems[index],
+          itemCode: itemCode,
+          itemName: itemDetails.data.item_name || itemCode,
+          uom: itemDetails.data.stock_uom || 'Nos',
+          description: itemDetails.data.description || ''
+        };
+        setItems(updatedItems);
         
         // Create draft when first item is added
         if (!draftRequest && items[0].itemCode === "") {
