@@ -1,16 +1,17 @@
 
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
 import { ERPNextStockAPI } from './stockApi';
-import { ERPNextItemAPI } from './itemApi';
+import { ERPNextItemsAPI } from './itemsApi';
 import { ERPNextMaterialAPI } from './materialApi';
 
 export class ERPNextAPI {
   public sales: ERPNextSalesAPI;
   public purchase: ERPNextPurchaseAPI;
   public stock: ERPNextStockAPI;
-  public item: ERPNextItemAPI;
+  public item: ERPNextItemsAPI;
   public material: ERPNextMaterialAPI;
 
   constructor(
@@ -21,7 +22,7 @@ export class ERPNextAPI {
     this.sales = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
     this.purchase = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
     this.stock = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
-    this.item = new ERPNextItemAPI(baseURL, apiKey, apiSecret);
+    this.item = new ERPNextItemsAPI(baseURL, apiKey, apiSecret);
     this.material = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
   }
 
@@ -64,6 +65,11 @@ export class ERPNextAPI {
   async updateMaterialRequest(name: string, data: any) {
     return this.material.updateMaterialRequest(name, data);
   }
+
+  async searchMaterialRequests(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.material.searchMaterialRequests(searchTerm, company, limitPageLength);
+  }
 }
 
 export * from './types';
+

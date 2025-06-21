@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -207,7 +206,6 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                   <Label>From Warehouse</Label>
                   <WarehouseSelector
                     onWarehouseSelected={(warehouse) => setFormData({...formData, fromWarehouse: warehouse})}
-                    selectedWarehouse={formData.fromWarehouse}
                     placeholder="Select source warehouse"
                   />
                 </div>
@@ -215,7 +213,6 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                   <Label>To Warehouse</Label>
                   <WarehouseSelector
                     onWarehouseSelected={(warehouse) => setFormData({...formData, toWarehouse: warehouse})}
-                    selectedWarehouse={formData.toWarehouse}
                     placeholder="Select target warehouse"
                   />
                 </div>
@@ -331,7 +328,6 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                           <Label>Warehouse</Label>
                           <WarehouseSelector
                             onWarehouseSelected={(warehouse) => updateItem(index, 'warehouse', warehouse)}
-                            selectedWarehouse={item.warehouse || ""}
                             placeholder="Select warehouse"
                           />
                         </div>
