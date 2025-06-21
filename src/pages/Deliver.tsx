@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Import components
 import DeliverDashboard from "@/components/deliver/DeliverDashboard";
 import DeliverySalesOrderList from "@/components/deliver/DeliverySalesOrderList";
+import EnhancedDeliveryItemScanner from "@/components/deliver/EnhancedDeliveryItemScanner";
+import DeliveryProcess from "@/components/deliver/DeliveryProcess";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,6 +47,9 @@ export interface SalesOrderOption {
   delivery_date: string;
   grand_total: number;
   status: string;
+  isDraft?: boolean;
+  draftName?: string;
+  items?: SOItem[];
 }
 
 // Add missing types that components need
@@ -95,9 +100,9 @@ export interface DashboardData {
 }
 
 const Deliver = () => {
-  const [currentView, setCurrentView] = useState<"dashboard" | "salesOrderList">("dashboard");
+  const [currentStep, setCurrentStep] = useState<"dashboard" | "deliverItems" | "reviewSubmit">("dashboard");
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrderOption | null>(null);
-  const [editingDeliveryNote, setEditingDeliveryNote] = useState<DeliveryNote | null>(null);
+  const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     todaysDelivery: 0,
     totalDeliveries: 0,
@@ -174,37 +179,49 @@ const Deliver = () => {
   };
 
   const handleSelectSalesOrder = (salesOrder: SalesOrderOption) => {
+    console.log('Sales order selected:', salesOrder);
     setSelectedSalesOrder(salesOrder);
-    setEditingDeliveryNote(null);
-    // For now, just show selection - actual delivery form implementation would go here
+    setDeliveryEntries([]);
+    setCurrentStep("deliverItems");
+    
     toast({
       title: "Sales Order Selected",
       description: `Selected ${salesOrder.label} for delivery processing`,
     });
   };
 
-  const handleEditDeliveryNote = (deliveryNote: DeliveryNote) => {
-    setEditingDeliveryNote(deliveryNote);
-    setSelectedSalesOrder(null);
-    // Delivery note editing would be implemented here
-    toast({
-      title: "Delivery Note Selected",
-      description: `Selected ${deliveryNote.name} for editing`,
-    });
+  const handleAddDeliveryEntry = (entry: DeliveryEntry) => {
+    setDeliveryEntries([...deliveryEntries, entry]);
   };
 
   const handleBackToDashboard = () => {
-    setCurrentView("dashboard");
+    setCurrentStep("dashboard");
     setSelectedSalesOrder(null);
-    setEditingDeliveryNote(null);
+    setDeliveryEntries([]);
   };
 
   const handleViewSalesOrders = () => {
-    setCurrentView("salesOrderList");
+    // This could navigate to a separate sales order list view if needed
+    toast({
+      title: "View Sales Orders",
+      description: "Feature to be implemented",
+    });
   };
 
-  const renderCurrentView = () => {
-    switch (currentView) {
+  const handleNextToReview = () => {
+    if (deliveryEntries.length === 0) {
+      toast({
+        title: "No Items to Deliver",
+        description: "Please add at least one item to the delivery",
+        variant: "destructive"
+      });
+      return;
+    }
+    setCurrentStep("reviewSubmit");
+  };
+
+  const renderTabContent = () => {
+    switch (currentStep) {
       case "dashboard":
         return (
           <DeliverDashboard
@@ -215,16 +232,136 @@ const Deliver = () => {
           />
         );
       
-      case "salesOrderList":
+      case "deliverItems":
+        if (!selectedSalesOrder) return null;
+        
         return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Sales Orders for Delivery</h2>
-              <Button variant="outline" onClick={() => setCurrentView("dashboard")}>
-                Back to Dashboard
+          <div className="space-y-6">
+            {/* Sales Order Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-medium text-blue-900 mb-2">Selected Sales Order</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Order:</span>
+                  <div className="font-medium">{selectedSalesOrder.value}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Customer:</span>
+                  <div className="font-medium">{selectedSalesOrder.customer_name}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Amount:</span>
+                  <div className="font-medium">₹{selectedSalesOrder.grand_total.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Item Scanner */}
+            {selectedSalesOrder.items && (
+              <EnhancedDeliveryItemScanner
+                soItems={selectedSalesOrder.items}
+                onAddEntry={handleAddDeliveryEntry}
+                company={getUserDefaultCompany()?.toString()}
+                deliveryNoteName={selectedSalesOrder.isDraft ? selectedSalesOrder.draftName : undefined}
+              />
+            )}
+
+            {/* Delivery Entries Table */}
+            {deliveryEntries.length > 0 && (
+              <div className="bg-white border rounded-lg p-4">
+                <h3 className="font-medium mb-4">Items to Deliver ({deliveryEntries.length})</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Item Code</th>
+                        <th className="text-left p-2">Item Name</th>
+                        <th className="text-left p-2">Warehouse</th>
+                        <th className="text-left p-2">Quantity</th>
+                        <th className="text-left p-2">UOM</th>
+                        <th className="text-left p-2">Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deliveryEntries.map((entry, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-2">{entry.itemCode}</td>
+                          <td className="p-2">{entry.itemName}</td>
+                          <td className="p-2">{entry.warehouse}</td>
+                          <td className="p-2">{entry.qtyToDeliver}</td>
+                          <td className="p-2">{entry.uom}</td>
+                          <td className="p-2">₹{entry.rate}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      
+      case "reviewSubmit":
+        return (
+          <div className="space-y-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <h3 className="font-medium text-green-900 mb-2">Review & Submit Delivery</h3>
+              <p className="text-sm text-green-700">
+                Review the delivery details below and submit to create the delivery note.
+              </p>
+            </div>
+
+            {/* Summary */}
+            <div className="bg-white border rounded-lg p-4">
+              <h3 className="font-medium mb-4">Delivery Summary</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
+                <div>
+                  <span className="text-gray-600">Sales Order:</span>
+                  <div className="font-medium">{selectedSalesOrder?.value}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Customer:</span>
+                  <div className="font-medium">{selectedSalesOrder?.customer_name}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Total Items:</span>
+                  <div className="font-medium">{deliveryEntries.length}</div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left p-3">Item Code</th>
+                      <th className="text-left p-3">Item Name</th>
+                      <th className="text-left p-3">Warehouse</th>
+                      <th className="text-left p-3">Quantity</th>
+                      <th className="text-left p-3">Rate</th>
+                      <th className="text-left p-3">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deliveryEntries.map((entry, index) => (
+                      <tr key={index} className="border-b">
+                        <td className="p-3">{entry.itemCode}</td>
+                        <td className="p-3">{entry.itemName}</td>
+                        <td className="p-3">{entry.warehouse}</td>
+                        <td className="p-3">{entry.qtyToDeliver} {entry.uom}</td>
+                        <td className="p-3">₹{entry.rate}</td>
+                        <td className="p-3">₹{(entry.qtyToDeliver * entry.rate).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <Button size="lg" className="px-8">
+                Submit Delivery Note
               </Button>
             </div>
-            <DeliverySalesOrderList onSelectSalesOrder={handleSelectSalesOrder} />
           </div>
         );
       
@@ -239,15 +376,6 @@ const Deliver = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            {currentView !== "dashboard" && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={handleBackToDashboard}
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-            )}
             <Truck className="w-6 h-6 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Deliver</h1>
@@ -256,26 +384,50 @@ const Deliver = () => {
                   Selected: {selectedSalesOrder.label}
                 </p>
               )}
-              {editingDeliveryNote && (
-                <p className="text-sm text-gray-600">
-                  Editing delivery note {editingDeliveryNote.name}
-                </p>
-              )}
             </div>
           </div>
 
-          {/* Quick Actions - Only show on dashboard */}
-          {currentView === "dashboard" && (
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={handleViewSalesOrders}>
-                View Sales Orders
-              </Button>
-            </div>
+          {/* Back Button - Only show when not on dashboard */}
+          {currentStep !== "dashboard" && (
+            <Button variant="outline" onClick={handleBackToDashboard}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
           )}
         </div>
 
-        {/* Main Content */}
-        {renderCurrentView()}
+        {/* Tabs - Only show when we have selected an SO or draft */}
+        {selectedSalesOrder ? (
+          <Tabs value={currentStep} onValueChange={(value) => setCurrentStep(value as any)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="dashboard" disabled>Dashboard</TabsTrigger>
+              <TabsTrigger value="deliverItems">Deliver Items</TabsTrigger>
+              <TabsTrigger value="reviewSubmit" disabled={deliveryEntries.length === 0}>Review & Submit</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="deliverItems" className="mt-6">
+              {renderTabContent()}
+            </TabsContent>
+
+            <TabsContent value="reviewSubmit" className="mt-6">
+              {renderTabContent()}
+            </TabsContent>
+          </Tabs>
+        ) : (
+          /* Dashboard View */
+          <div className="mt-6">
+            {renderTabContent()}
+          </div>
+        )}
+
+        {/* Navigation Buttons for Deliver Items Tab */}
+        {currentStep === "deliverItems" && deliveryEntries.length > 0 && (
+          <div className="mt-6 flex justify-end">
+            <Button onClick={handleNextToReview} size="lg">
+              Next: Review & Submit ({deliveryEntries.length} items)
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
