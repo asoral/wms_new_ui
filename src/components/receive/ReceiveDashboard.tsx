@@ -1,9 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { Search, FileText, Package, CheckCircle, Clock, LucideIcon } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
@@ -26,11 +23,10 @@ interface Shortcut {
 }
 
 interface ReceiveDashboardProps {
-  onSelectPO: (poNumber: string) => void;
-  shortcuts: Shortcut[];
+  onSelectPO: () => void;
 }
 
-const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
+const ReceiveDashboard = ({ onSelectPO }: ReceiveDashboardProps) => {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData>({
     pendingPOs: 0,
@@ -41,6 +37,24 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  const shortcuts: Shortcut[] = [
+    {
+      label: "Scan Purchase Order",
+      icon: Search,
+      action: onSelectPO
+    },
+    {
+      label: "View Draft Receipts",
+      icon: FileText,
+      action: () => navigate('/receive/drafts')
+    },
+    {
+      label: "Quality Check",
+      icon: CheckCircle,
+      action: () => navigate('/quality-check')
+    }
+  ];
 
   useEffect(() => {
     loadDashboardData();
@@ -210,7 +224,7 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <POSelector onSelectPO={onSelectPO} loading={loading} />
+          <POSelector onSelectPO={(poNumber: string) => onSelectPO()} loading={loading} />
         </CardContent>
       </Card>
 

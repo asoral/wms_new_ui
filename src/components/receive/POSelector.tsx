@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,16 +18,18 @@ interface PurchaseOrderOption {
 }
 
 interface POSelectorProps {
-  onSelectPO: (poNumber: string) => void;
+  purchaseOrders?: PurchaseOrderOption[];
+  onSelectPO: (po: PurchaseOrderOption) => void;
+  isLoading?: boolean;
   loading?: boolean;
 }
 
-const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
+const POSelector = ({ purchaseOrders = [], onSelectPO, isLoading = false, loading = false }: POSelectorProps) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [searchValue, setSearchValue] = useState("");
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderOption[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<PurchaseOrderOption[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
 
@@ -36,12 +37,12 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
   const debouncedSearch = useCallback(
     debounce(async (searchTerm: string) => {
       if (searchTerm.length < 2) {
-        setPurchaseOrders([]);
+        setSearchResults([]);
         setHasSearched(false);
         return;
       }
 
-      setIsLoading(true);
+      setIsSearching(true);
       setHasSearched(true);
       
       try {
@@ -117,7 +118,7 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
             status: po.status || ''
           }));
           
-          setPurchaseOrders(transformedOrders);
+          setSearchResults(transformedOrders);
           console.log('Found POs:', transformedOrders.length);
         }
       } catch (error) {
@@ -128,7 +129,7 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
           variant: "destructive"
         });
       } finally {
-        setIsLoading(false);
+        setIsSearching(false);
       }
     }, 500),
     []
@@ -144,11 +145,11 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
     };
   }, [searchValue, debouncedSearch]);
 
-  const handleSelect = (selectedValue: string) => {
-    setValue(selectedValue);
-    setSearchValue(selectedValue);
+  const handleSelect = (selectedPO: PurchaseOrderOption) => {
+    setValue(selectedPO.name);
+    setSearchValue(selectedPO.name);
     setOpen(false);
-    onSelectPO(selectedValue);
+    onSelectPO(selectedPO);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +158,8 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
     setOpen(newValue.length >= 2); // Show dropdown when user types at least 2 characters
   };
 
-  const selectedPO = purchaseOrders.find(po => po.name === value);
+  const selectedPO = searchResults.find(po => po.name === value) || purchaseOrders.find(po => po.name === value);
+  const displayResults = searchResults.length > 0 ? searchResults : purchaseOrders;
 
   return (
     <div className="space-y-4">
@@ -172,36 +174,36 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
             onBlur={() => setTimeout(() => setOpen(false), 200)} // Delay to allow clicks
             placeholder="Type at least 2 characters to search PO number, supplier name..."
             className="w-full"
-            disabled={loading}
+            disabled={loading || isLoading}
           />
           
           {/* Search Results Dropdown */}
           {open && searchValue.length >= 2 && (
             <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-              {isLoading && (
+              {isSearching && (
                 <div className="p-3 text-center">
                   <Loader2 className="w-4 h-4 animate-spin mx-auto" />
                   <p className="text-sm text-gray-600 mt-1">Searching...</p>
                 </div>
               )}
               
-              {!isLoading && hasSearched && purchaseOrders.length === 0 && (
+              {!isSearching && hasSearched && displayResults.length === 0 && (
                 <div className="p-3 text-center text-sm text-gray-600">
                   No purchase orders found matching "{searchValue}"
                 </div>
               )}
               
-              {!isLoading && purchaseOrders.length > 0 && purchaseOrders.map((po) => (
+              {!isSearching && displayResults.length > 0 && displayResults.map((po) => (
                 <div
                   key={po.name}
-                  onClick={() => handleSelect(po.name)}
+                  onClick={() => handleSelect(po)}
                   className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="font-medium text-sm">{po.name}</div>
                       <div className="text-xs text-gray-600">
-                        {po.supplier_name} • {po.schedule_date || po.transaction_date} • ₹{po.grand_total?.toLocaleString() || '0'}
+                        {po.supplier_name} • {po.delivery_date || po.transaction_date} • ₹{po.grand_total?.toLocaleString() || '0'}
                       </div>
                       <div className="text-xs text-blue-600 mt-1">
                         Status: {po.status}
@@ -216,7 +218,7 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
             </div>
           )}
           
-          {isLoading && (
+          {(isSearching || isLoading || loading) && (
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
               <Loader2 className="w-4 h-4 animate-spin" />
             </div>
@@ -228,14 +230,14 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
             <div className="text-sm">
               <p><strong>PO:</strong> {selectedPO.name}</p>
               <p><strong>Supplier:</strong> {selectedPO.supplier_name}</p>
-              <p><strong>Expected Date:</strong> {selectedPO.schedule_date || selectedPO.transaction_date}</p>
+              <p><strong>Expected Date:</strong> {selectedPO.delivery_date || selectedPO.transaction_date}</p>
               <p><strong>Total:</strong> ₹{selectedPO.grand_total?.toLocaleString() || '0'}</p>
               <p><strong>Status:</strong> {selectedPO.status}</p>
             </div>
           </div>
         )}
         
-        {!isLoading && hasSearched && searchValue.length >= 2 && purchaseOrders.length === 0 && (
+        {!isSearching && hasSearched && searchValue.length >= 2 && displayResults.length === 0 && (
           <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
             <p className="text-sm text-yellow-800">
               No purchase orders found matching your search. Try different keywords or check if the PO exists with status "To Receive" or "To Receive and Bill".
