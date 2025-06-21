@@ -10,78 +10,85 @@ import { PickList, PickListStatus } from "../../pages/PickList";
 
 interface PickListSelectionProps {
   onSelectPickList: (pickList: PickList) => void;
-  onCreateNew: () => void;
 }
 
-const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionProps) => {
+const PickListSelection = ({ onSelectPickList }: PickListSelectionProps) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Mock data
   const mockPickLists: PickList[] = [
     {
       id: "1",
-      number: "STO-PICK-2025-00009",
+      name: "STO-PICK-2025-00009",
       purpose: "Material Transfer",
       relatedDocument: "MAT-MR-2025-00005",
-      status: "draft",
+      status: "Draft",
       createdDate: "2025-05-29 15:10:13.443915",
+      createdBy: "John Doe",
+      company: "Test Company",
       items: []
     },
     {
       id: "2", 
-      number: "STO-PICK-2025-00008",
+      name: "STO-PICK-2025-00008",
       purpose: "Delivery",
       relatedDocument: "SO-2025-00012",
-      status: "draft",
+      status: "Draft",
       createdDate: "2025-05-29 15:10:01.028773",
+      createdBy: "Jane Smith",
+      company: "Test Company",
       items: []
     },
     {
       id: "3",
-      number: "STO-PICK-2025-00006",
-      purpose: "Transfer for Manufacturing",
+      name: "STO-PICK-2025-00006",
+      purpose: "Material Transfer",
       relatedDocument: "WO-2025-00003",
-      status: "in-progress",
+      status: "Open",
       createdDate: "2025-05-29 10:57:19.947189",
+      createdBy: "Bob Wilson",
+      company: "Test Company",
       items: []
     },
     {
       id: "4",
-      number: "STO-PICK-2025-00007",
+      name: "STO-PICK-2025-00007",
       purpose: "Material Transfer",
       relatedDocument: "MAT-MR-2025-00004",
-      status: "completed",
+      status: "Completed",
       createdDate: "2025-05-29 10:57:09.175952",
+      createdBy: "Alice Brown",
+      company: "Test Company",
       items: []
     }
   ];
 
   const getStatusColor = (status: PickListStatus) => {
     switch (status) {
-      case 'draft': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'in-progress': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'Draft': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'Open': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Completed': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getStatusIcon = (status: PickListStatus) => {
     switch (status) {
-      case 'draft': return <Package className="w-3 h-3" />;
-      case 'in-progress': return <Clock className="w-3 h-3" />;
-      case 'completed': return <CheckCircle className="w-3 h-3" />;
+      case 'Draft': return <Package className="w-3 h-3" />;
+      case 'Open': return <Clock className="w-3 h-3" />;
+      case 'Completed': return <CheckCircle className="w-3 h-3" />;
       default: return <Package className="w-3 h-3" />;
     }
   };
 
   const filteredPickLists = mockPickLists.filter(pickList =>
-    pickList.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    pickList.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     pickList.relatedDocument.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const draftPickLists = filteredPickLists.filter(p => p.status === 'draft');
-  const inProgressPickLists = filteredPickLists.filter(p => p.status === 'in-progress');
-  const completedPickLists = filteredPickLists.filter(p => p.status === 'completed');
+  const draftPickLists = filteredPickLists.filter(p => p.status === 'Draft');
+  const openPickLists = filteredPickLists.filter(p => p.status === 'Open');
+  const completedPickLists = filteredPickLists.filter(p => p.status === 'Completed');
 
   const renderPickListCard = (pickList: PickList) => (
     <Card 
@@ -93,11 +100,11 @@ const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionP
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             <Package className="w-4 h-4 text-gray-600" />
-            <span className="font-semibold text-gray-900">{pickList.number}</span>
+            <span className="font-semibold text-gray-900">{pickList.name}</span>
           </div>
           <Badge className={`${getStatusColor(pickList.status)} flex items-center space-x-1`}>
             {getStatusIcon(pickList.status)}
-            <span className="capitalize">{pickList.status.replace('-', ' ')}</span>
+            <span className="capitalize">{pickList.status}</span>
           </Badge>
         </div>
         
@@ -118,7 +125,7 @@ const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionP
 
   return (
     <div className="space-y-6">
-      {/* Search and Create New */}
+      {/* Search */}
       <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -129,10 +136,6 @@ const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionP
             className="pl-10"
           />
         </div>
-        <Button onClick={onCreateNew} className="flex items-center space-x-2">
-          <Plus className="w-4 h-4" />
-          <span>Create New</span>
-        </Button>
       </div>
 
       {/* Tabs for different statuses */}
@@ -144,7 +147,7 @@ const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionP
           </TabsTrigger>
           <TabsTrigger value="in-progress" className="flex items-center space-x-2">
             <Clock className="w-4 h-4" />
-            <span>In Progress ({inProgressPickLists.length})</span>
+            <span>In Progress ({openPickLists.length})</span>
           </TabsTrigger>
           <TabsTrigger value="completed" className="flex items-center space-x-2">
             <CheckCircle className="w-4 h-4" />
@@ -169,8 +172,8 @@ const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionP
 
         <TabsContent value="in-progress" className="mt-6">
           <div className="space-y-4">
-            {inProgressPickLists.length > 0 ? (
-              inProgressPickLists.map(renderPickListCard)
+            {openPickLists.length > 0 ? (
+              openPickLists.map(renderPickListCard)
             ) : (
               <Card>
                 <CardContent className="p-8 text-center">

@@ -16,8 +16,8 @@ const PalletCreator = () => {
     itemName: "",
     qty: 1,
     uom: "Nos",
-    batch: "",
-    serial: "",
+    batchNo: "",
+    serialNo: "",
     warehouse: ""
   });
   const [isScanning, setIsScanning] = useState(false);
@@ -52,8 +52,8 @@ const PalletCreator = () => {
         itemName: "",
         qty: 1,
         uom: "Nos",
-        batch: "",
-        serial: "",
+        batchNo: "",
+        serialNo: "",
         warehouse: currentItem.warehouse // Keep same warehouse
       });
     }
@@ -134,21 +134,21 @@ const PalletCreator = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="batch">Batch No (Optional)</Label>
+              <Label htmlFor="batchNo">Batch No (Optional)</Label>
               <Input
-                id="batch"
+                id="batchNo"
                 placeholder="BATCH-001"
-                value={currentItem.batch}
-                onChange={(e) => setCurrentItem({...currentItem, batch: e.target.value})}
+                value={currentItem.batchNo}
+                onChange={(e) => setCurrentItem({...currentItem, batchNo: e.target.value})}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="serial">Serial No (Optional)</Label>
+              <Label htmlFor="serialNo">Serial No (Optional)</Label>
               <Input
-                id="serial"
+                id="serialNo"
                 placeholder="SRL-001"
-                value={currentItem.serial}
-                onChange={(e) => setCurrentItem({...currentItem, serial: e.target.value})}
+                value={currentItem.serialNo}
+                onChange={(e) => setCurrentItem({...currentItem, serialNo: e.target.value})}
               />
             </div>
           </div>
@@ -203,11 +203,11 @@ const PalletCreator = () => {
                     <div className="flex flex-wrap gap-2 mt-1">
                       <span className="text-sm font-medium">{item.qty} {item.uom}</span>
                       <span className="text-sm text-gray-600">{item.warehouse}</span>
-                      {item.batch && (
-                        <Badge variant="outline" className="text-xs">Batch: {item.batch}</Badge>
+                      {item.batchNo && (
+                        <Badge variant="outline" className="text-xs">Batch: {item.batchNo}</Badge>
                       )}
-                      {item.serial && (
-                        <Badge variant="outline" className="text-xs">Serial: {item.serial}</Badge>
+                      {item.serialNo && (
+                        <Badge variant="outline" className="text-xs">Serial: {item.serialNo}</Badge>
                       )}
                     </div>
                   </div>

@@ -21,23 +21,23 @@ const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
 
   const currentItem = items[currentItemIndex];
   const totalItems = items.length;
-  const completedItems = items.filter(item => item.status === "completed").length;
+  const completedItems = items.filter(item => item.status === "picked").length;
 
   const handleScanSubmit = () => {
-    if (scannedCode === currentItem.code && enteredQty) {
+    if (scannedCode === currentItem.itemCode && enteredQty) {
       const qty = parseInt(enteredQty);
-      if (qty > 0 && qty <= currentItem.requiredQty) {
+      if (qty > 0 && qty <= currentItem.qty) {
         // Update item status
         const updatedItems = [...items];
         updatedItems[currentItemIndex] = {
           ...currentItem,
           pickedQty: qty,
-          status: qty === currentItem.requiredQty ? "completed" : "partial"
+          status: qty === currentItem.qty ? "picked" : "partially_picked"
         };
         setItems(updatedItems);
         
         // Move to next item if this one is completed
-        if (qty === currentItem.requiredQty && currentItemIndex < totalItems - 1) {
+        if (qty === currentItem.qty && currentItemIndex < totalItems - 1) {
           setCurrentItemIndex(currentItemIndex + 1);
           setScannedCode("");
           setEnteredQty("");
@@ -64,15 +64,15 @@ const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
 
   const getItemStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'partial': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'picked': return 'bg-green-100 text-green-800 border-green-200';
+      case 'partially_picked': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'pending': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const isCodeMatch = scannedCode === currentItem.code;
-  const isValidQty = enteredQty && parseInt(enteredQty) > 0 && parseInt(enteredQty) <= currentItem.requiredQty;
+  const isCodeMatch = scannedCode === currentItem.itemCode;
+  const isValidQty = enteredQty && parseInt(enteredQty) > 0 && parseInt(enteredQty) <= currentItem.qty;
 
   return (
     <div className="space-y-6">
@@ -85,7 +85,7 @@ const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
         
         <div className="flex items-center space-x-4">
           <Badge variant="outline" className="text-sm">
-            {pickList.number}
+            {pickList.name}
           </Badge>
           <Badge className="bg-blue-100 text-blue-800">
             {completedItems}/{totalItems} Items
@@ -126,11 +126,11 @@ const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="font-medium text-gray-600">Item Code:</span>
-                <p className="text-lg font-mono text-gray-900">{currentItem.code}</p>
+                <p className="text-lg font-mono text-gray-900">{currentItem.itemCode}</p>
               </div>
               <div>
                 <span className="font-medium text-gray-600">Item Name:</span>
-                <p className="text-gray-900">{currentItem.name}</p>
+                <p className="text-gray-900">{currentItem.itemName}</p>
               </div>
               <div>
                 <span className="font-medium text-gray-600">Warehouse:</span>
@@ -140,21 +140,21 @@ const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
                 <span className="font-medium text-gray-600">Bin:</span>
                 <p className="text-gray-900">{currentItem.bin}</p>
               </div>
-              {currentItem.batch && (
+              {currentItem.batchNo && (
                 <div>
                   <span className="font-medium text-gray-600">Batch:</span>
-                  <p className="text-gray-900">{currentItem.batch}</p>
+                  <p className="text-gray-900">{currentItem.batchNo}</p>
                 </div>
               )}
-              {currentItem.serial && (
+              {currentItem.serialNo && (
                 <div>
                   <span className="font-medium text-gray-600">Serial:</span>
-                  <p className="text-gray-900">{currentItem.serial}</p>
+                  <p className="text-gray-900">{currentItem.serialNo}</p>
                 </div>
               )}
               <div>
                 <span className="font-medium text-gray-600">Required Qty:</span>
-                <p className="text-gray-900">{currentItem.requiredQty}</p>
+                <p className="text-gray-900">{currentItem.qty}</p>
               </div>
               <div>
                 <span className="font-medium text-gray-600">Picked Qty:</span>
@@ -192,7 +192,7 @@ const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
                   ) : (
                     <>
                       <AlertCircle className="w-4 h-4 text-red-600" />
-                      <span className="text-red-600">Code doesn't match. Expected: {currentItem.code}</span>
+                      <span className="text-red-600">Code doesn't match. Expected: {currentItem.itemCode}</span>
                     </>
                   )}
                 </div>
@@ -207,13 +207,13 @@ const PickingProcess = ({ pickList, onBack }: PickingProcessProps) => {
                 value={enteredQty}
                 onChange={(e) => setEnteredQty(e.target.value)}
                 placeholder="Enter picked quantity"
-                max={currentItem.requiredQty}
+                max={currentItem.qty}
                 min="1"
                 className={isValidQty ? 'border-green-500' : enteredQty ? 'border-red-500' : ''}
               />
               {enteredQty && !isValidQty && (
                 <p className="text-sm text-red-600">
-                  Quantity must be between 1 and {currentItem.requiredQty}
+                  Quantity must be between 1 and {currentItem.qty}
                 </p>
               )}
             </div>

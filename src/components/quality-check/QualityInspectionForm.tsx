@@ -11,8 +11,9 @@ import { Scan, Plus, Trash2, Save, Send } from "lucide-react";
 import { QualityInspection, QualityParameter, InspectionType } from "../../pages/QualityCheck";
 
 interface QualityInspectionFormProps {
-  inspection?: QualityInspection | null;
+  editingInspection?: QualityInspection | null;
   onBack: () => void;
+  onSave: () => void;
 }
 
 // Mock data
@@ -24,32 +25,32 @@ const mockItems = [
 
 const mockParameterTemplates = {
   "ITEM-001": [
-    { parameter: "Length", specification: "10mm ± 0.1", acceptanceCriteria: "9.9-10.1mm" },
-    { parameter: "Diameter", specification: "10mm ± 0.05", acceptanceCriteria: "9.95-10.05mm" },
-    { parameter: "Surface Finish", specification: "Smooth", acceptanceCriteria: "No visible defects" },
+    { parameter: "Length", specification: "10mm ± 0.1", acceptanceValue: "9.9-10.1mm" },
+    { parameter: "Diameter", specification: "10mm ± 0.05", acceptanceValue: "9.95-10.05mm" },
+    { parameter: "Surface Finish", specification: "Smooth", acceptanceValue: "No visible defects" },
   ],
   "ITEM-002": [
-    { parameter: "Purity", specification: "≥95%", acceptanceCriteria: "≥95%" },
-    { parameter: "pH Level", specification: "7.0 ± 0.2", acceptanceCriteria: "6.8-7.2" },
-    { parameter: "Color", specification: "Clear", acceptanceCriteria: "No discoloration" },
+    { parameter: "Purity", specification: "≥95%", acceptanceValue: "≥95%" },
+    { parameter: "pH Level", specification: "7.0 ± 0.2", acceptanceValue: "6.8-7.2" },
+    { parameter: "Color", specification: "Clear", acceptanceValue: "No discoloration" },
   ],
   "ITEM-003": [
-    { parameter: "Dimensions", specification: "100x50x25mm", acceptanceCriteria: "±0.5mm" },
-    { parameter: "Weight", specification: "500g ± 10g", acceptanceCriteria: "490-510g" },
-    { parameter: "Finish Quality", specification: "Grade A", acceptanceCriteria: "No scratches or dents" },
+    { parameter: "Dimensions", specification: "100x50x25mm", acceptanceValue: "±0.5mm" },
+    { parameter: "Weight", specification: "500g ± 10g", acceptanceValue: "490-510g" },
+    { parameter: "Finish Quality", specification: "Grade A", acceptanceValue: "No scratches or dents" },
   ],
 };
 
-const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProps) => {
+const QualityInspectionForm = ({ editingInspection, onBack, onSave }: QualityInspectionFormProps) => {
   const [formData, setFormData] = useState({
-    itemCode: inspection?.itemCode || "",
-    batchSerial: inspection?.batchSerial || "",
-    inspectionType: inspection?.inspectionType || "Incoming" as InspectionType,
-    remarks: inspection?.remarks || "",
+    itemCode: editingInspection?.itemCode || "",
+    batchNo: editingInspection?.batchNo || "",
+    inspectionType: editingInspection?.inspectionType || "Incoming" as InspectionType,
+    remarks: editingInspection?.remarks || "",
   });
 
   const [parameters, setParameters] = useState<QualityParameter[]>(
-    inspection?.parameters || []
+    editingInspection?.parameters || []
   );
 
   const [scannedItem, setScannedItem] = useState("");
@@ -68,13 +69,12 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
     const templates = mockParameterTemplates[itemCode as keyof typeof mockParameterTemplates];
     if (templates) {
       const newParameters = templates.map((template, index) => ({
-        id: Date.now().toString() + index,
         parameter: template.parameter,
         specification: template.specification,
-        acceptanceCriteria: template.acceptanceCriteria,
-        reading: "",
-        value: "",
+        acceptanceValue: template.acceptanceValue,
         status: "Pending" as const,
+        actualValue: "",
+        remarks: "",
       }));
       setParameters(newParameters);
     }
@@ -85,67 +85,65 @@ const QualityInspectionForm = ({ inspection, onBack }: QualityInspectionFormProp
     loadParameterTemplate(itemCode);
   };
 
-const updateParameterReading = (id: string, reading: string) => {
-  setParameters(prev =>
-    prev.map(param => {
-      if (param.id === id) {
-        const value = parseFloat(reading);
-        let status: QualityParameter["status"] = "Pending";
+  const updateParameterReading = (index: number, actualValue: string) => {
+    setParameters(prev =>
+      prev.map((param, i) => {
+        if (i === index) {
+          const value = parseFloat(actualValue);
+          let status: QualityParameter["status"] = "Pending";
 
-        const match = param.acceptanceCriteria.match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
-        if (match && !isNaN(value)) {
-          const min = parseFloat(match[1]);
-          const max = parseFloat(match[2]);
-          status = value >= min && value <= max ? "Accepted" : "Rejected";
-        } else {
-          status = reading ? "Accepted" : "Pending"; // fallback
+          const match = param.acceptanceValue.match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
+          if (match && !isNaN(value)) {
+            const min = parseFloat(match[1]);
+            const max = parseFloat(match[2]);
+            status = value >= min && value <= max ? "Pass" : "Fail";
+          } else {
+            status = actualValue ? "Pass" : "Pending"; // fallback
+          }
+
+          return { ...param, actualValue, status };
         }
-
-        return { ...param, reading, value: reading, status };
-      }
-      return param;
-    })
-  );
-};
-
+        return param;
+      })
+    );
+  };
 
   const addCustomParameter = () => {
     const newParameter: QualityParameter = {
-      id: Date.now().toString(),
       parameter: "Custom Parameter",
       specification: "",
-      acceptanceCriteria: "",
-      reading: "",
-      value: "",
+      acceptanceValue: "",
+      actualValue: "",
       status: "Pending",
+      remarks: "",
     };
     setParameters(prev => [...prev, newParameter]);
   };
 
-  const removeParameter = (id: string) => {
-    setParameters(prev => prev.filter(param => param.id !== id));
+  const removeParameter = (index: number) => {
+    setParameters(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateParameter = (id: string, field: keyof QualityParameter, value: string) => {
-    setParameters(prev => prev.map(param => 
-      param.id === id ? { ...param, [field]: value } : param
+  const updateParameter = (index: number, field: keyof QualityParameter, value: string) => {
+    setParameters(prev => prev.map((param, i) => 
+      i === index ? { ...param, [field]: value } : param
     ));
   };
 
-  const handleSave = () => {
+  const handleSaveInspection = () => {
     console.log("Saving inspection as draft...", { formData, parameters });
-    onBack();
+    onSave();
   };
 
   const handleSubmit = () => {
     console.log("Submitting inspection...", { formData, parameters });
-    onBack();
+    onSave();
   };
 
   const selectedItem = mockItems.find(item => item.code === formData.itemCode);
   const overallResult = parameters.length > 0 ? 
-    (parameters.every(p => p.status === "Accepted") ? "Pass" : 
-     parameters.some(p => p.status === "Rejected") ? "Fail" : "Pending") : "Pending";
+    (parameters.every(p => p.status === "Pass") ? "Pass" : 
+     parameters.some(p => p.status === "Fail") ? "Fail" : "Pending") : "Pending";
 
   return (
     <div className="space-y-6">
@@ -190,12 +188,12 @@ const updateParameterReading = (id: string, reading: string) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="batch-serial">Batch/Serial Number</Label>
+              <Label htmlFor="batchNo">Batch/Serial Number</Label>
               <Input
-                id="batch-serial"
+                id="batchNo"
                 placeholder="Enter batch/serial..."
-                value={formData.batchSerial}
-                onChange={(e) => setFormData(prev => ({ ...prev, batchSerial: e.target.value }))}
+                value={formData.batchNo}
+                onChange={(e) => setFormData(prev => ({ ...prev, batchNo: e.target.value }))}
               />
             </div>
           </div>
@@ -211,8 +209,8 @@ const updateParameterReading = (id: string, reading: string) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Incoming">Incoming</SelectItem>
-                <SelectItem value="Final">Final</SelectItem>
-                <SelectItem value="In-Process">In Process</SelectItem>
+                <SelectItem value="Outgoing">Outgoing</SelectItem>
+                <SelectItem value="In Process">In Process</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -245,14 +243,14 @@ const updateParameterReading = (id: string, reading: string) => {
             </div>
           ) : (
             <div className="space-y-4">
-              {parameters.map((parameter) => (
-                <div key={parameter.id} className="border rounded-lg p-4">
+              {parameters.map((parameter, index) => (
+                <div key={index} className="border rounded-lg p-4">
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs">Parameter</Label>
                       <Input
                         value={parameter.parameter}
-                        onChange={(e) => updateParameter(parameter.id, "parameter", e.target.value)}
+                        onChange={(e) => updateParameter(index, "parameter", e.target.value)}
                         placeholder="Parameter name"
                       />
                     </div>
@@ -261,25 +259,25 @@ const updateParameterReading = (id: string, reading: string) => {
                       <Label className="text-xs">Specification</Label>
                       <Input
                         value={parameter.specification}
-                        onChange={(e) => updateParameter(parameter.id, "specification", e.target.value)}
+                        onChange={(e) => updateParameter(index, "specification", e.target.value)}
                         placeholder="Specification"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-xs">Acceptance Criteria</Label>
+                      <Label className="text-xs">Acceptance Value</Label>
                       <Input
-                        value={parameter.acceptanceCriteria}
-                        onChange={(e) => updateParameter(parameter.id, "acceptanceCriteria", e.target.value)}
-                        placeholder="Criteria"
+                        value={parameter.acceptanceValue}
+                        onChange={(e) => updateParameter(index, "acceptanceValue", e.target.value)}
+                        placeholder="Acceptance criteria"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-xs">Reading</Label>
+                      <Label className="text-xs">Actual Value</Label>
                       <Input
-                        value={parameter.reading || ""}
-                        onChange={(e) => updateParameterReading(parameter.id, e.target.value)}
+                        value={parameter.actualValue || ""}
+                        onChange={(e) => updateParameterReading(index, e.target.value)}
                         placeholder="Enter reading"
                       />
                     </div>
@@ -289,8 +287,8 @@ const updateParameterReading = (id: string, reading: string) => {
                       <div className="flex items-center justify-between">
                         <Badge 
                           className={
-                            parameter.status === "Accepted" ? "bg-green-100 text-green-800" :
-                            parameter.status === "Rejected" ? "bg-red-100 text-red-800" :
+                            parameter.status === "Pass" ? "bg-green-100 text-green-800" :
+                            parameter.status === "Fail" ? "bg-red-100 text-red-800" :
                             "bg-gray-100 text-gray-800"
                           }
                         >
@@ -299,7 +297,7 @@ const updateParameterReading = (id: string, reading: string) => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeParameter(parameter.id)}
+                          onClick={() => removeParameter(index)}
                           className="text-red-600 hover:text-red-800"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -355,7 +353,7 @@ const updateParameterReading = (id: string, reading: string) => {
         </Button>
         
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={handleSave}>
+          <Button variant="outline" onClick={handleSaveInspection}>
             <Save className="w-4 h-4 mr-2" />
             Save Draft
           </Button>

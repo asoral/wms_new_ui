@@ -16,11 +16,13 @@ export interface PalletItem {
   uom: string;
   batchNo?: string;
   serialNo?: string;
+  warehouse?: string;
 }
 
 export interface Pallet {
   id: string;
   name: string;
+  barcode: string;
   status: "Active" | "Moved" | "Depalletized";
   createdDate: string;
   location: string;
