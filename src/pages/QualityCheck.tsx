@@ -1,68 +1,67 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Shield } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CheckCircle, ArrowLeft } from "lucide-react";
 import QualityDashboard from "@/components/quality-check/QualityDashboard";
 import QualityInspectionList from "@/components/quality-check/QualityInspectionList";
 import QualityInspectionForm from "@/components/quality-check/QualityInspectionForm";
 import HelpSection from "@/components/ui/help-section";
 
-export type InspectionType = "Incoming" | "Outgoing" | "In Process";
-export type InspectionStatus = "Draft" | "Submitted" | "Accepted" | "Rejected";
+export type InspectionType = "Incoming" | "In-Process" | "Outgoing";
+export type InspectionStatus = "Pending" | "Pass" | "Fail";
 
 export interface QualityParameter {
   parameter: string;
   specification: string;
   acceptanceValue: string;
-  status: "Pass" | "Fail" | "Pending";
-  actualValue?: string;
-  remarks?: string;
+  reading: string;
+  value: string;
+  status: InspectionStatus;
 }
 
 export interface QualityInspection {
   id: string;
-  inspectionType: InspectionType;
+  name: string;
   itemCode: string;
   itemName: string;
-  batchNo?: string;
-  serialNo?: string;
-  qty: number;
-  uom: string;
-  inspectionDate: string;
-  inspector: string;
+  inspectionType: InspectionType;
   status: InspectionStatus;
+  inspectedBy: string;
+  inspectionDate: string;
+  batchSerial: string;
   parameters: QualityParameter[];
-  overallResult: "Accepted" | "Rejected" | "Pending";
   remarks?: string;
 }
 
-const QualityCheckPage = () => {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "list" | "form">("dashboard");
+const QualityCheck = () => {
+  const [currentView, setCurrentView] = useState<"dashboard" | "list" | "form">("dashboard");
   const [selectedInspection, setSelectedInspection] = useState<QualityInspection | null>(null);
-  const [inspections, setInspections] = useState<QualityInspection[]>([]);
 
   const handleCreateNew = () => {
     setSelectedInspection(null);
-    setActiveTab("form");
+    setCurrentView("form");
+  };
+
+  const handleViewList = () => {
+    setCurrentView("list");
   };
 
   const handleEditInspection = (inspection: QualityInspection) => {
     setSelectedInspection(inspection);
-    setActiveTab("form");
+    setCurrentView("form");
   };
 
   const handleBackToDashboard = () => {
-    setActiveTab("dashboard");
+    setCurrentView("dashboard");
     setSelectedInspection(null);
   };
 
   const handleBackToList = () => {
-    setActiveTab("list");
+    setCurrentView("list");
     setSelectedInspection(null);
   };
 
-  const showHelp = activeTab === "dashboard" && inspections.length === 0;
+  const showHelp = currentView === "dashboard";
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -70,60 +69,57 @@ const QualityCheckPage = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <Shield className="w-6 h-6 text-blue-600" />
+            {currentView !== "dashboard" && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={currentView === "form" ? 
+                  (selectedInspection ? handleBackToList : handleBackToDashboard) : 
+                  handleBackToDashboard
+                }
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            )}
+            <CheckCircle className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Quality Check</h1>
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "dashboard" | "list" | "form")} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="list">Inspections</TabsTrigger>
-            <TabsTrigger value="form">New Inspection</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="dashboard">
-            <QualityDashboard 
-              onCreateNew={handleCreateNew}
-              onViewList={() => setActiveTab("list")}
-            />
-          </TabsContent>
+        {/* Content */}
+        {currentView === "dashboard" && (
+          <QualityDashboard 
+            onViewList={handleViewList}
+          />
+        )}
 
-          <TabsContent value="list">
-            <QualityInspectionList 
-              onCreateNew={handleCreateNew}
-              onEditInspection={handleEditInspection}
-              onBackToDashboard={handleBackToDashboard}
-            />
-          </TabsContent>
+        {currentView === "list" && (
+          <QualityInspectionList
+            onCreateNew={handleCreateNew}
+            onEditInspection={handleEditInspection} 
+          />
+        )}
 
-          <TabsContent value="form">
-            <QualityInspectionForm 
-              editingInspection={selectedInspection}
-              onBack={selectedInspection ? handleBackToList : handleBackToDashboard}
-              onSave={() => {
-                if (selectedInspection) {
-                  handleBackToList();
-                } else {
-                  handleBackToDashboard();
-                }
-              }}
-            />
-          </TabsContent>
-        </Tabs>
+        {currentView === "form" && (
+          <QualityInspectionForm
+            inspection={selectedInspection}
+            onSave={() => selectedInspection ? handleBackToList() : handleBackToDashboard()}
+            onCancel={() => selectedInspection ? handleBackToList() : handleBackToDashboard()}
+          />
+        )}
 
         {/* Help Section - moved to bottom */}
         <div className="mt-8">
           <HelpSection
             show={showHelp}
-            icon={<Shield className="w-12 h-12" />}
-            title="Manage Quality Inspections"
-            description="Perform quality checks and inspections for incoming and outgoing materials."
+            icon={<CheckCircle className="w-12 h-12" />}
+            title="Quality Inspections"
+            description="Perform quality checks and inspections to ensure product standards."
             steps={[
-              "Create quality inspection templates",
-              "Select items for inspection",
-              "Record measurement values",
-              "Accept or reject based on criteria"
+              "Create new quality inspections",
+              "Define inspection parameters",
+              "Record measurements and readings",
+              "Submit inspection results"
             ]}
           />
         </div>
@@ -132,4 +128,4 @@ const QualityCheckPage = () => {
   );
 };
 
-export default QualityCheckPage;
+export default QualityCheck;

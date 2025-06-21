@@ -32,6 +32,11 @@ export interface Pallet {
 const PalletPage = () => {
   const [activeTab, setActiveTab] = useState<"creator" | "scanner" | "mover" | "depalletizer">("creator");
   const [pallets, setPallets] = useState<Pallet[]>([]);
+  const [selectedPallet, setSelectedPallet] = useState<Pallet | null>(null);
+
+  const handlePalletScanned = (pallet: Pallet) => {
+    setSelectedPallet(pallet);
+  };
 
   const showHelp = activeTab === "creator" && pallets.length === 0;
 
@@ -59,15 +64,15 @@ const PalletPage = () => {
           </TabsContent>
 
           <TabsContent value="scanner">
-            <PalletScanner />
+            <PalletScanner onPalletScanned={handlePalletScanned} />
           </TabsContent>
 
           <TabsContent value="mover">
-            <PalletMover />
+            <PalletMover pallet={selectedPallet} />
           </TabsContent>
 
           <TabsContent value="depalletizer">
-            <PalletDepalletizer />
+            <PalletDepalletizer pallet={selectedPallet} />
           </TabsContent>
         </Tabs>
 

@@ -21,6 +21,17 @@ export interface PurchaseOrderOption {
   status: string;
 }
 
+export interface POItem {
+  itemCode: string;
+  itemName: string;
+  orderedQty: number;
+  receivedQty: number;
+  pendingQty: number;
+  rate: number;
+  uom: string;
+  warehouse: string;
+}
+
 export interface ReceiveItem {
   itemCode: string;
   itemName: string;
@@ -149,25 +160,12 @@ const Receive = () => {
           </div>
         </div>
 
-        {/* Help Section */}
-        <div className="mb-6">
-          <HelpSection
-            show={showHelp}
-            icon={<Truck className="w-12 h-12" />}
-            title="Receive Materials"
-            description="Process incoming deliveries against purchase orders."
-            steps={[
-              "View pending purchase orders ready for receiving",
-              "Select a purchase order to process",
-              "Scan or enter received quantities",
-              "Update inventory and complete the receipt"
-            ]}
-          />
-        </div>
-
         {/* Content */}
         {currentView === "dashboard" && (
-          <ReceiveDashboard onSelectPO={() => setCurrentView("poSelector")} />
+          <ReceiveDashboard 
+            onSelectPO={() => setCurrentView("poSelector")} 
+            shortcuts={[]}
+          />
         )}
 
         {currentView === "poSelector" && (
@@ -180,7 +178,10 @@ const Receive = () => {
             </div>
             <POSelector
               purchaseOrders={purchaseOrders}
-              onSelectPO={handleSelectPO}
+              onSelectPO={(poNumber: string) => {
+                const po = purchaseOrders.find(p => p.value === poNumber);
+                if (po) handleSelectPO(po);
+              }}
               isLoading={isLoading}
             />
           </div>
@@ -195,11 +196,27 @@ const Receive = () => {
               </Button>
             </div>
             <ReceiveForm
-              selectedPO={selectedPO}
+              purchaseOrder={selectedPO.value}
               onBack={handleBackToPOSelector}
             />
           </div>
         )}
+
+        {/* Help Section - moved to bottom */}
+        <div className="mt-8">
+          <HelpSection
+            show={showHelp}
+            icon={<Truck className="w-12 h-12" />}
+            title="Receive Materials"
+            description="Process incoming deliveries against purchase orders."
+            steps={[
+              "View pending purchase orders ready for receiving",
+              "Select a purchase order to process",
+              "Scan or enter received quantities",
+              "Update inventory and complete the receipt"
+            ]}
+          />
+        </div>
       </div>
     </div>
   );
