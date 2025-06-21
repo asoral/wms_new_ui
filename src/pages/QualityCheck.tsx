@@ -28,7 +28,7 @@ export interface QualityInspection {
   status: InspectionStatus;
   inspectedBy: string;
   inspectionDate: string;
-  batchSerial: string;
+  batchNo?: string;
   parameters: QualityParameter[];
   remarks?: string;
 }
@@ -88,9 +88,7 @@ const QualityCheck = () => {
 
         {/* Content */}
         {currentView === "dashboard" && (
-          <QualityDashboard 
-            onViewList={handleViewList}
-          />
+          <QualityDashboard onCreateNew={handleCreateNew} />
         )}
 
         {currentView === "list" && (
@@ -102,7 +100,7 @@ const QualityCheck = () => {
 
         {currentView === "form" && (
           <QualityInspectionForm
-            inspection={selectedInspection}
+            initialData={selectedInspection}
             onSave={() => selectedInspection ? handleBackToList() : handleBackToDashboard()}
             onCancel={() => selectedInspection ? handleBackToList() : handleBackToDashboard()}
           />

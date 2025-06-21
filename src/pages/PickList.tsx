@@ -21,6 +21,8 @@ export interface PickListItem {
   batchNo?: string;
   serialNo?: string;
   status: "pending" | "picked" | "partially_picked";
+  pickedQty?: number;
+  bin?: string;
 }
 
 export interface PickList {
@@ -92,7 +94,6 @@ const PickListPage = () => {
         {currentView === "picking" && selectedPickList && (
           <PickingProcess 
             pickList={selectedPickList}
-            onComplete={handleBackToSelection}
             onBack={handleBackToSelection}
           />
         )}

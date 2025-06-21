@@ -177,7 +177,6 @@ const Receive = () => {
               </Button>
             </div>
             <POSelector
-              purchaseOrders={purchaseOrders}
               onSelectPO={(poNumber: string) => {
                 const po = purchaseOrders.find(p => p.value === poNumber);
                 if (po) handleSelectPO(po);
@@ -196,7 +195,6 @@ const Receive = () => {
               </Button>
             </div>
             <ReceiveForm
-              purchaseOrder={selectedPO.value}
               onBack={handleBackToPOSelector}
             />
           </div>

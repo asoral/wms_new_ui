@@ -1,367 +1,273 @@
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Scan, Plus, Trash2, Save, Send } from "lucide-react";
-import { QualityInspection, QualityParameter, InspectionType } from "../../pages/QualityCheck";
+import { Trash2, Plus, Save } from "lucide-react";
+import { QualityInspection, QualityParameter, InspectionType, InspectionStatus } from "../../pages/QualityCheck";
 
 interface QualityInspectionFormProps {
-  editingInspection?: QualityInspection | null;
-  onBack: () => void;
-  onSave: () => void;
+  initialData?: QualityInspection | null;
+  onSave: (inspection: QualityInspection) => void;
+  onCancel: () => void;
 }
 
-// Mock data
-const mockItems = [
-  { code: "ITEM-001", name: "Steel Rod 10mm", group: "Raw Materials" },
-  { code: "ITEM-002", name: "Chemical B", group: "Chemicals" },
-  { code: "ITEM-003", name: "Finished Product X", group: "Finished Goods" },
-];
-
-const mockParameterTemplates = {
-  "ITEM-001": [
-    { parameter: "Length", specification: "10mm ± 0.1", acceptanceValue: "9.9-10.1mm" },
-    { parameter: "Diameter", specification: "10mm ± 0.05", acceptanceValue: "9.95-10.05mm" },
-    { parameter: "Surface Finish", specification: "Smooth", acceptanceValue: "No visible defects" },
-  ],
-  "ITEM-002": [
-    { parameter: "Purity", specification: "≥95%", acceptanceValue: "≥95%" },
-    { parameter: "pH Level", specification: "7.0 ± 0.2", acceptanceValue: "6.8-7.2" },
-    { parameter: "Color", specification: "Clear", acceptanceValue: "No discoloration" },
-  ],
-  "ITEM-003": [
-    { parameter: "Dimensions", specification: "100x50x25mm", acceptanceValue: "±0.5mm" },
-    { parameter: "Weight", specification: "500g ± 10g", acceptanceValue: "490-510g" },
-    { parameter: "Finish Quality", specification: "Grade A", acceptanceValue: "No scratches or dents" },
-  ],
-};
-
-const QualityInspectionForm = ({ editingInspection, onBack, onSave }: QualityInspectionFormProps) => {
+const QualityInspectionForm = ({ initialData, onSave, onCancel }: QualityInspectionFormProps) => {
   const [formData, setFormData] = useState({
-    itemCode: editingInspection?.itemCode || "",
-    batchNo: editingInspection?.batchNo || "",
-    inspectionType: editingInspection?.inspectionType || "Incoming" as InspectionType,
-    remarks: editingInspection?.remarks || "",
+    itemCode: initialData?.itemCode || "",
+    itemName: initialData?.itemName || "",
+    inspectionType: initialData?.inspectionType || "Incoming" as In
+
+SpectionType,
+    inspectedBy: initialData?.inspectedBy || "",
+    batchNo: initialData?.batchNo || "",
+    remarks: initialData?.remarks || ""
   });
 
   const [parameters, setParameters] = useState<QualityParameter[]>(
-    editingInspection?.parameters || []
+    initialData?.parameters || [
+      {
+        parameter: "Dimension",
+        specification: "10mm ± 0.1",
+        acceptanceValue: "9.9-10.1mm",
+        reading: "",
+        value: "",
+        status: "Pending" as InspectionStatus
+      }
+    ]
   );
 
-  const [scannedItem, setScannedItem] = useState("");
-
-  const handleScanItem = () => {
-    if (scannedItem) {
-      const item = mockItems.find(i => i.code === scannedItem);
-      if (item) {
-        setFormData(prev => ({ ...prev, itemCode: item.code }));
-        loadParameterTemplate(item.code);
+  const updateParameter = (index: number, field: keyof QualityParameter, value: string) => {
+    const updated = [...parameters];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    // Auto-update status based on reading
+    if (field === 'reading' && value) {
+      const reading = parseFloat(value);
+      if (!isNaN(reading)) {
+        updated[index].status = reading >= 9.9 && reading <= 10.1 ? "Pass" : "Fail";
       }
     }
+    
+    setParameters(updated);
   };
 
-  const loadParameterTemplate = (itemCode: string) => {
-    const templates = mockParameterTemplates[itemCode as keyof typeof mockParameterTemplates];
-    if (templates) {
-      const newParameters = templates.map((template, index) => ({
-        parameter: template.parameter,
-        specification: template.specification,
-        acceptanceValue: template.acceptanceValue,
-        status: "Pending" as const,
-        actualValue: "",
-        remarks: "",
-      }));
-      setParameters(newParameters);
-    }
-  };
-
-  const handleItemSelect = (itemCode: string) => {
-    setFormData(prev => ({ ...prev, itemCode }));
-    loadParameterTemplate(itemCode);
-  };
-
-  const updateParameterReading = (index: number, actualValue: string) => {
-    setParameters(prev =>
-      prev.map((param, i) => {
-        if (i === index) {
-          const value = parseFloat(actualValue);
-          let status: QualityParameter["status"] = "Pending";
-
-          const match = param.acceptanceValue.match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
-          if (match && !isNaN(value)) {
-            const min = parseFloat(match[1]);
-            const max = parseFloat(match[2]);
-            status = value >= min && value <= max ? "Pass" : "Fail";
-          } else {
-            status = actualValue ? "Pass" : "Pending"; // fallback
-          }
-
-          return { ...param, actualValue, status };
-        }
-        return param;
-      })
-    );
-  };
-
-  const addCustomParameter = () => {
-    const newParameter: QualityParameter = {
-      parameter: "Custom Parameter",
-      specification: "",
-      acceptanceValue: "",
-      actualValue: "",
-      status: "Pending",
-      remarks: "",
-    };
-    setParameters(prev => [...prev, newParameter]);
+  const addParameter = () => {
+    setParameters([
+      ...parameters,
+      {
+        parameter: "",
+        specification: "",
+        acceptanceValue: "",
+        reading: "",
+        value: "",
+        status: "Pending" as InspectionStatus
+      }
+    ]);
   };
 
   const removeParameter = (index: number) => {
-    setParameters(prev => prev.filter((_, i) => i !== index));
+    setParameters(parameters.filter((_, i) => i !== index));
   };
 
-  const updateParameter = (index: number, field: keyof QualityParameter, value: string) => {
-    setParameters(prev => prev.map((param, i) => 
-      i === index ? { ...param, [field]: value } : param
-    ));
+  const handleSave = () => {
+    const inspection: QualityInspection = {
+      id: initialData?.id || `QI-${Date.now()}`,
+      name: `Quality Inspection - ${formData.itemCode}`,
+      itemCode: formData.itemCode,
+      itemName: formData.itemName,
+      inspectionType: formData.inspectionType,
+      status: parameters.every(p => p.status === "Pass") ? "Pass" : 
+              parameters.some(p => p.status === "Fail") ? "Fail" : "Pending",
+      inspectedBy: formData.inspectedBy,
+      inspectionDate: new Date().toISOString(),
+      batchNo: formData.batchNo,
+      parameters: parameters,
+      remarks: formData.remarks
+    };
+
+    onSave(inspection);
   };
 
-  const handleSaveInspection = () => {
-    console.log("Saving inspection as draft...", { formData, parameters });
-    onSave();
+  const getStatusColor = (status: InspectionStatus) => {
+    switch (status) {
+      case "Pass": return "bg-green-100 text-green-800";
+      case "Fail": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
   };
-
-  const handleSubmit = () => {
-    console.log("Submitting inspection...", { formData, parameters });
-    onSave();
-  };
-
-  const selectedItem = mockItems.find(item => item.code === formData.itemCode);
-  const overallResult = parameters.length > 0 ? 
-    (parameters.every(p => p.status === "Pass") ? "Pass" : 
-     parameters.some(p => p.status === "Fail") ? "Fail" : "Pending") : "Pending";
 
   return (
     <div className="space-y-6">
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>Inspection Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Item Scanner */}
-          <div className="space-y-2">
-            <Label htmlFor="item-scan">Scan Item Code</Label>
-            <div className="flex space-x-2">
-              <Input
-                id="item-scan"
-                placeholder="Scan or type item code..."
-                value={scannedItem}
-                onChange={(e) => setScannedItem(e.target.value)}
-              />
-              <Button variant="outline" size="icon" onClick={handleScanItem}>
-                <Scan className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Item Selection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Item</Label>
-              <Select value={formData.itemCode} onValueChange={handleItemSelect}>
+            <div>
+              <Label htmlFor="itemCode">Item Code</Label>
+              <Input
+                id="itemCode"
+                value={formData.itemCode}
+                onChange={(e) => setFormData({ ...formData, itemCode: e.target.value })}
+                placeholder="Enter item code"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="itemName">Item Name</Label>
+              <Input
+                id="itemName"
+                value={formData.itemName}
+                onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
+                placeholder="Enter item name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="inspectionType">Inspection Type</Label>
+              <Select 
+                value={formData.inspectionType} 
+                onValueChange={(value: InspectionType) => setFormData({ ...formData, inspectionType: value })}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select item..." />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockItems.map((item) => (
-                    <SelectItem key={item.code} value={item.code}>
-                      {item.name} ({item.code})
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="Incoming">Incoming</SelectItem>
+                  <SelectItem value="In-Process">In-Process</SelectItem>
+                  <SelectItem value="Outgoing">Outgoing</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="batchNo">Batch/Serial Number</Label>
+            <div>
+              <Label htmlFor="inspectedBy">Inspected By</Label>
+              <Input
+                id="inspectedBy"
+                value={formData.inspectedBy}
+                onChange={(e) => setFormData({ ...formData, inspectedBy: e.target.value })}
+                placeholder="Inspector name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="batchNo">Batch/Serial No</Label>
               <Input
                 id="batchNo"
-                placeholder="Enter batch/serial..."
                 value={formData.batchNo}
-                onChange={(e) => setFormData(prev => ({ ...prev, batchNo: e.target.value }))}
+                onChange={(e) => setFormData({ ...formData, batchNo: e.target.value })}
+                placeholder="Enter batch or serial number"
               />
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label>Inspection Type</Label>
-            <Select 
-              value={formData.inspectionType} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, inspectionType: value as InspectionType }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Incoming">Incoming</SelectItem>
-                <SelectItem value="Outgoing">Outgoing</SelectItem>
-                <SelectItem value="In Process">In Process</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedItem && (
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <div className="text-sm">
-                <span className="font-medium">Selected Item:</span> {selectedItem.name} - {selectedItem.group}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
       {/* Quality Parameters */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Quality Parameters</CardTitle>
-            <Button variant="outline" size="sm" onClick={addCustomParameter}>
+          <CardTitle className="flex items-center justify-between">
+            <span>Quality Parameters</span>
+            <Button onClick={addParameter} size="sm">
               <Plus className="w-4 h-4 mr-2" />
               Add Parameter
             </Button>
-          </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {parameters.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>Select an item to load quality parameters or add custom parameters.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {parameters.map((parameter, index) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Parameter</Label>
-                      <Input
-                        value={parameter.parameter}
-                        onChange={(e) => updateParameter(index, "parameter", e.target.value)}
-                        placeholder="Parameter name"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-xs">Specification</Label>
-                      <Input
-                        value={parameter.specification}
-                        onChange={(e) => updateParameter(index, "specification", e.target.value)}
-                        placeholder="Specification"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-xs">Acceptance Value</Label>
-                      <Input
-                        value={parameter.acceptanceValue}
-                        onChange={(e) => updateParameter(index, "acceptanceValue", e.target.value)}
-                        placeholder="Acceptance criteria"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-xs">Actual Value</Label>
-                      <Input
-                        value={parameter.actualValue || ""}
-                        onChange={(e) => updateParameterReading(index, e.target.value)}
-                        placeholder="Enter reading"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-xs">Status</Label>
-                      <div className="flex items-center justify-between">
-                        <Badge 
-                          className={
-                            parameter.status === "Pass" ? "bg-green-100 text-green-800" :
-                            parameter.status === "Fail" ? "bg-red-100 text-red-800" :
-                            "bg-gray-100 text-gray-800"
-                          }
-                        >
-                          {parameter.status}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeParameter(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+          <div className="space-y-4">
+            {parameters.map((param, index) => (
+              <div key={index} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">Parameter {index + 1}</h4>
+                  <div className="flex items-center space-x-2">
+                    <Badge className={getStatusColor(param.status)}>
+                      {param.status}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeParameter(index)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <Label>Parameter</Label>
+                    <Input
+                      value={param.parameter}
+                      onChange={(e) => updateParameter(index, 'parameter', e.target.value)}
+                      placeholder="e.g., Dimension"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Specification</Label>
+                    <Input
+                      value={param.specification}
+                      onChange={(e) => updateParameter(index, 'specification', e.target.value)}
+                      placeholder="e.g., 10mm ± 0.1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Acceptance Value</Label>
+                    <Input
+                      value={param.acceptanceValue}
+                      onChange={(e) => updateParameter(index, 'acceptanceValue', e.target.value)}
+                      placeholder="e.g., 9.9-10.1mm"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Reading</Label>
+                    <Input
+                      value={param.reading}
+                      onChange={(e) => updateParameter(index, 'reading', e.target.value)}
+                      placeholder="Actual measurement"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Overall Result & Remarks */}
-      {parameters.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Inspection Result</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <span className="font-medium">Overall Result:</span>
-              <Badge 
-                className={
-                  overallResult === "Pass" ? "bg-green-100 text-green-800" :
-                  overallResult === "Fail" ? "bg-red-100 text-red-800" :
-                  "bg-gray-100 text-gray-800"
-                }
-              >
-                {overallResult}
-              </Badge>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="remarks">Remarks</Label>
-              <Textarea
-                id="remarks"
-                placeholder="Add inspection remarks..."
-                value={formData.remarks}
-                onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                rows={3}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Remarks */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Remarks</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            value={formData.remarks}
+            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+            placeholder="Add any additional remarks or observations..."
+            rows={3}
+          />
+        </CardContent>
+      </Card>
 
       {/* Actions */}
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack}>
+      <div className="flex justify-end space-x-4">
+        <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={handleSaveInspection}>
-            <Save className="w-4 h-4 mr-2" />
-            Save Draft
-          </Button>
-          <Button onClick={handleSubmit} disabled={!formData.itemCode || parameters.length === 0}>
-            <Send className="w-4 h-4 mr-2" />
-            Submit Inspection
-          </Button>
-        </div>
+        <Button onClick={handleSave}>
+          <Save className="w-4 h-4 mr-2" />
+          Save Inspection
+        </Button>
       </div>
     </div>
   );

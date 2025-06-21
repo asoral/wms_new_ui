@@ -22,7 +22,6 @@ export interface PalletItem {
 export interface Pallet {
   id: string;
   name: string;
-  barcode: string;
   status: "Active" | "Moved" | "Depalletized";
   createdDate: string;
   location: string;
@@ -34,8 +33,17 @@ const PalletPage = () => {
   const [pallets, setPallets] = useState<Pallet[]>([]);
   const [selectedPallet, setSelectedPallet] = useState<Pallet | null>(null);
 
-  const handlePalletScanned = (pallet: Pallet) => {
-    setSelectedPallet(pallet);
+  const handlePalletScanned = (palletCode: string) => {
+    // Mock pallet lookup - in real app this would fetch from API
+    const mockPallet: Pallet = {
+      id: palletCode,
+      name: palletCode,
+      status: "Active",
+      createdDate: new Date().toISOString(),
+      location: "Warehouse A",
+      items: []
+    };
+    setSelectedPallet(mockPallet);
   };
 
   const showHelp = activeTab === "creator" && pallets.length === 0;

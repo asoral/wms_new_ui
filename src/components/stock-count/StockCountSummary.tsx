@@ -4,27 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from "lucide-react";
-
-interface StockCountSession {
-  id: string;
-  name: string;
-  warehouse: string;
-  status: "draft" | "in_progress" | "completed" | "cancelled";
-  countDate: string;
-  countedBy: string;
-  items: Array<{
-    itemCode: string;
-    itemName: string;
-    warehouse: string;
-    currentQty: number;
-    countedQty: number;
-    difference: number;
-    uom: string;
-  }>;
-}
+import { StockCount } from "../../pages/StockCount";
 
 interface StockCountSummaryProps {
-  session: StockCountSession;
+  session: StockCount;
 }
 
 const StockCountSummary = ({ session }: StockCountSummaryProps) => {
@@ -75,7 +58,7 @@ const StockCountSummary = ({ session }: StockCountSummaryProps) => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Count Number:</span>
-                  <span className="font-medium">{session.name}</span>
+                  <span className="font-medium">{session.number}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Warehouse:</span>
