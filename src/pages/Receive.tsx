@@ -192,7 +192,7 @@ const Receive = () => {
         }
       }
 
-      // If this is the first item, create a new Purchase Receipt
+      // Always add to the same Purchase Receipt instead of creating multiple ones
       if (!currentPurchaseReceipt) {
         console.log('Creating new Purchase Receipt...');
         
@@ -256,7 +256,7 @@ const Receive = () => {
         const currentReceiptData = await currentReceiptResponse.json();
         console.log('Current receipt data:', currentReceiptData);
         
-        // Add new item to existing items array
+        // Add new item to existing items array - this ensures all batches go into one receipt
         const newItem = {
           item_code: entryWithWarehouse.itemCode,
           qty: entryWithWarehouse.receivedQty,

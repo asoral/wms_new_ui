@@ -1,275 +1,220 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
-import { MaterialRequestPurpose, MaterialRequestItem, MaterialRequest } from "@/pages/MaterialRequest";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar"
+import { CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { MaterialRequest, MaterialRequestItem } from "@/pages/MaterialRequests";
+import { useToast } from "@/hooks/use-toast";
+import MaterialRequestItems from "./MaterialRequestItems";
 
 interface MaterialRequestFormProps {
-  purpose: MaterialRequestPurpose;
-  editingRequest?: MaterialRequest | null;
-  onBack: () => void;
-  onSave: () => void;
+  onSubmit: (materialRequest: MaterialRequest) => void;
+  onCancel: () => void;
 }
 
-const MaterialRequestForm = ({ purpose, editingRequest, onBack, onSave }: MaterialRequestFormProps) => {
-  const [items, setItems] = useState<MaterialRequestItem[]>(
-    editingRequest?.items || [
-      {
-        itemCode: "",
-        itemName: "",
-        qty: 0,
-        uom: "Nos"
-      }
-    ]
-  );
+const MaterialRequestForm = ({ onSubmit, onCancel }: MaterialRequestFormProps) => {
+  const [formData, setFormData] = useState({
+    type: "Purchase",
+    requestedBy: "",
+    requestedDate: new Date(),
+    requiredBy: new Date(),
+    department: "",
+    purpose: "",
+    remarks: ""
+  });
+  const [items, setItems] = useState<MaterialRequestItem[]>([]);
+  const { toast } = useToast();
 
-  const addItem = () => {
-    setItems([
-      ...items,
-      {
-        itemCode: "",
-        itemName: "",
-        qty: 0,
-        uom: "Nos"
-      }
-    ]);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const removeItem = (index: number) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
+  const handleDateChange = (name: string, date: Date | undefined) => {
+    if (date) {
+      setFormData(prev => ({ ...prev, [name]: date }));
     }
   };
 
-  const updateItem = (index: number, field: keyof MaterialRequestItem, value: any) => {
-    const updatedItems = [...items];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
-    setItems(updatedItems);
+  const handleAddItem = (item: MaterialRequestItem) => {
+    setItems(prev => [...prev, item]);
+  };
+
+  const handleUpdateItem = (index: number, item: MaterialRequestItem) => {
+    setItems(prev => {
+      const newItems = [...prev];
+      newItems[index] = item;
+      return newItems;
+    });
+  };
+
+  const handleDeleteItem = (index: number) => {
+    setItems(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submitting material request:", { purpose, items });
-    // Implement submission logic here
-    alert(`Material request ${editingRequest ? 'updated' : 'created'} successfully!`);
-    onSave();
+    
+    if (!formData.requestedBy || items.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields and add at least one item",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const materialRequest: MaterialRequest = {
+      id: crypto.randomUUID(),
+      number: `MR-${Date.now()}`,
+      type: formData.type,
+      status: "Draft",
+      requestedBy: formData.requestedBy,
+      requestedDate: formData.requestedDate,
+      requiredBy: formData.requiredBy,
+      department: formData.department,
+      purpose: formData.purpose,
+      priority: "Medium", // Add missing priority field
+      items: items,
+      approvedBy: "",
+      approvedDate: "",
+      remarks: formData.remarks
+    };
+
+    onSubmit(materialRequest);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center space-x-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <h2 className="text-xl font-semibold">
-          {editingRequest ? `Edit ${purpose} Request` : `Create ${purpose} Request`}
-        </h2>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Request Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="requestType">Request Type</Label>
-                <Input
-                  id="requestType"
-                  value={purpose}
-                  disabled
-                  className="bg-gray-50"
-                />
-              </div>
-              <div>
-                <Label htmlFor="priority">Priority</Label>
-                <Select defaultValue={editingRequest?.priority || "Medium"}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {purpose === "Material Transfer" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="fromWarehouse">From Warehouse</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select source warehouse" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="main-store">Main Store</SelectItem>
-                      <SelectItem value="site-store">Site Store</SelectItem>
-                      <SelectItem value="raw-materials">Raw Materials</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="toWarehouse">To Warehouse</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select target warehouse" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="main-store">Main Store</SelectItem>
-                      <SelectItem value="site-store">Site Store</SelectItem>
-                      <SelectItem value="finished-goods">Finished Goods</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Request Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Enter request description..."
-                rows={3}
-                defaultValue={editingRequest?.remarks || ""}
-              />
+              <Label htmlFor="type">Type</Label>
+              <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Purchase">Purchase</SelectItem>
+                  <SelectItem value="Transfer">Transfer</SelectItem>
+                  <SelectItem value="Manufacture">Manufacture</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <Label htmlFor="requestedBy">Requested By</Label>
+              <Input id="requestedBy" name="requestedBy" value={formData.requestedBy} onChange={handleInputChange} required />
+            </div>
+          </div>
 
-        {/* Items */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Items</CardTitle>
-            <Button type="button" onClick={addItem} size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {items.map((item, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-medium">Item {index + 1}</h4>
-                    {items.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeItem(index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="requestedDate">Requested Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.requestedDate && "text-muted-foreground"
                     )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Item Code</Label>
-                      <Input
-                        value={item.itemCode}
-                        onChange={(e) => updateItem(index, 'itemCode', e.target.value)}
-                        placeholder="Enter item code"
-                      />
-                    </div>
-                    <div>
-                      <Label>Item Name</Label>
-                      <Input
-                        value={item.itemName}
-                        onChange={(e) => updateItem(index, 'itemName', e.target.value)}
-                        placeholder="Enter item name"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label>Quantity</Label>
-                        <Input
-                          type="number"
-                          value={item.qty}
-                          onChange={(e) => updateItem(index, 'qty', parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <Label>UOM</Label>
-                        <Select
-                          value={item.uom}
-                          onValueChange={(value) => updateItem(index, 'uom', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Nos">Nos</SelectItem>
-                            <SelectItem value="Kg">Kg</SelectItem>
-                            <SelectItem value="Liters">Liters</SelectItem>
-                            <SelectItem value="Meters">Meters</SelectItem>
-                            <SelectItem value="Bags">Bags</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {purpose === "Purchase" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>Rate</Label>
-                        <Input
-                          type="number"
-                          value={item.rate || ""}
-                          onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <Label>Warehouse</Label>
-                        <Select
-                          value={item.warehouse || ""}
-                          onValueChange={(value) => updateItem(index, 'warehouse', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select warehouse" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="main-store">Main Store</SelectItem>
-                            <SelectItem value="raw-materials">Raw Materials</SelectItem>
-                            <SelectItem value="finished-goods">Finished Goods</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                  >
+                    {formData.requestedDate ? (
+                      format(formData.requestedDate, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.requestedDate}
+                    onSelect={(date) => handleDateChange("requestedDate", date)}
+                    disabled={(date) =>
+                      date > new Date()
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <Label htmlFor="requiredBy">Required By</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.requiredBy && "text-muted-foreground"
+                    )}
+                  >
+                    {formData.requiredBy ? (
+                      format(formData.requiredBy, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.requiredBy}
+                    onSelect={(date) => handleDateChange("requiredBy", date)}
+                    disabled={(date) =>
+                      date < new Date()
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
 
-        {/* Submit Actions */}
-        <div className="flex justify-end space-x-4">
-          <Button type="button" variant="outline" onClick={onBack}>
-            Cancel
-          </Button>
-          <Button type="submit">
-            <Save className="w-4 h-4 mr-2" />
-            {editingRequest ? 'Update Request' : 'Create Request'}
-          </Button>
-        </div>
-      </form>
-    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="department">Department</Label>
+              <Input id="department" name="department" value={formData.department} onChange={handleInputChange} />
+            </div>
+            <div>
+              <Label htmlFor="purpose">Purpose</Label>
+              <Input id="purpose" name="purpose" value={formData.purpose} onChange={handleInputChange} />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="remarks">Remarks</Label>
+            <Textarea id="remarks" name="remarks" value={formData.remarks} onChange={handleInputChange} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <MaterialRequestItems 
+        items={items}
+        onAddItem={handleAddItem}
+        onUpdateItem={handleUpdateItem}
+        onDeleteItem={handleDeleteItem}
+      />
+
+      <div className="flex justify-end space-x-2">
+        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button type="submit">Submit</Button>
+      </div>
+    </form>
   );
 };
 

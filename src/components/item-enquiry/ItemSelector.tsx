@@ -181,18 +181,18 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
           >
             <div className="flex-1 min-w-0 text-left">
               {selectedItem ? (
-                <div>
-                  <div className="font-medium truncate">
+                <div className="space-y-1">
+                  <div className="font-medium truncate text-sm md:text-base">
                     {selectedItem.item_name}
                   </div>
                   {selectedItem.item_name !== selectedItem.item_code && (
-                    <div className="text-sm text-muted-foreground truncate">
+                    <div className="text-xs md:text-sm text-muted-foreground truncate">
                       {selectedItem.item_code}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="truncate text-muted-foreground">
+                <div className="truncate text-muted-foreground text-sm md:text-base">
                   Search item by code, name or barcode...
                 </div>
               )}
@@ -209,6 +209,7 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                 console.log('Search value changing to:', value);
                 setSearchValue(value);
               }}
+              className="text-sm md:text-base"
             />
             <CommandList>
               <CommandEmpty>
@@ -235,21 +236,26 @@ const ItemSelector = ({ onItemSelected, isLoading }: ItemSelectorProps) => {
                           handleItemSelect(selectedItemData);
                         }
                       }}
+                      className="py-3"
                     >
                       <Check
                         className={cn(
-                          "mr-2 h-4 w-4",
+                          "mr-2 h-4 w-4 shrink-0",
                           selectedItem?.item_code === item.item_code ? "opacity-100" : "opacity-0"
                         )}
                       />
                       <div className="flex items-center space-x-3 flex-1 min-w-0">
                         <Package className="w-4 h-4 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate text-gray-900">{item.item_name}</div>
+                          <div className="font-medium truncate text-gray-900 text-sm md:text-base">
+                            {item.item_name}
+                          </div>
                           {showSeparateCode && (
-                            <div className="text-sm text-muted-foreground truncate">{item.item_code}</div>
+                            <div className="text-xs md:text-sm text-muted-foreground truncate">
+                              {item.item_code}
+                            </div>
                           )}
-                          <div className="text-xs px-1 py-0.5 bg-gray-100 text-gray-600 rounded mt-1 inline-block">
+                          <div className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded mt-1 inline-block">
                             {item.stock_uom}
                           </div>
                         </div>

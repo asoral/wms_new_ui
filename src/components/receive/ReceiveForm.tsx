@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,10 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Scan, Plus, Loader2, Trash2 } from "lucide-react";
+import { Plus, Loader2, Trash2 } from "lucide-react";
 import { POItem, ReceiveEntry } from "../../pages/Receive";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import ReceiveItemScanner from "./ReceiveItemScanner";
 
 interface ReceiveFormProps {
   poItems: POItem[];
@@ -37,7 +37,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     serial: ''
   });
   const [isScanning, setIsScanning] = useState(false);
-  const [inputMethod, setInputMethod] = useState<'traditional' | 'bundle'>('traditional');
+  const [inputMethod, setInputMethod<'traditional' | 'bundle'>('traditional');
   const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
   const [loadingItemDetails, setLoadingItemDetails] = useState(false);
   const [batchEntries, setBatchEntries] = useState<BatchEntry[]>([{ batch: '', qty: 0 }]);
@@ -75,18 +75,23 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     }
   };
 
-  const handleItemScan = () => {
-    setIsScanning(true);
-    
-    setTimeout(() => {
-      const scannedItem = poItems[0]?.itemCode || '';
+  const handleItemScanned = (itemCode: string) => {
+    const item = poItems.find(i => i.itemCode === itemCode);
+    if (item && item.pendingQty > 0) {
       setFormData(prev => ({ 
         ...prev, 
-        selectedItem: scannedItem,
-        warehouse: defaultWarehouse || poItems[0]?.warehouse || ''
+        selectedItem: itemCode,
+        warehouse: defaultWarehouse || item.warehouse || '',
+        batch: '',
+        serial: ''
       }));
-      setIsScanning(false);
-    }, 2000);
+    } else {
+      toast({
+        title: "Item Not Found",
+        description: `Item ${itemCode} is not in this Purchase Order or has no pending quantity`,
+        variant: "destructive"
+      });
+    }
   };
 
   const addBatchEntry = () => {
@@ -316,66 +321,11 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
         <CardContent className="pt-6">
           <h3 className="text-lg font-semibold mb-4">Scan Items</h3>
           
-          <Tabs defaultValue="manual" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-              <TabsTrigger value="scan">Scan Item</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="manual" className="space-y-4 mt-4">
-              <div>
-                <Label htmlFor="itemSelect">Item Code / Name</Label>
-                <Select 
-                  value={formData.selectedItem} 
-                  onValueChange={(value) => {
-                    const item = poItems.find(i => i.itemCode === value);
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      selectedItem: value,
-                      warehouse: defaultWarehouse || item?.warehouse || '',
-                      batch: '',
-                      serial: ''
-                    }));
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an item to receive..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {poItems.filter(item => item.pendingQty > 0).map((item) => (
-                      <SelectItem key={item.itemCode} value={item.itemCode}>
-                        {item.itemCode} - {item.itemName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="scan" className="space-y-4 mt-4">
-              <div className="text-center">
-                <Button 
-                  type="button"
-                  onClick={handleItemScan} 
-                  disabled={isScanning}
-                  size="lg"
-                  className="w-full"
-                >
-                  {isScanning ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Scanning...
-                    </>
-                  ) : (
-                    <>
-                      <Scan className="w-4 h-4 mr-2" />
-                      Scan Item
-                    </>
-                  )}
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
+          <ReceiveItemScanner
+            poItems={poItems}
+            onItemScanned={handleItemScanned}
+            isLoading={loadingItemDetails}
+          />
 
           {/* Item Details */}
           {selectedItemData && (
