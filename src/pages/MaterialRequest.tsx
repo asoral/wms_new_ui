@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, ArrowLeft } from "lucide-react";
@@ -8,6 +9,7 @@ import MaterialRequestDashboard from "@/components/material-request/MaterialRequ
 import MaterialRequestList from "@/components/material-request/MaterialRequestList";
 // Import the new improved form
 import MaterialRequestFormImproved from "@/components/material-request/MaterialRequestFormImproved";
+import MaterialRequestReview from "@/components/material-request/MaterialRequestReview";
 
 export type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture" | "Customer Provided";
 export type MaterialRequestStatus = "Draft" | "Submitted" | "Stopped" | "Cancelled" | "Pending" | "Partially Ordered" | "Partially Received" | "Ordered" | "Issued" | "Transferred" | "Received";
@@ -25,7 +27,6 @@ export interface MaterialRequestItem {
   description?: string;
   brand?: string;
   itemGroup?: string;
-  serialBatchBundle?: string;
 }
 
 export interface MaterialRequest {
@@ -46,73 +47,36 @@ export interface MaterialRequest {
 }
 
 const MaterialRequest = () => {
-  const [currentView, setCurrentView] = useState<"dashboard" | "list" | "form">("dashboard");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedPurpose, setSelectedPurpose] = useState<MaterialRequestPurpose | null>(null);
-  const [editingRequest, setEditingRequest] = useState<MaterialRequest | null>(null);
+  const [draftRequest, setDraftRequest] = useState<MaterialRequest | null>(null);
 
   const handleCreateNew = (purpose: MaterialRequestPurpose) => {
     setSelectedPurpose(purpose);
-    setEditingRequest(null);
-    setCurrentView("form");
+    setDraftRequest(null);
+    setActiveTab("create");
   };
 
-  const handleEditRequest = (request: MaterialRequest) => {
-    setEditingRequest(request);
-    setSelectedPurpose(request.purpose);
-    setCurrentView("form");
+  const handleDraftCreated = (draft: MaterialRequest) => {
+    setDraftRequest(draft);
+  };
+
+  const handleReviewAndSubmit = () => {
+    if (draftRequest) {
+      setActiveTab("review");
+    }
   };
 
   const handleBackToDashboard = () => {
-    setCurrentView("dashboard");
+    setActiveTab("dashboard");
     setSelectedPurpose(null);
-    setEditingRequest(null);
+    setDraftRequest(null);
   };
 
-  const handleBackToList = () => {
-    setCurrentView("list");
+  const handleSubmitComplete = () => {
+    setActiveTab("dashboard");
     setSelectedPurpose(null);
-    setEditingRequest(null);
-  };
-
-  const renderCurrentView = () => {
-    switch (currentView) {
-      case "dashboard":
-        return (
-          <MaterialRequestDashboard
-            onCreateNew={handleCreateNew}
-            onViewList={() => setCurrentView("list")}
-          />
-        );
-      
-      case "list":
-        return (
-          <MaterialRequestList
-            onCreateNew={handleCreateNew}
-            onEditRequest={handleEditRequest}
-            onBackToDashboard={handleBackToDashboard}
-          />
-        );
-      
-      case "form":
-        return selectedPurpose ? (
-          <MaterialRequestFormImproved
-            purpose={selectedPurpose}
-            editingRequest={editingRequest}
-            onBack={editingRequest ? handleBackToList : handleBackToDashboard}
-            onSave={() => {
-              // After saving, go back to appropriate view
-              if (editingRequest) {
-                handleBackToList();
-              } else {
-                handleBackToDashboard();
-              }
-            }}
-          />
-        ) : null;
-      
-      default:
-        return null;
-    }
+    setDraftRequest(null);
   };
 
   return (
@@ -121,41 +85,59 @@ const MaterialRequest = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            {currentView !== "dashboard" && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={currentView === "form" ? 
-                  (editingRequest ? handleBackToList : handleBackToDashboard) : 
-                  handleBackToDashboard
-                }
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-            )}
             <FileText className="w-6 h-6 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Material Request</h1>
-              {currentView === "form" && selectedPurpose && (
+              {selectedPurpose && (
                 <p className="text-sm text-gray-600">
-                  {editingRequest ? `Edit ${selectedPurpose} Request` : `Create ${selectedPurpose} Request`}
+                  {selectedPurpose} Request
                 </p>
               )}
             </div>
           </div>
-
-          {/* Quick Actions */}
-          {currentView === "dashboard" && (
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => setCurrentView("list")}>
-                View All Requests
-              </Button>
-            </div>
-          )}
         </div>
 
-        {/* Main Content */}
-        {renderCurrentView()}
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="create" disabled={!selectedPurpose}>
+              Create MR
+            </TabsTrigger>
+            <TabsTrigger value="review" disabled={!draftRequest}>
+              Review & Submit
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dashboard">
+            <MaterialRequestDashboard
+              onCreateNew={handleCreateNew}
+              onViewList={() => {}}
+            />
+          </TabsContent>
+
+          <TabsContent value="create">
+            {selectedPurpose && (
+              <MaterialRequestFormImproved
+                purpose={selectedPurpose}
+                draftRequest={draftRequest}
+                onDraftCreated={handleDraftCreated}
+                onReviewAndSubmit={handleReviewAndSubmit}
+                onBack={handleBackToDashboard}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="review">
+            {draftRequest && (
+              <MaterialRequestReview
+                draftRequest={draftRequest}
+                onSubmitComplete={handleSubmitComplete}
+                onBack={() => setActiveTab("create")}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

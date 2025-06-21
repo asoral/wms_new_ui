@@ -18,9 +18,11 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
     totalRequests: 0,
     pendingRequests: 0,
     approvedRequests: 0,
-    rejectedRequests: 0
+    rejectedRequests: 0,
+    draftRequests: 0
   });
   const [recentRequests, setRecentRequests] = useState<any[]>([]);
+  const [draftRequests, setDraftRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -43,23 +45,29 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
       const recentRequestsResult = await erpnextAPI.getMaterialRequests(
         undefined,
         company || undefined,
-        10
+        20
       );
 
       if (recentRequestsResult.data) {
         setRecentRequests(recentRequestsResult.data);
         
+        // Separate draft requests
+        const drafts = recentRequestsResult.data.filter((req: any) => req.docstatus === 0);
+        setDraftRequests(drafts);
+        
         // Calculate stats
         const total = recentRequestsResult.data.length;
-        const pending = recentRequestsResult.data.filter((req: any) => req.status === 'Pending' || req.status === 'Draft').length;
+        const pending = recentRequestsResult.data.filter((req: any) => req.status === 'Pending' || req.status === 'Submitted').length;
         const approved = recentRequestsResult.data.filter((req: any) => req.status === 'Ordered' || req.status === 'Issued').length;
         const rejected = recentRequestsResult.data.filter((req: any) => req.status === 'Cancelled').length;
+        const draft = drafts.length;
 
         setStats({
           totalRequests: total,
           pendingRequests: pending,
           approvedRequests: approved,
-          rejectedRequests: rejected
+          rejectedRequests: rejected,
+          draftRequests: draft
         });
       }
 
@@ -138,7 +146,7 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card>
           <CardContent className="flex items-center p-6">
             <div className="p-2 bg-blue-100 rounded-lg mr-4">
@@ -147,6 +155,18 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
             <div>
               <p className="text-2xl font-bold">{stats.totalRequests}</p>
               <p className="text-sm text-gray-600">Total Requests</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <div className="p-2 bg-gray-100 rounded-lg mr-4">
+              <FileText className="w-6 h-6 text-gray-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.draftRequests}</p>
+              <p className="text-sm text-gray-600">Drafts</p>
             </div>
           </CardContent>
         </Card>
@@ -188,6 +208,43 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
         </Card>
       </div>
 
+      {/* Draft Requests */}
+      {draftRequests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Draft Material Requests</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {draftRequests.map((request, index) => (
+                <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-2 bg-gray-50 rounded-lg">
+                      <FileText className="w-4 h-4 text-gray-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">{request.name}</h4>
+                      <p className="text-sm text-gray-600">
+                        {request.material_request_type} • {request.owner || 'Unknown'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge className="bg-gray-100 text-gray-800">
+                      Draft
+                    </Badge>
+                    <span className="text-sm text-gray-500">
+                      {new Date(request.transaction_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Material Requests */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Material Requests</CardTitle>

@@ -1,28 +1,35 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
+import { Plus, Trash2, Save } from "lucide-react";
 import { MaterialRequestPurpose, MaterialRequestItem, MaterialRequest } from "@/pages/MaterialRequest";
 import ItemSelector from "../item-enquiry/ItemSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import UOMSelector from "./UOMSelector";
-import SerialBatchBundleSelector from "../stock-count/SerialBatchBundleSelector";
 
 interface MaterialRequestFormImprovedProps {
   purpose: MaterialRequestPurpose;
-  editingRequest?: MaterialRequest | null;
+  draftRequest?: MaterialRequest | null;
+  onDraftCreated: (draft: MaterialRequest) => void;
+  onReviewAndSubmit: () => void;
   onBack: () => void;
-  onSave: () => void;
 }
 
-const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }: MaterialRequestFormImprovedProps) => {
+const MaterialRequestFormImproved = ({ 
+  purpose, 
+  draftRequest, 
+  onDraftCreated, 
+  onReviewAndSubmit, 
+  onBack 
+}: MaterialRequestFormImprovedProps) => {
   const [items, setItems] = useState<MaterialRequestItem[]>(
-    editingRequest?.items || [
+    draftRequest?.items || [
       {
         itemCode: "",
         itemName: "",
@@ -34,7 +41,7 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
   );
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    remarks: editingRequest?.remarks || "",
+    remarks: draftRequest?.remarks || "",
     fromWarehouse: "",
     toWarehouse: ""
   });
@@ -79,6 +86,11 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
         updateItem(index, 'uom', itemDetails.data.stock_uom || 'Nos');
         updateItem(index, 'description', itemDetails.data.description || '');
         
+        // Create draft when first item is added
+        if (!draftRequest && items[0].itemCode === "") {
+          await createDraft(updatedItems);
+        }
+        
         toast({
           title: "Item Details Loaded",
           description: `Item ${itemDetails.data.item_name} details loaded successfully`,
@@ -96,83 +108,97 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
     }
   };
 
-  const handleBundleCreated = (index: number, bundleName: string, totalQty: number) => {
-    updateItem(index, 'serialBatchBundle', bundleName);
-    updateItem(index, 'qty', totalQty);
-    toast({
-      title: "Bundle Created",
-      description: `Serial and Batch Bundle created: ${bundleName}`,
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  const createDraft = async (currentItems: MaterialRequestItem[]) => {
     try {
       const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        throw new Error('ERPNext API not configured');
-      }
+      if (!erpnextAPI) return;
 
       const company = await getUserDefaultCompany();
       
-      const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0);
+      const validItems = currentItems.filter(item => item.itemCode && item.itemCode.trim() !== "");
       
-      if (validItems.length === 0) {
-        throw new Error('Please add at least one item with valid item code and quantity greater than 0');
-      }
+      if (validItems.length === 0) return;
 
       const materialRequestData = {
         material_request_type: purpose,
         transaction_date: new Date().toISOString().split('T')[0],
         company: company,
-        items: validItems.map(item => {
-          const itemData: any = {
-            item_code: item.itemCode,
-            qty: item.qty,
-            uom: item.uom,
-            description: item.description || '',
-            warehouse: item.warehouse
-          };
-
-          if (purpose === "Material Transfer") {
-            if (formData.fromWarehouse) itemData.s_warehouse = formData.fromWarehouse;
-            if (formData.toWarehouse) itemData.t_warehouse = formData.toWarehouse;
-          }
-
-          if (item.rate) itemData.rate = item.rate;
-          if (item.requiredBy) itemData.schedule_date = item.requiredBy;
-          if (item.serialBatchBundle) itemData.serial_batch_bundle = item.serialBatchBundle;
-
-          return itemData;
-        }),
+        docstatus: 0, // Draft status
+        items: validItems.map(item => ({
+          item_code: item.itemCode,
+          qty: item.qty || 1,
+          uom: item.uom,
+          description: item.description || '',
+          warehouse: item.warehouse,
+          rate: item.rate,
+          schedule_date: item.requiredBy
+        })),
         remarks: formData.remarks
       };
 
-      console.log('Submitting material request data:', materialRequestData);
+      console.log('Creating draft material request:', materialRequestData);
 
-      let result;
-      if (editingRequest) {
-        result = await erpnextAPI.updateMaterialRequest(editingRequest.name, materialRequestData);
+      const result = await erpnextAPI.createMaterialRequest(materialRequestData);
+      
+      if (result.data) {
+        const draft: MaterialRequest = {
+          id: result.data.name,
+          name: result.data.name,
+          purpose: purpose,
+          status: "Draft",
+          transactionDate: new Date().toISOString().split('T')[0],
+          requestedBy: "Current User",
+          company: company || "",
+          items: validItems,
+          remarks: formData.remarks
+        };
+        
+        onDraftCreated(draft);
+        
         toast({
-          title: "Success",
-          description: `Material request ${editingRequest.name} updated successfully!`,
-        });
-      } else {
-        result = await erpnextAPI.createMaterialRequest(materialRequestData);
-        toast({
-          title: "Success", 
-          description: `Material request created successfully!`,
+          title: "Draft Created",
+          description: `Draft material request ${result.data.name} created successfully!`,
         });
       }
-
-      onSave();
     } catch (error) {
-      console.error('Error saving material request:', error);
+      console.error('Error creating draft:', error);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!draftRequest) return;
+    
+    setLoading(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "");
+      
+      const updateData = {
+        items: validItems.map(item => ({
+          item_code: item.itemCode,
+          qty: item.qty,
+          uom: item.uom,
+          description: item.description || '',
+          warehouse: item.warehouse,
+          rate: item.rate,
+          schedule_date: item.requiredBy
+        })),
+        remarks: formData.remarks
+      };
+
+      await erpnextAPI.updateMaterialRequest(draftRequest.name, updateData);
+      
+      toast({
+        title: "Draft Saved",
+        description: "Draft updated successfully!",
+      });
+    } catch (error) {
+      console.error('Error saving draft:', error);
       toast({
         title: "Error",
-        description: `Failed to save material request: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: "Failed to save draft",
         variant: "destructive"
       });
     } finally {
@@ -183,16 +209,18 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center space-x-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+      <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">
-          {editingRequest ? `Edit ${purpose} Request` : `Create ${purpose} Request`}
+          {draftRequest ? `Edit ${purpose} Request` : `Create ${purpose} Request`}
         </h2>
+        {draftRequest && (
+          <div className="text-sm text-gray-600">
+            Draft: {draftRequest.name}
+          </div>
+        )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* Basic Information */}
         <Card>
           <CardHeader>
@@ -251,7 +279,6 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                   onItemSelected={(itemCode) => handleItemSelected(index, itemCode)}
                   onUpdateItem={updateItem}
                   onRemoveItem={removeItem}
-                  onBundleCreated={(bundleName, totalQty) => handleBundleCreated(index, bundleName, totalQty)}
                   canRemove={items.length > 1}
                 />
               ))}
@@ -259,17 +286,29 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
           </CardContent>
         </Card>
 
-        {/* Submit Actions */}
-        <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4 pb-6">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0 sm:space-x-4 pb-6">
           <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
-            Cancel
+            Back to Dashboard
           </Button>
-          <Button type="submit" disabled={loading} className="w-full sm:w-auto">
-            <Save className="w-4 h-4 mr-2" />
-            {loading ? 'Saving...' : (editingRequest ? 'Update Request' : 'Create Request')}
-          </Button>
+          <div className="flex space-x-2">
+            {draftRequest && (
+              <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={loading} className="w-full sm:w-auto">
+                <Save className="w-4 h-4 mr-2" />
+                {loading ? 'Saving...' : 'Save Draft'}
+              </Button>
+            )}
+            <Button 
+              type="button" 
+              onClick={onReviewAndSubmit} 
+              disabled={!draftRequest || items.filter(item => item.itemCode).length === 0}
+              className="w-full sm:w-auto"
+            >
+              Review & Submit
+            </Button>
+          </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 };
@@ -281,7 +320,6 @@ interface ItemFormRowProps {
   onItemSelected: (itemCode: string) => void;
   onUpdateItem: (index: number, field: keyof MaterialRequestItem, value: any) => void;
   onRemoveItem: (index: number) => void;
-  onBundleCreated: (bundleName: string, totalQty: number) => void;
   canRemove: boolean;
 }
 
@@ -292,35 +330,8 @@ const ItemFormRow = ({
   onItemSelected, 
   onUpdateItem, 
   onRemoveItem, 
-  onBundleCreated,
   canRemove 
 }: ItemFormRowProps) => {
-  const [itemDetails, setItemDetails] = useState<any>(null);
-
-  // Fetch item details when item code changes
-  useEffect(() => {
-    const fetchItemDetails = async () => {
-      if (item.itemCode) {
-        try {
-          const erpnextAPI = await createERPNextAPI();
-          if (erpnextAPI) {
-            const details = await erpnextAPI.getItemDetails(item.itemCode);
-            if (details.data) {
-              setItemDetails(details.data);
-              console.log('Item details for tracking check:', details.data);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching item details for tracking:', error);
-        }
-      }
-    };
-
-    fetchItemDetails();
-  }, [item.itemCode]);
-
-  const hasSerialBatchTracking = itemDetails && (itemDetails.has_serial_no || itemDetails.has_batch_no);
-
   return (
     <div className="border rounded-lg p-4 space-y-4">
       <div className="flex justify-between items-start">
@@ -354,12 +365,6 @@ const ItemFormRow = ({
             <div className="text-sm">
               <div className="font-medium text-blue-900">{item.itemName}</div>
               <div className="text-blue-700">Code: {item.itemCode}</div>
-              {itemDetails && (
-                <div className="flex gap-2 mt-1">
-                  {itemDetails.has_serial_no && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Serial Tracking</span>}
-                  {itemDetails.has_batch_no && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Batch Tracking</span>}
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -405,29 +410,6 @@ const ItemFormRow = ({
             />
           </div>
         </div>
-
-        {/* Serial and Batch Bundle for tracked items */}
-        {hasSerialBatchTracking && item.itemCode && (
-          <div className="space-y-2">
-            <Label>Serial and Batch Bundle</Label>
-            <SerialBatchBundleSelector
-              itemCode={item.itemCode}
-              itemName={item.itemName || item.itemCode}
-              itemGroup={itemDetails?.item_group || 'All Item Groups'}
-              hasSerial={itemDetails?.has_serial_no || false}
-              hasBatch={itemDetails?.has_batch_no || false}
-              warehouse={item.warehouse || ''}
-              transactionType="Inward"
-              onBundleCreated={onBundleCreated}
-              initialQuantity={item.qty || 1}
-            />
-            {item.serialBatchBundle && (
-              <p className="text-sm text-muted-foreground">
-                Selected Bundle: {item.serialBatchBundle}
-              </p>
-            )}
-          </div>
-        )}
 
         {/* Additional fields for Purchase */}
         {purpose === "Purchase" && (
