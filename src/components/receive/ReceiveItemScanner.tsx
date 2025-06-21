@@ -74,6 +74,11 @@ const ReceiveItemScanner = ({ poItems, onItemScanned, isLoading }: ReceiveItemSc
           <ItemSelector 
             onItemSelected={handleItemSelected}
             isLoading={isLoading}
+            filteredItems={availableItems.map(item => ({
+              item_code: item.itemCode,
+              item_name: item.itemName
+            }))}
+            restrictToFilteredItems={true}
           />
         </TabsContent>
 
