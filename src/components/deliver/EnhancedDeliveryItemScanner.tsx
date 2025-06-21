@@ -382,7 +382,7 @@ const EnhancedDeliveryItemScanner = ({
         requiredQty={parseInt(quantity) || 1}
         onBatchesSelected={handleBatchesSelected}
         company={company || ""}
-        deliveryNoteName={deliveryNoteName}
+        deliveryNoteName={deliveryNoteName || undefined}
       />
     </>
   );

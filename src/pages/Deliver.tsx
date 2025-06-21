@@ -179,7 +179,7 @@ const Deliver = () => {
     }
   };
 
-  const createDraftDeliveryNote = async (salesOrder: SalesOrderOption) => {
+  const createDraftDeliveryNote = async (salesOrder: SalesOrderOption, firstEntry: DeliveryEntry) => {
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
@@ -188,7 +188,15 @@ const Deliver = () => {
 
       const company = await getUserDefaultCompany();
 
-      // Create a minimal draft delivery note without items
+      // Get the full sales order details to get the SO item reference
+      const salesOrderDetails = await erpnextAPI.sales.getSalesOrder(salesOrder.value);
+      
+      // Find the corresponding SO item for the first entry
+      const soItem = salesOrderDetails.data.items?.find((item: any) => 
+        item.item_code === firstEntry.itemCode
+      );
+
+      // Create delivery note with the first item
       const deliveryNoteData = {
         doctype: "Delivery Note",
         customer: salesOrder.customer,
@@ -197,14 +205,27 @@ const Deliver = () => {
         set_posting_time: 0,
         posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
         docstatus: 0, // Draft
-        items: [], // Empty items array - will be populated when items are added
+        items: [{
+          item_code: firstEntry.itemCode,
+          item_name: firstEntry.itemName,
+          qty: firstEntry.qtyToDeliver,
+          rate: firstEntry.rate,
+          amount: firstEntry.qtyToDeliver * firstEntry.rate,
+          warehouse: firstEntry.warehouse,
+          uom: firstEntry.uom,
+          against_sales_order: salesOrder.value,
+          so_detail: soItem?.name || '', // Link to sales order item
+          ...(firstEntry.serial_batch_bundle && { 
+            serial_and_batch_bundle: firstEntry.serial_batch_bundle 
+          })
+        }],
         territory: "All Territories",
         currency: "INR",
         selling_price_list: "Standard Selling",
         ignore_pricing_rule: 1
       };
 
-      console.log('Creating draft delivery note:', deliveryNoteData);
+      console.log('Creating draft delivery note with first item:', deliveryNoteData);
 
       const result = await erpnextAPI.sales.createDeliveryNote(deliveryNoteData);
       
@@ -214,7 +235,7 @@ const Deliver = () => {
         
         toast({
           title: "Draft Created",
-          description: `Draft delivery note ${result.data.name} created successfully`,
+          description: `Draft delivery note ${result.data.name} created successfully with first item`,
         });
 
         return result.data.name;
@@ -230,12 +251,62 @@ const Deliver = () => {
     return null;
   };
 
+  const addItemToExistingDeliveryNote = async (entry: DeliveryEntry) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI || !currentDeliveryNote || !selectedSalesOrder) {
+        throw new Error('Missing required data for adding item');
+      }
+
+      // Get current delivery note
+      const currentDN = await erpnextAPI.sales.getDeliveryNote(currentDeliveryNote);
+      
+      // Get sales order details for SO item reference
+      const salesOrderDetails = await erpnextAPI.sales.getSalesOrder(selectedSalesOrder.value);
+      const soItem = salesOrderDetails.data.items?.find((item: any) => 
+        item.item_code === entry.itemCode
+      );
+
+      // Add the new item to existing items
+      const newItem = {
+        item_code: entry.itemCode,
+        item_name: entry.itemName,
+        qty: entry.qtyToDeliver,
+        rate: entry.rate,
+        amount: entry.qtyToDeliver * entry.rate,
+        warehouse: entry.warehouse,
+        uom: entry.uom,
+        against_sales_order: selectedSalesOrder.value,
+        so_detail: soItem?.name || '',
+        ...(entry.serial_batch_bundle && { 
+          serial_and_batch_bundle: entry.serial_batch_bundle 
+        })
+      };
+
+      const updatedItems = [...(currentDN.data.items || []), newItem];
+
+      await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, {
+        items: updatedItems
+      });
+
+      console.log('Item added to existing delivery note:', currentDeliveryNote);
+      
+    } catch (error) {
+      console.error('Error adding item to delivery note:', error);
+      toast({
+        title: "Warning",
+        description: "Item tracked but failed to add to delivery note",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleSelectSalesOrder = async (salesOrder: SalesOrderOption) => {
     console.log('Sales order selected:', salesOrder);
     setSelectedSalesOrder(salesOrder);
     setDeliveryEntries([]);
     
-    // Don't create draft delivery note immediately - wait for first item to be added
+    // Set current delivery note if it's a draft
     if (salesOrder.isDraft) {
       setCurrentDeliveryNote(salesOrder.draftName || null);
     } else {
@@ -251,19 +322,22 @@ const Deliver = () => {
   };
 
   const handleAddDeliveryEntry = async (entry: DeliveryEntry) => {
-    // Create draft delivery note if it doesn't exist (first item being added)
+    console.log('Adding delivery entry:', entry);
+    
+    // If this is the first item and we don't have a delivery note, create one
     if (!currentDeliveryNote && selectedSalesOrder && !selectedSalesOrder.isDraft) {
-      const draftName = await createDraftDeliveryNote(selectedSalesOrder);
+      console.log('Creating new draft delivery note with first item');
+      const draftName = await createDraftDeliveryNote(selectedSalesOrder, entry);
       if (draftName) {
         setCurrentDeliveryNote(draftName);
-        // Update the entry with the delivery note reference if it has a bundle
-        if (entry.serial_batch_bundle) {
-          // The bundle should already be created with the delivery note reference
-          // We just need to add the entry
-        }
       }
+    } else if (currentDeliveryNote) {
+      // Add item to existing delivery note
+      console.log('Adding item to existing delivery note');
+      await addItemToExistingDeliveryNote(entry);
     }
     
+    // Add to local state
     setDeliveryEntries([...deliveryEntries, entry]);
   };
 
@@ -311,24 +385,10 @@ const Deliver = () => {
         throw new Error('ERPNext API not configured');
       }
 
-      // Update the draft delivery note with items
-      const deliveryItems = deliveryEntries.map(entry => ({
-        item_code: entry.itemCode,
-        item_name: entry.itemName,
-        qty: entry.qtyToDeliver,
-        rate: entry.rate,
-        amount: entry.qtyToDeliver * entry.rate,
-        warehouse: entry.warehouse,
-        uom: entry.uom,
-        ...(entry.serial_batch_bundle && { serial_and_batch_bundle: entry.serial_batch_bundle })
-      }));
-
-      const updateData = {
-        items: deliveryItems,
-        docstatus: 1 // Submit the delivery note
-      };
-
-      await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, updateData);
+      // Submit the delivery note (change docstatus to 1)
+      await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, {
+        docstatus: 1
+      });
 
       toast({
         title: "Delivery Note Submitted",
