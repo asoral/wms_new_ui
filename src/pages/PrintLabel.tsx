@@ -7,6 +7,7 @@ import { Printer, RefreshCcw } from "lucide-react";
 import BinLabelForm from "../components/print-label/BinLabelForm";
 import ItemLabelForm from "../components/print-label/ItemLabelForm";
 import LabelPreview from "../components/print-label/LabelPreview";
+import HelpSection from "@/components/ui/help-section";
 
 export type LabelType = "bin" | "item";
 
@@ -46,6 +47,8 @@ const PrintLabelPage = () => {
   const handlePrint = () => {
     window.print();
   };
+
+  const showHelp = !labelData;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -106,10 +109,18 @@ const PrintLabelPage = () => {
                   labelType={activeTab} 
                 />
               ) : (
-                <div className="text-center text-gray-500 py-12">
-                  <Printer className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Configure label settings to see preview</p>
-                </div>
+                <HelpSection
+                  show={showHelp}
+                  icon={<Printer className="w-12 h-12" />}
+                  title="Create Custom Labels"
+                  description="Design and print barcode labels for bins and items."
+                  steps={[
+                    "Choose between bin labels or item labels",
+                    "Select warehouse/bin or scan item barcode",
+                    "Configure label details and quantities",
+                    "Preview and print the generated labels"
+                  ]}
+                />
               )}
             </CardContent>
           </Card>

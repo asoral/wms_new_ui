@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Database, Plus, TrendingUp, TrendingDown, ArrowRightLeft, Eye } from "lucide-react";
 import StockEntryForm from "../components/stock-entry/StockEntryForm";
 import StockEntryList from "../components/stock-entry/StockEntryList";
+import HelpSection from "@/components/ui/help-section";
 
 export type StockEntryType = 
   | "Material Issue"
@@ -51,6 +52,7 @@ export interface StockEntry {
 const StockEntry = () => {
   const [activeTab, setActiveTab] = useState<"list" | "form">("list");
   const [selectedType, setSelectedType] = useState<StockEntryType | null>(null);
+  const [stockEntries, setStockEntries] = useState<StockEntry[]>([]);
 
   const handleCreateNew = (type: StockEntryType) => {
     setSelectedType(type);
@@ -61,6 +63,8 @@ const StockEntry = () => {
     setSelectedType(null);
     setActiveTab("list");
   };
+
+  const showHelp = activeTab === "list" && stockEntries.length === 0;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -86,6 +90,21 @@ const StockEntry = () => {
           </TabsList>
           
           <TabsContent value="list">
+            {/* Help Section */}
+            <div className="mb-6">
+              <HelpSection
+                show={showHelp}
+                icon={<Database className="w-12 h-12" />}
+                title="Manage Stock Movements"
+                description="Record all types of inventory transactions and movements."
+                steps={[
+                  "Choose the type of stock entry to create",
+                  "Add items and specify quantities",
+                  "Set source and destination warehouses",
+                  "Submit to update inventory levels"
+                ]}
+              />
+            </div>
             <StockEntryList onCreateNew={handleCreateNew} />
           </TabsContent>
 

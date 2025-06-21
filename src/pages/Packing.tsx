@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package2, RefreshCcw, Plus } from "lucide-react";
 import PackingSlipList from "../components/packing/PackingSlipList";
 import PackingSlipForm from "../components/packing/PackingSlipForm";
+import HelpSection from "@/components/ui/help-section";
 
 export interface PackingSlipItem {
   itemCode: string;
@@ -33,6 +34,7 @@ export interface PackingSlip {
 const PackingPage = () => {
   const [currentView, setCurrentView] = useState<"list" | "create">("list");
   const [selectedDeliveryNote, setSelectedDeliveryNote] = useState<string>("");
+  const [packingSlips, setPackingSlips] = useState<PackingSlip[]>([]);
 
   const handleCreateNew = (deliveryNote?: string) => {
     if (deliveryNote) {
@@ -45,6 +47,8 @@ const PackingPage = () => {
     setCurrentView("list");
     setSelectedDeliveryNote("");
   };
+
+  const showHelp = currentView === "list" && packingSlips.length === 0;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -66,6 +70,22 @@ const PackingPage = () => {
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Help Section */}
+        <div className="mb-6">
+          <HelpSection
+            show={showHelp}
+            icon={<Package2 className="w-12 h-12" />}
+            title="Create Packing Slips"
+            description="Generate packing documentation for shipments."
+            steps={[
+              "Select delivery notes ready for packing",
+              "Generate packing slips with item details",
+              "Include package weights and dimensions",
+              "Print shipping labels and documentation"
+            ]}
+          />
         </div>
 
         {/* Content */}
