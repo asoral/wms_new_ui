@@ -37,7 +37,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
     serial: ''
   });
   const [isScanning, setIsScanning] = useState(false);
-  const [inputMethod, setInputMethod<'traditional' | 'bundle'>('traditional');
+  const [inputMethod, setInputMethod] = useState<'traditional' | 'bundle'>('traditional');
   const [itemDetails, setItemDetails] = useState<ItemDetails | null>(null);
   const [loadingItemDetails, setLoadingItemDetails] = useState(false);
   const [batchEntries, setBatchEntries] = useState<BatchEntry[]>([{ batch: '', qty: 0 }]);
