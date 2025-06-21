@@ -1,45 +1,25 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  FileText, 
-  Plus, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle,
-  TrendingUp,
-  Package
-} from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ShoppingCart, ArrowRightLeft, Package, RefreshCw } from "lucide-react";
+import { MaterialRequestStatusChecker } from "@/components/material-request/MaterialRequestStatusChecker";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import MaterialRequestStatusChecker from "./MaterialRequestStatusChecker";
 
 interface MaterialRequestDashboardProps {
   onCreateNew: (purpose: string) => void;
   onViewList: () => void;
 }
 
-interface MaterialRequestSummary {
-  name: string;
-  title?: string;
-  material_request_type: string;
-  status: string;
-  transaction_date: string;
-  requested_by: string;
-}
-
 const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDashboardProps) => {
   const [stats, setStats] = useState({
-    draft: 0,
-    submitted: 0,
-    partiallyOrdered: 0,
-    ordered: 0,
-    cancelled: 0
+    totalRequests: 0,
+    pendingRequests: 0,
+    approvedRequests: 0,
+    rejectedRequests: 0
   });
-  const [recentRequests, setRecentRequests] = useState<MaterialRequestSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [recentRequests, setRecentRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,74 +27,45 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
   }, []);
 
   const fetchDashboardData = async () => {
-    setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         console.warn('ERPNext API not configured');
+        setLoading(false);
         return;
       }
 
       const company = await getUserDefaultCompany();
       
-      // Fetch recent material requests (last 5)
-      const recentResult = await erpnextAPI.getMaterialRequests(
-        [['docstatus', '!=', 2]], // Exclude cancelled
-        company || undefined,
-        5
-      );
-
-      if (recentResult.data) {
-        // Transform the data to match MaterialRequestSummary interface
-        const transformedRequests: MaterialRequestSummary[] = recentResult.data.map(req => ({
-          name: req.name,
-          title: req.title || req.name,
-          material_request_type: req.material_request_type || 'Purchase',
-          status: req.status,
-          transaction_date: req.transaction_date,
-          requested_by: req.requested_by || 'System'
-        }));
-        setRecentRequests(transformedRequests);
-      }
-
-      // Fetch all material requests for stats
-      const allResult = await erpnextAPI.getMaterialRequests(
+      // Fetch recent material requests
+      const recentRequestsResult = await erpnextAPI.getMaterialRequests(
         undefined,
         company || undefined,
-        1000
+        10
       );
 
-      if (allResult.data) {
-        const statsData = allResult.data.reduce((acc, req) => {
-          switch (req.status) {
-            case 'Draft':
-              acc.draft++;
-              break;
-            case 'Submitted':
-            case 'Pending':
-              acc.submitted++;
-              break;
-            case 'Partially Ordered':
-              acc.partiallyOrdered++;
-              break;
-            case 'Ordered':
-              acc.ordered++;
-              break;
-            case 'Cancelled':
-              acc.cancelled++;
-              break;
-          }
-          return acc;
-        }, { draft: 0, submitted: 0, partiallyOrdered: 0, ordered: 0, cancelled: 0 });
+      if (recentRequestsResult.data) {
+        setRecentRequests(recentRequestsResult.data);
+        
+        // Calculate stats
+        const total = recentRequestsResult.data.length;
+        const pending = recentRequestsResult.data.filter((req: any) => req.status === 'Pending' || req.status === 'Draft').length;
+        const approved = recentRequestsResult.data.filter((req: any) => req.status === 'Ordered' || req.status === 'Issued').length;
+        const rejected = recentRequestsResult.data.filter((req: any) => req.status === 'Cancelled').length;
 
-        setStats(statsData);
+        setStats({
+          totalRequests: total,
+          pendingRequests: pending,
+          approvedRequests: approved,
+          rejectedRequests: rejected
+        });
       }
 
     } catch (error) {
-      console.error('Error fetching material request data:', error);
+      console.error('Error fetching dashboard data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch material request data",
+        description: "Failed to fetch dashboard data",
         variant: "destructive"
       });
     } finally {
@@ -136,125 +87,129 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
 
   return (
     <div className="space-y-6">
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* Header with Status Checker */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <MaterialRequestStatusChecker />
+        </div>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button 
+                onClick={() => onCreateNew("Purchase")} 
+                className="w-full justify-start" 
+                variant="outline"
+              >
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Purchase Request
+              </Button>
+              <Button 
+                onClick={() => onCreateNew("Material Transfer")} 
+                className="w-full justify-start" 
+                variant="outline"
+              >
+                <ArrowRightLeft className="w-4 h-4 mr-2" />
+                Transfer Request
+              </Button>
+              <Button 
+                onClick={() => onCreateNew("Material Issue")} 
+                className="w-full justify-start" 
+                variant="outline"
+              >
+                <Package className="w-4 h-4 mr-2" />
+                Issue Request
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-4 text-center">
-            <FileText className="w-6 h-6 text-gray-600 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{stats.draft}</div>
-            <div className="text-sm text-gray-600">Draft</div>
+          <CardContent className="flex items-center p-6">
+            <div className="p-2 bg-blue-100 rounded-lg mr-4">
+              <FileText className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.totalRequests}</p>
+              <p className="text-sm text-gray-600">Total Requests</p>
+            </div>
           </CardContent>
         </Card>
-        
+
         <Card>
-          <CardContent className="p-4 text-center">
-            <Clock className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{stats.submitted}</div>
-            <div className="text-sm text-gray-600">Submitted</div>
+          <CardContent className="flex items-center p-6">
+            <div className="p-2 bg-yellow-100 rounded-lg mr-4">
+              <Clock className="w-6 h-6 text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.pendingRequests}</p>
+              <p className="text-sm text-gray-600">Pending</p>
+            </div>
           </CardContent>
         </Card>
-        
+
         <Card>
-          <CardContent className="p-4 text-center">
-            <AlertCircle className="w-6 h-6 text-yellow-600 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{stats.partiallyOrdered}</div>
-            <div className="text-sm text-gray-600">Partially Ordered</div>
+          <CardContent className="flex items-center p-6">
+            <div className="p-2 bg-green-100 rounded-lg mr-4">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.approvedRequests}</p>
+              <p className="text-sm text-gray-600">Approved</p>
+            </div>
           </CardContent>
         </Card>
-        
+
         <Card>
-          <CardContent className="p-4 text-center">
-            <CheckCircle className="w-6 h-6 text-green-600 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{stats.ordered}</div>
-            <div className="text-sm text-gray-600">Ordered</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4 text-center">
-            <XCircle className="w-6 h-6 text-red-600 mx-auto mb-2" />
-            <div className="text-2xl font-bold">{stats.cancelled}</div>
-            <div className="text-sm text-gray-600">Cancelled</div>
+          <CardContent className="flex items-center p-6">
+            <div className="p-2 bg-red-100 rounded-lg mr-4">
+              <XCircle className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.rejectedRequests}</p>
+              <p className="text-sm text-gray-600">Rejected</p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Status Checker */}
-      <MaterialRequestStatusChecker />
-
-      {/* Create New Material Request */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Plus className="w-5 h-5" />
-            <span>Create Material Request</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button 
-              className="h-20 flex-col space-y-2"
-              variant="outline"
-              onClick={() => onCreateNew("Purchase")}
-            >
-              <Package className="w-6 h-6" />
-              <span>Purchase Request</span>
-            </Button>
-            
-            <Button 
-              className="h-20 flex-col space-y-2"
-              variant="outline"
-              onClick={() => onCreateNew("Material Transfer")}
-            >
-              <TrendingUp className="w-6 h-6" />
-              <span>Material Transfer</span>
-            </Button>
-            
-            <Button 
-              className="h-20 flex-col space-y-2"
-              variant="outline"
-              onClick={() => onCreateNew("Material Issue")}
-            >
-              <FileText className="w-6 h-6" />
-              <span>Material Issue</span>
-            </Button>
-            
-            <Button 
-              className="h-20 flex-col space-y-2"
-              variant="outline"
-              onClick={() => onCreateNew("Manufacture")}
-            >
-              <CheckCircle className="w-6 h-6" />
-              <span>Manufacturing</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Requests */}
+      {/* Recent Material Requests */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Material Requests</CardTitle>
-          <Button variant="outline" size="sm" onClick={onViewList}>
+          <Button variant="outline" onClick={onViewList}>
             View All
           </Button>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-4">Loading recent requests...</div>
+            <div className="text-center py-8">
+              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+              <p className="text-gray-600 mt-2">Loading recent requests...</p>
+            </div>
           ) : recentRequests.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">No recent material requests found</div>
+            <div className="text-center py-8 text-gray-500">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p>No material requests found</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {recentRequests.map((request) => (
-                <div key={request.name} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="w-4 h-4 text-blue-600" />
+            <div className="space-y-4">
+              {recentRequests.slice(0, 5).map((request, index) => (
+                <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <FileText className="w-4 h-4 text-blue-600" />
+                    </div>
                     <div>
-                      <div className="font-medium">{request.name}</div>
-                      <div className="text-sm text-gray-500">
-                        {request.material_request_type} • {request.requested_by}
-                      </div>
+                      <h4 className="font-medium">{request.name}</h4>
+                      <p className="text-sm text-gray-600">
+                        {request.material_request_type} • {request.requested_by || 'Unknown'}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">

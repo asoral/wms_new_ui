@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
@@ -16,9 +15,9 @@ export class ERPNextAPI {
   public warehouse: ERPNextWarehouseAPI;
 
   constructor(
-    private baseURL: string,
-    private apiKey: string,
-    private apiSecret: string
+    public baseURL: string,  // Made public
+    public apiKey: string,   // Made public
+    public apiSecret: string // Made public
   ) {
     this.sales = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
     this.purchase = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);

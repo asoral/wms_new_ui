@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
 import { offlineStorage } from '@/services/offlineStorage';
@@ -43,13 +44,13 @@ export function useERPNextData<T>(
         // Dynamic method calling based on endpoint with corrected API calls
         switch (endpoint) {
           case 'items':
-            result = await erpnextAPI.getItems(filters, 20);
+            result = await erpnextAPI.getItems(filters, undefined, 20);
             break;
           case 'warehouses':
             result = await erpnextAPI.getWarehouses(filters, defaultCompany || undefined);
             break;
           case 'stock-balance':
-            result = await erpnextAPI.getStockBalance(filters, defaultCompany || undefined);
+            result = await erpnextAPI.getStockBalance(defaultCompany || undefined);
             break;
           case 'sales-orders':
             result = await erpnextAPI.getSalesOrders(filters, defaultCompany || undefined);
@@ -67,19 +68,19 @@ export function useERPNextData<T>(
             result = await erpnextAPI.getMaterialRequests(filters, defaultCompany || undefined);
             break;
           case 'stock-entries':
-            result = await erpnextAPI.getStockEntries(filters, defaultCompany || undefined);
+            result = await erpnextAPI.getStockEntries();
             break;
           case 'pick-lists':
-            result = await erpnextAPI.getPickLists(filters, defaultCompany || undefined);
+            result = await erpnextAPI.getPickLists();
             break;
           case 'packing-slips':
-            result = await erpnextAPI.getPackingSlips(filters, defaultCompany || undefined);
+            result = await erpnextAPI.getPackingSlips();
             break;
           case 'quality-inspections':
-            result = await erpnextAPI.getQualityInspections(filters, defaultCompany || undefined);
+            result = await erpnextAPI.getQualityInspections();
             break;
           case 'product-bundles':
-            result = await erpnextAPI.getProductBundles(filters, defaultCompany || undefined);
+            result = await erpnextAPI.getProductBundles();
             break;
           default:
             throw new Error(`Unknown endpoint: ${endpoint}`);

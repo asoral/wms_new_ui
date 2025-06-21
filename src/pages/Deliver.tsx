@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Truck, ArrowLeft } from "lucide-react";
@@ -46,6 +47,44 @@ export interface SalesOrderOption {
   delivery_date: string;
   grand_total: number;
   status: string;
+}
+
+// Add missing types that components need
+export interface SOItem {
+  itemCode: string;
+  itemName: string;
+  orderedQty: number;
+  deliveredQty: number;
+  pendingQty: number;
+  rate: number;
+  uom: string;
+  warehouse: string;
+  qtyToDeliver: number;
+}
+
+export interface SalesOrder {
+  id?: string;
+  number: string;
+  customer: string;
+  status: string;
+  deliveryDate: string;
+  expectedDelivery?: string;
+  totalItems: number;
+  totalValue: number;
+  percentDelivered?: number;
+  items: SOItem[];
+}
+
+export interface DeliveryEntry {
+  itemCode: string;
+  itemName: string;
+  warehouse: string;
+  batch?: string;
+  serial?: string;
+  qtyToDeliver: number;
+  actualQty: number;
+  rate: number;
+  uom: string;
 }
 
 export interface DashboardData {

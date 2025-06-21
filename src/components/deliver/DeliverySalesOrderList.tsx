@@ -63,7 +63,20 @@ const DeliverySalesOrderList = ({ onSelectSalesOrder }: DeliverySalesOrderListPr
       const result = await erpnextAPI.getSalesOrders(filters, company || undefined, 100);
       
       if (result.data) {
-        setSalesOrders(result.data);
+        // Transform ERPNext sales orders to our local type
+        const transformedOrders: SalesOrder[] = result.data.map((so: any) => ({
+          name: so.name,
+          customer: so.customer,
+          customer_name: so.customer_name || so.customer,
+          delivery_date: so.delivery_date,
+          transaction_date: so.transaction_date,
+          grand_total: so.grand_total,
+          status: so.status,
+          per_delivered: so.per_delivered || 0,
+          company: so.company
+        }));
+        
+        setSalesOrders(transformedOrders);
       }
 
     } catch (error) {
