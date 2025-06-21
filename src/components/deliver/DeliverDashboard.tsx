@@ -85,7 +85,19 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
       const salesOrdersResult = await erpnextAPI.getSalesOrders(filters, company || undefined, 100);
 
       if (salesOrdersResult.data) {
-        setSalesOrders(salesOrdersResult.data);
+        // Transform the ERPNext data to match our local interface
+        const transformedOrders: SalesOrder[] = salesOrdersResult.data.map((order: any) => ({
+          name: order.name || '',
+          customer: order.customer || '',
+          customer_name: order.customer_name || order.customer || '',
+          delivery_date: order.delivery_date || '',
+          grand_total: order.grand_total || 0,
+          status: order.status || '',
+          per_delivered: order.per_delivered || 0,
+          total_qty: order.total_qty || 0
+        }));
+        
+        setSalesOrders(transformedOrders);
       }
     } catch (error) {
       console.error('Error fetching sales orders:', error);
@@ -105,11 +117,14 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
       return;
     }
 
-    const filtered = salesOrders.filter(order =>
-      order.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filtered = salesOrders.filter(order => {
+      const searchTerm = searchQuery.toLowerCase();
+      return (
+        (order.name || '').toLowerCase().includes(searchTerm) ||
+        (order.customer || '').toLowerCase().includes(searchTerm) ||
+        (order.customer_name || '').toLowerCase().includes(searchTerm)
+      );
+    });
     setFilteredOrders(filtered);
   };
 
