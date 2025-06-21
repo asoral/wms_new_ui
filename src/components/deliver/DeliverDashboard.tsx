@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Printer,
   Package,
@@ -16,10 +15,14 @@ import {
   Calendar,
   DollarSign,
   CheckCircle,
-  ArrowRightLeft
+  ArrowRightLeft,
+  RefreshCw,
+  FileText,
+  User
 } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import DraftDeliveryNotes from "./DraftDeliveryNotes";
 
 interface DeliverDashboardProps {
   onSelectSalesOrder: (salesOrder: any) => void;
@@ -31,66 +34,114 @@ interface DeliverDashboardProps {
   isLoading: boolean;
 }
 
+interface SalesOrder {
+  name: string;
+  customer: string;
+  customer_name: string;
+  delivery_date: string;
+  grand_total: number;
+  status: string;
+  per_delivered: number;
+  total_qty: number;
+}
+
 const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData, isLoading }: DeliverDashboardProps) => {
-  const [salesOrders, setSalesOrders] = useState<{ value: string; label: string; customer: string; customer_name: string; delivery_date: string; grand_total: number; status: string; }[]>([]);
-  const [selectedSalesOrder, setSelectedSalesOrder] = useState<{ value: string; label: string; customer: string; customer_name: string; delivery_date: string; grand_total: number; status: string; } | undefined>(undefined);
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<SalesOrder[]>([]);
+  const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrder | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchSalesOrders = async () => {
-      try {
-        const erpnextAPI = await createERPNextAPI();
-        if (!erpnextAPI) {
-          toast({
-            title: "ERPNext Not Configured",
-            description: "Please configure your ERPNext settings in the Profile page.",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        const company = await getUserDefaultCompany();
-
-        // Enhanced filters for sales orders ready for delivery
-        const filters = [
-          ['docstatus', '=', 1], // Submitted orders only
-          ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']] // Orders that need delivery
-        ];
-
-        const salesOrdersResult = await erpnextAPI.getSalesOrders(filters, company || undefined, 100);
-
-        if (salesOrdersResult.data) {
-          // Transform the data to match the Select component's expected format
-          const transformedSalesOrders = salesOrdersResult.data.map(so => ({
-            value: so.name,
-            label: `${so.name} - ${so.customer_name}`,
-            customer: so.customer,
-            customer_name: so.customer_name,
-            delivery_date: so.delivery_date,
-            grand_total: so.grand_total || 0,
-            status: so.status
-          }));
-          setSalesOrders(transformedSalesOrders);
-        }
-      } catch (error) {
-        console.error('Error fetching sales orders:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch sales orders",
-          variant: "destructive"
-        });
-      }
-    };
-
     fetchSalesOrders();
   }, []);
 
-  const handleSalesOrderSelect = (value: string) => {
-    const selectedOrder = salesOrders.find(so => so.value === value);
-    setSelectedSalesOrder(selectedOrder);
-    if (selectedOrder) {
-      onSelectSalesOrder(selectedOrder);
+  useEffect(() => {
+    filterOrders();
+  }, [searchQuery, salesOrders]);
+
+  const fetchSalesOrders = async () => {
+    setLoading(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const company = await getUserDefaultCompany();
+
+      // Enhanced filters for sales orders ready for delivery
+      const filters = [
+        ['docstatus', '=', 1], // Submitted orders only
+        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']] // Orders that need delivery
+      ];
+
+      const salesOrdersResult = await erpnextAPI.getSalesOrders(filters, company || undefined, 100);
+
+      if (salesOrdersResult.data) {
+        setSalesOrders(salesOrdersResult.data);
+      }
+    } catch (error) {
+      console.error('Error fetching sales orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch sales orders",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const filterOrders = () => {
+    if (!searchQuery.trim()) {
+      setFilteredOrders(salesOrders);
+      return;
+    }
+
+    const filtered = salesOrders.filter(order =>
+      order.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    setFilteredOrders(filtered);
+  };
+
+  const handleSalesOrderSelect = (order: SalesOrder) => {
+    setSelectedSalesOrder(order);
+    const transformedOrder = {
+      value: order.name,
+      label: `${order.name} - ${order.customer_name}`,
+      customer: order.customer,
+      customer_name: order.customer_name,
+      delivery_date: order.delivery_date,
+      grand_total: order.grand_total || 0,
+      status: order.status
+    };
+    onSelectSalesOrder(transformedOrder);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "To Deliver": return "bg-yellow-100 text-yellow-800";
+      case "To Deliver and Bill": return "bg-blue-100 text-blue-800";
+      case "Partially Delivered": return "bg-orange-100 text-orange-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const handleDraftSelect = (draftName: string, salesOrderNumber?: string) => {
+    // Handle draft delivery note selection
+    toast({
+      title: "Draft Selected",
+      description: `Selected draft delivery note: ${draftName}`,
+    });
   };
 
   return (
@@ -135,55 +186,89 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
       {/* Sales Order Selector */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Warehouse className="w-5 h-5" />
-            <span>Select Sales Order</span>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Warehouse className="w-5 h-5" />
+              <span>Select Sales Order</span>
+            </div>
+            <Button variant="outline" onClick={fetchSalesOrders} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <Select onValueChange={handleSalesOrderSelect}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a sales order to deliver" />
-              </SelectTrigger>
-              <SelectContent>
-                {salesOrders.map((so) => (
-                  <SelectItem key={so.value} value={so.value}>
-                    {so.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search by SO number, customer..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-            {selectedSalesOrder && (
-              <div className="border rounded-md p-4 bg-gray-50">
-                <h3 className="text-lg font-semibold">{selectedSalesOrder.label}</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-gray-500">Customer:</span>
-                    <p className="font-medium">{selectedSalesOrder.customer_name}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Delivery Date:</span>
-                    <p className="font-medium">{new Date(selectedSalesOrder.delivery_date).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Amount:</span>
-                    <p className="font-medium">₹{(selectedSalesOrder.grand_total || 0).toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Status:</span>
-                    <Badge className={`text-xs font-medium ${
-                      selectedSalesOrder.status === 'To Deliver' ? 'bg-yellow-100 text-yellow-800' :
-                      selectedSalesOrder.status === 'To Deliver and Bill' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {selectedSalesOrder.status}
-                    </Badge>
-                  </div>
+            {/* Sales Orders List */}
+            <div className="max-h-96 overflow-y-auto space-y-2">
+              {loading ? (
+                <div className="text-center py-4">
+                  <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2" />
+                  <span className="text-sm text-gray-500">Loading sales orders...</span>
                 </div>
-              </div>
-            )}
+              ) : filteredOrders.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    {searchQuery ? 'No sales orders found matching your search' : 'No sales orders ready for delivery'}
+                  </p>
+                </div>
+              ) : (
+                filteredOrders.map((order) => (
+                  <Card 
+                    key={order.name} 
+                    className={`cursor-pointer hover:shadow-md transition-shadow ${
+                      selectedSalesOrder?.name === order.name ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+                    }`}
+                    onClick={() => handleSalesOrderSelect(order)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <FileText className="w-5 h-5 text-blue-600" />
+                          <div>
+                            <h3 className="font-medium">{order.name}</h3>
+                            <p className="text-sm text-gray-500">{order.customer_name}</p>
+                          </div>
+                        </div>
+                        <Badge className={getStatusColor(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Customer Code:</span>
+                          <p className="font-medium">{order.customer}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Delivery Date:</span>
+                          <p className="font-medium">{new Date(order.delivery_date).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Total Value:</span>
+                          <p className="font-medium">₹{(order.grand_total || 0).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Items/Delivered:</span>
+                          <p className="font-medium">{order.total_qty || 0} / {order.per_delivered || 0}%</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -214,17 +299,7 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
       </Card>
 
       {/* Draft Delivery Notes */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <AlertTriangle className="w-5 h-5" />
-            <span>Draft Delivery Notes</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-500">No draft delivery notes found.</p>
-        </CardContent>
-      </Card>
+      <DraftDeliveryNotes onSelectDraft={handleDraftSelect} />
     </div>
   );
 };
