@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,9 +19,7 @@ const QualityInspectionForm = ({ initialData, onSave, onCancel }: QualityInspect
   const [formData, setFormData] = useState({
     itemCode: initialData?.itemCode || "",
     itemName: initialData?.itemName || "",
-    inspectionType: initialData?.inspectionType || "Incoming" as In
-
-SpectionType,
+    inspectionType: initialData?.inspectionType || "Incoming" as InspectionType,
     inspectedBy: initialData?.inspectedBy || "",
     batchNo: initialData?.batchNo || "",
     remarks: initialData?.remarks || ""
