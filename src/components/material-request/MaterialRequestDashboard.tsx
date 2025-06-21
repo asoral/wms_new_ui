@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Clock, CheckCircle, XCircle, ShoppingCart, ArrowRightLeft, Package, RefreshCw } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ShoppingCart, ArrowRightLeft, Package, RefreshCw, Wrench } from "lucide-react";
 import MaterialRequestStatusChecker from "@/components/material-request/MaterialRequestStatusChecker";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -124,6 +124,14 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
                 <Package className="w-4 h-4 mr-2" />
                 Issue Request
               </Button>
+              <Button 
+                onClick={() => onCreateNew("Manufacture")} 
+                className="w-full justify-start" 
+                variant="outline"
+              >
+                <Wrench className="w-4 h-4 mr-2" />
+                Manufacture Request
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -180,7 +188,6 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList }: MaterialRequestDa
         </Card>
       </div>
 
-      {/* Recent Material Requests */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Material Requests</CardTitle>

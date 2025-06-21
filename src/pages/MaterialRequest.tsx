@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, ArrowLeft } from "lucide-react";
@@ -30,7 +31,6 @@ export interface MaterialRequestItem {
 export interface MaterialRequest {
   id: string;
   name: string;
-  title?: string;
   purpose: MaterialRequestPurpose;
   status: MaterialRequestStatus;
   transactionDate: string;
@@ -39,7 +39,6 @@ export interface MaterialRequest {
   company: string;
   costCenter?: string;
   project?: string;
-  priority: "Low" | "Medium" | "High" | "Urgent";
   items: MaterialRequestItem[];
   totalValue?: number;
   remarks?: string;

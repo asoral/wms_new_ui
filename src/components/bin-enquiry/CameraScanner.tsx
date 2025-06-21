@@ -13,7 +13,7 @@ interface CameraScannerProps {
 
 const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flashSupported, setFlashSupported] = useState(false);
@@ -37,27 +37,25 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
       setError(null);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment', // Use back camera
+          facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
       });
 
-      setStream(mediaStream);
+      streamRef.current = mediaStream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
         videoRef.current.play();
       }
 
-      // Check if flash is supported (simplified check)
       const track = mediaStream.getVideoTracks()[0];
       const capabilities = track.getCapabilities();
       setFlashSupported('torch' in capabilities);
 
       setIsScanning(true);
       
-      // Initialize barcode scanner
       codeReader.current = new BrowserMultiFormatReader();
       startBarcodeScanning();
 
@@ -90,22 +88,28 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
   };
 
   const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log('Camera track stopped:', track.kind);
+      });
+      streamRef.current = null;
     }
     if (codeReader.current) {
       codeReader.current.reset();
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     setIsScanning(false);
     setFlashOn(false);
   };
 
   const toggleFlash = async () => {
-    if (!stream || !flashSupported) return;
+    if (!streamRef.current || !flashSupported) return;
 
     try {
-      const track = stream.getVideoTracks()[0];
+      const track = streamRef.current.getVideoTracks()[0];
       await track.applyConstraints({
         advanced: [{ torch: !flashOn } as any]
       });
@@ -118,6 +122,11 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
   const handleBarcodeFound = (code: string) => {
     console.log('Barcode detected:', code);
     onBarcodeDetected(code);
+    stopCamera();
+    onClose();
+  };
+
+  const handleClose = () => {
     stopCamera();
     onClose();
   };
@@ -142,7 +151,7 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
                 <span>{flashOn ? 'Flash Off' : 'Flash On'}</span>
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={onClose}>
+            <Button variant="outline" size="sm" onClick={handleClose}>
               <X className="w-4 h-4" />
             </Button>
           </div>
@@ -166,24 +175,19 @@ const CameraScanner = ({ onBarcodeDetected, isActive, onClose }: CameraScannerPr
           {/* Scanning overlay */}
           <div className="absolute inset-0 pointer-events-none">
             <div className="relative w-full h-full">
-              {/* Dark overlay */}
               <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg"></div>
               
-              {/* Scanning rectangle */}
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                 <div className="w-48 h-32 border-2 border-green-400 rounded-lg bg-transparent">
-                  {/* Corner indicators */}
                   <div className="absolute -top-1 -left-1 w-6 h-6 border-l-4 border-t-4 border-green-400 rounded-tl-lg"></div>
                   <div className="absolute -top-1 -right-1 w-6 h-6 border-r-4 border-t-4 border-green-400 rounded-tr-lg"></div>
                   <div className="absolute -bottom-1 -left-1 w-6 h-6 border-l-4 border-b-4 border-green-400 rounded-bl-lg"></div>
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 border-r-4 border-b-4 border-green-400 rounded-br-lg"></div>
                   
-                  {/* Scanning line animation */}
                   <div className="absolute top-0 left-0 w-full h-0.5 bg-green-400 animate-pulse"></div>
                 </div>
               </div>
               
-              {/* Instructions */}
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
                 <div className="bg-black bg-opacity-60 text-white px-4 py-2 rounded-lg text-sm text-center">
                   Position barcode within the frame

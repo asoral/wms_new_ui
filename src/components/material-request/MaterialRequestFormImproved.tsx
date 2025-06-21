@@ -1,9 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
 import { MaterialRequestPurpose, MaterialRequestItem, MaterialRequest } from "@/pages/MaterialRequest";
@@ -27,15 +27,14 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
         itemCode: "",
         itemName: "",
         qty: 0,
-        uom: "Nos"
+        uom: "Nos",
+        description: ""
       }
     ]
   );
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    title: editingRequest?.title || "",
-    priority: editingRequest?.priority || "Medium",
-    description: editingRequest?.remarks || "",
+    remarks: editingRequest?.remarks || "",
     fromWarehouse: "",
     toWarehouse: ""
   });
@@ -48,7 +47,8 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
         itemCode: "",
         itemName: "",
         qty: 0,
-        uom: "Nos"
+        uom: "Nos",
+        description: ""
       }
     ]);
   };
@@ -77,6 +77,8 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
         updateItem(index, 'itemCode', itemCode);
         updateItem(index, 'itemName', itemDetails.data.item_name || itemCode);
         updateItem(index, 'uom', itemDetails.data.stock_uom || 'Nos');
+        // Set description from item details
+        updateItem(index, 'description', itemDetails.data.description || '');
       }
     } catch (error) {
       console.error('Error fetching item details:', error);
@@ -97,15 +99,17 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
 
       const company = await getUserDefaultCompany();
       
-      // Validate items
-      const validItems = items.filter(item => item.itemCode && item.qty > 0);
+      // Validate items - ensure itemCode exists and qty is greater than 0
+      const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0);
+      console.log('Valid items:', validItems);
+      console.log('All items:', items);
+      
       if (validItems.length === 0) {
-        throw new Error('Please add at least one item with valid quantity');
+        throw new Error('Please add at least one item with valid item code and quantity greater than 0');
       }
 
       // Prepare material request data
       const materialRequestData = {
-        title: formData.title || `${purpose} Request`,
         material_request_type: purpose,
         transaction_date: new Date().toISOString().split('T')[0],
         company: company,
@@ -114,6 +118,7 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
             item_code: item.itemCode,
             qty: item.qty,
             uom: item.uom,
+            description: item.description || '',
             warehouse: item.warehouse
           };
 
@@ -127,8 +132,10 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
 
           return itemData;
         }),
-        remarks: formData.description
+        remarks: formData.remarks
       };
+
+      console.log('Submitting material request data:', materialRequestData);
 
       let result;
       if (editingRequest) {
@@ -177,32 +184,6 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
             <CardTitle>Request Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  placeholder="Enter request title..."
-                />
-              </div>
-              <div>
-                <Label htmlFor="priority">Priority</Label>
-                <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value as any})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
             {purpose === "Material Transfer" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -223,13 +204,13 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
             )}
 
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="remarks">Remarks</Label>
               <Textarea
-                id="description"
-                placeholder="Enter request description..."
+                id="remarks"
+                placeholder="Enter request remarks..."
                 rows={3}
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                value={formData.remarks}
+                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
               />
             </div>
           </CardContent>
@@ -277,6 +258,17 @@ const MaterialRequestFormImproved = ({ purpose, editingRequest, onBack, onSave }
                         <span className="font-medium">{item.itemName}</span>
                       </div>
                     )}
+
+                    {/* Item Description */}
+                    <div>
+                      <Label>Description</Label>
+                      <Textarea
+                        value={item.description || ""}
+                        onChange={(e) => updateItem(index, 'description', e.target.value)}
+                        placeholder="Item description..."
+                        rows={2}
+                      />
+                    </div>
 
                     {/* Quantity and UOM */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -11,6 +11,7 @@ interface CameraScannerProps {
 
 const CameraScanner = ({ onBarcodeScanned, onClose }: CameraScannerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +28,8 @@ const CameraScanner = ({ onBarcodeScanned, onClose }: CameraScannerProps) => {
         video: { facingMode: 'environment' }
       });
       
+      streamRef.current = stream;
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsScanning(true);
@@ -38,16 +41,29 @@ const CameraScanner = ({ onBarcodeScanned, onClose }: CameraScannerProps) => {
   };
 
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log('Camera track stopped:', track.kind);
+      });
+      streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsScanning(false);
+  };
+
+  const handleClose = () => {
+    stopCamera();
+    onClose();
   };
 
   const handleManualInput = () => {
     const barcode = prompt('Enter barcode manually:');
     if (barcode) {
       onBarcodeScanned(barcode);
+      stopCamera();
     }
   };
 
@@ -56,7 +72,7 @@ const CameraScanner = ({ onBarcodeScanned, onClose }: CameraScannerProps) => {
       <Card className="w-full max-w-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-lg">Scan Barcode</CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={handleClose}>
             <X className="w-4 h-4" />
           </Button>
         </CardHeader>
@@ -88,7 +104,7 @@ const CameraScanner = ({ onBarcodeScanned, onClose }: CameraScannerProps) => {
                 <Button onClick={handleManualInput} variant="outline" className="flex-1">
                   Enter Manually
                 </Button>
-                <Button onClick={onClose} variant="outline" className="flex-1">
+                <Button onClick={handleClose} variant="outline" className="flex-1">
                   Cancel
                 </Button>
               </div>
