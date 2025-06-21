@@ -14,6 +14,7 @@ export interface PalletItem {
   itemName: string;
   qty: number;
   uom: string;
+  warehouse: string;
   batchNo?: string;
   serialNo?: string;
 }
@@ -21,6 +22,7 @@ export interface PalletItem {
 export interface Pallet {
   id: string;
   palletId: string;
+  barcode: string;
   location: string;
   status: "Active" | "Moved" | "Depalletized";
   createdDate: string;

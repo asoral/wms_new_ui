@@ -12,25 +12,32 @@ export type InspectionType = "Incoming" | "Outgoing" | "In Process";
 export type InspectionStatus = "Draft" | "Submitted" | "Accepted" | "Rejected";
 
 export interface QualityParameter {
+  id: string;
   parameter: string;
   specification: string;
   acceptanceValue: string;
+  acceptanceCriteria: string;
   status: "Pass" | "Fail" | "Pending";
   actualValue?: string;
+  reading?: string;
+  value?: string;
   remarks?: string;
 }
 
 export interface QualityInspection {
   id: string;
+  name: string;
   inspectionType: InspectionType;
   itemCode: string;
   itemName: string;
   batchNo?: string;
+  batchSerial?: string;
   serialNo?: string;
   qty: number;
   uom: string;
   inspectionDate: string;
   inspector: string;
+  inspectedBy: string;
   status: InspectionStatus;
   parameters: QualityParameter[];
   overallResult: "Accepted" | "Rejected" | "Pending";

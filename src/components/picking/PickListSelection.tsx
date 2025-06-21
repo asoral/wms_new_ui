@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,56 +19,68 @@ const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionP
   const mockPickLists: PickList[] = [
     {
       id: "1",
+      name: "STO-PICK-2025-00009",
       number: "STO-PICK-2025-00009",
       purpose: "Material Transfer",
       relatedDocument: "MAT-MR-2025-00005",
-      status: "draft",
+      status: "Draft",
       createdDate: "2025-05-29 15:10:13.443915",
+      createdBy: "admin",
+      company: "Company",
       items: []
     },
     {
       id: "2", 
+      name: "STO-PICK-2025-00008",
       number: "STO-PICK-2025-00008",
       purpose: "Delivery",
       relatedDocument: "SO-2025-00012",
-      status: "draft",
+      status: "Draft",
       createdDate: "2025-05-29 15:10:01.028773",
+      createdBy: "admin",
+      company: "Company",
       items: []
     },
     {
       id: "3",
+      name: "STO-PICK-2025-00006",
       number: "STO-PICK-2025-00006",
-      purpose: "Transfer for Manufacturing",
+      purpose: "Material Transfer",
       relatedDocument: "WO-2025-00003",
-      status: "in-progress",
+      status: "Open",
       createdDate: "2025-05-29 10:57:19.947189",
+      createdBy: "admin",
+      company: "Company",
       items: []
     },
     {
       id: "4",
+      name: "STO-PICK-2025-00007",
       number: "STO-PICK-2025-00007",
       purpose: "Material Transfer",
       relatedDocument: "MAT-MR-2025-00004",
-      status: "completed",
+      status: "Completed",
       createdDate: "2025-05-29 10:57:09.175952",
+      createdBy: "admin",
+      company: "Company",
       items: []
     }
   ];
 
   const getStatusColor = (status: PickListStatus) => {
     switch (status) {
-      case 'draft': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'in-progress': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'Draft': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'Open': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Completed': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getStatusIcon = (status: PickListStatus) => {
     switch (status) {
-      case 'draft': return <Package className="w-3 h-3" />;
-      case 'in-progress': return <Clock className="w-3 h-3" />;
-      case 'completed': return <CheckCircle className="w-3 h-3" />;
+      case 'Draft': return <Package className="w-3 h-3" />;
+      case 'Open': return <Clock className="w-3 h-3" />;
+      case 'Completed': return <CheckCircle className="w-3 h-3" />;
       default: return <Package className="w-3 h-3" />;
     }
   };
@@ -79,9 +90,9 @@ const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionP
     pickList.relatedDocument.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const draftPickLists = filteredPickLists.filter(p => p.status === 'draft');
-  const inProgressPickLists = filteredPickLists.filter(p => p.status === 'in-progress');
-  const completedPickLists = filteredPickLists.filter(p => p.status === 'completed');
+  const draftPickLists = filteredPickLists.filter(p => p.status === 'Draft');
+  const inProgressPickLists = filteredPickLists.filter(p => p.status === 'Open');
+  const completedPickLists = filteredPickLists.filter(p => p.status === 'Completed');
 
   const renderPickListCard = (pickList: PickList) => (
     <Card 

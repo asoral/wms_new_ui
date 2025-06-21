@@ -11,19 +11,26 @@ export type PickListStatus = "Draft" | "Open" | "Completed" | "Cancelled";
 export type PickListPurpose = "Delivery" | "Material Issue" | "Material Transfer";
 
 export interface PickListItem {
+  id: string;
   itemCode: string;
   itemName: string;
+  code: string;
+  name: string;
   qty: number;
+  requiredQty: number;
+  pickedQty: number;
   uom: string;
   warehouse: string;
   bin?: string;
   batchNo?: string;
   serialNo?: string;
+  status: "pending" | "partial" | "completed";
 }
 
 export interface PickList {
   id: string;
   name: string;
+  number: string;
   status: PickListStatus;
   createdDate: string;
   createdBy: string;
