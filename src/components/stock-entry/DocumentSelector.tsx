@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -39,10 +39,15 @@ const DocumentSelector = ({ doctype, stockEntryType, onDocumentSelected, isLoadi
     try {
       setLoading(true);
       const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
+      if (!erpnextAPI) {
+        console.error('ERPNext API not available');
+        return;
+      }
 
       const company = await getUserDefaultCompany();
       let result;
+
+      console.log(`Fetching ${doctype} for stock entry type: ${stockEntryType}`);
 
       switch (doctype) {
         case "Material Request":
@@ -61,7 +66,9 @@ const DocumentSelector = ({ doctype, stockEntryType, onDocumentSelected, isLoadi
           result = { data: [] };
       }
 
-      if (result.data) {
+      console.log(`${doctype} search result:`, result);
+
+      if (result && result.data) {
         let filteredData = result.data;
         if (search) {
           filteredData = result.data.filter((doc: Document) => 
@@ -73,6 +80,9 @@ const DocumentSelector = ({ doctype, stockEntryType, onDocumentSelected, isLoadi
           );
         }
         setDocuments(filteredData);
+        console.log(`Found ${filteredData.length} ${doctype}(s)`);
+      } else {
+        setDocuments([]);
       }
     } catch (error) {
       console.error(`Error fetching ${doctype}:`, error);
@@ -81,6 +91,7 @@ const DocumentSelector = ({ doctype, stockEntryType, onDocumentSelected, isLoadi
         description: `Failed to fetch ${doctype}`,
         variant: "destructive"
       });
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
