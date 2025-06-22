@@ -12,7 +12,11 @@ export interface StockEntryData {
   company: string;
   items: StockEntryItemData[];
   remarks?: string;
-  get_items_from?: string; // For getting items from Material Request, Purchase Order, etc.
+  get_items_from?: string;
+  material_request?: string;
+  purchase_order?: string;
+  sales_order?: string;
+  bom_no?: string;
   docstatus?: number;
 }
 
@@ -164,18 +168,118 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
   }
 
   async getStockEntryTypes(): Promise<string[]> {
-    // Based on ERPNext Stock Entry types
     return [
       "Material Issue",
       "Material Receipt", 
       "Material Transfer",
+      "Material Transfer for Manufacture",
+      "Material Consumption for Manufacture",
       "Manufacture",
       "Repack",
       "Send to Subcontractor",
-      "Material Transfer for Manufacture",
-      "Material Consumption for Manufacture",
-      "Receive at Warehouse",
-      "Send to Warehouse"
+      "Send to Warehouse",
+      "Receive at Warehouse"
     ];
+  }
+
+  // Search documents for Get Items From functionality
+  async searchMaterialRequestsForStockEntry(stockEntryType: string, company?: string): Promise<ERPNextResponse<any[]>> {
+    const filters = [['docstatus', '=', 1]]; // Only submitted Material Requests
+    
+    // Filter by material request type based on stock entry type
+    if (stockEntryType === 'Material Transfer') {
+      filters.push(['material_request_type', '=', 'Material Transfer']);
+    } else if (stockEntryType === 'Material Issue') {
+      filters.push(['material_request_type', '=', 'Material Issue']);
+    } else if (stockEntryType === 'Material Receipt') {
+      filters.push(['material_request_type', '=', 'Purchase']);
+    }
+    
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+
+    const params = this.buildQueryParams(filters, [
+      'name', 'title', 'material_request_type', 'status', 
+      'transaction_date', 'required_by', 'company'
+    ], 20);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search material requests: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async searchPurchaseOrdersForStockEntry(company?: string): Promise<ERPNextResponse<any[]>> {
+    const filters = [['docstatus', '=', 1]]; // Only submitted Purchase Orders
+    
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+
+    const params = this.buildQueryParams(filters, [
+      'name', 'supplier', 'transaction_date', 'status', 
+      'grand_total', 'currency', 'company'
+    ], 20);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Order?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search purchase orders: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async searchSalesOrdersForStockEntry(company?: string): Promise<ERPNextResponse<any[]>> {
+    const filters = [['docstatus', '=', 1]]; // Only submitted Sales Orders
+    
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+
+    const params = this.buildQueryParams(filters, [
+      'name', 'customer', 'transaction_date', 'status', 
+      'grand_total', 'currency', 'company'
+    ], 20);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Sales Order?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search sales orders: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async searchBOMs(company?: string): Promise<ERPNextResponse<any[]>> {
+    const filters = [['docstatus', '=', 1], ['is_active', '=', 1]]; // Only active BOMs
+    
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+
+    const params = this.buildQueryParams(filters, [
+      'name', 'item', 'item_name', 'quantity', 'company'
+    ], 20);
+
+    const response = await fetch(`${this.baseURL}/api/resource/BOM?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search BOMs: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 }

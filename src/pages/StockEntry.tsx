@@ -14,14 +14,13 @@ export type StockEntryType =
   | "Material Issue"
   | "Material Receipt" 
   | "Material Transfer"
+  | "Material Transfer for Manufacture"
+  | "Material Consumption for Manufacture"
   | "Manufacture"
   | "Repack"
   | "Send to Subcontractor"
-  | "Material Transfer for Manufacture"
-  | "Material Consumption for Manufacture"
-  | "Receive at Warehouse"
   | "Send to Warehouse"
-  | "Stock Reconciliation";
+  | "Receive at Warehouse";
 
 export type StockEntryStatus = "draft" | "submitted" | "cancelled";
 
@@ -117,7 +116,7 @@ const StockEntry = () => {
           
           <TabsContent value="dashboard">
             <StockEntryDashboard 
-              onCreateNew={handleCreateNew} 
+              onCreate ={handleCreateNew} 
               onViewList={() => setActiveTab("list")}
               onEditDraft={handleEditDraft}
             />

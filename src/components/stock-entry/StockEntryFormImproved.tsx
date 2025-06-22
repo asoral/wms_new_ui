@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +10,7 @@ import { StockEntryType, StockEntryItem } from "@/pages/StockEntry";
 import ItemSelector from "../item-enquiry/ItemSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
 import UOMSelector from "../material-request/UOMSelector";
+import DocumentSelector from "./DocumentSelector";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -50,14 +50,47 @@ const StockEntryFormImproved = ({
     postingDate: draftEntry?.posting_date || new Date().toISOString().split('T')[0],
     postingTime: draftEntry?.posting_time || new Date().toTimeString().split(' ')[0].substring(0, 5),
     getItemsFrom: "",
+    selectedDocument: null as any,
     remarks: draftEntry?.remarks || ""
   });
   const { toast } = useToast();
 
   const isTransferType = type.includes("Transfer") || type === "Material Issue" || type === "Material Receipt";
   const requiresBothWarehouses = type.includes("Transfer");
-  const requiresFromWarehouse = type === "Material Issue" || requiresBothWarehouses;
-  const requiresToWarehouse = type === "Material Receipt" || requiresBothWarehouses;
+  const requiresFromWarehouse = type === "Material Issue" || requiresBothWarehouses || type === "Send to Warehouse" || type === "Send to Subcontractor";
+  const requiresToWarehouse = type === "Material Receipt" || requiresBothWarehouses || type === "Receive at Warehouse";
+
+  // Get Items From options based on stock entry type
+  const getGetItemsFromOptions = () => {
+    const options = [];
+    
+    switch (type) {
+      case "Material Transfer":
+      case "Material Issue":
+      case "Material Receipt":
+        options.push({ value: "Material Request", label: "Material Request" });
+        break;
+      case "Material Transfer for Manufacture":
+      case "Material Consumption for Manufacture":
+        options.push({ value: "Material Request", label: "Material Request" });
+        options.push({ value: "Sales Order", label: "Sales Order" });
+        options.push({ value: "BOM", label: "Bill of Materials" });
+        break;
+      case "Manufacture":
+        options.push({ value: "BOM", label: "Bill of Materials" });
+        break;
+      case "Send to Subcontractor":
+        options.push({ value: "Purchase Order", label: "Purchase Order" });
+        break;
+      default:
+        options.push({ value: "Material Request", label: "Material Request" });
+        options.push({ value: "Purchase Order", label: "Purchase Order" });
+        options.push({ value: "Sales Order", label: "Sales Order" });
+        options.push({ value: "BOM", label: "Bill of Materials" });
+    }
+    
+    return options;
+  };
 
   const addNewItemRow = () => {
     setItems([
@@ -121,6 +154,49 @@ const StockEntryFormImproved = ({
     }
   };
 
+  const handleDocumentSelected = async (document: any) => {
+    setFormData({...formData, selectedDocument: document});
+    
+    toast({
+      title: "Document Selected",
+      description: `${formData.getItemsFrom} ${document.name} selected. You can now fetch items from this document.`,
+    });
+  };
+
+  const fetchItemsFromDocument = async () => {
+    if (!formData.selectedDocument || !formData.getItemsFrom) {
+      toast({
+        title: "Error",
+        description: "Please select a document first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      // This would typically call a specific ERPNext method to get items
+      // For now, we'll show a success message
+      toast({
+        title: "Items Fetched",
+        description: `Items from ${formData.getItemsFrom} ${formData.selectedDocument.name} would be loaded here`,
+      });
+      
+    } catch (error) {
+      console.error('Error fetching items from document:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch items from selected document",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const createOrUpdateDraft = async () => {
     const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0);
     
@@ -180,7 +256,12 @@ const StockEntryFormImproved = ({
           batch_no: item.batch || undefined,
           serial_no: item.serial || undefined
         })),
-        remarks: formData.remarks
+        remarks: formData.remarks,
+        // Link to selected document if available
+        material_request: formData.getItemsFrom === "Material Request" ? formData.selectedDocument?.name : undefined,
+        purchase_order: formData.getItemsFrom === "Purchase Order" ? formData.selectedDocument?.name : undefined,
+        sales_order: formData.getItemsFrom === "Sales Order" ? formData.selectedDocument?.name : undefined,
+        bom_no: formData.getItemsFrom === "BOM" ? formData.selectedDocument?.name : undefined
       };
 
       console.log('Creating draft stock entry:', stockEntryData);
@@ -301,19 +382,45 @@ const StockEntryFormImproved = ({
               </div>
               <div>
                 <Label>Get Items From</Label>
-                <Select value={formData.getItemsFrom} onValueChange={(value) => setFormData({...formData, getItemsFrom: value})}>
+                <Select value={formData.getItemsFrom} onValueChange={(value) => setFormData({...formData, getItemsFrom: value, selectedDocument: null})}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select source document" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="material_request">Material Request</SelectItem>
-                    <SelectItem value="purchase_order">Purchase Order</SelectItem>
-                    <SelectItem value="sales_order">Sales Order</SelectItem>
-                    <SelectItem value="bom">Bill of Materials</SelectItem>
+                    {getGetItemsFromOptions().map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {/* Document Selector */}
+            {formData.getItemsFrom && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <Label>Select {formData.getItemsFrom}</Label>
+                  <DocumentSelector
+                    doctype={formData.getItemsFrom}
+                    stockEntryType={type}
+                    onDocumentSelected={handleDocumentSelected}
+                    isLoading={loading}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    type="button" 
+                    onClick={fetchItemsFromDocument}
+                    disabled={!formData.selectedDocument || loading}
+                    className="w-full"
+                  >
+                    Get Items
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {(requiresFromWarehouse || requiresToWarehouse) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
