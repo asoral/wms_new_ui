@@ -71,8 +71,10 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
       const draftFilters = { docstatus: 0 }; // 0 for draft
       const receiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(draftFilters);
 
+      let transformedReceipts: DraftReceipt[] = [];
+      
       if (receiptsResult.data) {
-        const transformedReceipts: DraftReceipt[] = receiptsResult.data.map((receipt: any) => ({
+        transformedReceipts = receiptsResult.data.map((receipt: any) => ({
           id: receipt.name,
           supplier: receipt.supplier,
           date: receipt.posting_date,

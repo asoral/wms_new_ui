@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Database } from "lucide-react";
@@ -116,7 +115,7 @@ const StockEntry = () => {
           
           <TabsContent value="dashboard">
             <StockEntryDashboard 
-              onCreate ={handleCreateNew} 
+              onCreateNew={handleCreateNew} 
               onViewList={() => setActiveTab("list")}
               onEditDraft={handleEditDraft}
             />
