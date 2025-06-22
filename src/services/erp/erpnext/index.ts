@@ -1,103 +1,246 @@
+
 import { ERPNextBaseAPI } from './baseApi';
-import { ERPNextSalesAPI } from './salesApi';
-import { ERPNextPurchaseAPI } from './purchaseApi';
-import { ERPNextStockAPI } from './stockApi';
-import { ERPNextStockEntryAPI } from './stockEntryApi';
-import { ERPNextItemsAPI } from './itemsApi';
-import { ERPNextWarehouseAPI } from './warehouseApi';
-import { ERPNextCompanyAPI } from './companyApi';
 import { ERPNextMaterialAPI } from './materialApi';
+import { ERPNextItemsAPI } from './itemsApi';
+import { ERPNextStockAPI } from './stockApi';
+import { ERPNextWarehouseAPI } from './warehouseApi';
+import { ERPNextPurchaseAPI } from './purchaseApi';
+import { ERPNextSalesAPI } from './salesApi';
+import { ERPNextCompanyAPI } from './companyApi';
 import { ERPNextDashboardAPI } from './dashboardApi';
-import { ERPNextOtherAPIs } from './otherApis';
+import { ERPNextStockEntryAPI } from './stockEntryApi';
 
 export class ERPNextAPI extends ERPNextBaseAPI {
-  public sales: ERPNextSalesAPI;
-  public purchase: ERPNextPurchaseAPI;
-  public stock: ERPNextStockAPI;
-  public stockEntry: ERPNextStockEntryAPI;
-  public items: ERPNextItemsAPI;
-  public warehouse: ERPNextWarehouseAPI;
-  public company: ERPNextCompanyAPI;
-  public material: ERPNextMaterialAPI;
-  public dashboard: ERPNextDashboardAPI;
-  public other: ERPNextOtherAPIs;
+  private materialsAPI: ERPNextMaterialAPI;
+  private itemsAPI: ERPNextItemsAPI;
+  private stockAPI: ERPNextStockAPI;
+  private warehouseAPI: ERPNextWarehouseAPI;
+  private purchaseAPI: ERPNextPurchaseAPI;
+  private salesAPI: ERPNextSalesAPI;
+  private companyAPI: ERPNextCompanyAPI;
+  private dashboardAPI: ERPNextDashboardAPI;
+  private stockEntryAPI: ERPNextStockEntryAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
     super(baseURL, apiKey, apiSecret);
-    
-    this.sales = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
-    this.purchase = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
-    this.stock = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
-    this.stockEntry = new ERPNextStockEntryAPI(baseURL, apiKey, apiSecret);
-    this.items = new ERPNextItemsAPI(baseURL, apiKey, apiSecret);
-    this.warehouse = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
-    this.company = new ERPNextCompanyAPI(baseURL, apiKey, apiSecret);
-    this.material = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
-    this.dashboard = new ERPNextDashboardAPI(baseURL, apiKey, apiSecret);
-    this.other = new ERPNextOtherAPIs(baseURL, apiKey, apiSecret);
+    this.materialsAPI = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
+    this.itemsAPI = new ERPNextItemsAPI(baseURL, apiKey, apiSecret);
+    this.stockAPI = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
+    this.warehouseAPI = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
+    this.purchaseAPI = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
+    this.salesAPI = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
+    this.companyAPI = new ERPNextCompanyAPI(baseURL, apiKey, apiSecret);
+    this.dashboardAPI = new ERPNextDashboardAPI(baseURL, apiKey, apiSecret);
+    this.stockEntryAPI = new ERPNextStockEntryAPI(baseURL, apiKey, apiSecret);
   }
 
-  // Legacy methods for backward compatibility
-  async getSalesOrders(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.sales.getSalesOrders(filters, undefined, limitPageLength);
+  // Expose API instances for direct access
+  get sales() {
+    return this.salesAPI;
   }
 
-  async getPurchaseOrders(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.purchase.getPurchaseOrders(filters, undefined, limitPageLength);
+  get purchase() {
+    return this.purchaseAPI;
   }
 
-  async getStockEntries(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.stockEntry.getStockEntries(filters, undefined, limitPageLength);
+  get stock() {
+    return this.stockAPI;
   }
 
-  async getDeliveryNotes(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.sales.getDeliveryNotes(filters, undefined, limitPageLength);
+  get warehouse() {
+    return this.warehouseAPI;
   }
 
-  async getPurchaseReceipts(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.purchase.getPurchaseReceipts(filters, undefined, limitPageLength);
+  // Material Request methods
+  async getMaterialRequests(filters?: any, company?: string, limitPageLength?: number) {
+    return this.materialsAPI.getMaterialRequests(filters, company, limitPageLength);
   }
 
-  async getMaterialRequests(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.material.getMaterialRequests(filters, undefined, limitPageLength);
+  async getMaterialRequest(name: string) {
+    return this.materialsAPI.getMaterialRequest(name);
   }
 
-  async getItems(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.items.getItems(filters, undefined, limitPageLength);
+  async createMaterialRequest(data: any) {
+    return this.materialsAPI.createMaterialRequest(data);
   }
 
+  async updateMaterialRequest(name: string, data: any) {
+    return this.materialsAPI.updateMaterialRequest(name, data);
+  }
+
+  async searchMaterialRequests(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.materialsAPI.searchMaterialRequests(searchTerm, company, limitPageLength);
+  }
+
+  // Item methods
+  async getItems(filters?: any, limitPageLength?: number) {
+    return this.itemsAPI.getItems(filters, limitPageLength);
+  }
+
+  async searchItems(search: string, limit?: number) {
+    return this.itemsAPI.searchItems(search, limit);
+  }
+
+  async searchItemsByBarcode(barcode: string) {
+    return this.itemsAPI.searchItemsByBarcode(barcode);
+  }
+
+  async getItemsPaginated(filters?: any, fields?: string[], limit?: number, page?: number) {
+    return this.itemsAPI.getItemsPaginated(filters, fields, limit, page);
+  }
+
+  async getItemDetails(itemCode: string) {
+    return this.itemsAPI.getItemDetails(itemCode);
+  }
+
+  async getItemByBarcode(barcode: string) {
+    return this.itemsAPI.getItemByBarcode(barcode);
+  }
+
+  // Stock methods
+  async getStockBalance(itemCode?: string, company?: string, warehouse?: string) {
+    return this.stockAPI.getStockBalance(itemCode, company, warehouse);
+  }
+
+  async getCurrentStock(itemCode: string, warehouse?: string) {
+    return this.stockAPI.getCurrentStock(itemCode, warehouse);
+  }
+
+  async getBatches(itemCode: string, warehouse?: string) {
+    return this.stockAPI.getBatches(itemCode, warehouse);
+  }
+
+  async getSerialNumbers(itemCode: string, warehouse?: string) {
+    return this.stockAPI.getSerialNumbers(itemCode, warehouse);
+  }
+
+  async getStockLedgerEntries(itemCode: string, warehouse?: string, fromDate?: string, toDate?: string) {
+    return this.stockAPI.getStockLedgerEntries(itemCode, warehouse, fromDate, toDate);
+  }
+
+  async getBinStock(itemCode?: string, warehouse?: string, company?: string) {
+    return this.stockAPI.getBinStock(itemCode, warehouse, company);
+  }
+
+  async getStockAgingReport() {
+    return this.stockAPI.getStockAgingReport();
+  }
+
+  async createStockReconciliation(reconciliationData: any) {
+    return this.stockAPI.createStockReconciliation(reconciliationData);
+  }
+
+  async updateStockReconciliation(name: string, reconciliationData: any) {
+    return this.stockAPI.updateStockReconciliation(name, reconciliationData);
+  }
+
+  async getSerialBatchBundle(name: string) {
+    return this.stockAPI.getSerialBatchBundle(name);
+  }
+
+  async createSerialBatchBundle(bundleData: any) {
+    return this.stockAPI.createSerialBatchBundle(bundleData);
+  }
+
+  // Warehouse methods
   async getWarehouses(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.warehouse.getWarehouses(filters, undefined, limitPageLength);
+    return this.warehouseAPI.getWarehouses(filters, fields, limitPageLength);
   }
 
-  async getBinData(filters?: any, fields?: string[], limitPageLength: number = 50) {
-    return this.stock.getBinData(filters, fields, limitPageLength.toString());
+  // Purchase methods
+  async getPurchaseOrders(filters?: any, fields?: string[], limitPageLength?: number) {
+    return this.purchaseAPI.getPurchaseOrders(filters, fields, limitPageLength);
   }
 
-  async getStockBalance(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.stock.getStockBalance(filters, fields, limitPageLength?.toString());
+  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
+    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength);
   }
 
-  async getStockLedger(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.stock.getStockLedger(filters, fields, limitPageLength?.toString());
+  // Sales methods
+  async getSalesOrders(filters?: any, fields?: string[], limitPageLength?: number) {
+    return this.salesAPI.getSalesOrders(filters, fields, limitPageLength);
   }
 
-  async getSerialNo(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.stock.getSerialNo(filters, fields, limitPageLength?.toString());
+  async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
+    return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
   }
 
-  async getBatchData(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.stock.getBatchData(filters, fields, limitPageLength?.toString());
+  // Company methods
+  async getCompanies(filters?: any, fields?: string[], limitPageLength?: number) {
+    return this.companyAPI.getCompanies(filters, fields, limitPageLength);
   }
 
-  async getCompanies() {
-    return this.company.getCompanies();
+  // Dashboard methods
+  async getDashboardData(doctype: string, filters?: any) {
+    return this.dashboardAPI.getDashboardData(doctype, filters);
   }
 
-  async getQualityInspections(filters?: any, limitPageLength?: number) {
-    return this.other.getQualityInspections(filters, limitPageLength);
+  // Stock Entry methods
+  async getStockEntries(filters?: any, company?: string, limitPageLength?: number) {
+    return this.stockEntryAPI.getStockEntries(filters, company, limitPageLength);
+  }
+
+  async getStockEntry(name: string) {
+    return this.stockEntryAPI.getStockEntry(name);
+  }
+
+  async createStockEntry(data: any) {
+    return this.stockEntryAPI.createStockEntry(data);
+  }
+
+  async updateStockEntry(name: string, data: any) {
+    return this.stockEntryAPI.updateStockEntry(name, data);
+  }
+
+  async submitStockEntry(name: string) {
+    return this.stockEntryAPI.submitStockEntry(name);
+  }
+
+  async cancelStockEntry(name: string) {
+    return this.stockEntryAPI.cancelStockEntry(name);
+  }
+
+  async getStockEntryTypes() {
+    return this.stockEntryAPI.getStockEntryTypes();
+  }
+
+  async getItemsFromDocument(doctype: string, docname: string) {
+    return this.stockEntryAPI.getItemsFromDocument(doctype, docname);
+  }
+
+  // Document selector methods for Stock Entry
+  async searchMaterialRequestsForStockEntry(stockEntryType: string, company?: string) {
+    return this.stockEntryAPI.searchMaterialRequestsForStockEntry(stockEntryType, company);
+  }
+
+  async searchPurchaseOrdersForStockEntry(company?: string) {
+    return this.stockEntryAPI.searchPurchaseOrdersForStockEntry(company);
+  }
+
+  async searchSalesOrdersForStockEntry(company?: string) {
+    return this.stockEntryAPI.searchSalesOrdersForStockEntry(company);
+  }
+
+  async searchBOMs(company?: string) {
+    return this.stockEntryAPI.searchBOMs(company);
+  }
+
+  // Legacy methods for backward compatibility - placeholder implementations
+  async getPickLists(filters?: any, company?: string, limitPageLength?: number) {
+    return { data: [] };
+  }
+
+  async getPackingSlips(filters?: any, company?: string, limitPageLength?: number) {
+    return { data: [] };
+  }
+
+  async getQualityInspections(filters?: any, company?: string, limitPageLength?: number) {
+    return { data: [] };
+  }
+
+  async getProductBundles(filters?: any, company?: string, limitPageLength?: number) {
+    return { data: [] };
   }
 }
 
-// Re-export types
-export * from './types';
+export { ERPNextBaseAPI, ERPNextItemsAPI, ERPNextMaterialAPI, ERPNextStockAPI };

@@ -48,16 +48,9 @@ const DocumentSelector = ({ doctype, stockEntryType, onDocumentSelected, isLoadi
       let result;
 
       console.log(`Fetching ${doctype} for stock entry type: ${stockEntryType}`);
-      console.log(`Company: ${company}`);
 
       switch (doctype) {
         case "Material Request":
-          // Always fetch all material requests for debugging
-          console.log('Fetching all Material Requests first...');
-          const allMRs = await erpnextAPI.getMaterialRequests(undefined, company || undefined, 50);
-          console.log('All Material Requests:', allMRs);
-          
-          // Now fetch filtered ones
           result = await erpnextAPI.searchMaterialRequestsForStockEntry(stockEntryType || "", company || undefined);
           break;
         case "Purchase Order":

@@ -184,32 +184,25 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
 
   // Search documents for Get Items From functionality
   async searchMaterialRequestsForStockEntry(stockEntryType: string, company?: string): Promise<ERPNextResponse<any[]>> {
-    console.log(`Searching Material Requests for stock entry type: ${stockEntryType}, company: ${company}`);
-    
     const filters = [['docstatus', '=', 1]]; // Only submitted Material Requests
     
-    // Map stock entry types to material request types more comprehensively
-    if (stockEntryType === 'Material Transfer' || stockEntryType === 'Material Transfer for Manufacture') {
+    // Filter by material request type based on stock entry type
+    if (stockEntryType === 'Material Transfer') {
       filters.push(['material_request_type', '=', 'Material Transfer']);
-    } else if (stockEntryType === 'Material Issue' || stockEntryType === 'Material Consumption for Manufacture') {
+    } else if (stockEntryType === 'Material Issue') {
       filters.push(['material_request_type', '=', 'Material Issue']);
     } else if (stockEntryType === 'Material Receipt') {
       filters.push(['material_request_type', '=', 'Purchase']);
-    } else if (stockEntryType === 'Manufacture') {
-      filters.push(['material_request_type', '=', 'Manufacture']);
     }
-    // For other stock entry types, don't filter by material_request_type - show all
     
     if (company) {
       filters.push(['company', '=', company]);
     }
 
-    console.log('Material Request filters:', filters);
-
     const params = this.buildQueryParams(filters, [
       'name', 'title', 'material_request_type', 'status', 
       'transaction_date', 'required_by', 'company'
-    ], 50); // Increase limit for better results
+    ], 20);
 
     const response = await fetch(`${this.baseURL}/api/resource/Material Request?${params}`, {
       headers: this.getHeaders(),
@@ -219,9 +212,7 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
       throw new Error(`Failed to search material requests: ${response.statusText}`);
     }
 
-    const result = await response.json();
-    console.log('Material Request API response:', result);
-    return result;
+    return response.json();
   }
 
   async searchPurchaseOrdersForStockEntry(company?: string): Promise<ERPNextResponse<any[]>> {

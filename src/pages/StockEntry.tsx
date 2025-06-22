@@ -116,7 +116,7 @@ const StockEntry = () => {
           
           <TabsContent value="dashboard">
             <StockEntryDashboard 
-              onCreateNew={handleCreateNew} 
+              onCreate ={handleCreateNew} 
               onViewList={() => setActiveTab("list")}
               onEditDraft={handleEditDraft}
             />
