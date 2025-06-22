@@ -543,10 +543,10 @@ const StockEntryItemRow = ({
         {/* Rate and Batch/Serial */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <Label>Basic Rate</Label>
+            <Label>Rate</Label>
             <Input
               type="number"
-              value={item.rate || ""}
+              value={item.rate || 0}
               onChange={(e) => onUpdateItem(index, 'rate', parseFloat(e.target.value) || 0)}
               placeholder="0.00"
               min="0"
@@ -556,7 +556,7 @@ const StockEntryItemRow = ({
           <div>
             <Label>Batch No</Label>
             <Input
-              value={item.batch || ""}
+              value={item.batch || ''}
               onChange={(e) => onUpdateItem(index, 'batch', e.target.value)}
               placeholder="Enter batch number"
             />
@@ -564,12 +564,20 @@ const StockEntryItemRow = ({
           <div>
             <Label>Serial No</Label>
             <Input
-              value={item.serial || ""}
+              value={item.serial || ''}
               onChange={(e) => onUpdateItem(index, 'serial', e.target.value)}
               placeholder="Enter serial number"
             />
           </div>
         </div>
+
+        {item.rate && item.qty && (
+          <div className="text-right">
+            <span className="text-lg font-semibold text-green-600">
+              Total: ₹{(item.qty * item.rate).toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -31,6 +32,23 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     this.companyAPI = new ERPNextCompanyAPI(baseURL, apiKey, apiSecret);
     this.dashboardAPI = new ERPNextDashboardAPI(baseURL, apiKey, apiSecret);
     this.stockEntryAPI = new ERPNextStockEntryAPI(baseURL, apiKey, apiSecret);
+  }
+
+  // Expose API instances for direct access
+  get sales() {
+    return this.salesAPI;
+  }
+
+  get purchase() {
+    return this.purchaseAPI;
+  }
+
+  get stock() {
+    return this.stockAPI;
+  }
+
+  get warehouse() {
+    return this.warehouseAPI;
   }
 
   // Material Request methods
@@ -104,10 +122,6 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockAPI.getBinStock(itemCode, warehouse, company);
   }
 
-  async getStockEntries(filters?: any, company?: string) {
-    return this.stockAPI.getStockEntries(filters, company);
-  }
-
   async getStockAgingReport() {
     return this.stockAPI.getStockAgingReport();
   }
@@ -133,16 +147,12 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.warehouseAPI.getWarehouses(filters, fields, limitPageLength);
   }
 
-  async getWarehouseDetails(warehouseName: string) {
-    return this.warehouseAPI.getWarehouseDetails(warehouseName);
-  }
-
   // Purchase methods
   async getPurchaseOrders(filters?: any, fields?: string[], limitPageLength?: number) {
     return this.purchaseAPI.getPurchaseOrders(filters, fields, limitPageLength);
   }
 
-   // Sales methods
+  // Sales methods
   async getSalesOrders(filters?: any, fields?: string[], limitPageLength?: number) {
     return this.salesAPI.getSalesOrders(filters, fields, limitPageLength);
   }
@@ -188,6 +198,35 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   async getItemsFromDocument(doctype: string, docname: string) {
     return this.stockEntryAPI.getItemsFromDocument(doctype, docname);
+  }
+
+  // Legacy methods for backward compatibility
+  async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
+    return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
+  }
+
+  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
+    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength);
+  }
+
+  async getPickLists(filters?: any, company?: string, limitPageLength?: number) {
+    // Placeholder method - implement if needed
+    return { data: [] };
+  }
+
+  async getPackingSlips(filters?: any, company?: string, limitPageLength?: number) {
+    // Placeholder method - implement if needed
+    return { data: [] };
+  }
+
+  async getQualityInspections(filters?: any, company?: string, limitPageLength?: number) {
+    // Placeholder method - implement if needed
+    return { data: [] };
+  }
+
+  async getProductBundles(filters?: any, company?: string, limitPageLength?: number) {
+    // Placeholder method - implement if needed
+    return { data: [] };
   }
 }
 
