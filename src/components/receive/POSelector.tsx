@@ -1,232 +1,282 @@
 
-import { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Search, ChevronDown, Package, Calendar, User, DollarSign } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { debounce } from "lodash";
 
-interface PurchaseOrderOption {
+interface PurchaseOrder {
   name: string;
   supplier: string;
   supplier_name: string;
   schedule_date: string;
-  transaction_date: string;
   grand_total: number;
   status: string;
+  per_received: number;
 }
 
 interface POSelectorProps {
-  onSelectPO: (poNumber: string) => void;
-  loading?: boolean;
+  onOrderSelected: (order: any) => void;
+  loading: boolean;
 }
 
-const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("");
-  const [searchValue, setSearchValue] = useState("");
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderOption[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<PurchaseOrder[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const { toast } = useToast();
 
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    debounce(async (searchTerm: string) => {
-      if (searchTerm.length < 2) {
-        setPurchaseOrders([]);
-        setHasSearched(false);
+  useEffect(() => {
+    if (searchTerm.length >= 2) {
+      searchPurchaseOrders();
+    } else {
+      setSearchResults([]);
+      setShowDropdown(false);
+    }
+  }, [searchTerm]);
+
+  const searchPurchaseOrders = async () => {
+    try {
+      setSearching(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
         return;
       }
 
-      setIsLoading(true);
-      setHasSearched(true);
+      const company = await getUserDefaultCompany();
       
-      try {
-        const erpnextAPI = await createERPNextAPI();
-        if (!erpnextAPI) {
-          toast({
-            title: "ERPNext Not Configured",
-            description: "Please configure your ERPNext settings in the Profile page.",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        const defaultCompany = await getUserDefaultCompany();
-        
-        // Build filters for search with company filter
-        const filters = [
-          ['docstatus', '=', 1],
-          ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']],
-          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
-        ];
-
-        // Add search filters - search in name, supplier, and supplier_name
-        const searchFilters = [
-          ['name', 'like', `%${searchTerm}%`],
-          ['supplier', 'like', `%${searchTerm}%`],
-          ['supplier_name', 'like', `%${searchTerm}%`]
-        ];
-
-        console.log('Searching POs with term:', searchTerm);
-
-        // Use the purchase API to get POs
-        const result = await erpnextAPI.purchase.getPurchaseOrders(
-          Object.fromEntries(filters.map(([key, op, val]) => [key, val])),
-          defaultCompany || undefined,
-          50,
-          0
-        );
-
-        console.log('Search results:', result);
-        
-        if (result?.data) {
-          // Filter results based on search term
-          let filteredData = result.data.filter((po: any) => 
-            po.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            po.supplier?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            po.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-
-          const transformedOrders: PurchaseOrderOption[] = filteredData.map((po: any) => ({
-            name: po.name || '',
-            supplier: po.supplier || '',
-            supplier_name: po.supplier_name || po.supplier || 'Unknown Supplier',
-            schedule_date: po.schedule_date || po.transaction_date || '',
-            transaction_date: po.transaction_date || po.schedule_date || '',
-            grand_total: Number(po.grand_total) || 0,
-            status: po.status || ''
-          }));
-          
-          setPurchaseOrders(transformedOrders);
-          console.log('Found POs:', transformedOrders.length);
-        }
-      } catch (error) {
-        console.error('Failed to search purchase orders:', error);
-        toast({
-          title: "Error",
-          description: "Failed to search purchase orders from ERPNext",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
+      // Search for purchase orders that are ready for receiving
+      const result = await erpnextAPI.purchase.searchPurchaseOrders(searchTerm.trim(), company, 20);
+      
+      if (result.data) {
+        setSearchResults(result.data);
+        setShowDropdown(true);
       }
-    }, 500),
-    []
-  );
-
-  // Effect to trigger search when searchValue changes
-  useEffect(() => {
-    debouncedSearch(searchValue);
-    
-    // Cleanup function to cancel debounced calls
-    return () => {
-      debouncedSearch.cancel();
-    };
-  }, [searchValue, debouncedSearch]);
-
-  const handleSelect = (selectedValue: string) => {
-    setValue(selectedValue);
-    setSearchValue(selectedValue);
-    setOpen(false);
-    onSelectPO(selectedValue);
+    } catch (error) {
+      console.error('Error searching purchase orders:', error);
+      toast({
+        title: "Search Error",
+        description: "Failed to search purchase orders from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setSearching(false);
+    }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setSearchValue(newValue);
-    setOpen(newValue.length >= 2); // Show dropdown when user types at least 2 characters
+  const selectPurchaseOrder = async (po: PurchaseOrder) => {
+    try {
+      setSearching(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      // Get full PO details
+      const fullPOResult = await erpnextAPI.purchase.getPurchaseOrder(po.name);
+      if (fullPOResult.data) {
+        const fullPO = fullPOResult.data;
+        
+        const transformedPO = {
+          number: fullPO.name,
+          supplier: fullPO.supplier_name || fullPO.supplier,
+          status: fullPO.status,
+          scheduleDate: fullPO.schedule_date || fullPO.transaction_date,
+          totalItems: fullPO.items ? fullPO.items.length : 0,
+          totalValue: fullPO.grand_total || 0,
+          items: fullPO.items ? fullPO.items.map((item: any) => ({
+            itemCode: item.item_code,
+            itemName: item.item_name,
+            orderedQty: item.qty || 0,
+            receivedQty: item.received_qty || 0,
+            pendingQty: (item.qty || 0) - (item.received_qty || 0),
+            rate: item.rate || 0,
+            uom: item.stock_uom || item.uom,
+            warehouse: item.warehouse || 'Main Store',
+            qtyToReceive: (item.qty || 0) - (item.received_qty || 0)
+          })) : []
+        };
+
+        setSelectedPO(po);
+        setShowDropdown(false);
+        setSearchTerm(po.name);
+        
+        // Call the parent handler to proceed to receiving
+        onOrderSelected(transformedPO);
+      }
+    } catch (error) {
+      console.error('Error fetching PO details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch Purchase Order details",
+        variant: "destructive"
+      });
+    } finally {
+      setSearching(false);
+    }
   };
 
-  const selectedPO = purchaseOrders.find(po => po.name === value);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "To Receive": return "bg-yellow-100 text-yellow-800";
+      case "To Receive and Bill": return "bg-blue-100 text-blue-800";
+      case "Partially Received": return "bg-orange-100 text-orange-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="poSearch">Search Purchase Order</Label>
-        <div className="relative">
-          <Input
-            id="poSearch"
-            value={searchValue}
-            onChange={handleInputChange}
-            onFocus={() => setOpen(searchValue.length >= 2)}
-            onBlur={() => setTimeout(() => setOpen(false), 200)} // Delay to allow clicks
-            placeholder="Type at least 2 characters to search PO number, supplier name..."
-            className="w-full"
-            disabled={loading}
-          />
-          
-          {/* Search Results Dropdown */}
-          {open && searchValue.length >= 2 && (
-            <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-              {isLoading && (
-                <div className="p-3 text-center">
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                  <p className="text-sm text-gray-600 mt-1">Searching...</p>
-                </div>
-              )}
-              
-              {!isLoading && hasSearched && purchaseOrders.length === 0 && (
-                <div className="p-3 text-center text-sm text-gray-600">
-                  No purchase orders found matching "{searchValue}"
-                </div>
-              )}
-              
-              {!isLoading && purchaseOrders.length > 0 && purchaseOrders.map((po) => (
-                <div
-                  key={po.name}
-                  onClick={() => handleSelect(po.name)}
-                  className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{po.name}</div>
-                      <div className="text-xs text-gray-600">
-                        {po.supplier_name} • {po.schedule_date || po.transaction_date} • ₹{po.grand_total?.toLocaleString() || '0'}
+    <div className="space-y-6">
+      {/* Search Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Search className="w-5 h-5" />
+            <span>Select Purchase Order for Receiving</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="relative">
+            <Label htmlFor="poSearch">Search Purchase Order</Label>
+            <div className="flex space-x-2 mt-1">
+              <div className="relative flex-1">
+                <Input
+                  id="poSearch"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by PO number, supplier name..."
+                  className="pr-10"
+                />
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                {searching && (
+                  <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Dropdown Results */}
+            {showDropdown && searchResults.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                {searchResults.map((po, index) => (
+                  <div
+                    key={index}
+                    className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    onClick={() => selectPurchaseOrder(po)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900">{po.name}</div>
+                        <div className="text-sm text-gray-600 truncate">{po.supplier_name || po.supplier}</div>
+                        <div className="flex items-center space-x-4 mt-1">
+                          <Badge variant="outline" className={getStatusColor(po.status)}>
+                            {po.status}
+                          </Badge>
+                          <span className="text-xs text-gray-500">
+                            Due: {new Date(po.schedule_date).toLocaleDateString()}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Received: {po.per_received || 0}%
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-xs text-blue-600 mt-1">
-                        Status: {po.status}
+                      <div className="text-right ml-2">
+                        <div className="font-medium text-green-600">
+                          ₹{(po.grand_total || 0).toLocaleString()}
+                        </div>
                       </div>
                     </div>
-                    {value === po.name && (
-                      <Check className="h-4 w-4 text-green-600" />
-                    )}
                   </div>
+                ))}
+              </div>
+            )}
+
+            {showDropdown && searchResults.length === 0 && !searching && searchTerm.length >= 2 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-4 text-center text-gray-500">
+                No purchase orders found matching "{searchTerm}"
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Selected PO Details */}
+      {selectedPO && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center space-x-2">
+                <Package className="w-5 h-5" />
+                <span>Selected Purchase Order</span>
+              </span>
+              <Badge className={getStatusColor(selectedPO.status)}>{selectedPO.status}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Package className="w-5 h-5 text-blue-600" />
                 </div>
-              ))}
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{selectedPO.name}</div>
+                  <div className="text-sm text-gray-600">Order Number</div>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <User className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate" title={selectedPO.supplier_name || selectedPO.supplier}>
+                    {selectedPO.supplier_name || selectedPO.supplier}
+                  </div>
+                  <div className="text-sm text-gray-600">Supplier</div>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Calendar className="w-5 h-5 text-orange-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">
+                    {new Date(selectedPO.schedule_date).toLocaleDateString()}
+                  </div>
+                  <div className="text-sm text-gray-600">Schedule Date</div>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <DollarSign className="w-5 h-5 text-purple-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">₹{selectedPO.grand_total.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">Total Value</div>
+                </div>
+              </div>
             </div>
-          )}
-          
-          {isLoading && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <Loader2 className="w-4 h-4 animate-spin" />
+
+            <div className="flex justify-end">
+              <Button disabled={loading} size="lg">
+                Proceed to Receive Items
+              </Button>
             </div>
-          )}
-        </div>
-        
-        {selectedPO && (
-          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
-            <div className="text-sm">
-              <p><strong>PO:</strong> {selectedPO.name}</p>
-              <p><strong>Supplier:</strong> {selectedPO.supplier_name}</p>
-              <p><strong>Expected Date:</strong> {selectedPO.schedule_date || selectedPO.transaction_date}</p>
-              <p><strong>Total:</strong> ₹{selectedPO.grand_total?.toLocaleString() || '0'}</p>
-              <p><strong>Status:</strong> {selectedPO.status}</p>
-            </div>
-          </div>
-        )}
-        
-        {!isLoading && hasSearched && searchValue.length >= 2 && purchaseOrders.length === 0 && (
-          <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <p className="text-sm text-yellow-800">
-              No purchase orders found matching your search. Try different keywords or check if the PO exists with status "To Receive" or "To Receive and Bill".
-            </p>
-          </div>
-        )}
-      </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
