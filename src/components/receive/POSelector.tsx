@@ -55,17 +55,28 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
 
       const company = await getUserDefaultCompany();
       
-      // Use getPurchaseOrders with search filters
+      // Use simple filters for submitted POs with pending status
       const filters = {
         docstatus: 1,
         status: ['in', ['To Receive', 'To Receive and Bill', 'Partially Received']],
         name: ['like', `%${searchTerm.trim()}%`]
       };
       
-      const result = await erpnextAPI.purchase.getPurchaseOrders(filters, company, 20);
+      const result = await erpnextAPI.getPurchaseOrders(filters, company, 20);
       
       if (result.data) {
-        setSearchResults(result.data);
+        // Transform the data to match our interface
+        const transformedResults: PurchaseOrder[] = result.data.map((po: any) => ({
+          name: po.name,
+          supplier: po.supplier,
+          supplier_name: po.supplier_name || po.supplier,
+          schedule_date: po.schedule_date || po.transaction_date,
+          grand_total: po.grand_total || 0,
+          status: po.status,
+          per_received: po.per_received || 0
+        }));
+        
+        setSearchResults(transformedResults);
         setShowDropdown(true);
       }
     } catch (error) {
@@ -87,7 +98,7 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
       if (!erpnextAPI) return;
 
       // Get full PO details
-      const fullPOResult = await erpnextAPI.purchase.getPurchaseOrder(po.name);
+      const fullPOResult = await erpnextAPI.getPurchaseOrder(po.name);
       if (fullPOResult.data) {
         const fullPO = fullPOResult.data;
         

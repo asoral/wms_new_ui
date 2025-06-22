@@ -152,6 +152,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength, limitStart);
   }
 
+  async getPurchaseOrder(name: string) {
+    return this.purchaseAPI.getPurchaseOrder(name);
+  }
+
   async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
     return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength, limitStart);
   }
