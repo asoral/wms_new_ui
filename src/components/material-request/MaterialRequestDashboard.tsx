@@ -58,25 +58,31 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
       );
 
       if (recentRequestsResult.data) {
+        console.log('Fetched material requests:', recentRequestsResult.data);
         setRecentRequests(recentRequestsResult.data);
         
-        // Separate draft requests
+        // Separate draft requests (docstatus = 0)
         const drafts = recentRequestsResult.data.filter((req: any) => req.docstatus === 0);
         setDraftRequests(drafts);
         
-        // Calculate stats based on correct ERPNext statuses
+        // Calculate stats based on correct ERPNext statuses and docstatus
         const total = recentRequestsResult.data.length;
         const draft = drafts.length;
-        const submitted = recentRequestsResult.data.filter((req: any) => req.status === 'Submitted').length;
-        const pending = recentRequestsResult.data.filter((req: any) => req.status === 'Pending').length;
-        const partiallyOrdered = recentRequestsResult.data.filter((req: any) => req.status === 'Partially Ordered').length;
-        const ordered = recentRequestsResult.data.filter((req: any) => req.status === 'Ordered').length;
-        const issued = recentRequestsResult.data.filter((req: any) => req.status === 'Issued').length;
-        const transferred = recentRequestsResult.data.filter((req: any) => req.status === 'Transferred').length;
-        const received = recentRequestsResult.data.filter((req: any) => req.status === 'Received').length;
-        const cancelled = recentRequestsResult.data.filter((req: any) => req.status === 'Cancelled').length;
-        const stopped = recentRequestsResult.data.filter((req: any) => req.status === 'Stopped').length;
-        const partiallyReceived = recentRequestsResult.data.filter((req: any) => req.status === 'Partially Received').length;
+        const submitted = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Submitted').length;
+        const pending = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Pending').length;
+        const partiallyOrdered = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Partially Ordered').length;
+        const ordered = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Ordered').length;
+        const issued = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Issued').length;
+        const transferred = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Transferred').length;
+        const received = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Received').length;
+        const cancelled = recentRequestsResult.data.filter((req: any) => req.docstatus === 2 || req.status === 'Cancelled').length;
+        const stopped = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Stopped').length;
+        const partiallyReceived = recentRequestsResult.data.filter((req: any) => req.docstatus === 1 && req.status === 'Partially Received').length;
+
+        console.log('Status counts:', {
+          total, draft, submitted, pending, partiallyOrdered, ordered, 
+          issued, transferred, received, cancelled, stopped, partiallyReceived
+        });
 
         setStats({
           totalRequests: total,
@@ -121,7 +127,7 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
           purpose: draftDetails.data.material_request_type as MaterialRequestPurpose,
           status: "Draft",
           transactionDate: draftDetails.data.transaction_date,
-          requestedBy: draftDetails.data.owner || draftDetails.data.requested_by || "Current User",
+          requestedBy: draftDetails.data.owner || draftDetails.data.requested_by || draftDetails.data.modified_by || "Unknown User",
           company: draftDetails.data.company,
           items: draftDetails.data.items?.map((item: any) => ({
             itemCode: item.item_code,
@@ -184,13 +190,15 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
 
   const formatRequestInfo = (request: any) => {
     const itemCount = request.items?.length || 0;
-    const requestedBy = request.owner || request.requested_by || 'Unknown';
+    const requestedBy = request.owner || request.requested_by || request.modified_by || 'Unknown User';
     const date = new Date(request.transaction_date).toLocaleDateString();
+    const actualStatus = request.docstatus === 0 ? 'Draft' : request.status;
     
     return {
       itemCount,
       requestedBy,
       date,
+      actualStatus,
       subtitle: `${request.material_request_type} • ${itemCount} item${itemCount !== 1 ? 's' : ''} • ${requestedBy}`
     };
   };
@@ -383,7 +391,7 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
             <div className="space-y-4">
               {recentRequests.slice(0, 8).map((request, index) => {
                 const info = formatRequestInfo(request);
-                const StatusIcon = getStatusIcon(request.status);
+                const StatusIcon = getStatusIcon(info.actualStatus);
                 return (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
                     <div className="flex items-center space-x-4">
@@ -396,8 +404,8 @@ const MaterialRequestDashboard = ({ onCreateNew, onViewList, onEditDraft }: Mate
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge className={getStatusColor(request.status)}>
-                        {request.status}
+                      <Badge className={getStatusColor(info.actualStatus)}>
+                        {info.actualStatus}
                       </Badge>
                       <span className="text-sm text-gray-500">{info.date}</span>
                     </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -131,13 +130,97 @@ const MaterialRequestFormImproved = ({
       
     } catch (error) {
       console.error('Error creating/updating draft:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save material request",
-        variant: "destructive"
-      });
+      
+      // Check if it's a validation error that should be treated as a warning
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Allow Zero Valuation Rate') || 
+          errorMessage.includes('zero rate') || 
+          errorMessage.includes('ValidationError')) {
+        
+        // Show warning but allow the draft to be created with validation warnings
+        toast({
+          title: "Validation Warnings",
+          description: "Draft saved with validation warnings. Please review before submitting.",
+          variant: "default"
+        });
+        
+        // Try to create draft anyway - ERPNext allows saving drafts with validation warnings
+        try {
+          await createDraftWithWarnings(validItems);
+        } catch (finalError) {
+          toast({
+            title: "Error",
+            description: "Failed to save material request draft",
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save material request",
+          variant: "destructive"
+        });
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createDraftWithWarnings = async (itemsToAdd: MaterialRequestItem[]) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const company = await getUserDefaultCompany();
+      
+      // Create simplified material request data for draft with warnings
+      const materialRequestData = {
+        material_request_type: purpose,
+        transaction_date: new Date().toISOString().split('T')[0],
+        company: company,
+        docstatus: 0, // Draft status
+        items: itemsToAdd.map(item => ({
+          item_code: item.itemCode,
+          qty: item.qty || 1,
+          uom: item.uom,
+          description: item.description || '',
+          schedule_date: item.requiredBy || new Date().toISOString().split('T')[0],
+          // Don't include rate and warehouse to avoid validation errors for draft
+          ...(purpose !== "Purchase" && item.warehouse && { warehouse: item.warehouse }),
+          ...(purpose === "Purchase" && item.rate && { rate: item.rate })
+        })),
+        remarks: formData.remarks,
+        // Allow zero valuation for drafts
+        ignore_validate: 1
+      };
+
+      console.log('Creating draft with warnings:', materialRequestData);
+
+      const result = await erpnextAPI.createMaterialRequest(materialRequestData);
+      
+      if (result.data) {
+        const draft: MaterialRequest = {
+          id: result.data.name,
+          name: result.data.name,
+          purpose: purpose,
+          status: "Draft",
+          transactionDate: new Date().toISOString().split('T')[0],
+          requestedBy: "Current User",
+          company: company || "",
+          items: itemsToAdd,
+          remarks: formData.remarks
+        };
+        
+        onDraftCreated(draft);
+        
+        toast({
+          title: "Draft Created with Warnings",
+          description: `Draft ${result.data.name} created. Please review validation warnings before submitting.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error creating draft with warnings:', error);
+      throw error;
     }
   };
 
@@ -191,11 +274,7 @@ const MaterialRequestFormImproved = ({
       }
     } catch (error) {
       console.error('Error creating draft:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create draft material request",
-        variant: "destructive"
-      });
+      throw error;
     }
   };
 
@@ -346,12 +425,10 @@ const MaterialRequestFormImproved = ({
             Back to Dashboard
           </Button>
           <div className="flex space-x-2">
-            {draftRequest && (
-              <Button type="button" variant="outline" onClick={createOrUpdateDraft} disabled={loading} className="w-full sm:w-auto">
-                <Save className="w-4 h-4 mr-2" />
-                {loading ? 'Saving...' : 'Save Draft'}
-              </Button>
-            )}
+            <Button type="button" variant="outline" onClick={createOrUpdateDraft} disabled={loading} className="w-full sm:w-auto">
+              <Save className="w-4 h-4 mr-2" />
+              {loading ? 'Saving...' : draftRequest ? 'Update Draft' : 'Save Draft'}
+            </Button>
             <Button 
               type="button" 
               onClick={handleReviewSubmit} 

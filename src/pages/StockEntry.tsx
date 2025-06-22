@@ -1,12 +1,14 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Database } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Database, Plus, TrendingUp, TrendingDown, ArrowRightLeft, Eye } from "lucide-react";
-import StockEntryForm from "../components/stock-entry/StockEntryForm";
-import StockEntryList from "../components/stock-entry/StockEntryList";
+
+// Import components
+import StockEntryDashboard from "@/components/stock-entry/StockEntryDashboard";
+import StockEntryList from "@/components/stock-entry/StockEntryList";
+import StockEntryFormImproved from "@/components/stock-entry/StockEntryFormImproved";
+import StockEntryReview from "@/components/stock-entry/StockEntryReview";
 
 export type StockEntryType = 
   | "Material Issue"
@@ -49,17 +51,42 @@ export interface StockEntry {
 }
 
 const StockEntry = () => {
-  const [activeTab, setActiveTab] = useState<"list" | "form">("list");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedType, setSelectedType] = useState<StockEntryType | null>(null);
+  const [draftEntry, setDraftEntry] = useState<any | null>(null);
 
   const handleCreateNew = (type: StockEntryType) => {
     setSelectedType(type);
-    setActiveTab("form");
+    setDraftEntry(null);
+    setActiveTab("create");
   };
 
-  const handleBackToList = () => {
+  const handleEditDraft = (draft: any) => {
+    setSelectedType(draft.stock_entry_type as StockEntryType);
+    setDraftEntry(draft);
+    setActiveTab("create");
+  };
+
+  const handleDraftCreated = (draft: any) => {
+    setDraftEntry(draft);
+  };
+
+  const handleReviewAndSubmit = () => {
+    if (draftEntry) {
+      setActiveTab("review");
+    }
+  };
+
+  const handleBackToDashboard = () => {
+    setActiveTab("dashboard");
     setSelectedType(null);
-    setActiveTab("list");
+    setDraftEntry(null);
+  };
+
+  const handleSubmitComplete = () => {
+    setActiveTab("dashboard");
+    setSelectedType(null);
+    setDraftEntry(null);
   };
 
   return (
@@ -69,29 +96,56 @@ const StockEntry = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <Database className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Stock Entry</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Stock Entry</h1>
+              {selectedType && (
+                <p className="text-sm text-gray-600">
+                  {selectedType}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "list" | "form")} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="list">
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Stock Entry List
-            </TabsTrigger>
-            <TabsTrigger value="form" disabled={!selectedType}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create New Entry
-            </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="list">Entry List</TabsTrigger>
+            <TabsTrigger value="create" disabled={!selectedType}>Create Entry</TabsTrigger>
+            <TabsTrigger value="review" disabled={!draftEntry}>Review & Submit</TabsTrigger>
           </TabsList>
           
+          <TabsContent value="dashboard">
+            <StockEntryDashboard 
+              onCreateNew={handleCreateNew} 
+              onViewList={() => setActiveTab("list")}
+              onEditDraft={handleEditDraft}
+            />
+          </TabsContent>
+
           <TabsContent value="list">
             <StockEntryList onCreateNew={handleCreateNew} />
           </TabsContent>
 
-          <TabsContent value="form">
+          <TabsContent value="create">
             {selectedType && (
-              <StockEntryForm type={selectedType} onBack={handleBackToList} />
+              <StockEntryFormImproved
+                type={selectedType}
+                draftEntry={draftEntry}
+                onDraftCreated={handleDraftCreated}
+                onReviewAndSubmit={handleReviewAndSubmit}
+                onBack={handleBackToDashboard}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="review">
+            {draftEntry && (
+              <StockEntryReview
+                draftEntry={draftEntry}
+                onSubmitComplete={handleSubmitComplete}
+                onBack={() => setActiveTab("create")}
+              />
             )}
           </TabsContent>
         </Tabs>

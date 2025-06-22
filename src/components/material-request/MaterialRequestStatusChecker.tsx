@@ -15,6 +15,9 @@ interface MaterialRequestStatus {
   transaction_date: string;
   requested_by: string;
   company: string;
+  owner: string;
+  modified_by: string;
+  docstatus: number;
 }
 
 const MaterialRequestStatusChecker = () => {
@@ -50,11 +53,14 @@ const MaterialRequestStatusChecker = () => {
       if (result.data) {
         setRequestStatus({
           name: result.data.name,
-          status: result.data.status,
+          status: result.data.docstatus === 0 ? 'Draft' : result.data.status,
           material_request_type: result.data.material_request_type,
           transaction_date: result.data.transaction_date,
-          requested_by: result.data.requested_by,
-          company: result.data.company
+          requested_by: result.data.requested_by || result.data.owner || result.data.modified_by || 'Unknown User',
+          company: result.data.company,
+          owner: result.data.owner,
+          modified_by: result.data.modified_by,
+          docstatus: result.data.docstatus
         });
       } else {
         setRequestStatus(null);
@@ -84,7 +90,12 @@ const MaterialRequestStatusChecker = () => {
       case "Pending": return "bg-blue-100 text-blue-800";
       case "Partially Ordered": return "bg-yellow-100 text-yellow-800";
       case "Ordered": return "bg-green-100 text-green-800";
+      case "Issued": return "bg-green-100 text-green-800";
+      case "Transferred": return "bg-green-100 text-green-800";
+      case "Received": return "bg-green-100 text-green-800";
+      case "Partially Received": return "bg-lime-100 text-lime-800";
       case "Cancelled": return "bg-red-100 text-red-800";
+      case "Stopped": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -139,6 +150,19 @@ const MaterialRequestStatusChecker = () => {
               <div>
                 <span className="text-gray-500">Company:</span>
                 <p className="font-medium">{requestStatus.company}</p>
+              </div>
+              {requestStatus.owner && requestStatus.owner !== requestStatus.requested_by && (
+                <div>
+                  <span className="text-gray-500">Created By:</span>
+                  <p className="font-medium">{requestStatus.owner}</p>
+                </div>
+              )}
+              <div>
+                <span className="text-gray-500">Document Status:</span>
+                <p className="font-medium">
+                  {requestStatus.docstatus === 0 ? 'Draft' : 
+                   requestStatus.docstatus === 1 ? 'Submitted' : 'Cancelled'}
+                </p>
               </div>
             </div>
           </div>
