@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Save, Check } from "lucide-react";
+import { Plus, Trash2, Save } from "lucide-react";
 import { MaterialRequestPurpose, MaterialRequestItem, MaterialRequest } from "@/pages/MaterialRequest";
 import ItemSelector from "../item-enquiry/ItemSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
@@ -87,7 +87,7 @@ const MaterialRequestFormImproved = ({
           itemCode: itemCode,
           itemName: itemDetails.data.item_name || itemCode,
           uom: itemDetails.data.stock_uom || 'Nos',
-          description: itemDetails.data.description || ''
+          description: itemDetails.data.description || itemDetails.data.item_name || ''
         };
         setItems(updatedItems);
         
@@ -108,13 +108,13 @@ const MaterialRequestFormImproved = ({
     }
   };
 
-  const addItemToRequest = async (index: number) => {
-    const item = items[index];
+  const createOrUpdateDraft = async () => {
+    const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0);
     
-    if (!item.itemCode || item.qty <= 0) {
+    if (validItems.length === 0) {
       toast({
         title: "Error",
-        description: "Please select an item and enter a valid quantity",
+        description: "Please add at least one valid item with quantity greater than 0",
         variant: "destructive"
       });
       return;
@@ -123,24 +123,17 @@ const MaterialRequestFormImproved = ({
     try {
       setLoading(true);
       
-      // If no draft exists, create one
       if (!draftRequest) {
-        await createDraft([item]);
+        await createDraft(validItems);
       } else {
-        // Update existing draft
-        await updateDraft([...draftRequest.items, item]);
+        await updateDraft(validItems);
       }
       
-      toast({
-        title: "Item Added",
-        description: `${item.itemName} added to material request`,
-      });
-      
     } catch (error) {
-      console.error('Error adding item to request:', error);
+      console.error('Error creating/updating draft:', error);
       toast({
         title: "Error",
-        description: "Failed to add item to request",
+        description: "Failed to save material request",
         variant: "destructive"
       });
     } finally {
@@ -193,7 +186,7 @@ const MaterialRequestFormImproved = ({
         
         toast({
           title: "Draft Created",
-          description: `Draft material request ${result.data.name} created successfully!`,
+          description: `Draft material request ${result.data.name} created successfully with ${itemsToAdd.length} item(s)!`,
         });
       }
     } catch (error) {
@@ -236,34 +229,27 @@ const MaterialRequestFormImproved = ({
       };
       onDraftCreated(updatedDraft);
       
+      toast({
+        title: "Draft Updated",
+        description: `Draft updated successfully with ${updatedItems.length} item(s)!`,
+      });
+      
     } catch (error) {
       console.error('Error updating draft:', error);
       throw error;
     }
   };
 
-  const handleSaveDraft = async () => {
-    if (!draftRequest) return;
-    
-    setLoading(true);
-    try {
-      const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "");
-      await updateDraft(validItems);
-      
-      toast({
-        title: "Draft Saved",
-        description: "Draft updated successfully!",
-      });
-    } catch (error) {
-      console.error('Error saving draft:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save draft",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleReviewSubmit = async () => {
+    await createOrUpdateDraft();
+    // Small delay to ensure state is updated
+    setTimeout(() => {
+      onReviewAndSubmit();
+    }, 500);
+  };
+
+  const getValidItemsCount = () => {
+    return items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0).length;
   };
 
   return (
@@ -339,13 +325,18 @@ const MaterialRequestFormImproved = ({
                   onItemSelected={(itemCode) => handleItemSelected(index, itemCode)}
                   onUpdateItem={updateItem}
                   onRemoveItem={removeItem}
-                  onAddToRequest={() => addItemToRequest(index)}
                   canRemove={items.length > 1}
-                  loading={loading}
-                  isInDraft={draftRequest?.items.some(draftItem => draftItem.itemCode === item.itemCode) || false}
                 />
               ))}
             </div>
+            
+            {getValidItemsCount() > 0 && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-700">
+                  ✓ {getValidItemsCount()} item(s) ready for review and submission
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -356,18 +347,18 @@ const MaterialRequestFormImproved = ({
           </Button>
           <div className="flex space-x-2">
             {draftRequest && (
-              <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={loading} className="w-full sm:w-auto">
+              <Button type="button" variant="outline" onClick={createOrUpdateDraft} disabled={loading} className="w-full sm:w-auto">
                 <Save className="w-4 h-4 mr-2" />
                 {loading ? 'Saving...' : 'Save Draft'}
               </Button>
             )}
             <Button 
               type="button" 
-              onClick={onReviewAndSubmit} 
-              disabled={!draftRequest}
+              onClick={handleReviewSubmit} 
+              disabled={loading || getValidItemsCount() === 0}
               className="w-full sm:w-auto"
             >
-              Review & Submit
+              {loading ? 'Processing...' : 'Review & Submit'}
             </Button>
           </div>
         </div>
@@ -383,10 +374,7 @@ interface ItemFormRowProps {
   onItemSelected: (itemCode: string) => void;
   onUpdateItem: (index: number, field: keyof MaterialRequestItem, value: any) => void;
   onRemoveItem: (index: number) => void;
-  onAddToRequest: () => void;
   canRemove: boolean;
-  loading: boolean;
-  isInDraft: boolean;
 }
 
 const ItemFormRow = ({ 
@@ -396,31 +384,18 @@ const ItemFormRow = ({
   onItemSelected, 
   onUpdateItem, 
   onRemoveItem, 
-  onAddToRequest,
-  canRemove,
-  loading,
-  isInDraft
+  canRemove
 }: ItemFormRowProps) => {
+  const isValidItem = item.itemCode && item.itemCode.trim() !== "" && item.qty > 0;
+
   return (
-    <div className="border rounded-lg p-4 space-y-4">
+    <div className={`border rounded-lg p-4 space-y-4 ${isValidItem ? 'border-green-200 bg-green-50' : 'border-gray-200'}`}>
       <div className="flex justify-between items-start">
         <h4 className="font-medium">Item {index + 1}</h4>
         <div className="flex space-x-2">
-          {!isInDraft && (
-            <Button
-              type="button"
-              onClick={onAddToRequest}
-              disabled={!item.itemCode || item.qty <= 0 || loading}
-              size="sm"
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <Check className="w-4 h-4 mr-2" />
-              {loading ? 'Adding...' : 'Add Item'}
-            </Button>
-          )}
-          {isInDraft && (
-            <span className="text-sm text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
-              Added to Request
+          {isValidItem && (
+            <span className="text-sm text-green-600 font-medium bg-green-100 px-2 py-1 rounded">
+              ✓ Ready
             </span>
           )}
           {canRemove && (
@@ -445,6 +420,9 @@ const ItemFormRow = ({
             onItemSelected={onItemSelected}
             isLoading={false}
           />
+          {item.itemName && item.itemName !== item.itemCode && (
+            <p className="text-sm text-gray-600 mt-1">{item.itemName}</p>
+          )}
         </div>
 
         {/* Item Description */}
