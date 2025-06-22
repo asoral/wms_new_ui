@@ -58,7 +58,7 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
         const defaultCompany = await getUserDefaultCompany();
         
         // Build filters for search with company filter
-        let filters = [
+        const filters = [
           ['docstatus', '=', 1],
           ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']],
           ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
@@ -73,41 +73,25 @@ const POSelector = ({ onSelectPO, loading }: POSelectorProps) => {
 
         console.log('Searching POs with term:', searchTerm);
 
-        // Fetch POs with explicit field selection
-        const params = new URLSearchParams();
-        params.append('filters', JSON.stringify(filters));
-        params.append('or_filters', JSON.stringify(searchFilters));
-        
-        const fields = [
-          'name',
-          'supplier',
-          'supplier_name', 
-          'schedule_date',
-          'transaction_date',
-          'grand_total',
-          'status',
-          'company'
-        ];
-        params.append('fields', JSON.stringify(fields));
-        params.append('limit_page_length', '50'); // Limit results for performance
+        // Use the purchase API to get POs
+        const result = await erpnextAPI.purchase.getPurchaseOrders(
+          Object.fromEntries(filters.map(([key, op, val]) => [key, val])),
+          defaultCompany || undefined,
+          50,
+          0
+        );
 
-        const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Order?${params.toString()}`, {
-          headers: {
-            'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch POs: ${response.statusText}`);
-        }
-
-        const result = await response.json();
         console.log('Search results:', result);
         
         if (result?.data) {
-          const transformedOrders: PurchaseOrderOption[] = result.data.map((po: any) => ({
+          // Filter results based on search term
+          let filteredData = result.data.filter((po: any) => 
+            po.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            po.supplier?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            po.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
+          );
+
+          const transformedOrders: PurchaseOrderOption[] = filteredData.map((po: any) => ({
             name: po.name || '',
             supplier: po.supplier || '',
             supplier_name: po.supplier_name || po.supplier || 'Unknown Supplier',
