@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -107,11 +108,83 @@ const Receive = () => {
       setSelectedPO(transformedPO);
       setActiveTab("receive");
       
+      toast({
+        title: "Purchase Order Loaded",
+        description: `PO ${poNumber} loaded successfully with ${transformedPO.items.length} items`,
+      });
+      
     } catch (error) {
       console.error('Error fetching PO:', error);
       toast({
         title: "Error",
         description: "Failed to fetch Purchase Order from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectDraftReceipt = async (receiptId: string) => {
+    setLoading(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Fetch draft receipt data
+      const receiptResult = await erpnextAPI.purchase.getPurchaseReceipt(receiptId);
+      if (!receiptResult.data) {
+        toast({
+          title: "Purchase Receipt Not Found",
+          description: `Receipt ${receiptId} could not be found.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const receipt = receiptResult.data;
+      
+      // If receipt has a purchase order, load it first
+      if (receipt.purchase_order) {
+        await selectPO(receipt.purchase_order);
+      }
+
+      // Set current receipt and populate entries
+      setCurrentPurchaseReceipt(receiptId);
+      
+      // Transform receipt items to receive entries
+      const entries: ReceiveEntry[] = receipt.items ? receipt.items.map((item: any) => ({
+        itemCode: item.item_code,
+        itemName: item.item_name || item.item_code,
+        receivedQty: item.qty || 0,
+        warehouse: item.warehouse || 'Main Store',
+        batch: item.batch_no,
+        serial: item.serial_no,
+        uom: item.uom || 'Nos',
+        rate: item.rate || 0,
+        purchaseOrderItem: item.purchase_order_item
+      })) : [];
+
+      setReceiveEntries(entries);
+      setActiveTab("receive");
+      
+      toast({
+        title: "Draft Receipt Loaded",
+        description: `Draft receipt ${receiptId} loaded with ${entries.length} items`,
+      });
+      
+    } catch (error) {
+      console.error('Error fetching draft receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch draft purchase receipt",
         variant: "destructive"
       });
     } finally {
@@ -381,7 +454,7 @@ const Receive = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="receive" disabled={!selectedPO}>
+            <TabsTrigger value="receive" disabled={!selectedPO && !currentPurchaseReceipt}>
               Receive Items
             </TabsTrigger>
             <TabsTrigger value="review" disabled={receiveEntries.length === 0} className="relative">
@@ -395,6 +468,7 @@ const Receive = () => {
           <TabsContent value="dashboard">
             <ReceiveDashboard 
               onSelectPO={selectPO}
+              onSelectDraftReceipt={selectDraftReceipt}
               shortcuts={shortcuts}
             />
           </TabsContent>

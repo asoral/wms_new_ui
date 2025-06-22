@@ -1,54 +1,45 @@
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
-import { Search, FileText, Package, CheckCircle, Clock, LucideIcon } from "lucide-react";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Search, Loader2, Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import POSelector from "./POSelector";
 
-interface DashboardData {
-  pendingPOs: number;
-  pendingPOsToday: number;
-  receiptsThisWeek: number;
-  draftReceipts: number;
-  pendingQC: number;
-}
-
-interface Shortcut {
-  label: string;
-  icon: LucideIcon;
-  action: () => void;
+interface DraftReceipt {
+  id: string;
+  supplier: string;
+  date: string;
+  items: number;
+  amount: number;
 }
 
 interface ReceiveDashboardProps {
   onSelectPO: (poNumber: string) => void;
-  shortcuts: Shortcut[];
+  onSelectDraftReceipt?: (receiptId: string) => void;
+  shortcuts: Array<{
+    label: string;
+    icon: any;
+    action: () => void;
+  }>;
 }
 
-const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
+const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: ReceiveDashboardProps) => {
+  const [poNumber, setPONumber] = useState("");
+  const [draftReceipts, setDraftReceipts] = useState<DraftReceipt[]>([]);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const [data, setData] = useState<DashboardData>({
-    pendingPOs: 0,
-    pendingPOsToday: 0,
-    receiptsThisWeek: 0,
-    draftReceipts: 0,
-    pendingQC: 0
-  });
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    loadDashboardData();
+    fetchDraftReceipts();
   }, []);
 
-  const loadDashboardData = async () => {
+  const fetchDraftReceipts = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -59,80 +50,25 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
         return;
       }
 
-      const defaultCompany = await getUserDefaultCompany();
-      
-      // Get today's date and week boundaries
-      const today = new Date().toISOString().split('T')[0];
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - dayOfWeek);
-      const endOfWeek = new Date(now);
-      endOfWeek.setDate(now.getDate() + (6 - dayOfWeek));
+      // Fetch draft purchase receipts
+      const filters = { docstatus: 0 }; // 0 for draft
+      const receiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(filters);
 
-      const [allPendingPOs, pendingPOsToday, receiptsThisWeek, draftPRResult, qcResult] = await Promise.allSettled([
-        // All Pending POs (To Receive, To Receive and Bill) with company filter
-        erpnextAPI.purchase.getPurchaseOrders([
-          ['docstatus', '=', 1],
-          ['status', 'in', ['To Receive', 'To Receive and Bill']],
-          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
-        ]),
-        
-        // Pending POs with schedule_date = today with company filter
-        erpnextAPI.purchase.getPurchaseOrders([
-          ['docstatus', '=', 1],
-          ['status', 'in', ['To Receive', 'To Receive and Bill']],
-          ['schedule_date', '=', today],
-          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
-        ]),
-        
-        // POs to be received this week (schedule_date in this week) with company filter
-        erpnextAPI.purchase.getPurchaseOrders([
-          ['docstatus', '=', 1],
-          ['status', 'in', ['To Receive', 'To Receive and Bill']],
-          ['schedule_date', 'between', [startOfWeek.toISOString().split('T')[0], endOfWeek.toISOString().split('T')[0]]],
-          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
-        ]),
-        
-        // Draft Purchase Receipts with company filter
-        erpnextAPI.purchase.getPurchaseReceipts([
-          ['docstatus', '=', 0],
-          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
-        ]),
-        
-        // Pending QC (Quality Inspections with type=incoming and docstatus=0) with company filter
-        fetch(`${erpnextAPI.baseURL}/api/resource/Quality Inspection?filters=${JSON.stringify([
-          ['inspection_type', '=', 'Incoming'],
-          ['docstatus', '=', 0],
-          ...(defaultCompany ? [['company', '=', defaultCompany]] : [])
-        ])}&limit_page_length=1000`, {
-          headers: {
-            'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          }
-        }).then(res => res.json())
-      ]);
-
-      const pendingPOs = allPendingPOs.status === 'fulfilled' && allPendingPOs.value?.data ? allPendingPOs.value.data.length : 0;
-      const pendingPOsTodayCount = pendingPOsToday.status === 'fulfilled' && pendingPOsToday.value?.data ? pendingPOsToday.value.data.length : 0;
-      const receiptsThisWeekCount = receiptsThisWeek.status === 'fulfilled' && receiptsThisWeek.value?.data ? receiptsThisWeek.value.data.length : 0;
-      const draftReceipts = draftPRResult.status === 'fulfilled' && draftPRResult.value?.data ? draftPRResult.value.data.length : 0;
-      const pendingQC = qcResult.status === 'fulfilled' && qcResult.value?.data ? qcResult.value.data.length : 0;
-
-      setData({
-        pendingPOs,
-        pendingPOsToday: pendingPOsTodayCount,
-        receiptsThisWeek: receiptsThisWeekCount,
-        draftReceipts,
-        pendingQC
-      });
-
+      if (receiptsResult.data) {
+        const transformedReceipts: DraftReceipt[] = receiptsResult.data.map((receipt: any) => ({
+          id: receipt.name,
+          supplier: receipt.supplier,
+          date: receipt.posting_date,
+          items: receipt.items ? receipt.items.length : 0,
+          amount: receipt.grand_total || 0
+        }));
+        setDraftReceipts(transformedReceipts);
+      }
     } catch (error) {
-      console.error('Failed to load dashboard data:', error);
+      console.error('Error fetching draft receipts:', error);
       toast({
         title: "Error",
-        description: "Failed to load dashboard data from ERPNext",
+        description: "Failed to fetch draft purchase receipts",
         variant: "destructive"
       });
     } finally {
@@ -140,128 +76,125 @@ const ReceiveDashboard = ({ onSelectPO, shortcuts }: ReceiveDashboardProps) => {
     }
   };
 
-  const handleCardClick = (type: string) => {
-    switch (type) {
-      case 'pendingPOs':
-        toast({
-          title: "Pending POs",
-          description: `${data.pendingPOs} total pending POs (${data.pendingPOsToday} due today)`,
-        });
-        break;
-      case 'receiptsThisWeek':
-        toast({
-          title: "Receipts This Week",
-          description: `${data.receiptsThisWeek} purchase orders to be received this week`,
-        });
-        break;
-      case 'draftReceipts':
-        // Navigate to draft receipts list
-        navigate('/receive/drafts');
-        break;
-      case 'pendingQC':
-        navigate('/quality-check');
-        break;
+  const handlePOSearch = () => {
+    if (poNumber.trim()) {
+      onSelectPO(poNumber.trim());
     }
   };
 
-  const dashboardItems = [
-    {
-      title: "Pending POs",
-      value: `${data.pendingPOs} (${data.pendingPOsToday})`,
-      icon: Clock,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
-      type: "pendingPOs"
-    },
-    {
-      title: "Receipts This Week",
-      value: data.receiptsThisWeek,
-      icon: Package,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-      type: "receiptsThisWeek"
-    },
-    {
-      title: "Draft Receipts",
-      value: data.draftReceipts,
-      icon: FileText,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-      type: "draftReceipts"
-    },
-    {
-      title: "Pending QC",
-      value: data.pendingQC,
-      icon: CheckCircle,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
-      type: "pendingQC"
+  const handleDraftReceiptView = (receiptId: string) => {
+    if (onSelectDraftReceipt) {
+      onSelectDraftReceipt(receiptId);
     }
-  ];
+  };
 
   return (
     <div className="space-y-6">
       {/* PO Search */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="w-5 h-5" />
-            <span>Select Purchase Order</span>
-          </CardTitle>
+          <CardTitle>Receive Items from Purchase Order</CardTitle>
         </CardHeader>
         <CardContent>
-          <POSelector onSelectPO={onSelectPO} loading={loading} />
+          <div className="flex items-center space-x-2">
+            <Input
+              type="text"
+              placeholder="Enter Purchase Order Number"
+              value={poNumber}
+              onChange={(e) => setPONumber(e.target.value)}
+            />
+            <Button onClick={handlePOSearch}>
+              <Search className="w-4 h-4 mr-2" />
+              Search
+            </Button>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Dashboard Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {dashboardItems.map((item, index) => {
-          const Icon = item.icon;
-          return (
-            <Card 
-              key={index} 
-              className={`cursor-pointer hover:shadow-md transition-shadow ${item.bgColor}`}
-              onClick={() => handleCardClick(item.type)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{item.title}</p>
-                    <p className={`text-2xl font-bold ${item.color}`}>
-                      {loading ? "..." : item.value}
-                    </p>
-                  </div>
-                  <Icon className={`w-8 h-8 ${item.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
 
       {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {shortcuts.map((shortcut, index) => (
+              <Button key={index} onClick={shortcut.action} className="h-12">
+                <shortcut.icon className="w-4 h-4 mr-2" />
+                {shortcut.label}
+              </Button>
+            ))}
+          </CardContent>
+        </CardHeader>
+      </Card>
+
+      {/* Draft Purchase Receipts */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Draft Purchase Receipts</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {shortcuts.map((shortcut, index) => {
-              const Icon = shortcut.icon;
-              return (
-                <Button
-                  key={index}
-                  variant="outline"
-                  onClick={shortcut.action}
-                  className="h-16 flex-col"
-                >
-                  <Icon className="w-6 h-6 mb-2" />
-                  {shortcut.label}
-                </Button>
-              );
-            })}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <span className="ml-2 text-gray-600">Loading draft receipts...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2">Receipt ID</th>
+                    <th className="text-left py-2">Supplier</th>
+                    <th className="text-left py-2">Date</th>
+                    <th className="text-left py-2">Items</th>
+                    <th className="text-left py-2">Amount</th>
+                    <th className="text-left py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {draftReceipts.map((receipt) => (
+                    <tr key={receipt.id} className="border-b hover:bg-gray-50">
+                      <td className="py-3 font-medium text-blue-600">{receipt.id}</td>
+                      <td className="py-3">{receipt.supplier}</td>
+                      <td className="py-3">{receipt.date}</td>
+                      <td className="py-3">{receipt.items} items</td>
+                      <td className="py-3">₹{receipt.amount.toLocaleString()}</td>
+                      <td className="py-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDraftReceiptView(receipt.id)}
+                          className="flex items-center"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {draftReceipts.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No draft purchase receipts found
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Shortcuts */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Shortcuts</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {shortcuts.map((shortcut, index) => (
+            <Button key={index} onClick={shortcut.action} className="h-12">
+              <shortcut.icon className="w-4 h-4 mr-2" />
+              {shortcut.label}
+            </Button>
+          ))}
         </CardContent>
       </Card>
     </div>
