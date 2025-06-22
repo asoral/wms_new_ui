@@ -10,10 +10,45 @@ import SalesOrderList from "@/components/deliver/SalesOrderList";
 import DeliveryProcess from "@/components/deliver/DeliveryProcess";
 import DraftDeliveryNotes from "@/components/deliver/DraftDeliveryNotes";
 
+// Export types that other components need
+export interface SalesOrder {
+  name: string;
+  customer: string;
+  status: string;
+  transaction_date: string;
+  grand_total: number;
+  currency: string;
+  items?: any[];
+}
+
+export interface SOItem {
+  itemCode: string;
+  itemName: string;
+  orderedQty: number;
+  deliveredQty: number;
+  pendingQty: number;
+  rate: number;
+  uom: string;
+  warehouse: string;
+}
+
+export interface DeliveryEntry {
+  id: string;
+  salesOrder: string;
+  items: SOItem[];
+  status: string;
+  createdDate: string;
+}
+
 const Deliver = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [dashboardData] = useState({
+    todaysDelivery: 0,
+    totalDeliveries: 0
+  });
+  const [isLoading] = useState(false);
 
   const handleSalesOrderSelect = (salesOrder: any) => {
     setSelectedSalesOrder(salesOrder);
@@ -67,8 +102,10 @@ const Deliver = () => {
 
           <TabsContent value="dashboard">
             <DeliverDashboard
-              onViewOrders={() => setActiveTab("orders")}
-              onViewDrafts={() => setActiveTab("drafts")}
+              onSelectSalesOrder={handleSalesOrderSelect}
+              onViewSalesOrders={() => setActiveTab("orders")}
+              dashboardData={dashboardData}
+              isLoading={isLoading}
             />
           </TabsContent>
 
@@ -95,7 +132,6 @@ const Deliver = () => {
             {selectedSalesOrder && (
               <DeliveryProcess
                 salesOrder={selectedSalesOrder}
-                selectedItems={selectedItems}
                 onBack={handleBackToDashboard}
                 onDeliveryComplete={handleDeliveryComplete}
               />
@@ -114,7 +150,7 @@ const Deliver = () => {
                   Back to Dashboard
                 </Button>
               </div>
-              <DraftDeliveryNotes />
+              <DraftDeliveryNotes onSelectDraft={() => {}} />
             </div>
           </TabsContent>
         </Tabs>

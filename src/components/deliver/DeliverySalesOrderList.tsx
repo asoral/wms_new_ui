@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,7 +55,17 @@ const DeliverySalesOrderList = ({ onSalesOrderSelect, onItemsSelect }: DeliveryS
       ], 50);
 
       if (result.data) {
-        setSalesOrders(result.data);
+        // Transform the data to match our interface
+        const transformedData: SalesOrder[] = result.data.map((order: any) => ({
+          name: order.name,
+          customer: order.customer,
+          status: order.status,
+          transaction_date: order.transaction_date || new Date().toISOString(),
+          grand_total: order.grand_total || 0,
+          currency: order.currency || 'INR',
+          items: order.items
+        }));
+        setSalesOrders(transformedData);
       }
     } catch (error) {
       console.error('Error fetching sales orders:', error);
