@@ -1,9 +1,11 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, Eye } from "lucide-react";
+import { Search, Loader2, Eye, Package, TrendingUp, Clock, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { MetricCard } from "@/components/ui/metric-card";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +16,13 @@ interface DraftReceipt {
   date: string;
   items: number;
   amount: number;
+}
+
+interface DashboardMetrics {
+  todaysReceipts: number;
+  draftReceipts: number;
+  itemsReceived: number;
+  overdueReceipts: number;
 }
 
 interface ReceiveDashboardProps {
@@ -29,16 +38,24 @@ interface ReceiveDashboardProps {
 const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: ReceiveDashboardProps) => {
   const [poNumber, setPONumber] = useState("");
   const [draftReceipts, setDraftReceipts] = useState<DraftReceipt[]>([]);
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    todaysReceipts: 0,
+    draftReceipts: 0,
+    itemsReceived: 0,
+    overdueReceipts: 0
+  });
   const [loading, setLoading] = useState(false);
+  const [metricsLoading, setMetricsLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchDraftReceipts();
+    fetchDashboardData();
   }, []);
 
-  const fetchDraftReceipts = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
+    setMetricsLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
@@ -51,8 +68,8 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
       }
 
       // Fetch draft purchase receipts
-      const filters = { docstatus: 0 }; // 0 for draft
-      const receiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(filters);
+      const draftFilters = { docstatus: 0 }; // 0 for draft
+      const receiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(draftFilters);
 
       if (receiptsResult.data) {
         const transformedReceipts: DraftReceipt[] = receiptsResult.data.map((receipt: any) => ({
@@ -64,15 +81,51 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
         }));
         setDraftReceipts(transformedReceipts);
       }
+
+      // Fetch today's submitted receipts
+      const today = new Date().toISOString().split('T')[0];
+      const todayFilters = { 
+        docstatus: 1,
+        posting_date: today
+      };
+      const todayReceiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(todayFilters);
+
+      // Fetch all submitted receipts for total items count
+      const submittedFilters = { docstatus: 1 };
+      const allReceiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(submittedFilters, undefined, 1000);
+      
+      let totalItemsReceived = 0;
+      if (allReceiptsResult.data) {
+        totalItemsReceived = allReceiptsResult.data.reduce((total: number, receipt: any) => {
+          return total + (receipt.items ? receipt.items.length : 0);
+        }, 0);
+      }
+
+      // Calculate overdue receipts (POs past schedule date that are still pending)
+      const overdueFilters = {
+        docstatus: 1,
+        status: ['To Receive', 'To Receive and Bill', 'Partially Received'],
+        schedule_date: ['<', today]
+      };
+      const overduePOsResult = await erpnextAPI.purchase.getPurchaseOrders(overdueFilters);
+
+      setMetrics({
+        todaysReceipts: todayReceiptsResult.data ? todayReceiptsResult.data.length : 0,
+        draftReceipts: transformedReceipts.length,
+        itemsReceived: totalItemsReceived,
+        overdueReceipts: overduePOsResult.data ? overduePOsResult.data.length : 0
+      });
+
     } catch (error) {
-      console.error('Error fetching draft receipts:', error);
+      console.error('Error fetching dashboard data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch draft purchase receipts",
+        description: "Failed to fetch dashboard data",
         variant: "destructive"
       });
     } finally {
       setLoading(false);
+      setMetricsLoading(false);
     }
   };
 
@@ -90,6 +143,50 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
 
   return (
     <div className="space-y-6">
+      {/* Dashboard Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {metricsLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="flex items-center p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="p-2 bg-gray-100 rounded-lg animate-pulse">
+                    <div className="w-6 h-6 bg-gray-300 rounded"></div>
+                  </div>
+                  <div>
+                    <div className="h-4 bg-gray-200 rounded w-20 mb-2 animate-pulse"></div>
+                    <div className="h-6 bg-gray-200 rounded w-16 animate-pulse"></div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <>
+            <MetricCard
+              title="Today's Receipts"
+              value={metrics.todaysReceipts.toString()}
+              icon={Package}
+            />
+            <MetricCard
+              title="Draft Receipts"
+              value={metrics.draftReceipts.toString()}
+              icon={Clock}
+            />
+            <MetricCard
+              title="Items Received"
+              value={metrics.itemsReceived.toString()}
+              icon={TrendingUp}
+            />
+            <MetricCard
+              title="Overdue Receipts"
+              value={metrics.overdueReceipts.toString()}
+              icon={AlertTriangle}
+            />
+          </>
+        )}
+      </div>
+
       {/* PO Search */}
       <Card>
         <CardHeader>
@@ -102,6 +199,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
               placeholder="Enter Purchase Order Number"
               value={poNumber}
               onChange={(e) => setPONumber(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handlePOSearch()}
             />
             <Button onClick={handlePOSearch}>
               <Search className="w-4 h-4 mr-2" />
@@ -109,21 +207,6 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
             </Button>
           </div>
         </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {shortcuts.map((shortcut, index) => (
-              <Button key={index} onClick={shortcut.action} className="h-12">
-                <shortcut.icon className="w-4 h-4 mr-2" />
-                {shortcut.label}
-              </Button>
-            ))}
-          </CardContent>
-        </CardHeader>
       </Card>
 
       {/* Draft Purchase Receipts */}
@@ -183,18 +266,25 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
         </CardContent>
       </Card>
 
-      {/* Shortcuts */}
+      {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Shortcuts</CardTitle>
+          <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {shortcuts.map((shortcut, index) => (
-            <Button key={index} onClick={shortcut.action} className="h-12">
-              <shortcut.icon className="w-4 h-4 mr-2" />
-              {shortcut.label}
-            </Button>
-          ))}
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {shortcuts.map((shortcut, index) => (
+              <Button 
+                key={index} 
+                onClick={shortcut.action} 
+                variant="outline"
+                className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
+              >
+                <shortcut.icon className="w-5 h-5 text-blue-600" />
+                <span className="text-sm font-medium">{shortcut.label}</span>
+              </Button>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

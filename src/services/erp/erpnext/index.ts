@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -147,17 +148,17 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Purchase methods
-  async getPurchaseOrders(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.purchaseAPI.getPurchaseOrders(filters, fields, limitPageLength);
+  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
+    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength, limitStart);
   }
 
-  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength);
+  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
+    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength, limitStart);
   }
 
   // Sales methods
-  async getSalesOrders(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.salesAPI.getSalesOrders(filters, fields, limitPageLength);
+  async getSalesOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
+    return this.salesAPI.getSalesOrders(filters, company, limitPageLength, limitStart);
   }
 
   async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
