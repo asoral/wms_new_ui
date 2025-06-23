@@ -144,7 +144,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   // Warehouse methods
   async getWarehouses(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.warehouseAPI.getWarehouses(filters, fields, limitPageLength);
+    return this.warehouseAPI.getWarehouses(filters, undefined, false);
   }
 
   // Purchase methods
@@ -171,7 +171,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   // Company methods
   async getCompanies(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.companyAPI.getCompanies(filters, fields, limitPageLength);
+    return this.companyAPI.getCompanies();
   }
 
   // Dashboard methods
