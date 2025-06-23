@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Search, ChevronDown, Package, Calendar, User, DollarSign } from "lucide-react";
+import { Search, ChevronDown, Package, Calendar, User, DollarSign, Loader2 } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,7 +33,10 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
 
   useEffect(() => {
     if (searchTerm.length >= 2) {
-      searchPurchaseOrders();
+      const debounceTimer = setTimeout(() => {
+        searchPurchaseOrders();
+      }, 300);
+      return () => clearTimeout(debounceTimer);
     } else {
       setSearchResults([]);
       setShowDropdown(false);
@@ -55,12 +58,18 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
 
       const company = await getUserDefaultCompany();
       
-      // Use simple filters for submitted POs with pending status
+      // Search for submitted POs with pending receiving status
       const filters = {
         docstatus: 1,
-        status: ['in', ['To Receive', 'To Receive and Bill', 'Partially Received']],
-        name: ['like', `%${searchTerm.trim()}%`]
+        status: ['in', ['To Receive', 'To Receive and Bill', 'Partially Received']]
       };
+
+      // Add search filter if we have a search term
+      if (searchTerm.trim()) {
+        Object.assign(filters, {
+          name: ['like', `%${searchTerm.trim()}%`]
+        });
+      }
       
       const result = await erpnextAPI.getPurchaseOrders(filters, company, 20);
       
@@ -155,27 +164,25 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Search className="w-5 h-5" />
-          <span>Select Purchase Order for Receiving</span>
+          <span>Select Purchase Order</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="relative">
           <Label htmlFor="poSearch">Search Purchase Order</Label>
-          <div className="flex space-x-2 mt-1">
-            <div className="relative flex-1">
-              <Input
-                id="poSearch"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by PO number, supplier name..."
-                className="pr-10"
-              />
-              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="relative mt-1">
+            <Input
+              id="poSearch"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by PO number..."
+              className="pr-10"
+            />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
               {searching && (
-                <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                </div>
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
               )}
+              <ChevronDown className="w-4 h-4 text-gray-400" />
             </div>
           </div>
 

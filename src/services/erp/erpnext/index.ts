@@ -68,7 +68,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.materialsAPI.updateMaterialRequest(name, data);
   }
 
-  async searchMaterialRequests(searchTerm: string, company?: string, limitPageLength?: number) {
+  async searchMaterialRequests(searchTerm: string, company?: string, limitPageLength: number = 20) {
     return this.materialsAPI.searchMaterialRequests(searchTerm, company, limitPageLength);
   }
 
@@ -149,7 +149,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   // Purchase methods
   async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
-    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength, limitStart);
+    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength || 20, limitStart || 0);
   }
 
   async getPurchaseOrder(name: string) {
@@ -157,12 +157,12 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
-    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength, limitStart);
+    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength || 20, limitStart || 0);
   }
 
   // Sales methods
   async getSalesOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
-    return this.salesAPI.getSalesOrders(filters, company, limitPageLength, limitStart);
+    return this.salesAPI.getSalesOrders(filters, company, limitPageLength || 20, limitStart || 0);
   }
 
   async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
