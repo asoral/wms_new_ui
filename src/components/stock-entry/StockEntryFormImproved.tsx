@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, FileText } from "lucide-react";
+import { Plus, Trash2, Save, FileText, Download } from "lucide-react";
 import { StockEntryType, StockEntryItem } from "@/pages/StockEntry";
 import ItemSelector from "../item-enquiry/ItemSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
@@ -178,12 +178,44 @@ const StockEntryFormImproved = ({
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      // This would typically call a specific ERPNext method to get items
-      // For now, we'll show a success message
-      toast({
-        title: "Items Fetched",
-        description: `Items from ${formData.getItemsFrom} ${formData.selectedDocument.name} would be loaded here`,
-      });
+      if (formData.getItemsFrom === "Material Request") {
+        console.log('Fetching items from Material Request:', formData.selectedDocument.name);
+        
+        // Fetch items from Material Request
+        const itemsResult = await erpnextAPI.stockEntryAPI.getItemsFromMaterialRequest(formData.selectedDocument.name);
+        
+        if (itemsResult.data && itemsResult.data.length > 0) {
+          const fetchedItems: StockEntryItem[] = itemsResult.data.map((item: any) => ({
+            itemCode: item.item_code,
+            itemName: item.item_name || item.item_code,
+            qty: item.qty || 0,
+            uom: item.uom || item.stock_uom || "Nos",
+            fromWarehouse: item.warehouse || formData.fromWarehouse || "",
+            toWarehouse: formData.toWarehouse || "",
+            rate: 0
+          }));
+
+          // Replace current items with fetched items
+          setItems(fetchedItems);
+          
+          toast({
+            title: "Items Fetched Successfully",
+            description: `${fetchedItems.length} items loaded from Material Request ${formData.selectedDocument.name}`,
+          });
+        } else {
+          toast({
+            title: "No Items Found",
+            description: "No items found in the selected Material Request",
+            variant: "destructive"
+          });
+        }
+      } else {
+        // For other document types, show placeholder message for now
+        toast({
+          title: "Feature Coming Soon",
+          description: `Fetching items from ${formData.getItemsFrom} will be implemented soon`,
+        });
+      }
       
     } catch (error) {
       console.error('Error fetching items from document:', error);
@@ -416,9 +448,18 @@ const StockEntryFormImproved = ({
                     disabled={!formData.selectedDocument || loading}
                     className="w-full"
                   >
-                    Get Items
+                    <Download className="w-4 h-4 mr-2" />
+                    {loading ? 'Loading...' : 'Get Items'}
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {formData.selectedDocument && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Selected:</strong> {formData.selectedDocument.name} - {formData.selectedDocument.title || formData.selectedDocument.supplier || formData.selectedDocument.customer || formData.selectedDocument.item}
+                </p>
               </div>
             )}
 

@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -210,6 +209,11 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   async getItemsFromDocument(doctype: string, docname: string) {
     return this.stockEntryAPI.getItemsFromDocument(doctype, docname);
+  }
+
+  // New method to fetch items from Material Request
+  async getItemsFromMaterialRequest(materialRequestName: string) {
+    return this.stockEntryAPI.getItemsFromMaterialRequest(materialRequestName);
   }
 
   // Document selector methods for Stock Entry

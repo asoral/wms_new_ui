@@ -1,4 +1,5 @@
 
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse } from './types';
 
@@ -165,6 +166,25 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
     }
 
     return response.json();
+  }
+
+  // New method to fetch items from Material Request
+  async getItemsFromMaterialRequest(materialRequestName: string): Promise<ERPNextResponse<any[]>> {
+    console.log('Fetching items from Material Request:', materialRequestName);
+    
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request Item?filters=[["parent","=","${materialRequestName}"]]&fields=["item_code","item_name","qty","uom","warehouse","stock_uom"]`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error fetching Material Request items:', errorText);
+      throw new Error(`Failed to fetch Material Request items: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('Material Request items fetched:', result);
+    return result;
   }
 
   async getStockEntryTypes(): Promise<string[]> {
