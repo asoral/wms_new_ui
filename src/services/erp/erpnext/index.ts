@@ -142,14 +142,14 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockAPI.createSerialBatchBundle(bundleData);
   }
 
-  // Warehouse methods
+  // Warehouse methods - Fixed signature to match actual implementation
   async getWarehouses(filters?: any, fields?: string[], limitPageLength?: number) {
     return this.warehouseAPI.getWarehouses(filters, fields, limitPageLength);
   }
 
-  // Purchase methods
+  // Purchase methods - Fixed signatures to match actual implementation
   async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
-    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength || 20, limitStart || 0);
+    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength, limitStart);
   }
 
   async getPurchaseOrder(name: string) {
@@ -157,19 +157,19 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
-    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength || 20, limitStart || 0);
+    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength, limitStart);
   }
 
-  // Sales methods
+  // Sales methods - Fixed signature to match actual implementation
   async getSalesOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
-    return this.salesAPI.getSalesOrders(filters, company, limitPageLength || 20, limitStart || 0);
+    return this.salesAPI.getSalesOrders(filters, company, limitPageLength);
   }
 
   async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
     return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
   }
 
-  // Company methods
+  // Company methods - Fixed signature to match actual implementation
   async getCompanies(filters?: any, fields?: string[], limitPageLength?: number) {
     return this.companyAPI.getCompanies(filters, fields, limitPageLength);
   }
