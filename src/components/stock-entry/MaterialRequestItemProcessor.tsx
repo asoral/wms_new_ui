@@ -42,6 +42,12 @@ interface MaterialRequestItemProcessorProps {
   onBack: () => void;
 }
 
+interface BatchInfo {
+  batch_id: string;
+  batch_qty: number;
+  expiry_date?: string;
+}
+
 const MaterialRequestItemProcessor = ({
   materialRequestName,
   materialRequestItems,
@@ -106,9 +112,9 @@ const MaterialRequestItemProcessor = ({
     setCurrentWarehouse(warehouse);
   };
 
-  const handleBatchSelected = (batches: string[]) => {
+  const handleBatchSelected = (batches: BatchInfo[]) => {
     if (batches.length > 0) {
-      setCurrentBatch(batches[0]);
+      setCurrentBatch(batches[0].batch_id);
     }
   };
 

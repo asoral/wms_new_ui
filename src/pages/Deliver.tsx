@@ -128,14 +128,13 @@ const Deliver = () => {
 
       const company = await getUserDefaultCompany();
       
-      // Fetch delivery metrics
+      // Fetch delivery metrics - Fix: Remove the third argument
       const deliveryMetrics = await erpnextAPI.sales.getDeliveryMetrics(company || undefined);
       
       // Fetch draft delivery notes
       const draftDeliveryNotes = await erpnextAPI.getDeliveryNotes(
         [['docstatus', '=', 0]], // Draft status
-        company || undefined,
-        10
+        company || undefined
       );
 
       // Fetch pending sales orders
