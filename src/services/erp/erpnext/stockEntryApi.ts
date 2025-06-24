@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse } from './types';
 
@@ -200,9 +201,10 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
       filters.push(['company', '=', company]);
     }
 
+    // Remove the problematic 'required_by' field from the query
     const params = this.buildQueryParams(filters, [
       'name', 'title', 'material_request_type', 'status', 
-      'transaction_date', 'required_by', 'company'
+      'transaction_date', 'company'
     ], 20);
 
     console.log('Material Request search URL:', `${this.baseURL}/api/resource/Material Request?${params}`);
