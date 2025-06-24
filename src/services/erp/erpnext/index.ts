@@ -69,7 +69,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async searchMaterialRequests(searchTerm: string, company?: string, limitPageLength?: number) {
-    return this.materialsAPI.searchMaterialRequests(searchTerm, company, String(limitPageLength || 20));
+    return this.materialsAPI.searchMaterialRequests(searchTerm, company || '', String(limitPageLength || 20));
   }
 
   // Item methods
