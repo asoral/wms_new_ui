@@ -69,7 +69,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async searchMaterialRequests(searchTerm: string, company?: string, limitPageLength?: number) {
-    return this.materialsAPI.searchMaterialRequests(searchTerm, company, limitPageLength || 20);
+    return this.materialsAPI.searchMaterialRequests(searchTerm, company, String(limitPageLength || 20));
   }
 
   // Item methods
@@ -144,7 +144,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   // Warehouse methods
   async getWarehouses(filters?: any, fields?: string[], limitPageLength?: number) {
-    return this.warehouseAPI.getWarehouses(filters, undefined, false);
+    return this.warehouseAPI.getWarehouses(filters);
   }
 
   // Purchase methods
