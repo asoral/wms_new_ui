@@ -56,7 +56,7 @@ export function useERPNextData<T>(
             result = await erpnextAPI.getSalesOrders(filters, undefined, 20);
             break;
           case 'delivery-notes':
-            result = await erpnextAPI.getDeliveryNotes(filters, defaultCompany || undefined, 20);
+            result = await erpnextAPI.getDeliveryNotes(filters, defaultCompany || undefined);
             break;
           case 'purchase-orders':
             result = await erpnextAPI.getPurchaseOrders(filters, undefined, 20);

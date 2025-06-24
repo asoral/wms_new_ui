@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse } from './types';
 
@@ -184,6 +183,8 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
 
   // Search documents for Get Items From functionality
   async searchMaterialRequestsForStockEntry(stockEntryType: string, company?: string): Promise<ERPNextResponse<any[]>> {
+    console.log('Searching Material Requests for Stock Entry:', { stockEntryType, company });
+    
     const filters = [['docstatus', '=', 1]]; // Only submitted Material Requests
     
     // Filter by material request type based on stock entry type
@@ -204,15 +205,26 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
       'transaction_date', 'required_by', 'company'
     ], 20);
 
+    console.log('Material Request search URL:', `${this.baseURL}/api/resource/Material Request?${params}`);
+
     const response = await fetch(`${this.baseURL}/api/resource/Material Request?${params}`, {
       headers: this.getHeaders(),
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to search material requests: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Material Request Search Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        url: `${this.baseURL}/api/resource/Material Request?${params}`
+      });
+      throw new Error(`Failed to search material requests: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log('Material Request search result:', result);
+    return result;
   }
 
   async searchPurchaseOrdersForStockEntry(company?: string): Promise<ERPNextResponse<any[]>> {

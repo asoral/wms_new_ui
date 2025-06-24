@@ -16,7 +16,9 @@ export class ERPNextMaterialAPI extends ERPNextBaseAPI {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch material requests: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Material Request API Error:', response.status, errorText);
+      throw new Error(`Failed to fetch material requests: ${response.status} ${response.statusText}`);
     }
 
     return response.json();
@@ -28,7 +30,9 @@ export class ERPNextMaterialAPI extends ERPNextBaseAPI {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch material request: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Material Request Detail API Error:', response.status, errorText);
+      throw new Error(`Failed to fetch material request: ${response.status} ${response.statusText}`);
     }
 
     return response.json();
@@ -46,6 +50,7 @@ export class ERPNextMaterialAPI extends ERPNextBaseAPI {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Create Material Request API Error:', response.status, errorText);
       throw new Error(`Failed to create material request: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
@@ -64,6 +69,7 @@ export class ERPNextMaterialAPI extends ERPNextBaseAPI {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Update Material Request API Error:', response.status, errorText);
       throw new Error(`Failed to update material request: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
@@ -104,7 +110,9 @@ export class ERPNextMaterialAPI extends ERPNextBaseAPI {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to search material requests: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Search Material Request API Error:', response.status, errorText);
+      throw new Error(`Failed to search material requests: ${response.status} ${response.statusText}`);
     }
 
     return response.json();

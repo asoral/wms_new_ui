@@ -142,12 +142,12 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockAPI.createSerialBatchBundle(bundleData);
   }
 
-  // Warehouse methods - Fixed signature to match actual implementation
+  // Warehouse methods
   async getWarehouses(filters?: any, fields?: string[], limitPageLength?: number) {
     return this.warehouseAPI.getWarehouses(filters, fields, limitPageLength);
   }
 
-  // Purchase methods - Fixed signatures to match actual implementation
+  // Purchase methods
   async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
     return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength, limitStart);
   }
@@ -160,7 +160,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.purchaseAPI.getPurchaseReceipts();
   }
 
-  // Sales methods - Fixed signature to match actual implementation
+  // Sales methods
   async getSalesOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
     return this.salesAPI.getSalesOrders(filters);
   }
@@ -169,7 +169,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.salesAPI.getDeliveryNotes(filters, company);
   }
 
-  // Company methods - Fixed signature to match actual implementation
+  // Company methods
   async getCompanies() {
     return this.companyAPI.getCompanies();
   }
