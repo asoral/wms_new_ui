@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { Outlet } from "react-router-dom";
 import Layout from "./components/Layout";
 import { AuthProvider } from "./components/auth/AuthContext";
 import { SubscriptionProvider } from "./components/subscription/SubscriptionContext";
@@ -48,8 +49,8 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <TooltipProvider>
-        <SubscriptionProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <SubscriptionProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -58,7 +59,9 @@ const App = () => (
                 <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                 <Route path="/" element={
                   <ProtectedRoute>
-                    <Layout />
+                    <Layout>
+                      <Outlet />
+                    </Layout>
                   </ProtectedRoute>
                 }>
                   <Route index element={<Index />} />
@@ -85,8 +88,8 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </AuthProvider>
-        </SubscriptionProvider>
+          </SubscriptionProvider>
+        </AuthProvider>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>

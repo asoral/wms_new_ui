@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextItemsAPI } from './itemsApi';
@@ -19,7 +18,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   private salesAPI: ERPNextSalesAPI;
   private companyAPI: ERPNextCompanyAPI;
   private dashboardAPI: ERPNextDashboardAPI;
-  public stockEntryAPI: ERPNextStockEntryAPI; // Make this public
+  public stockEntryAPI: ERPNextStockEntryAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
     super(baseURL, apiKey, apiSecret);
@@ -143,7 +142,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Warehouse methods
-  async getWarehouses(filters?: any, fields?: string[], limitPageLength?: number) {
+  async getWarehouses(filters?: any, company?: string, limitPageLength?: number) {
     return this.warehouseAPI.getWarehouses(filters, company, limitPageLength);
   }
 
