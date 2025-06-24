@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Search, ChevronDown, Package, Calendar, User, DollarSign, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Package, Calendar, User, DollarSign, Loader2 } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,19 +28,17 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<PurchaseOrder[]>([]);
   const [searching, setSearching] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (searchTerm.length >= 2) {
+    if (searchTerm.length >= 3) {
       const debounceTimer = setTimeout(() => {
         searchPurchaseOrders();
       }, 300);
       return () => clearTimeout(debounceTimer);
     } else {
       setSearchResults([]);
-      setShowDropdown(false);
     }
   }, [searchTerm]);
 
@@ -58,9 +57,9 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
 
       const company = await getUserDefaultCompany();
       
-      // Search for submitted POs with pending receiving status
+      // Search for submitted POs with proper receiving status using Frappe filters
       const filters = {
-        docstatus: 1,
+        docstatus: 1, // Submitted documents only
         status: ['in', ['To Receive', 'To Receive and Bill', 'Partially Received']]
       };
 
@@ -73,7 +72,7 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
       
       const result = await erpnextAPI.getPurchaseOrders(filters, company, 20);
       
-      if (result.data) {
+      if (result.data && Array.isArray(result.data)) {
         // Transform the data to match our interface
         const transformedResults: PurchaseOrder[] = result.data.map((po: any) => ({
           name: po.name,
@@ -86,7 +85,8 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
         }));
         
         setSearchResults(transformedResults);
-        setShowDropdown(true);
+      } else {
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('Error searching purchase orders:', error);
@@ -95,6 +95,7 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
         description: "Failed to search purchase orders from ERPNext",
         variant: "destructive"
       });
+      setSearchResults([]);
     } finally {
       setSearching(false);
     }
@@ -132,8 +133,8 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
         };
 
         setSelectedPO(po);
-        setShowDropdown(false);
         setSearchTerm(po.name);
+        setSearchResults([]);
         
         // Call the parent handler to proceed to receiving
         onOrderSelected(transformedPO);
@@ -152,67 +153,87 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "To Receive": return "bg-yellow-100 text-yellow-800";
-      case "To Receive and Bill": return "bg-blue-100 text-blue-800";
-      case "Partially Received": return "bg-orange-100 text-orange-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "To Receive": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "To Receive and Bill": return "bg-blue-100 text-blue-800 border-blue-200";
+      case "Partially Received": return "bg-orange-100 text-orange-800 border-orange-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      searchPurchaseOrders();
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Search className="w-5 h-5" />
-          <span>Select Purchase Order</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="relative">
-          <Label htmlFor="poSearch">Search Purchase Order</Label>
-          <div className="relative mt-1">
-            <Input
-              id="poSearch"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by PO number..."
-              className="pr-10"
-            />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-              {searching && (
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              )}
-              <ChevronDown className="w-4 h-4 text-gray-400" />
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Package className="w-5 h-5" />
+            <span>Receive Items from Purchase Order</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSearchSubmit} className="flex space-x-2">
+            <div className="flex-1">
+              <Label htmlFor="poSearch" className="sr-only">Search Purchase Order</Label>
+              <Input
+                id="poSearch"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Enter Purchase Order number (e.g., PUR-ORD-2025-00001)"
+                className="w-full"
+              />
             </div>
-          </div>
+            <Button 
+              type="submit" 
+              disabled={searching || !searchTerm.trim()}
+              className="px-6"
+            >
+              {searching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
+              Search
+            </Button>
+          </form>
 
-          {/* Dropdown Results */}
-          {showDropdown && searchResults.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          {/* Search Results */}
+          {searchResults.length > 0 && (
+            <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
               {searchResults.map((po, index) => (
                 <div
                   key={index}
-                  className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                  className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={() => selectPurchaseOrder(po)}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900">{po.name}</div>
-                      <div className="text-sm text-gray-600 truncate">{po.supplier_name || po.supplier}</div>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <Badge variant="outline" className={getStatusColor(po.status)}>
+                      <div className="font-semibold text-gray-900 text-lg">{po.name}</div>
+                      <div className="text-sm text-gray-600 flex items-center mt-1">
+                        <User className="w-4 h-4 mr-1" />
+                        {po.supplier_name || po.supplier}
+                      </div>
+                      <div className="flex items-center space-x-4 mt-2">
+                        <Badge className={getStatusColor(po.status)}>
                           {po.status}
                         </Badge>
-                        <span className="text-xs text-gray-500">
+                        <div className="text-sm text-gray-500 flex items-center">
+                          <Calendar className="w-4 h-4 mr-1" />
                           Due: {new Date(po.schedule_date).toLocaleDateString()}
-                        </span>
-                        <span className="text-xs text-gray-500">
+                        </div>
+                        <div className="text-sm text-gray-500">
                           Received: {po.per_received || 0}%
-                        </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right ml-2">
-                      <div className="font-medium text-green-600">
+                    <div className="text-right ml-4">
+                      <div className="font-semibold text-green-600 flex items-center">
+                        <DollarSign className="w-4 h-4 mr-1" />
                         ₹{(po.grand_total || 0).toLocaleString()}
                       </div>
                     </div>
@@ -222,14 +243,24 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
             </div>
           )}
 
-          {showDropdown && searchResults.length === 0 && !searching && searchTerm.length >= 2 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-4 text-center text-gray-500">
-              No purchase orders found matching "{searchTerm}"
+          {searchResults.length === 0 && !searching && searchTerm.length >= 3 && (
+            <div className="mt-4 p-4 border border-gray-200 rounded-lg text-center text-gray-500">
+              <Package className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p>No purchase orders found matching "{searchTerm}"</p>
+              <p className="text-sm mt-1">Try searching with a different Purchase Order number</p>
             </div>
           )}
-        </div>
-      </CardContent>
-    </Card>
+
+          {searchTerm.length > 0 && searchTerm.length < 3 && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                Please enter at least 3 characters to search for Purchase Orders
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
