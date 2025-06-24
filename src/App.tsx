@@ -1,228 +1,95 @@
 
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Auth from "./pages/Auth";
+import { ThemeProvider } from "next-themes";
+import Layout from "./components/Layout";
+import { AuthProvider } from "./components/auth/AuthContext";
+import { SubscriptionProvider } from "./components/subscription/SubscriptionContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+
+// Import pages
 import Index from "./pages/Index";
 import Home from "./pages/Home";
-import BinEnquiry from "./pages/BinEnquiry";
+import Auth from "./pages/Auth";
+import Profile from "./pages/Profile";
 import ItemEnquiry from "./pages/ItemEnquiry";
+import BinEnquiry from "./pages/BinEnquiry";
 import StockCount from "./pages/StockCount";
+import Receive from "./pages/Receive";
+import Deliver from "./pages/Deliver";
+import MaterialRequest from "./pages/MaterialRequest";
+import StockEntry from "./pages/StockEntry";
 import PickList from "./pages/PickList";
 import Packing from "./pages/Packing";
-import Deliver from "./pages/Deliver";
-import Receive from "./pages/Receive";
-import StockEntry from "./pages/StockEntry";
-import MaterialRequest from "./pages/MaterialRequest";
 import QualityCheck from "./pages/QualityCheck";
 import PrintLabel from "./pages/PrintLabel";
 import Pallet from "./pages/Pallet";
 import Reports from "./pages/Reports";
-import Sync from "./pages/Sync";
 import Notifications from "./pages/Notifications";
-import Profile from "./pages/Profile";
-import NotFound from "./pages/NotFound";
-import { AuthProvider } from "./components/auth/AuthContext";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
-import { SubscriptionProvider } from "./components/subscription/SubscriptionContext";
-import SubscriptionGuard from "./components/subscription/SubscriptionGuard";
-import SubscriptionSuccess from "./pages/SubscriptionSuccess";
+import Sync from "./pages/Sync";
 import DraftReceipts from "./pages/DraftReceipts";
 import ReceiptDetail from "./pages/ReceiptDetail";
-import Layout from "./components/Layout";
+import SubscriptionSuccess from "./pages/SubscriptionSuccess";
+import NotFound from "./pages/NotFound";
 
-function App() {
-  return (
-    <BrowserRouter>
-      <AuthProvider>
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <TooltipProvider>
         <SubscriptionProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Index />
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/home" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Home />
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/bin-enquiry" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <BinEnquiry />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/item-enquiry" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <ItemEnquiry />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/stock-count" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <StockCount />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/pick-list" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <PickList />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/packing" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <Packing />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/deliver" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <Deliver />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/receive" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <Receive />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/receive/drafts" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <DraftReceipts />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/receive/receipt/:receiptName" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <ReceiptDetail />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/stock-entry" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <StockEntry />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/material-request" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <MaterialRequest />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/quality-check" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <QualityCheck />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/print-label" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <PrintLabel />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/pallet" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <Pallet />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/reports" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <Reports />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/sync" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <Sync />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/notifications" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <Notifications />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <SubscriptionGuard>
-                  <Layout>
-                    <Profile />
-                  </Layout>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/subscription-success" element={
-              <ProtectedRoute>
-                <SubscriptionSuccess />
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AuthProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+                <Route path="/" element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Index />} />
+                  <Route path="home" element={<Home />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="item-enquiry" element={<ItemEnquiry />} />
+                  <Route path="bin-enquiry" element={<BinEnquiry />} />
+                  <Route path="stock-count" element={<StockCount />} />
+                  <Route path="receive" element={<Receive />} />
+                  <Route path="deliver" element={<Deliver />} />
+                  <Route path="material-request" element={<MaterialRequest />} />
+                  <Route path="stock-entry" element={<StockEntry />} />
+                  <Route path="pick-list" element={<PickList />} />
+                  <Route path="packing" element={<Packing />} />
+                  <Route path="quality-check" element={<QualityCheck />} />
+                  <Route path="print-label" element={<PrintLabel />} />
+                  <Route path="pallet" element={<Pallet />} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="notifications" element={<Notifications />} />
+                  <Route path="sync" element={<Sync />} />
+                  <Route path="draft-receipts" element={<DraftReceipts />} />
+                  <Route path="receipt/:id" element={<ReceiptDetail />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </AuthProvider>
         </SubscriptionProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  );
-}
+      </TooltipProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
+);
 
 export default App;

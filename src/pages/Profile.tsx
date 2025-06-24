@@ -1,253 +1,151 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { User, Settings, Warehouse, LogOut, Building2 } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { configureERPNextAPI } from "@/services/erpnextApi";
-import { AlertCircle, CheckCircle, Settings, Database, Key } from "lucide-react";
+import DarkModeToggle from "@/components/DarkModeToggle";
 
 const Profile = () => {
-  const [erpnextUrl, setErpnextUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [apiSecret, setApiSecret] = useState("");
-  const [defaultCompany, setDefaultCompany] = useState("");
-  const [availableCompanies, setAvailableCompanies] = useState<{ name: string }[]>([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [testing, setTesting] = useState(false);
+  const { user, signOut, isLoading } = useAuth();
   const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('erpnext_url, erpnext_api_key, erpnext_api_secret, erpnext_default_company')
-          .eq('id', user.id)
-          .single();
-
-        if (profile) {
-          setErpnextUrl(profile.erpnext_url || "");
-          setApiKey(profile.erpnext_api_key || "");
-          setApiSecret(profile.erpnext_api_secret || "");
-          setDefaultCompany(profile.erpnext_default_company || "");
-        }
-      }
-    };
-
-    fetchProfile();
-  }, []);
-
-  const testConnection = async () => {
-    if (!erpnextUrl || !apiKey || !apiSecret) {
-      toast({
-        title: "Missing Configuration",
-        description: "Please fill in all ERPNext configuration fields",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setTesting(true);
+  const handleSignOut = async () => {
     try {
-      const api = configureERPNextAPI(erpnextUrl, apiKey, apiSecret);
-      
-      // Test with simple API call
-      const result = await api.getItems();
-      
-      if (result && result.data) {
-        setConnectionStatus('success');
-        toast({
-          title: "Connection Successful",
-          description: `Connected to ERPNext successfully. Found ${result.data.length} items.`,
-        });
-      } else {
-        throw new Error('No data returned from API');
-      }
-    } catch (error) {
-      console.error('Connection test failed:', error);
-      setConnectionStatus('error');
+      await signOut();
       toast({
-        title: "Connection Failed",
-        description: "Failed to connect to ERPNext. Please check your configuration.",
-        variant: "destructive"
+        title: "Signed out successfully",
+        description: "You have been logged out of your account.",
       });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const fetchCompanies = async () => {
-    if (!erpnextUrl || !apiKey || !apiSecret) {
-      toast({
-        title: "Missing Configuration",
-        description: "Please configure ERPNext connection first",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoadingCompanies(true);
-    try {
-      const api = configureERPNextAPI(erpnextUrl, apiKey, apiSecret);
-      const result = await api.getCompanies();
-      
-      if (result && result.data) {
-        setAvailableCompanies(result.data);
-        toast({
-          title: "Companies Loaded",
-          description: `Found ${result.data.length} companies`,
-        });
-      }
     } catch (error) {
-      console.error('Failed to fetch companies:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch companies from ERPNext",
-        variant: "destructive"
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive",
       });
-    } finally {
-      setLoadingCompanies(false);
     }
   };
 
-  const saveProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          erpnext_url: erpnextUrl,
-          erpnext_api_key: apiKey,
-          erpnext_api_secret: apiSecret,
-          erpnext_default_company: defaultCompany
-        })
-        .eq('id', user.id);
-
-      if (error) {
-        console.error('Failed to update profile:', error);
-        toast({
-          title: "Error",
-          description: "Failed to update profile",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Profile Updated",
-          description: "ERPNext configuration updated successfully",
-        });
-      }
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto py-10">
-      <Card className="w-full max-w-3xl mx-auto">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Settings className="w-5 h-5" />
-            <span>ERPNext Configuration</span>
-          </CardTitle>
-          <CardDescription>
-            Configure your ERPNext instance to connect with this application.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Tabs defaultValue="connection" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="connection" className="flex items-center space-x-2">
-                <Database className="w-4 h-4" />
-                <span>Connection</span>
-              </TabsTrigger>
-              <TabsTrigger value="company" className="flex items-center space-x-2">
-                <Key className="w-4 h-4" />
-                <span>Company</span>
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="connection" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="erpnext_url">ERPNext URL</Label>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <User className="w-6 h-6 text-blue-600" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Profile</h1>
+          </div>
+          <Badge variant="outline" className="bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300">
+            Active
+          </Badge>
+        </div>
+
+        {/* User Information */}
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 dark:text-gray-100">
+              <User className="w-5 h-5" />
+              <span>User Information</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="email" className="dark:text-gray-200">Email</Label>
                 <Input
-                  id="erpnext_url"
-                  placeholder="https://your-erpnext-instance.com"
-                  value={erpnextUrl}
-                  onChange={(e) => setErpnextUrl(e.target.value)}
+                  id="email"
+                  type="email"
+                  value={user?.email || ""}
+                  readOnly
+                  className="bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="api_key">API Key</Label>
+              <div>
+                <Label htmlFor="userId" className="dark:text-gray-200">User ID</Label>
                 <Input
-                  id="api_key"
-                  placeholder="Your ERPNext API Key"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  id="userId"
+                  value={user?.id || ""}
+                  readOnly
+                  className="bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="api_secret">API Secret</Label>
-                <Input
-                  id="api_secret"
-                  type="password"
-                  placeholder="Your ERPNext API Secret"
-                  value={apiSecret}
-                  onChange={(e) => setApiSecret(e.target.value)}
-                />
-              </div>
-              <Button onClick={testConnection} disabled={testing} className="w-full">
-                {testing ? "Testing..." : "Test Connection"}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Settings */}
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 dark:text-gray-100">
+              <Settings className="w-5 h-5" />
+              <span>Settings</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <DarkModeToggle />
+              
+              <Button variant="ghost" className="w-full justify-start dark:text-gray-200 dark:hover:bg-gray-700">
+                <Warehouse className="h-4 w-4 mr-3" />
+                Set Default Warehouse
               </Button>
-
-              {connectionStatus === 'success' && (
-                <div className="flex items-center space-x-2 text-green-500">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Connection successful</span>
-                </div>
-              )}
-
-              {connectionStatus === 'error' && (
-                <div className="flex items-center space-x-2 text-red-500">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>Connection failed. Check your configuration.</span>
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="company" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="default_company">Default Company</Label>
-                <Input
-                  id="default_company"
-                  placeholder="Your Default Company"
-                  value={defaultCompany}
-                  onChange={(e) => setDefaultCompany(e.target.value)}
-                />
-              </div>
-
-              <Button onClick={fetchCompanies} disabled={loadingCompanies} className="w-full">
-                {loadingCompanies ? "Loading Companies..." : "Load Available Companies"}
+              
+              <Button variant="ghost" className="w-full justify-start dark:text-gray-200 dark:hover:bg-gray-700">
+                <Building2 className="h-4 w-4 mr-3" />
+                Company Settings
               </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-              {availableCompanies.length > 0 && (
-                <div className="mt-4">
-                  <Label>Available Companies:</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {availableCompanies.map(company => (
-                      <Badge key={company.name} variant="secondary">{company.name}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-          <Button onClick={saveProfile} className="w-full">
-            Save Profile
-          </Button>
-        </CardContent>
-      </Card>
+        {/* Support */}
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardHeader>
+            <CardTitle className="dark:text-gray-100">Support</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Need help? Contact our support team at support@dexciss.io
+            </p>
+            <Button variant="outline" className="w-full dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+              Contact Support
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Separator className="dark:border-gray-700" />
+
+        {/* Logout */}
+        <Card className="border-red-200 dark:border-red-800 dark:bg-gray-800">
+          <CardContent className="pt-6">
+            <Button
+              onClick={handleSignOut}
+              variant="destructive"
+              className="w-full flex items-center justify-center space-x-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

@@ -1,5 +1,3 @@
-
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse } from './types';
 
@@ -168,23 +166,76 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-  // New method to fetch items from Material Request
+  // Updated method to fetch items from Material Request using ERPNext API method
   async getItemsFromMaterialRequest(materialRequestName: string): Promise<ERPNextResponse<any[]>> {
-    console.log('Fetching items from Material Request:', materialRequestName);
+    console.log('Fetching items from Material Request using ERPNext API method:', materialRequestName);
     
-    const response = await fetch(`${this.baseURL}/api/resource/Material Request Item?filters=[["parent","=","${materialRequestName}"]]&fields=["item_code","item_name","qty","uom","warehouse","stock_uom"]`, {
-      headers: this.getHeaders(),
-    });
+    try {
+      // Use ERPNext's built-in method to get items from Material Request for Stock Entry
+      const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.doctype.stock_entry.stock_entry.get_items_from_material_request`, {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          material_request: materialRequestName
+        })
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error fetching Material Request items:', errorText);
-      throw new Error(`Failed to fetch Material Request items: ${response.status} ${response.statusText} - ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error fetching Material Request items via API method:', errorText);
+        
+        // Fallback to direct document fetch
+        console.log('Trying fallback method - fetching Material Request document directly');
+        return this.getMaterialRequestItems(materialRequestName);
+      }
+
+      const result = await response.json();
+      console.log('Material Request items fetched via API method:', result);
+      
+      if (result.message && Array.isArray(result.message)) {
+        return { data: result.message };
+      }
+      
+      // If the API method doesn't return the expected format, try fallback
+      return this.getMaterialRequestItems(materialRequestName);
+      
+    } catch (error) {
+      console.error('Error with API method, trying fallback:', error);
+      return this.getMaterialRequestItems(materialRequestName);
     }
+  }
 
-    const result = await response.json();
-    console.log('Material Request items fetched:', result);
-    return result;
+  // Fallback method to get Material Request items by fetching the document directly
+  private async getMaterialRequestItems(materialRequestName: string): Promise<ERPNextResponse<any[]>> {
+    console.log('Fetching Material Request document directly:', materialRequestName);
+    
+    try {
+      const response = await fetch(`${this.baseURL}/api/resource/Material Request/${encodeURIComponent(materialRequestName)}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error fetching Material Request document:', errorText);
+        throw new Error(`Failed to fetch Material Request: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Material Request document fetched:', result);
+      
+      if (result.data && result.data.items) {
+        return { data: result.data.items };
+      }
+      
+      return { data: [] };
+      
+    } catch (error) {
+      console.error('Error fetching Material Request document:', error);
+      throw error;
+    }
   }
 
   async getStockEntryTypes(): Promise<string[]> {
@@ -221,7 +272,6 @@ export class ERPNextStockEntryAPI extends ERPNextBaseAPI {
       filters.push(['company', '=', company]);
     }
 
-    // Remove the problematic 'required_by' field from the query
     const params = this.buildQueryParams(filters, [
       'name', 'title', 'material_request_type', 'status', 
       'transaction_date', 'company'
