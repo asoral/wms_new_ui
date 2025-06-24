@@ -166,7 +166,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
-    return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
+    return this.salesAPI.getDeliveryNotes(filters, company);
   }
 
   // Company methods - Fixed signature to match actual implementation
