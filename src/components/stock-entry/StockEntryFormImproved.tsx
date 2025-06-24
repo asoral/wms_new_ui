@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, FileText, Download } from "lucide-react";
+import { Plus, Trash2, Save, FileText, Download, ArrowLeft } from "lucide-react";
 import { StockEntryType, StockEntryItem } from "@/pages/StockEntry";
 import ItemSelector from "../item-enquiry/ItemSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
 import UOMSelector from "../material-request/UOMSelector";
 import DocumentSelector from "./DocumentSelector";
+import MaterialRequestItemProcessor from "./MaterialRequestItemProcessor";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -53,6 +54,11 @@ const StockEntryFormImproved = ({
     selectedDocument: null as any,
     remarks: draftEntry?.remarks || ""
   });
+  
+  // Material Request processing state
+  const [showMRProcessor, setShowMRProcessor] = useState(false);
+  const [mrItems, setMRItems] = useState<any[]>([]);
+  
   const { toast } = useToast();
 
   const isTransferType = type.includes("Transfer") || type === "Material Issue" || type === "Material Receipt";
@@ -185,22 +191,13 @@ const StockEntryFormImproved = ({
         const itemsResult = await erpnextAPI.stockEntryAPI.getItemsFromMaterialRequest(formData.selectedDocument.name);
         
         if (itemsResult.data && itemsResult.data.length > 0) {
-          const fetchedItems: StockEntryItem[] = itemsResult.data.map((item: any) => ({
-            itemCode: item.item_code,
-            itemName: item.item_name || item.item_code,
-            qty: item.qty || 0,
-            uom: item.uom || item.stock_uom || "Nos",
-            fromWarehouse: item.warehouse || formData.fromWarehouse || "",
-            toWarehouse: formData.toWarehouse || "",
-            rate: 0
-          }));
-
-          // Replace current items with fetched items
-          setItems(fetchedItems);
+          console.log('Material Request items fetched:', itemsResult.data);
+          setMRItems(itemsResult.data);
+          setShowMRProcessor(true);
           
           toast({
-            title: "Items Fetched Successfully",
-            description: `${fetchedItems.length} items loaded from Material Request ${formData.selectedDocument.name}`,
+            title: "Items Retrieved",
+            description: `${itemsResult.data.length} items found. You can now process them step by step.`,
           });
         } else {
           toast({
@@ -228,6 +225,46 @@ const StockEntryFormImproved = ({
       setLoading(false);
     }
   };
+
+  const handleMRItemsProcessed = (processedItems: any[]) => {
+    // Convert processed items to stock entry items
+    const stockEntryItems: StockEntryItem[] = processedItems.map(item => ({
+      itemCode: item.item_code,
+      itemName: item.item_name,
+      qty: item.qty,
+      uom: item.uom,
+      fromWarehouse: item.warehouse,
+      toWarehouse: formData.toWarehouse || "",
+      rate: 0,
+      batch: item.batch_no,
+      serial: item.serial_no
+    }));
+
+    setItems(stockEntryItems);
+    setShowMRProcessor(false);
+    
+    toast({
+      title: "Items Added Successfully",
+      description: `${processedItems.length} items added to Stock Entry`,
+    });
+  };
+
+  const handleBackFromProcessor = () => {
+    setShowMRProcessor(false);
+    setMRItems([]);
+  };
+
+  // Show Material Request processor if active
+  if (showMRProcessor && mrItems.length > 0) {
+    return (
+      <MaterialRequestItemProcessor
+        materialRequestName={formData.selectedDocument?.name || ""}
+        materialRequestItems={mrItems}
+        onItemsProcessed={handleMRItemsProcessed}
+        onBack={handleBackFromProcessor}
+      />
+    );
+  }
 
   const createOrUpdateDraft = async () => {
     const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0);
