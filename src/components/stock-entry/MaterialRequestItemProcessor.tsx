@@ -106,6 +106,12 @@ const MaterialRequestItemProcessor = ({
     setCurrentWarehouse(warehouse);
   };
 
+  const handleBatchSelected = (batches: string[]) => {
+    if (batches.length > 0) {
+      setCurrentBatch(batches[0]);
+    }
+  };
+
   const handleConfirmItem = async () => {
     if (!currentWarehouse) {
       toast({
@@ -303,7 +309,7 @@ const MaterialRequestItemProcessor = ({
                       <BatchSelector
                         itemCode={currentItem.item_code}
                         warehouse={currentWarehouse}
-                        onBatchSelected={setCurrentBatch}
+                        onBatchesSelected={handleBatchSelected}
                         isLoading={loading}
                       />
                     </div>

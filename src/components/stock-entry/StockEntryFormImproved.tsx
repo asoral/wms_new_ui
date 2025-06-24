@@ -1,15 +1,12 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, FileText, Download, ArrowLeft } from "lucide-react";
-import { StockEntryType, StockEntryItem } from "@/pages/StockEntry";
-import ItemSelector from "../item-enquiry/ItemSelector";
+import { Save, Download, ArrowLeft } from "lucide-react";
+import { StockEntryType } from "@/pages/StockEntry";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
-import UOMSelector from "../material-request/UOMSelector";
 import DocumentSelector from "./DocumentSelector";
 import MaterialRequestItemProcessor from "./MaterialRequestItemProcessor";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
@@ -30,29 +27,13 @@ const StockEntryFormImproved = ({
   onReviewAndSubmit, 
   onBack 
 }: StockEntryFormImprovedProps) => {
-  const [items, setItems] = useState<StockEntryItem[]>(
-    draftEntry?.items || [
-      {
-        itemCode: "",
-        itemName: "",
-        qty: 0,
-        uom: "Nos",
-        fromWarehouse: "",
-        toWarehouse: "",
-        rate: 0
-      }
-    ]
-  );
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    purpose: draftEntry?.purpose || "",
     fromWarehouse: draftEntry?.from_warehouse || "",
     toWarehouse: draftEntry?.to_warehouse || "",
-    postingDate: draftEntry?.posting_date || new Date().toISOString().split('T')[0],
-    postingTime: draftEntry?.posting_time || new Date().toTimeString().split(' ')[0].substring(0, 5),
     getItemsFrom: "",
     selectedDocument: null as any,
-    remarks: draftEntry?.remarks || ""
+    processedItems: [] as any[]
   });
   
   // Material Request processing state
@@ -96,68 +77,6 @@ const StockEntryFormImproved = ({
     }
     
     return options;
-  };
-
-  const addNewItemRow = () => {
-    setItems([
-      ...items,
-      {
-        itemCode: "",
-        itemName: "",
-        qty: 0,
-        uom: "Nos",
-        fromWarehouse: "",
-        toWarehouse: "",
-        rate: 0
-      }
-    ]);
-  };
-
-  const removeItem = (index: number) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateItem = (index: number, field: keyof StockEntryItem, value: any) => {
-    const updatedItems = [...items];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
-    setItems(updatedItems);
-  };
-
-  const handleItemSelected = async (index: number, itemCode: string) => {
-    console.log('Item selected for stock entry:', itemCode);
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const itemDetails = await erpnextAPI.getItemDetails(itemCode);
-      if (itemDetails.data) {
-        console.log('Item details fetched:', itemDetails.data);
-        const updatedItems = [...items];
-        updatedItems[index] = {
-          ...updatedItems[index],
-          itemCode: itemCode,
-          itemName: itemDetails.data.item_name || itemCode,
-          uom: itemDetails.data.stock_uom || 'Nos'
-        };
-        setItems(updatedItems);
-        
-        toast({
-          title: "Item Details Loaded",
-          description: `Item ${itemDetails.data.item_name} details loaded successfully`,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching item details:', error);
-      updateItem(index, 'itemCode', itemCode);
-      updateItem(index, 'itemName', itemCode);
-      toast({
-        title: "Warning",
-        description: "Item selected but details could not be loaded",
-        variant: "destructive"
-      });
-    }
   };
 
   const handleDocumentSelected = async (document: any) => {
@@ -227,25 +146,12 @@ const StockEntryFormImproved = ({
   };
 
   const handleMRItemsProcessed = (processedItems: any[]) => {
-    // Convert processed items to stock entry items
-    const stockEntryItems: StockEntryItem[] = processedItems.map(item => ({
-      itemCode: item.item_code,
-      itemName: item.item_name,
-      qty: item.qty,
-      uom: item.uom,
-      fromWarehouse: item.warehouse,
-      toWarehouse: formData.toWarehouse || "",
-      rate: 0,
-      batch: item.batch_no,
-      serial: item.serial_no
-    }));
-
-    setItems(stockEntryItems);
+    setFormData(prev => ({...prev, processedItems}));
     setShowMRProcessor(false);
     
     toast({
       title: "Items Added Successfully",
-      description: `${processedItems.length} items added to Stock Entry`,
+      description: `${processedItems.length} items processed for Stock Entry`,
     });
   };
 
@@ -267,12 +173,10 @@ const StockEntryFormImproved = ({
   }
 
   const createOrUpdateDraft = async () => {
-    const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0);
-    
-    if (validItems.length === 0) {
+    if (formData.processedItems.length === 0) {
       toast({
         title: "Error",
-        description: "Please add at least one valid item with quantity greater than 0",
+        description: "Please process items from a document first",
         variant: "destructive"
       });
       return;
@@ -282,9 +186,9 @@ const StockEntryFormImproved = ({
       setLoading(true);
       
       if (!draftEntry) {
-        await createDraft(validItems);
+        await createDraft();
       } else {
-        await updateDraft(validItems);
+        await updateDraft();
       }
       
     } catch (error) {
@@ -299,7 +203,7 @@ const StockEntryFormImproved = ({
     }
   };
 
-  const createDraft = async (itemsToAdd: StockEntryItem[]) => {
+  const createDraft = async () => {
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
@@ -308,24 +212,23 @@ const StockEntryFormImproved = ({
       
       const stockEntryData = {
         stock_entry_type: type,
-        purpose: formData.purpose || type,
-        posting_date: formData.postingDate,
-        posting_time: formData.postingTime,
+        purpose: type,
+        posting_date: new Date().toISOString().split('T')[0],
+        posting_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
         company: company,
         from_warehouse: formData.fromWarehouse || undefined,
         to_warehouse: formData.toWarehouse || undefined,
         docstatus: 0, // Draft status
-        items: itemsToAdd.map(item => ({
-          item_code: item.itemCode,
+        items: formData.processedItems.map(item => ({
+          item_code: item.item_code,
           qty: item.qty,
           uom: item.uom,
-          s_warehouse: item.fromWarehouse || formData.fromWarehouse || undefined,
-          t_warehouse: item.toWarehouse || formData.toWarehouse || undefined,
-          basic_rate: item.rate || 0,
-          batch_no: item.batch || undefined,
-          serial_no: item.serial || undefined
+          s_warehouse: item.warehouse || formData.fromWarehouse || undefined,
+          t_warehouse: formData.toWarehouse || undefined,
+          basic_rate: 0,
+          batch_no: item.batch_no || undefined,
+          serial_no: item.serial_no || undefined
         })),
-        remarks: formData.remarks,
         // Link to selected document if available
         material_request: formData.getItemsFrom === "Material Request" ? formData.selectedDocument?.name : undefined,
         purchase_order: formData.getItemsFrom === "Purchase Order" ? formData.selectedDocument?.name : undefined,
@@ -343,19 +246,16 @@ const StockEntryFormImproved = ({
           name: result.data.name,
           type: type,
           status: "draft",
-          posting_date: formData.postingDate,
-          items: itemsToAdd,
-          purpose: formData.purpose,
+          items: formData.processedItems,
           from_warehouse: formData.fromWarehouse,
-          to_warehouse: formData.toWarehouse,
-          remarks: formData.remarks
+          to_warehouse: formData.toWarehouse
         };
         
         onDraftCreated(draft);
         
         toast({
           title: "Draft Created",
-          description: `Draft stock entry ${result.data.name} created successfully with ${itemsToAdd.length} item(s)!`,
+          description: `Draft stock entry ${result.data.name} created successfully with ${formData.processedItems.length} item(s)!`,
         });
       }
     } catch (error) {
@@ -364,7 +264,7 @@ const StockEntryFormImproved = ({
     }
   };
 
-  const updateDraft = async (updatedItems: StockEntryItem[]) => {
+  const updateDraft = async () => {
     if (!draftEntry) return;
     
     try {
@@ -372,33 +272,29 @@ const StockEntryFormImproved = ({
       if (!erpnextAPI) return;
 
       const updateData = {
-        items: updatedItems.map(item => ({
-          item_code: item.itemCode,
+        items: formData.processedItems.map(item => ({
+          item_code: item.item_code,
           qty: item.qty,
           uom: item.uom,
-          s_warehouse: item.fromWarehouse || formData.fromWarehouse || undefined,
-          t_warehouse: item.toWarehouse || formData.toWarehouse || undefined,
-          basic_rate: item.rate || 0,
-          batch_no: item.batch || undefined,
-          serial_no: item.serial || undefined
-        })),
-        purpose: formData.purpose,
-        remarks: formData.remarks
+          s_warehouse: item.warehouse || formData.fromWarehouse || undefined,
+          t_warehouse: formData.toWarehouse || undefined,
+          basic_rate: 0,
+          batch_no: item.batch_no || undefined,
+          serial_no: item.serial_no || undefined
+        }))
       };
 
       await erpnextAPI.updateStockEntry(draftEntry.name, updateData);
       
       const updatedDraft = {
         ...draftEntry,
-        items: updatedItems,
-        purpose: formData.purpose,
-        remarks: formData.remarks
+        items: formData.processedItems
       };
       onDraftCreated(updatedDraft);
       
       toast({
         title: "Draft Updated",
-        description: `Draft updated successfully with ${updatedItems.length} item(s)!`,
+        description: `Draft updated successfully with ${formData.processedItems.length} item(s)!`,
       });
       
     } catch (error) {
@@ -414,8 +310,9 @@ const StockEntryFormImproved = ({
     }, 500);
   };
 
-  const getValidItemsCount = () => {
-    return items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0).length;
+  const truncateText = (text: string, maxLength: number = 50) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
   };
 
   return (
@@ -441,15 +338,6 @@ const StockEntryFormImproved = ({
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Purpose</Label>
-                <Textarea
-                  value={formData.purpose}
-                  onChange={(e) => setFormData({...formData, purpose: e.target.value})}
-                  placeholder={`Enter purpose for ${type}...`}
-                  rows={2}
-                />
-              </div>
-              <div>
                 <Label>Get Items From</Label>
                 <Select value={formData.getItemsFrom} onValueChange={(value) => setFormData({...formData, getItemsFrom: value, selectedDocument: null})}>
                   <SelectTrigger>
@@ -464,42 +352,41 @@ const StockEntryFormImproved = ({
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-end">
+                <Button 
+                  type="button" 
+                  onClick={fetchItemsFromDocument}
+                  disabled={!formData.selectedDocument || loading}
+                  className="w-full"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {loading ? 'Loading...' : 'Get Items'}
+                </Button>
+              </div>
             </div>
 
             {/* Document Selector */}
             {formData.getItemsFrom && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <Label>Select {formData.getItemsFrom}</Label>
-                  <DocumentSelector
-                    doctype={formData.getItemsFrom}
-                    stockEntryType={type}
-                    onDocumentSelected={handleDocumentSelected}
-                    isLoading={loading}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button 
-                    type="button" 
-                    onClick={fetchItemsFromDocument}
-                    disabled={!formData.selectedDocument || loading}
-                    className="w-full"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    {loading ? 'Loading...' : 'Get Items'}
-                  </Button>
-                </div>
+              <div>
+                <Label>Select {formData.getItemsFrom}</Label>
+                <DocumentSelector
+                  doctype={formData.getItemsFrom}
+                  stockEntryType={type}
+                  onDocumentSelected={handleDocumentSelected}
+                  isLoading={loading}
+                />
               </div>
             )}
 
             {formData.selectedDocument && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700">
-                  <strong>Selected:</strong> {formData.selectedDocument.name} - {formData.selectedDocument.title || formData.selectedDocument.supplier || formData.selectedDocument.customer || formData.selectedDocument.item}
+                  <strong>Selected:</strong> {formData.selectedDocument.name} - {truncateText(formData.selectedDocument.title || formData.selectedDocument.supplier || formData.selectedDocument.customer || formData.selectedDocument.item || "")}
                 </p>
               </div>
             )}
 
+            {/* Warehouse Selection */}
             {(requiresFromWarehouse || requiresToWarehouse) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {requiresFromWarehouse && (
@@ -523,68 +410,11 @@ const StockEntryFormImproved = ({
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Posting Date</Label>
-                <Input
-                  type="date"
-                  value={formData.postingDate}
-                  onChange={(e) => setFormData({...formData, postingDate: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label>Posting Time</Label>
-                <Input
-                  type="time"
-                  value={formData.postingTime}
-                  onChange={(e) => setFormData({...formData, postingTime: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>Remarks</Label>
-              <Textarea
-                value={formData.remarks}
-                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-                placeholder="Enter remarks..."
-                rows={3}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Items */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Items</CardTitle>
-            <Button type="button" onClick={addNewItemRow} size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item Row
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {items.map((item, index) => (
-                <StockEntryItemRow 
-                  key={index}
-                  item={item}
-                  index={index}
-                  type={type}
-                  requiresFromWarehouse={requiresFromWarehouse}
-                  requiresToWarehouse={requiresToWarehouse}
-                  onItemSelected={(itemCode) => handleItemSelected(index, itemCode)}
-                  onUpdateItem={updateItem}
-                  onRemoveItem={removeItem}
-                  canRemove={items.length > 1}
-                />
-              ))}
-            </div>
-            
-            {getValidItemsCount() > 0 && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            {/* Processed Items Summary */}
+            {formData.processedItems.length > 0 && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-sm text-green-700">
-                  ✓ {getValidItemsCount()} item(s) ready for review and submission
+                  ✓ {formData.processedItems.length} item(s) processed and ready for review
                 </p>
               </div>
             )}
@@ -594,175 +424,30 @@ const StockEntryFormImproved = ({
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0 sm:space-x-4 pb-6">
           <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
+            <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
           </Button>
           <div className="flex space-x-2">
-            <Button type="button" variant="outline" onClick={createOrUpdateDraft} disabled={loading} className="w-full sm:w-auto">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={createOrUpdateDraft} 
+              disabled={loading || formData.processedItems.length === 0} 
+              className="w-full sm:w-auto"
+            >
               <Save className="w-4 h-4 mr-2" />
               {loading ? 'Saving...' : draftEntry ? 'Update Draft' : 'Save Draft'}
             </Button>
             <Button 
               type="button" 
               onClick={handleReviewSubmit} 
-              disabled={loading || getValidItemsCount() === 0}
+              disabled={loading || formData.processedItems.length === 0}
               className="w-full sm:w-auto"
             >
               {loading ? 'Processing...' : 'Review & Submit'}
             </Button>
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
-
-interface StockEntryItemRowProps {
-  item: StockEntryItem;
-  index: number;
-  type: StockEntryType;
-  requiresFromWarehouse: boolean;
-  requiresToWarehouse: boolean;
-  onItemSelected: (itemCode: string) => void;
-  onUpdateItem: (index: number, field: keyof StockEntryItem, value: any) => void;
-  onRemoveItem: (index: number) => void;
-  canRemove: boolean;
-}
-
-const StockEntryItemRow = ({ 
-  item, 
-  index, 
-  type,
-  requiresFromWarehouse,
-  requiresToWarehouse,
-  onItemSelected, 
-  onUpdateItem, 
-  onRemoveItem, 
-  canRemove
-}: StockEntryItemRowProps) => {
-  const isValidItem = item.itemCode && item.itemCode.trim() !== "" && item.qty > 0;
-
-  return (
-    <div className={`border rounded-lg p-4 space-y-4 ${isValidItem ? 'border-green-200 bg-green-50' : 'border-gray-200'}`}>
-      <div className="flex justify-between items-start">
-        <h4 className="font-medium">Item {index + 1}</h4>
-        <div className="flex space-x-2">
-          {isValidItem && (
-            <span className="text-sm text-green-600 font-medium bg-green-100 px-2 py-1 rounded">
-              ✓ Ready
-            </span>
-          )}
-          {canRemove && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => onRemoveItem(index)}
-              className="text-red-600 hover:text-red-700"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {/* Item Selection */}
-        <div>
-          <Label>Item Code *</Label>
-          <ItemSelector
-            onItemSelected={onItemSelected}
-            isLoading={false}
-          />
-          {item.itemName && item.itemName !== item.itemCode && (
-            <p className="text-sm text-gray-600 mt-1">{item.itemName}</p>
-          )}
-        </div>
-
-        {/* Quantity and UOM */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>Quantity *</Label>
-            <Input
-              type="number"
-              value={item.qty}
-              onChange={(e) => onUpdateItem(index, 'qty', parseFloat(e.target.value) || 0)}
-              placeholder="0"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <Label>UOM</Label>
-            <UOMSelector
-              value={item.uom}
-              onValueChange={(uom) => onUpdateItem(index, 'uom', uom)}
-              disabled={false}
-            />
-          </div>
-        </div>
-
-        {/* Warehouses */}
-        {(requiresFromWarehouse || requiresToWarehouse) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {requiresFromWarehouse && (
-              <div>
-                <Label>From Warehouse</Label>
-                <WarehouseSelector
-                  onWarehouseSelected={(warehouse) => onUpdateItem(index, 'fromWarehouse', warehouse)}
-                  isLoading={false}
-                />
-              </div>
-            )}
-            {requiresToWarehouse && (
-              <div>
-                <Label>To Warehouse</Label>
-                <WarehouseSelector
-                  onWarehouseSelected={(warehouse) => onUpdateItem(index, 'toWarehouse', warehouse)}
-                  isLoading={false}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Rate and Batch/Serial */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <Label>Rate</Label>
-            <Input
-              type="number"
-              value={item.rate || 0}
-              onChange={(e) => onUpdateItem(index, 'rate', parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <Label>Batch No</Label>
-            <Input
-              value={item.batch || ''}
-              onChange={(e) => onUpdateItem(index, 'batch', e.target.value)}
-              placeholder="Enter batch number"
-            />
-          </div>
-          <div>
-            <Label>Serial No</Label>
-            <Input
-              value={item.serial || ''}
-              onChange={(e) => onUpdateItem(index, 'serial', e.target.value)}
-              placeholder="Enter serial number"
-            />
-          </div>
-        </div>
-
-        {item.rate && item.qty && (
-          <div className="text-right">
-            <span className="text-lg font-semibold text-green-600">
-              Total: ₹{(item.qty * item.rate).toLocaleString()}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );
