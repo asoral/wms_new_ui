@@ -42,6 +42,7 @@ interface MaterialRequestItemProcessorProps {
   onBack: () => void;
 }
 
+// Use the BatchInfo interface from the BatchSelector component's expected format
 interface BatchInfo {
   batch_id: string;
   batch_qty: number;
