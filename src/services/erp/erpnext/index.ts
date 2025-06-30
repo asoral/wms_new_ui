@@ -234,11 +234,60 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockEntryAPI.searchBOMs(company);
   }
 
-  // Legacy methods for backward compatibility - placeholder implementations
+  // Pick List methods - Add proper ERPNext API integration
   async getPickLists(filters?: any, company?: string, limitPageLength?: number) {
-    return { data: [] };
+    const finalFilters = [];
+    if (filters) {
+      finalFilters.push(...this.convertToFrappeFilters(filters));
+    }
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+    
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pick lists: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
+  async createPickList(data: any) {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create pick list: ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPickList(name: string) {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List/${encodeURIComponent(name)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pick list: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Legacy methods for backward compatibility - placeholder implementations
   async getPackingSlips(filters?: any, company?: string, limitPageLength?: number) {
     return { data: [] };
   }

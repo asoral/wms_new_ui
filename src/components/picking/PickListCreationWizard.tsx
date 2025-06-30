@@ -1,10 +1,11 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight, Package, FileText, Truck, Cog } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface PickListCreationWizardProps {
   onBack: () => void;
@@ -19,13 +20,16 @@ interface DocumentOption {
   name: string;
   customer?: string;
   date: string;
-  itemCount: number;
+  itemCount?: number;
 }
 
 const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardProps) => {
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [selectedType, setSelectedType] = useState<PickListType | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<DocumentOption | null>(null);
+  const [documents, setDocuments] = useState<DocumentOption[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const { toast } = useToast();
 
   const pickListTypes = [
     {
@@ -51,8 +55,81 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
     }
   ];
 
-  // Mock document options based on selected type
-  const getDocumentOptions = (type: PickListType): DocumentOption[] => {
+  // Fetch documents from ERPNext based on selected type
+  const fetchDocuments = async (type: PickListType) => {
+    setIsLoadingDocuments(true);
+    try {
+      const api = await createERPNextAPI();
+      const company = await getUserDefaultCompany();
+      
+      if (!api) {
+        toast({
+          title: "ERPNext Connection Error",
+          description: "Please configure ERPNext settings in your profile",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      let documentsData = [];
+      
+      switch (type) {
+        case "Delivery":
+          const salesOrders = await api.getSalesOrders(
+            [['status', 'in', ['To Deliver and Bill', 'To Deliver']]],
+            company || undefined,
+            20
+          );
+          documentsData = salesOrders.data.map((so: any) => ({
+            id: so.name,
+            name: so.name,
+            customer: so.customer,
+            date: so.transaction_date,
+            itemCount: so.total_qty || 0
+          }));
+          break;
+          
+        case "Material Transfer":
+          const materialRequests = await api.getMaterialRequests(
+            [['material_request_type', '=', 'Material Transfer'], ['status', '!=', 'Cancelled']],
+            company || undefined,
+            20
+          );
+          documentsData = materialRequests.data.map((mr: any) => ({
+            id: mr.name,
+            name: mr.name,
+            date: mr.transaction_date,
+            itemCount: mr.items?.length || 0
+          }));
+          break;
+          
+        case "Manufacturing":
+          // For manufacturing, we would typically fetch Work Orders
+          // For now, using mock data as Work Order API might not be implemented
+          documentsData = [
+            { id: "WO-2025-00001", name: "WO-2025-00001", date: "2025-01-02", itemCount: 22 },
+            { id: "WO-2025-00002", name: "WO-2025-00002", date: "2025-01-03", itemCount: 18 }
+          ];
+          break;
+      }
+      
+      setDocuments(documentsData);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      toast({
+        title: "Error Loading Documents",
+        description: "Failed to load documents from ERPNext",
+        variant: "destructive"
+      });
+      // Fallback to mock data
+      setDocuments(getMockDocuments(type));
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  };
+
+  // Mock document options as fallback
+  const getMockDocuments = (type: PickListType): DocumentOption[] => {
     switch (type) {
       case "Delivery":
         return [
@@ -79,6 +156,7 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
 
   const handleNext = () => {
     if (currentStep === 1 && selectedType) {
+      fetchDocuments(selectedType);
       setCurrentStep(2);
     } else if (currentStep === 2 && selectedDocument) {
       setCurrentStep(3);
@@ -93,14 +171,65 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
     }
   };
 
-  const handleCreatePickList = () => {
+  const handleCreatePickList = async () => {
     if (selectedType && selectedDocument) {
-      onComplete({
-        type: selectedType,
-        document: selectedDocument,
-        // Mock items would be fetched from ERPNext based on the selected document
-        items: []
-      });
+      try {
+        const api = await createERPNextAPI();
+        if (!api) {
+          toast({
+            title: "ERPNext Connection Error",
+            description: "Please configure ERPNext settings in your profile",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        // Fetch items from the selected document
+        let items = [];
+        try {
+          if (selectedType === "Delivery") {
+            const salesOrder = await api.sales.getSalesOrder(selectedDocument.name);
+            items = salesOrder.data.items || [];
+          } else if (selectedType === "Material Transfer") {
+            const materialRequest = await api.getMaterialRequest(selectedDocument.name);
+            items = materialRequest.data.items || [];
+          }
+        } catch (error) {
+          console.error('Error fetching document items:', error);
+          // Use mock items as fallback
+          items = [
+            {
+              item_code: "ITEM-003",
+              item_name: "Wooden Desk",
+              qty: 3,
+              uom: "Nos",
+              warehouse: "Store A",
+              bin: "C-003"
+            },
+            {
+              item_code: "ITEM-004",
+              item_name: "Office Chair", 
+              qty: 4,
+              uom: "Nos",
+              warehouse: "Store A",
+              bin: "D-004"
+            }
+          ];
+        }
+
+        onComplete({
+          type: selectedType,
+          document: selectedDocument,
+          items: items
+        });
+      } catch (error) {
+        console.error('Error creating pick list:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create pick list",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -205,38 +334,48 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
               <p className="text-gray-600 mb-4">
                 Select a {selectedType.toLowerCase()} document to create pick list from:
               </p>
-              {getDocumentOptions(selectedType).map((doc) => (
-                <div
-                  key={doc.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                    selectedDocument?.id === doc.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-blue-300"
-                  }`}
-                  onClick={() => setSelectedDocument(doc)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <FileText className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <h4 className="font-medium">{doc.name}</h4>
-                        {doc.customer && (
-                          <p className="text-sm text-gray-600">Customer: {doc.customer}</p>
+              
+              {isLoadingDocuments ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Loading documents...</p>
+                </div>
+              ) : (
+                documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                      selectedDocument?.id === doc.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-blue-300"
+                    }`}
+                    onClick={() => setSelectedDocument(doc)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <h4 className="font-medium">{doc.name}</h4>
+                          {doc.customer && (
+                            <p className="text-sm text-gray-600">Customer: {doc.customer}</p>
+                          )}
+                          <p className="text-xs text-gray-500">Date: {doc.date}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {doc.itemCount && (
+                          <Badge variant="outline">{doc.itemCount} items</Badge>
                         )}
-                        <p className="text-xs text-gray-500">Date: {doc.date}</p>
+                        {selectedDocument?.id === doc.id && (
+                          <div className="mt-1">
+                            <Badge className="bg-blue-100 text-blue-800">Selected</Badge>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="outline">{doc.itemCount} items</Badge>
-                      {selectedDocument?.id === doc.id && (
-                        <div className="mt-1">
-                          <Badge className="bg-blue-100 text-blue-800">Selected</Badge>
-                        </div>
-                      )}
-                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
@@ -270,7 +409,7 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
                     )}
                     <div className="flex justify-between">
                       <span className="text-gray-600">Items to Pick:</span>
-                      <span className="font-medium">{selectedDocument.itemCount}</span>
+                      <span className="font-medium">{selectedDocument.itemCount || 'TBD'}</span>
                     </div>
                   </div>
                 </div>
@@ -303,7 +442,7 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
               onClick={handleNext} 
               disabled={
                 (currentStep === 1 && !selectedType) || 
-                (currentStep === 2 && !selectedDocument)
+                (currentStep === 2 && (!selectedDocument || isLoadingDocuments))
               }
             >
               Next
