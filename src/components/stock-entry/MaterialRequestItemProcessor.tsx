@@ -10,7 +10,6 @@ import { Package, ScanLine, CheckCircle, SkipForward, ArrowRight } from "lucide-
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "../item-enquiry/ItemSelector";
 import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
-import BatchSelector from "../deliver/BatchSelector";
 import { createERPNextAPI } from "@/services/erpnextApi";
 
 interface MaterialRequestItem {
@@ -42,8 +41,8 @@ interface MaterialRequestItemProcessorProps {
   onBack: () => void;
 }
 
-// Use the BatchInfo interface from the BatchSelector component's expected format
-interface BatchInfo {
+// Local BatchInfo interface to avoid conflicts
+interface LocalBatchInfo {
   batch_id: string;
   batch_qty: number;
   expiry_date?: string;
@@ -113,10 +112,9 @@ const MaterialRequestItemProcessor = ({
     setCurrentWarehouse(warehouse);
   };
 
-  const handleBatchSelected = (batches: BatchInfo[]) => {
-    if (batches.length > 0) {
-      setCurrentBatch(batches[0].batch_id);
-    }
+  // Simple batch selection handler - just takes the first batch ID
+  const handleBatchSelected = (batchId: string) => {
+    setCurrentBatch(batchId);
   };
 
   const handleConfirmItem = async () => {
@@ -312,12 +310,11 @@ const MaterialRequestItemProcessor = ({
                 <div className="space-y-4">
                   {itemDetails.has_batch_no && (
                     <div>
-                      <Label>Select Batch</Label>
-                      <BatchSelector
-                        itemCode={currentItem.item_code}
-                        warehouse={currentWarehouse}
-                        onBatchesSelected={handleBatchSelected}
-                        isLoading={loading}
+                      <Label>Batch Number</Label>
+                      <Input
+                        value={currentBatch}
+                        onChange={(e) => setCurrentBatch(e.target.value)}
+                        placeholder="Enter batch number"
                       />
                     </div>
                   )}

@@ -148,8 +148,8 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Purchase methods
-  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
-    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength, limitStart);
+  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
+    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength);
   }
 
   async getPurchaseOrder(name: string) {
@@ -161,12 +161,12 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Sales methods
-  async getSalesOrders(filters?: any, company?: string, limitPageLength?: number, limitStart?: number) {
-    return this.salesAPI.getSalesOrders(filters, company, limitPageLength, limitStart);
+  async getSalesOrders(filters?: any, company?: string, limitPageLength?: number) {
+    return this.salesAPI.getSalesOrders(filters, company, limitPageLength);
   }
 
-  async getDeliveryNotes(filters?: any, company?: string) {
-    return this.salesAPI.getDeliveryNotes(filters, company);
+  async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
+    return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
   }
 
   // Company methods
