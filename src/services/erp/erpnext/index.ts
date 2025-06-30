@@ -356,6 +356,44 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
+  // Get Pick List statistics for dashboard
+  async getPickListStats(company?: string) {
+    try {
+      // Get pending pick lists
+      const pendingFilters = [['docstatus', '=', '0']]; // Draft status
+      if (company) {
+        pendingFilters.push(['company', '=', company]);
+      }
+      
+      const pendingPickLists = await this.getPickLists(pendingFilters, company, 100);
+      
+      // Get completed pick lists for today
+      const today = new Date().toISOString().split('T')[0];
+      const completedFilters = [
+        ['docstatus', '=', '1'], // Submitted status
+        ['creation', '>=', today]
+      ];
+      if (company) {
+        completedFilters.push(['company', '=', company]);
+      }
+      
+      const completedToday = await this.getPickLists(completedFilters, company, 100);
+      
+      return {
+        pendingCount: pendingPickLists.data?.length || 0,
+        completedToday: completedToday.data?.length || 0,
+        pendingPickLists: pendingPickLists.data || []
+      };
+    } catch (error) {
+      console.error('Error fetching pick list stats:', error);
+      return {
+        pendingCount: 0,
+        completedToday: 0,
+        pendingPickLists: []
+      };
+    }
+  }
+
   // Legacy methods for backward compatibility - placeholder implementations
   async getPackingSlips(filters?: any, company?: string, limitPageLength?: number) {
     return { data: [] };

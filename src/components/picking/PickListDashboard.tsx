@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Package, Plus, Clock, TrendingUp, Users, BarChart3, CheckCircle } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface PickListDashboardProps {
   onCreateNew: () => void;
@@ -38,54 +40,111 @@ const PickListDashboard = ({ onCreateNew, onSelectPendingPickList }: PickListDas
   });
 
   const [pendingPickLists, setPendingPickLists] = useState<PendingPickList[]>([]);
+  const [pickListTypeData, setPickListTypeData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Mock data for demonstration
-  useEffect(() => {
-    setStats({
-      pendingPickLists: 12,
-      pickingEfficiency: 94.5,
-      avgPickTime: "3.2 min",
-      completedToday: 28
-    });
-
-    setPendingPickLists([
-      {
-        id: "1",
-        number: "PICK-2025-00001",
-        type: "Delivery",
-        relatedDocument: "SO-2025-00012",
-        itemCount: 8,
-        createdAt: "2025-01-02 09:15",
-        priority: "High"
-      },
-      {
-        id: "2", 
-        number: "PICK-2025-00002",
-        type: "Material Transfer",
-        relatedDocument: "MAT-MR-2025-00005",
-        itemCount: 12,
-        createdAt: "2025-01-02 10:30",
-        priority: "Medium"
-      },
-      {
-        id: "3",
-        number: "PICK-2025-00003",
-        type: "Manufacturing",
-        relatedDocument: "WO-2025-00001",
-        itemCount: 6,
-        createdAt: "2025-01-02 11:45",
-        priority: "Low"
+  // Fetch dashboard data from ERPNext
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      const api = await createERPNextAPI();
+      const company = await getUserDefaultCompany();
+      
+      if (!api) {
+        toast({
+          title: "ERPNext Connection Error",
+          description: "Please configure ERPNext settings in your profile",
+          variant: "destructive"
+        });
+        return;
       }
-    ]);
+
+      // Fetch pick list statistics
+      const statsData = await api.getPickListStats(company || undefined);
+      
+      // Process pending pick lists
+      const processedPendingLists = statsData.pendingPickLists.map((pl: any, index: number) => ({
+        id: pl.name,
+        number: pl.name,
+        type: pl.purpose || "Unknown",
+        relatedDocument: pl.material_request || pl.work_order || "N/A",
+        itemCount: pl.locations?.length || 0,
+        createdAt: new Date(pl.creation).toLocaleString(),
+        priority: index % 3 === 0 ? "High" : index % 2 === 0 ? "Medium" : "Low"
+      }));
+
+      // Calculate efficiency (mock calculation based on completed vs total)
+      const totalPickLists = statsData.pendingCount + statsData.completedToday;
+      const efficiency = totalPickLists > 0 ? (statsData.completedToday / totalPickLists) * 100 : 0;
+
+      setStats({
+        pendingPickLists: statsData.pendingCount,
+        pickingEfficiency: Math.round(efficiency),
+        avgPickTime: "3.2 min", // Mock value - would need custom API for this
+        completedToday: statsData.completedToday
+      });
+
+      setPendingPickLists(processedPendingLists);
+
+      // Process pick list type data for charts
+      const typeMap: { [key: string]: number } = {};
+      statsData.pendingPickLists.forEach((pl: any) => {
+        const purpose = pl.purpose || "Unknown";
+        typeMap[purpose] = (typeMap[purpose] || 0) + 1;
+      });
+
+      const chartData = Object.entries(typeMap).map(([name, value], index) => ({
+        name,
+        value,
+        color: index === 0 ? "#3B82F6" : index === 1 ? "#10B981" : "#F59E0B"
+      }));
+
+      setPickListTypeData(chartData);
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast({
+        title: "Error Loading Dashboard",
+        description: "Failed to load pick list data from ERPNext. Using fallback data.",
+        variant: "destructive"
+      });
+
+      // Fallback to demo data
+      setStats({
+        pendingPickLists: 12,
+        pickingEfficiency: 94,
+        avgPickTime: "3.2 min",
+        completedToday: 28
+      });
+
+      setPendingPickLists([
+        {
+          id: "1",
+          number: "PICK-2025-00001",
+          type: "Delivery",
+          relatedDocument: "SO-2025-00012",
+          itemCount: 8,
+          createdAt: "2025-01-02 09:15",
+          priority: "High"
+        }
+      ]);
+
+      setPickListTypeData([
+        { name: "Delivery", value: 45, color: "#3B82F6" },
+        { name: "Transfer", value: 30, color: "#10B981" },
+        { name: "Manufacturing", value: 25, color: "#F59E0B" }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
   }, []);
 
-  // Mock data for charts
-  const pickListTypeData = [
-    { name: "Delivery", value: 45, color: "#3B82F6" },
-    { name: "Transfer", value: 30, color: "#10B981" },
-    { name: "Manufacturing", value: 25, color: "#F59E0B" }
-  ];
-
+  // Mock data for user picks chart (would need custom implementation in ERPNext)
   const pickListUserData = [
     { name: "John", picks: 45 },
     { name: "Sarah", picks: 38 },
@@ -101,6 +160,17 @@ const PickListDashboard = ({ onCreateNew, onSelectPendingPickList }: PickListDas
       default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="ml-3 text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -179,32 +249,40 @@ const PickListDashboard = ({ onCreateNew, onSelectPendingPickList }: PickListDas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pickListTypeData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {pickListTypeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+            {pickListTypeData.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={pickListTypeData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {pickListTypeData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex justify-center space-x-4 mt-4">
+                  {pickListTypeData.map((item, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                      <span className="text-sm text-gray-600">{item.name}</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex justify-center space-x-4 mt-4">
-              {pickListTypeData.map((item, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                  <span className="text-sm text-gray-600">{item.name}</span>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                No data available
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -233,7 +311,12 @@ const PickListDashboard = ({ onCreateNew, onSelectPendingPickList }: PickListDas
       {/* Pending Pick Lists */}
       <Card>
         <CardHeader>
-          <CardTitle>Pending Pick Lists</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Pending Pick Lists</CardTitle>
+            <Button variant="outline" size="sm" onClick={fetchDashboardData}>
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
