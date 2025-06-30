@@ -8,24 +8,27 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Package, ScanLine, CheckCircle, SkipForward, ArrowLeft, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import ItemSelector from "../item-enquiry/ItemSelector";
-import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 
 interface PickListItem {
   item_code: string;
   item_name: string;
   qty: number;
+  picked_qty?: number;
   uom: string;
   warehouse?: string;
   bin?: string;
-  batch?: string;
-  serial?: string;
+  batch_no?: string;
+  serial_no?: string;
+  stock_qty?: number;
+  conversion_factor?: number;
 }
 
 interface ProcessedPickItem {
   item_code: string;
   item_name: string;
   qty: number;
+  picked_qty: number;
   uom: string;
   warehouse: string;
   bin?: string;
@@ -44,33 +47,72 @@ interface PickListItemProcessorProps {
 
 const PickListItemProcessor = ({
   pickListNumber,
-  pickListItems,
+  pickListItems: initialItems,
   onItemsProcessed,
   onBack
 }: PickListItemProcessorProps) => {
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [processedItems, setProcessedItems] = useState<ProcessedPickItem[]>([]);
+  const [pickListItems, setPickListItems] = useState<PickListItem[]>(initialItems);
   const [currentWarehouse, setCurrentWarehouse] = useState("");
   const [currentBin, setCurrentBin] = useState("");
-  const [currentQty, setCurrentQty] = useState(0);
+  const [currentPickedQty, setCurrentPickedQty] = useState(0);
   const [currentBatch, setCurrentBatch] = useState("");
   const [currentSerial, setCurrentSerial] = useState("");
   const [scannedItemCode, setScannedItemCode] = useState("");
-  const [itemDetails, setItemDetails] = useState<any>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const currentItem = pickListItems[currentItemIndex];
   const totalItems = pickListItems.length;
   const progress = ((currentItemIndex) / totalItems) * 100;
 
+  // Fetch pick list items from ERPNext when component mounts
+  useEffect(() => {
+    fetchPickListItems();
+  }, [pickListNumber]);
+
+  const fetchPickListItems = async () => {
+    if (!pickListNumber) return;
+    
+    setIsLoading(true);
+    try {
+      const api = await createERPNextAPI();
+      if (!api) {
+        toast({
+          title: "ERPNext Connection Error",
+          description: "Please configure ERPNext settings",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const pickListItems = await api.getPickListItems(pickListNumber);
+      
+      if (pickListItems && pickListItems.length > 0) {
+        setPickListItems(pickListItems);
+        console.log('Fetched pick list items:', pickListItems);
+      }
+    } catch (error) {
+      console.error('Error fetching pick list items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch pick list items from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (currentItem) {
-      setCurrentQty(currentItem.qty);
+      setCurrentPickedQty(currentItem.picked_qty || currentItem.qty);
       setCurrentWarehouse(currentItem.warehouse || "");
       setCurrentBin(currentItem.bin || "");
-      setCurrentBatch(currentItem.batch || "");
-      setCurrentSerial(currentItem.serial || "");
+      setCurrentBatch(currentItem.batch_no || "");
+      setCurrentSerial(currentItem.serial_no || "");
     }
   }, [currentItemIndex, currentItem]);
 
@@ -91,10 +133,6 @@ const PickListItemProcessor = ({
     }
   };
 
-  const handleWarehouseSelected = (warehouse: string) => {
-    setCurrentWarehouse(warehouse);
-  };
-
   const handleConfirmItem = () => {
     if (!currentWarehouse) {
       toast({
@@ -105,10 +143,10 @@ const PickListItemProcessor = ({
       return;
     }
 
-    if (currentQty <= 0) {
+    if (currentPickedQty < 0) {
       toast({
         title: "Invalid Quantity",
-        description: "Please enter a valid quantity",
+        description: "Picked quantity cannot be negative",
         variant: "destructive"
       });
       return;
@@ -117,7 +155,8 @@ const PickListItemProcessor = ({
     const processedItem: ProcessedPickItem = {
       item_code: currentItem.item_code,
       item_name: currentItem.item_name,
-      qty: currentQty,
+      qty: currentItem.qty,
+      picked_qty: currentPickedQty,
       uom: currentItem.uom,
       warehouse: currentWarehouse,
       bin: currentBin || undefined,
@@ -135,9 +174,13 @@ const PickListItemProcessor = ({
     const skippedItem: ProcessedPickItem = {
       item_code: currentItem.item_code,
       item_name: currentItem.item_name,
-      qty: 0,
+      qty: currentItem.qty,
+      picked_qty: 0, // Set picked qty to 0 for skipped items
       uom: currentItem.uom,
-      warehouse: "",
+      warehouse: currentItem.warehouse || "",
+      bin: currentItem.bin,
+      batch_no: currentItem.batch_no,
+      serial_no: currentItem.serial_no,
       scanned: false,
       skipped: true
     };
@@ -149,22 +192,21 @@ const PickListItemProcessor = ({
   const moveToNextItem = () => {
     if (currentItemIndex < totalItems - 1) {
       setCurrentItemIndex(prev => prev + 1);
-      // Reset form for next item
       resetForm();
     } else {
       // All items processed
-      const confirmedItems = processedItems.filter(item => !item.skipped);
-      onItemsProcessed([...confirmedItems, processedItems[processedItems.length - 1]]);
+      const allProcessedItems = [...processedItems];
+      if (processedItems.length < totalItems) {
+        // Add the last processed item
+        allProcessedItems.push(processedItems[processedItems.length - 1]);
+      }
+      onItemsProcessed(allProcessedItems);
     }
   };
 
   const resetForm = () => {
     setScannedItemCode("");
-    setCurrentWarehouse("");
-    setCurrentBin("");
-    setCurrentBatch("");
-    setCurrentSerial("");
-    setItemDetails(null);
+    setIsScanning(false);
   };
 
   const handlePreviousItem = () => {
@@ -175,6 +217,17 @@ const PickListItemProcessor = ({
       resetForm();
     }
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading pick list items...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!currentItem) {
     return (
@@ -235,12 +288,22 @@ const PickListItemProcessor = ({
               </div>
               {currentItem.warehouse && (
                 <div>
-                  <span className="font-medium">Suggested Warehouse:</span> {currentItem.warehouse}
+                  <span className="font-medium">Warehouse:</span> {currentItem.warehouse}
                 </div>
               )}
               {currentItem.bin && (
                 <div>
                   <span className="font-medium">Bin Location:</span> {currentItem.bin}
+                </div>
+              )}
+              {currentItem.batch_no && (
+                <div>
+                  <span className="font-medium">Batch:</span> {currentItem.batch_no}
+                </div>
+              )}
+              {currentItem.serial_no && (
+                <div>
+                  <span className="font-medium">Serial:</span> {currentItem.serial_no}
                 </div>
               )}
             </div>
@@ -267,24 +330,32 @@ const PickListItemProcessor = ({
                 </Button>
               </div>
               {isScanning && (
-                <div className="mt-4">
-                  <ItemSelector
-                    onItemSelected={handleScanItem}
-                    isLoading={false}
+                <div className="mt-4 p-4 border rounded-lg">
+                  <Input
+                    placeholder="Scan or enter item code"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleScanItem(e.target.value);
+                      }
+                    }}
+                    autoFocus
                   />
                 </div>
               )}
             </div>
           )}
 
-          {/* Warehouse and Location Selection */}
+          {/* Picking Details */}
           {scannedItemCode && (
             <div className="space-y-4">
               <div>
-                <Label>Confirm Warehouse *</Label>
-                <WarehouseSelector
-                  onWarehouseSelected={handleWarehouseSelected}
-                  isLoading={false}
+                <Label>Warehouse *</Label>
+                <Input
+                  value={currentWarehouse}
+                  onChange={(e) => setCurrentWarehouse(e.target.value)}
+                  placeholder="Warehouse"
+                  readOnly={!!currentItem.warehouse}
                 />
               </div>
 
@@ -302,11 +373,14 @@ const PickListItemProcessor = ({
                 <Label>Quantity to Pick *</Label>
                 <Input
                   type="number"
-                  value={currentQty}
-                  onChange={(e) => setCurrentQty(Number(e.target.value))}
+                  value={currentPickedQty}
+                  onChange={(e) => setCurrentPickedQty(Number(e.target.value))}
                   min="0"
                   step="0.01"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Set to 0 to skip this item
+                </p>
               </div>
 
               {/* Batch/Serial Numbers */}
@@ -333,7 +407,7 @@ const PickListItemProcessor = ({
               <div className="flex space-x-2 pt-4">
                 <Button
                   onClick={handleConfirmItem}
-                  disabled={!currentWarehouse || currentQty <= 0}
+                  disabled={!currentWarehouse}
                   className="flex-1"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
@@ -370,7 +444,7 @@ const PickListItemProcessor = ({
         
         {processedItems.length > 0 && (
           <div className="text-sm text-gray-600">
-            {processedItems.filter(item => !item.skipped).length} items picked
+            {processedItems.filter(item => !item.skipped).length} items picked, {processedItems.filter(item => item.skipped).length} items skipped
           </div>
         )}
       </div>

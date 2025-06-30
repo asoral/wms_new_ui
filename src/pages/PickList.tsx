@@ -6,6 +6,8 @@ import PickListDashboard from "../components/picking/PickListDashboard";
 import PickListCreationWizard from "../components/picking/PickListCreationWizard";
 import PickListItemProcessor from "../components/picking/PickListItemProcessor";
 import PickListReviewSubmit from "../components/picking/PickListReviewSubmit";
+import { createERPNextAPI } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 export type PickListStatus = "draft" | "in-progress" | "completed";
 export type PickListPurpose = "Material Transfer" | "Delivery" | "Transfer for Manufacturing";
@@ -39,62 +41,56 @@ const PickListPage = () => {
   const [currentView, setCurrentView] = useState<CurrentView>("dashboard");
   const [currentPickList, setCurrentPickList] = useState<any>(null);
   const [processedItems, setProcessedItems] = useState<any[]>([]);
+  const { toast } = useToast();
 
   const handleCreateNew = () => {
     setCurrentView("create");
   };
 
-  const handleSelectPendingPickList = (pickListId: string) => {
-    // In a real implementation, fetch the pick list details from API
-    const mockPickList = {
-      number: `PICK-2025-${pickListId.padStart(5, '0')}`,
-      items: [
-        {
-          item_code: "ITEM-001",
-          item_name: "Metal Chair",
-          qty: 5,
-          uom: "Nos",
-          warehouse: "Main Store",
-          bin: "A-001"
-        },
-        {
-          item_code: "ITEM-002", 
-          item_name: "Office Table",
-          qty: 2,
-          uom: "Nos",
-          warehouse: "Main Store",
-          bin: "B-002"
-        }
-      ]
-    };
-    setCurrentPickList(mockPickList);
-    setCurrentView("pick");
+  const handleSelectPendingPickList = async (pickListId: string) => {
+    try {
+      const api = await createERPNextAPI();
+      if (!api) {
+        toast({
+          title: "ERPNext Connection Error",
+          description: "Please configure ERPNext settings",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Fetch the actual pick list from ERPNext
+      const pickListData = await api.getPickList(pickListId);
+      
+      if (pickListData && pickListData.data) {
+        const pickList = pickListData.data;
+        setCurrentPickList({
+          number: pickList.name,
+          name: pickList.name,
+          items: pickList.locations || []
+        });
+        setCurrentView("pick");
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load pick list details",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching pick list:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load pick list from ERPNext",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCreatePickList = (pickListData: any) => {
-    // In a real implementation, create the pick list via API and fetch items
-    const mockPickList = {
-      number: `PICK-2025-${Date.now().toString().slice(-5)}`,
-      items: [
-        {
-          item_code: "ITEM-003",
-          item_name: "Wooden Desk",
-          qty: 3,
-          uom: "Nos",
-          warehouse: "Store A",
-          bin: "C-003"
-        },
-        {
-          item_code: "ITEM-004",
-          item_name: "Office Chair",
-          qty: 4,
-          uom: "Nos", 
-          warehouse: "Store A",
-          bin: "D-004"
-        }
-      ]
-    };
-    setCurrentPickList(mockPickList);
+    // The creation wizard will handle the ERPNext API call
+    // and return the created pick list with items
+    setCurrentPickList(pickListData);
     setCurrentView("pick");
   };
 
@@ -117,9 +113,41 @@ const PickListPage = () => {
     setCurrentView("pick");
   };
 
-  const handleSubmitPickList = () => {
-    // In a real implementation, submit the pick list via API
-    handleBackToDashboard();
+  const handleSubmitPickList = async () => {
+    try {
+      const api = await createERPNextAPI();
+      if (!api && currentPickList) {
+        // Update the pick list with processed items
+        const updateData = {
+          locations: processedItems.map(item => ({
+            item_code: item.item_code,
+            item_name: item.item_name,
+            qty: item.qty,
+            picked_qty: item.picked_qty,
+            warehouse: item.warehouse,
+            bin: item.bin,
+            batch_no: item.batch_no,
+            serial_no: item.serial_no
+          }))
+        };
+
+        await api.updatePickList(currentPickList.number, updateData);
+        
+        toast({
+          title: "Pick List Updated",
+          description: `${currentPickList.number} has been updated successfully`,
+        });
+      }
+      
+      handleBackToDashboard();
+    } catch (error) {
+      console.error('Error updating pick list:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update pick list in ERPNext",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -133,7 +161,7 @@ const PickListPage = () => {
               <h1 className="text-2xl font-bold text-gray-900">Pick List</h1>
               {currentPickList && (
                 <p className="text-sm text-gray-600">
-                  {currentPickList.number}
+                  {currentPickList.number || currentPickList.name}
                 </p>
               )}
             </div>
@@ -168,8 +196,8 @@ const PickListPage = () => {
 
         {currentView === "pick" && currentPickList && (
           <PickListItemProcessor
-            pickListNumber={currentPickList.number}
-            pickListItems={currentPickList.items}
+            pickListNumber={currentPickList.number || currentPickList.name}
+            pickListItems={currentPickList.items || []}
             onItemsProcessed={handleItemsProcessed}
             onBack={handleBackToCreate}
           />
@@ -177,7 +205,7 @@ const PickListPage = () => {
 
         {currentView === "review" && currentPickList && (
           <PickListReviewSubmit
-            pickListNumber={currentPickList.number}
+            pickListNumber={currentPickList.number || currentPickList.name}
             processedItems={processedItems}
             onBack={handleBackToPicking}
             onSubmit={handleSubmitPickList}

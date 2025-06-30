@@ -287,6 +287,24 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
+  async updatePickList(name: string, data: any) {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update pick list: ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
+
   // Enhanced Pick List creation with ERPNext picking strategy
   async createPickListFromDocument(pickListData: {
     purpose: string;
@@ -360,7 +378,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   async getPickListStats(company?: string) {
     try {
       // Get pending pick lists
-      const pendingFilters = [['docstatus', '=', '0']]; // Draft status
+      const pendingFilters = [['docstatus', '=', 0]]; // Draft status - fix: use number instead of string
       if (company) {
         pendingFilters.push(['company', '=', company]);
       }
@@ -370,7 +388,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
       // Get completed pick lists for today
       const today = new Date().toISOString().split('T')[0];
       const completedFilters = [
-        ['docstatus', '=', '1'], // Submitted status
+        ['docstatus', '=', 1], // Submitted status - fix: use number instead of string
         ['creation', '>=', today]
       ];
       if (company) {
