@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
   const [selectedDocument, setSelectedDocument] = useState<DocumentOption | null>(null);
   const [documents, setDocuments] = useState<DocumentOption[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [isCreatingPickList, setIsCreatingPickList] = useState(false);
   const { toast } = useToast();
 
   const pickListTypes = [
@@ -173,9 +175,12 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
 
   const handleCreatePickList = async () => {
     if (selectedType && selectedDocument) {
+      setIsCreatingPickList(true);
       try {
         const api = await createERPNextAPI();
-        if (!api) {
+        const company = await getUserDefaultCompany();
+        
+        if (!api || !company) {
           toast({
             title: "ERPNext Connection Error",
             description: "Please configure ERPNext settings in your profile",
@@ -184,27 +189,76 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
           return;
         }
 
-        // Fetch items from the selected document
-        let items = [];
-        try {
-          if (selectedType === "Delivery") {
-            const salesOrder = await api.sales.getSalesOrder(selectedDocument.name);
-            items = salesOrder.data.items || [];
-          } else if (selectedType === "Material Transfer") {
-            const materialRequest = await api.getMaterialRequest(selectedDocument.name);
-            items = materialRequest.data.items || [];
-          }
-        } catch (error) {
-          console.error('Error fetching document items:', error);
-          // Use mock items as fallback
-          items = [
+        // Map pick list type to ERPNext purpose
+        const purposeMap = {
+          "Delivery": "Delivery",
+          "Material Transfer": "Material Transfer",
+          "Manufacturing": "Material Transfer for Manufacture"
+        };
+
+        // Map document type for ERPNext
+        const documentTypeMap = {
+          "Delivery": "Sales Order",
+          "Material Transfer": "Material Request",
+          "Manufacturing": "Work Order"
+        };
+
+        // Create pick list in ERPNext
+        const pickListData = {
+          purpose: purposeMap[selectedType],
+          company: company,
+          document_type: documentTypeMap[selectedType],
+          document_name: selectedDocument.name
+        };
+
+        console.log('Creating pick list with data:', pickListData);
+
+        // Create the pick list in ERPNext
+        const result = await api.createPickListFromDocument(pickListData);
+        
+        console.log('Pick list created:', result);
+
+        // Fetch the created pick list with items
+        const createdPickList = await api.getPickList(result.data.name);
+        const pickListItems = await api.getPickListItems(result.data.name);
+
+        toast({
+          title: "Pick List Created",
+          description: `Pick List ${result.data.name} created successfully`,
+          variant: "default"
+        });
+
+        // Pass the created pick list data to the parent component
+        onComplete({
+          name: result.data.name,
+          type: selectedType,
+          document: selectedDocument,
+          items: pickListItems,
+          erpnextData: createdPickList.data
+        });
+
+      } catch (error) {
+        console.error('Error creating pick list:', error);
+        toast({
+          title: "Error Creating Pick List",
+          description: "Failed to create pick list in ERPNext. Using fallback data.",
+          variant: "destructive"
+        });
+
+        // Fallback to mock data
+        const mockPickList = {
+          name: `PICK-${Date.now().toString().slice(-5)}`,
+          type: selectedType,
+          document: selectedDocument,
+          items: [
             {
               item_code: "ITEM-003",
               item_name: "Wooden Desk",
               qty: 3,
               uom: "Nos",
               warehouse: "Store A",
-              bin: "C-003"
+              batch_no: null,
+              serial_no: null
             },
             {
               item_code: "ITEM-004",
@@ -212,23 +266,15 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
               qty: 4,
               uom: "Nos",
               warehouse: "Store A",
-              bin: "D-004"
+              batch_no: null,
+              serial_no: null
             }
-          ];
-        }
+          ]
+        };
 
-        onComplete({
-          type: selectedType,
-          document: selectedDocument,
-          items: items
-        });
-      } catch (error) {
-        console.error('Error creating pick list:', error);
-        toast({
-          title: "Error",
-          description: "Failed to create pick list",
-          variant: "destructive"
-        });
+        onComplete(mockPickList);
+      } finally {
+        setIsCreatingPickList(false);
       }
     }
   };
@@ -385,7 +431,7 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <h3 className="font-medium text-green-900 mb-2">Ready to Create Pick List</h3>
                 <p className="text-sm text-green-700">
-                  Review the details below and click "Create Pick List" to start the picking process.
+                  Review the details below and click "Create Pick List" to create a draft pick list in ERPNext with items fetched according to the picking strategy.
                 </p>
               </div>
 
@@ -415,12 +461,12 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
                 </div>
 
                 <div>
-                  <h4 className="font-medium mb-2">Next Steps</h4>
+                  <h4 className="font-medium mb-2">What happens next?</h4>
                   <div className="text-sm text-gray-600 space-y-1">
-                    <p>• Items will be fetched from {selectedDocument.name}</p>
-                    <p>• You'll scan each item to confirm</p>
-                    <p>• Select warehouse and batch/serial if needed</p>
-                    <p>• Review and submit the pick list</p>
+                    <p>• Draft pick list created in ERPNext</p>
+                    <p>• Items fetched with warehouse locations</p>
+                    <p>• Batch/serial information included</p>
+                    <p>• Ready for item-by-item verification</p>
                   </div>
                 </div>
               </div>
@@ -431,7 +477,7 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
 
       {/* Navigation Buttons */}
       <div className="flex justify-between">
-        <Button variant="outline" onClick={handleBack}>
+        <Button variant="outline" onClick={handleBack} disabled={isCreatingPickList}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
@@ -449,8 +495,20 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           ) : (
-            <Button onClick={handleCreatePickList} size="lg" className="px-8">
-              Create Pick List
+            <Button 
+              onClick={handleCreatePickList} 
+              size="lg" 
+              className="px-8"
+              disabled={isCreatingPickList}
+            >
+              {isCreatingPickList ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creating...
+                </>
+              ) : (
+                'Create Pick List'
+              )}
             </Button>
           )}
         </div>

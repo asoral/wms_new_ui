@@ -234,7 +234,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockEntryAPI.searchBOMs(company);
   }
 
-  // Pick List methods - Add proper ERPNext API integration
+  // Pick List methods - Enhanced ERPNext API integration
   async getPickLists(filters?: any, company?: string, limitPageLength?: number) {
     const finalFilters = [];
     if (filters) {
@@ -282,6 +282,75 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to fetch pick list: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Enhanced Pick List creation with ERPNext picking strategy
+  async createPickListFromDocument(pickListData: {
+    purpose: string;
+    company: string;
+    document_type: string;
+    document_name: string;
+    locations?: any[];
+  }) {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        purpose: pickListData.purpose,
+        company: pickListData.company,
+        locations: pickListData.locations || [],
+        work_order: pickListData.document_type === 'Work Order' ? pickListData.document_name : undefined,
+        material_request: pickListData.document_type === 'Material Request' ? pickListData.document_name : undefined,
+        docstatus: 0, // Draft status
+        ...pickListData
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create pick list from document: ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  // Get items with picking details from ERPNext
+  async getPickListItems(pickListName: string) {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List/${encodeURIComponent(pickListName)}?fields=["*"]`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pick list items: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.data?.locations || [];
+  }
+
+  // Call ERPNext method to get items for picking
+  async getItemsForPicking(doctype: string, docname: string, company: string) {
+    const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.doctype.pick_list.pick_list.get_items_for_pick_list`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        doctype: doctype,
+        docname: docname,
+        company: company
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get items for picking: ${response.statusText}`);
     }
 
     return response.json();
