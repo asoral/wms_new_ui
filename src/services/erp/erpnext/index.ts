@@ -22,7 +22,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Items API
-  async getItems(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<Item[]>> {
+  async getItems(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<Item[]>> {
     const finalFilters = this.convertToFrappeFilters(filters);
     const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
 
@@ -73,17 +73,57 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
+  async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse<Item[]>> {
+    const filters = [
+      ['barcode', '=', barcode]
+    ];
+
+    const params = new URLSearchParams({
+      filters: JSON.stringify(filters),
+      fields: JSON.stringify(['item_code', 'item_name', 'stock_uom', 'description', 'has_batch_no', 'has_serial_no']),
+      limit_page_length: '20'
+    });
+
+    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search items by barcode: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   // Warehouse API
-  async getWarehouses(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<Warehouse[]>> {
+  async getWarehouses(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<Warehouse[]>> {
     return this.warehouseAPI.getWarehouses(filters, limitPageLength);
   }
 
-  async searchWarehouses(searchTerm: string, limitPageLength?: number): Promise<ERPNextResponse<Warehouse[]>> {
-    return this.warehouseAPI.searchWarehouses(searchTerm, limitPageLength);
+  async searchWarehouses(searchTerm: string, limitPageLength: number = 20): Promise<ERPNextResponse<Warehouse[]>> {
+    const orFilters = [
+      ['warehouse_name', 'like', `%${searchTerm}%`],
+      ['warehouse_type', 'like', `%${searchTerm}%`]
+    ];
+
+    const params = new URLSearchParams({
+      or_filters: JSON.stringify(orFilters),
+      limit_page_length: limitPageLength.toString()
+    });
+
+    const response = await fetch(`${this.baseURL}/api/resource/Warehouse?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search warehouses: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
   // Stock API
-  async getStockBalance(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<StockBalance[]>> {
+  async getStockBalance(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<StockBalance[]>> {
     return this.stockAPI.getStockBalance(filters, limitPageLength);
   }
 
@@ -96,7 +136,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Sales API methods
-  async getSalesOrders(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getSalesOrders(filters?: any, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     return this.salesAPI.getSalesOrders(filters, company, limitPageLength);
   }
 
@@ -104,11 +144,11 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.salesAPI.getSalesOrder(soNumber);
   }
 
-  async searchSalesOrders(searchTerm: string, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async searchSalesOrders(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     return this.salesAPI.searchSalesOrders(searchTerm, company, limitPageLength);
   }
 
-  async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getDeliveryNotes(filters?: any, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
   }
 
@@ -125,7 +165,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Purchase API methods
-  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getPurchaseOrders(filters?: any, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength);
   }
 
@@ -133,11 +173,57 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.purchaseAPI.getPurchaseOrder(poNumber);
   }
 
-  async searchPurchaseOrders(searchTerm: string, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getPurchaseReceipt(receiptName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt/${encodeURIComponent(receiptName)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch purchase receipt: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async updatePurchaseReceipt(name: string, receiptData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(receiptData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update purchase receipt: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async submitPurchaseReceipt(receiptName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Purchase Receipt/${encodeURIComponent(receiptName)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ docstatus: 1 })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to submit purchase receipt: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async searchPurchaseOrders(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     return this.purchaseAPI.searchPurchaseOrders(searchTerm, company, limitPageLength);
   }
 
-  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength);
   }
 
@@ -146,7 +232,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Stock Entry API methods
-  async getStockEntries(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getStockEntries(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     return this.stockAPI.getStockEntries(filters, limitPageLength);
   }
 
@@ -158,8 +244,43 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockAPI.createStockReconciliation(reconciliationData);
   }
 
+  async getStockReconciliations(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
+    const finalFilters = this.convertToFrappeFilters(filters);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Reconciliation?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock reconciliations: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async submitStockEntry(stockEntryName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry/${encodeURIComponent(stockEntryName)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        docstatus: 1
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to submit stock entry: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
+
   // Material Request API methods
-  async getMaterialRequests(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getMaterialRequests(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     const finalFilters = this.convertToFrappeFilters(filters);
     const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
 
@@ -223,7 +344,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Pick List API methods
-  async getPickLists(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getPickLists(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
     const finalFilters = this.convertToFrappeFilters(filters);
     const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
 
@@ -284,7 +405,6 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async getPickListAnalytics(company?: string): Promise<ERPNextResponse<any>> {
-    // This would be a custom method to get pick list analytics
     const response = await fetch(`${this.baseURL}/api/method/frappe.desk.query_report.run?report_name=Pick List Summary`, {
       headers: this.getHeaders(),
     });
@@ -296,24 +416,36 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-  // Generic API call method
-  async callAPI(method: string, params?: any): Promise<ERPNextResponse<any>> {
-    const url = params 
-      ? `${this.baseURL}/api/method/${method}?${new URLSearchParams(params)}`
-      : `${this.baseURL}/api/method/${method}`;
-
-    const response = await fetch(url, {
+  // Company API methods
+  async getCompanies(): Promise<ERPNextResponse<any[]>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Company`, {
       headers: this.getHeaders(),
     });
 
     if (!response.ok) {
-      throw new Error(`API call failed: ${response.statusText}`);
+      throw new Error(`Failed to fetch companies: ${response.statusText}`);
     }
 
     return response.json();
   }
 
-  // Search methods for stock entry
+  // Bin Stock API methods
+  async getBinStock(filters?: any): Promise<ERPNextResponse<any[]>> {
+    const finalFilters = this.convertToFrappeFilters(filters);
+    const params = this.buildQueryParams(finalFilters);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch bin stock: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Document search methods for stock entry
   async searchMaterialRequestsForStockEntry(searchTerm: string): Promise<ERPNextResponse<any[]>> {
     return this.getMaterialRequests([
       ['name', 'like', `%${searchTerm}%`],
@@ -361,21 +493,18 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
-  async submitStockEntry(stockEntryName: string): Promise<ERPNextResponse<any>> {
-    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry/${encodeURIComponent(stockEntryName)}`, {
-      method: 'PUT',
-      headers: {
-        ...this.getHeaders(),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        docstatus: 1
-      })
+  // Generic API call method
+  async callAPI(method: string, params?: any): Promise<ERPNextResponse<any>> {
+    const url = params 
+      ? `${this.baseURL}/api/method/${method}?${new URLSearchParams(params)}`
+      : `${this.baseURL}/api/method/${method}`;
+
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to submit stock entry: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`API call failed: ${response.statusText}`);
     }
 
     return response.json();
