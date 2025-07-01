@@ -7,7 +7,7 @@ import ItemSelector from "./ItemSelector";
 import CameraScanner from "./CameraScanner";
 
 interface ItemScannerProps {
-  onItemScanned: (itemCode: string) => void;
+  onItemScanned: (item: Item) => void;
   isLoading: boolean;
 }
 
@@ -15,13 +15,20 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   const [activeTab, setActiveTab] = useState("manual");
   const [showCamera, setShowCamera] = useState(false);
 
-  const handleItemSelected = (itemCode: string) => {
-    onItemScanned(itemCode);
+  const handleItemSelected = (item: Item) => {
+    onItemScanned(item);
   };
 
   const handleBarcodeScanned = (code: string) => {
     console.log('Barcode scanned in ItemScanner:', code);
-    onItemScanned(code);
+    // Create a minimal Item object from the scanned code
+    const scannedItem: Item = {
+      name: code,
+      item_code: code,
+      item_name: code,
+      stock_uom: 'Nos'
+    };
+    onItemScanned(scannedItem);
     setShowCamera(false);
     setActiveTab("manual");
   };

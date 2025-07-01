@@ -1,70 +1,123 @@
-
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight } from "lucide-react";
+import { Package, Truck, FileText, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import SalesOrderSearch from "../components/deliver/SalesOrderSearch";
-import DeliveryForm from "../components/deliver/DeliveryForm";
-import DraftDeliveryNotes from "../components/deliver/DraftDeliveryNotes";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import DeliveryProcess from "@/components/deliver/DeliveryProcess";
+import DeliveryTable from "@/components/deliver/DeliveryTable";
+import { format } from 'date-fns';
 
-export interface SalesOrder {
-  name: string;
+export interface SalesOrderOption {
+  id: string;
+  number: string;
   customer: string;
-  customer_name?: string;
-  transaction_date: string;
-  delivery_date?: string;
   status: string;
-  grand_total: number;
-  per_delivered?: number;
-  items?: SalesOrderItem[];
+  delivery_date?: string;
+  totalValue: number;
+  totalItems: number;
+  expectedDelivery?: string;
+  percentDelivered: number;
 }
 
+export interface DashboardData {
+  pendingOrders: number;
+  readyToShip: number;
+  overdue: number;
+  deliveredToday: number;
+}
+
+export interface SOItem {
+  itemCode: string;
+  itemName: string;
+  orderedQty: number;
+  deliveredQty: number;
+  pendingQty: number;
+  uom: string;
+  rate: number;
+  warehouse?: string;
+}
+
+// Update the existing SalesOrder interface to include missing properties
+export interface SalesOrder {
+  name: string;
+  id: string;
+  number: string;
+  customer: string;
+  customer_name?: string;
+  status: string;
+  delivery_date?: string;
+  deliveryDate?: string;
+  expectedDelivery?: string;
+  grand_total: number;
+  totalValue: number;
+  totalItems: number;
+  percentDelivered: number;
+  per_delivered?: number;
+  items: SalesOrderItem[];
+}
+
+// Update SalesOrderItem to include missing properties
 export interface SalesOrderItem {
   name: string;
   item_code: string;
+  itemCode: string;
   item_name: string;
+  itemName: string;
   qty: number;
-  delivered_qty?: number;
-  pending_qty?: number;
-  uom: string;
+  orderedQty: number;
+  delivered_qty: number;
+  deliveredQty: number;
+  pending_qty: number;
+  pendingQty: number;
   rate: number;
-  warehouse: string;
-  description?: string;
-  stock_qty?: number;
-  conversion_factor?: number;
+  stock_uom: string;
+  uom: string;
+  warehouse?: string;
 }
 
+// Update DeliveryEntry to include missing properties
 export interface DeliveryEntry {
   itemCode: string;
   itemName: string;
   deliveredQty: number;
+  qtyToDeliver: number;
   warehouse: string;
   batch?: string;
   serial?: string;
-  serialBatchBundle?: string;
   uom: string;
   rate: number;
-  salesOrderItem?: string;
-  useTraditionalEntry?: boolean;
+  salesOrderItem: string;
 }
 
 const Deliver = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "process" | "review">("dashboard");
+  const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
   const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
-  const [activeTab, setActiveTab] = useState("search");
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    pendingOrders: 0,
+    readyToShip: 0,
+    overdue: 0,
+    deliveredToday: 0,
+  });
   const [loading, setLoading] = useState(false);
-  const [currentDeliveryNote, setCurrentDeliveryNote] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<SalesOrderOption[]>([]);
+  const { toast } = useToast();
 
-  const selectSO = async (soNumber: string) => {
-    setLoading(true);
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
     try {
+      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -75,58 +128,141 @@ const Deliver = () => {
         return;
       }
 
-      // Fetch SO data from ERPNext
-      const soResult = await erpnextAPI.getSalesOrder(soNumber);
-      if (!soResult.data) {
+      // Fetch dummy dashboard data
+      const dashboardData = {
+        pendingOrders: Math.floor(Math.random() * 50),
+        readyToShip: Math.floor(Math.random() * 30),
+        overdue: Math.floor(Math.random() * 10),
+        deliveredToday: Math.floor(Math.random() * 20),
+      };
+      setDashboardData(dashboardData);
+
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const searchSalesOrders = async () => {
+    if (!searchTerm) return;
+
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Fetch sales orders based on the search term
+      const response = await erpnextAPI.getSalesOrders({
+        'customer': ['like', `%${searchTerm}%`]
+      });
+
+      if (response?.data) {
+        const transformedResults: SalesOrderOption[] = response.data.map((so: any) => ({
+          id: so.name,
+          number: so.name,
+          customer: so.customer,
+          status: so.status,
+          delivery_date: so.delivery_date,
+          totalValue: so.grand_total,
+          totalItems: so.total_qty,
+          percentDelivered: so.per_delivered
+        }));
+        setSearchResults(transformedResults);
+      } else {
+        setSearchResults([]);
+      }
+
+    } catch (error) {
+      console.error('Failed to search sales orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search sales orders from ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSalesOrderDetails = async (salesOrderNumber: string) => {
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Fetch the sales order details
+      const response = await erpnextAPI.getSalesOrder(salesOrderNumber);
+
+      if (response?.data) {
+        // Transform the sales order data
+        const transformedSO: SalesOrder = {
+          name: response.data.name,
+          id: response.data.name,
+          number: response.data.name,
+          customer: response.data.customer,
+          customer_name: response.data.customer_name,
+          status: response.data.status,
+          delivery_date: response.data.delivery_date,
+          deliveryDate: response.data.delivery_date,
+          expectedDelivery: response.data.delivery_date,
+          grand_total: response.data.grand_total,
+          totalValue: response.data.grand_total,
+          totalItems: response.data.total_qty,
+          percentDelivered: response.data.per_delivered,
+          per_delivered: response.data.per_delivered,
+          items: response.data.items.map((item: any) => ({
+            name: item.name,
+            item_code: item.item_code,
+            itemCode: item.item_code,
+            item_name: item.item_name,
+            itemName: item.item_name,
+            qty: item.qty,
+            orderedQty: item.qty,
+            delivered_qty: item.delivered_qty,
+            deliveredQty: item.delivered_qty,
+            pending_qty: item.pending_qty,
+            pendingQty: item.pending_qty,
+            rate: item.rate,
+            stock_uom: item.stock_uom,
+            uom: item.stock_uom,
+            warehouse: item.warehouse
+          }))
+        };
+        setSalesOrder(transformedSO);
+        setActiveTab("process");
+      } else {
         toast({
           title: "Sales Order Not Found",
-          description: `SO ${soNumber} could not be found in ERPNext.`,
+          description: `Sales order ${salesOrderNumber} not found in ERPNext`,
           variant: "destructive"
         });
-        return;
       }
 
-      const so = soResult.data;
-      
-      // Transform ERPNext SO data to our interface
-      const transformedSO: SalesOrder = {
-        name: so.name,
-        customer: so.customer,
-        customer_name: so.customer_name,
-        transaction_date: so.transaction_date,
-        delivery_date: so.delivery_date,
-        status: so.status,
-        grand_total: so.grand_total || 0,
-        per_delivered: so.per_delivered || 0,
-        items: so.items ? so.items.map((item: any) => ({
-          name: item.name,
-          item_code: item.item_code,
-          item_name: item.item_name,
-          qty: item.qty || 0,
-          delivered_qty: item.delivered_qty || 0,
-          pending_qty: (item.qty || 0) - (item.delivered_qty || 0),
-          uom: item.stock_uom || item.uom,
-          rate: item.rate || 0,
-          warehouse: item.warehouse || 'Main Store',
-          description: item.description,
-          stock_qty: item.stock_qty,
-          conversion_factor: item.conversion_factor || 1
-        })) : []
-      };
-
-      setSelectedSO(transformedSO);
-      setActiveTab("deliver");
-      
-      toast({
-        title: "Sales Order Loaded",
-        description: `SO ${soNumber} loaded successfully with ${transformedSO.items?.length || 0} items`,
-      });
-      
     } catch (error) {
-      console.error('Error fetching SO:', error);
+      console.error('Failed to load sales order details:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch Sales Order from ERPNext",
+        description: "Failed to load sales order details from ERPNext",
         variant: "destructive"
       });
     } finally {
@@ -134,326 +270,301 @@ const Deliver = () => {
     }
   };
 
-  const selectDraftDeliveryNote = async (deliveryNoteId: string) => {
-    setLoading(true);
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Fetch draft delivery note data
-      const deliveryNoteResult = await erpnextAPI.getDeliveryNote(deliveryNoteId);
-      if (!deliveryNoteResult.data) {
-        toast({
-          title: "Delivery Note Not Found",
-          description: `Delivery Note ${deliveryNoteId} could not be found.`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const deliveryNote = deliveryNoteResult.data;
-      
-      // If delivery note has a sales order, load it first
-      if (deliveryNote.sales_order) {
-        await selectSO(deliveryNote.sales_order);
-      }
-
-      // Set current delivery note and populate entries
-      setCurrentDeliveryNote(deliveryNoteId);
-      
-      // Transform delivery note items to delivery entries
-      const entries: DeliveryEntry[] = deliveryNote.items ? deliveryNote.items.map((item: any) => ({
-        itemCode: item.item_code,
-        itemName: item.item_name || item.item_code,
-        deliveredQty: item.qty || 0,
-        warehouse: item.warehouse || 'Main Store',
-        batch: item.batch_no,
-        serial: item.serial_no,
-        serialBatchBundle: item.serial_batch_bundle,
-        uom: item.uom || 'Nos',
-        rate: item.rate || 0,
-        salesOrderItem: item.so_detail,
-        useTraditionalEntry: item.batch_no || item.serial_no ? true : false
-      })) : [];
-
-      setDeliveryEntries(entries);
-      setActiveTab("deliver");
-      
-      toast({
-        title: "Draft Delivery Note Loaded",
-        description: `Draft delivery note ${deliveryNoteId} loaded with ${entries.length} items`,
-      });
-      
-    } catch (error) {
-      console.error('Error fetching draft delivery note:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch draft delivery note",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleSOSelect = async (salesOrderOption: SalesOrderOption) => {
+    await loadSalesOrderDetails(salesOrderOption.number);
   };
 
-  const addDeliveryEntry = async (entry: DeliveryEntry) => {
-    console.log('addDeliveryEntry called with:', entry);
-    
-    if (!selectedSO) {
-      console.error('No SO selected');
-      toast({
-        title: "Error",
-        description: "No Sales Order selected",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        console.error('ERPNext API not configured');
-        toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Find the corresponding SO item to get the SO item ID
-      const soItem = selectedSO.items?.find(item => item.item_code === entry.itemCode);
-      if (!soItem || !soItem.name) {
-        console.error('SO item not found or missing ID:', entry.itemCode);
-        toast({
-          title: "Error",
-          description: "Sales Order item reference not found",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const entryWithSOItem = {
-        ...entry,
-        salesOrderItem: soItem.name
-      };
-
-      console.log('Processing entry with SO item reference:', entryWithSOItem);
-
-      // Get the company from the SO
-      const soDetails = await erpnextAPI.getSalesOrder(selectedSO.name);
-      const company = soDetails.data.company;
-
-      if (!currentDeliveryNote) {
-        console.log('Creating new Delivery Note...');
-        
-        const deliveryNoteItem = {
-          item_code: entryWithSOItem.itemCode,
-          qty: entryWithSOItem.deliveredQty,
-          warehouse: entryWithSOItem.warehouse,
-          rate: entryWithSOItem.rate,
-          uom: entryWithSOItem.uom,
-          sales_order: selectedSO.name,
-          so_detail: entryWithSOItem.salesOrderItem,
-          ...(entryWithSOItem.batch && { batch_no: entryWithSOItem.batch }),
-          ...(entryWithSOItem.serial && { serial_no: entryWithSOItem.serial }),
-          ...(entryWithSOItem.serialBatchBundle && { serial_batch_bundle: entryWithSOItem.serialBatchBundle })
-        };
-
-        const deliveryNoteData = {
-          customer: selectedSO.customer,
-          company: company,
-          posting_date: new Date().toISOString().split('T')[0],
-          sales_order: selectedSO.name,
-          set_posting_time: 1,
-          items: [deliveryNoteItem]
-        };
-
-        console.log('Creating new Delivery Note with data:', deliveryNoteData);
-        
-        const result = await erpnextAPI.createDeliveryNote(deliveryNoteData);
-        console.log('Delivery Note creation result:', result);
-        
-        if (result.data?.name) {
-          setCurrentDeliveryNote(result.data.name);
-          console.log('Delivery Note created successfully:', result.data.name);
-          toast({
-            title: "Delivery Note Created",
-            description: `Draft Delivery Note ${result.data.name} created successfully`,
-          });
-        } else {
-          console.error('No name returned from delivery note creation:', result);
-          throw new Error('Delivery Note creation failed - no name returned');
-        }
-      } else {
-        console.log('Adding item to existing Delivery Note:', currentDeliveryNote);
-        
-        // Get current delivery note data
-        const currentDeliveryNoteResponse = await erpnextAPI.getDeliveryNote(currentDeliveryNote);
-        const currentDeliveryNoteData = currentDeliveryNoteResponse.data;
-        
-        console.log('Current delivery note data:', currentDeliveryNoteData);
-        
-        // Add new item to existing items array
-        const newItem = {
-          item_code: entryWithSOItem.itemCode,
-          qty: entryWithSOItem.deliveredQty,
-          warehouse: entryWithSOItem.warehouse,
-          rate: entryWithSOItem.rate,
-          uom: entryWithSOItem.uom,
-          sales_order: selectedSO.name,
-          so_detail: entryWithSOItem.salesOrderItem,
-          ...(entryWithSOItem.batch && { batch_no: entryWithSOItem.batch }),
-          ...(entryWithSOItem.serial && { serial_no: entryWithSOItem.serial }),
-          ...(entryWithSOItem.serialBatchBundle && { serial_batch_bundle: entryWithSOItem.serialBatchBundle })
-        };
-        
-        const updatedItems = [...(currentDeliveryNoteData.items || []), newItem];
-        
-        // Update the delivery note with new items
-        const updateResult = await erpnextAPI.updateDeliveryNote(currentDeliveryNote, {
-          items: updatedItems
-        });
-        
-        console.log('Item added to existing delivery note successfully:', updateResult);
-        toast({
-          title: "Item Added",
-          description: `Item ${entryWithSOItem.itemCode} added to Delivery Note ${currentDeliveryNote}`,
-        });
-      }
-
-      // Add to local state
-      console.log('Adding entry to local state:', entryWithSOItem);
-      setDeliveryEntries(prev => [...prev, entryWithSOItem]);
-      
-    } catch (error) {
-      console.error('Error in addDeliveryEntry:', error);
-      toast({
-        title: "Error",
-        description: `Failed to create/update delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive"
-      });
-    }
+  const handleAddDeliveryEntry = (entry: DeliveryEntry) => {
+    setDeliveryEntries([...deliveryEntries, entry]);
   };
 
-  const submitDeliveryNote = async () => {
-    if (!currentDeliveryNote) {
-      toast({
-        title: "No Delivery Note to Submit",
-        description: "Please add items first to create a delivery note.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Show processing toast immediately
+  const handleRemoveDeliveryEntry = async (index: number) => {
+    const updatedEntries = [...deliveryEntries];
+    updatedEntries.splice(index, 1);
+    setDeliveryEntries(updatedEntries);
+  
     toast({
-      title: "Processing Transaction",
-      description: "Delivery note is being submitted. You may continue your work.",
+      title: "Item Removed",
+      description: "Item removed from delivery list.",
     });
-    
+  };
+
+  const handleSubmitDelivery = async () => {
+    if (!salesOrder) {
+      toast({
+        title: "No Sales Order",
+        description: "Please select a sales order to deliver.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (deliveryEntries.length === 0) {
+      toast({
+        title: "No Items",
+        description: "Please add items to the delivery list.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
+      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
           title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings.",
+          description: "Please configure your ERPNext settings in the Profile page.",
           variant: "destructive"
         });
         return;
       }
 
-      // Submit the Delivery Note
-      await erpnextAPI.submitDeliveryNote(currentDeliveryNote);
-      
-      toast({
-        title: "Success",
-        description: `Delivery note ${currentDeliveryNote} submitted successfully!`,
-      });
-      
-      // Reset form
-      setDeliveryEntries([]);
-      setSelectedSO(null);
-      setCurrentDeliveryNote(null);
-      setActiveTab("search");
-      
+      // Prepare the delivery data
+      const deliveryData = {
+        sales_order: salesOrder.name,
+        customer: salesOrder.customer,
+        company: 'Siddhivinayak Impex', // Replace with dynamic value if needed
+        items: deliveryEntries.map(entry => ({
+          item_code: entry.itemCode,
+          qty: entry.qtyToDeliver,
+          rate: entry.rate,
+          uom: entry.uom,
+          warehouse: entry.warehouse,
+          batch_no: entry.batch,
+          serial_no: entry.serial,
+          sales_order_item: entry.salesOrderItem
+        }))
+      };
+
+      // Submit the delivery data to ERPNext
+      const response = await erpnextAPI.submitDeliveryNote(deliveryData);
+
+      if (response?.data) {
+        toast({
+          title: "Delivery Submitted",
+          description: "Delivery note submitted successfully.",
+        });
+        // Reset state and go back to dashboard
+        setSalesOrder(null);
+        setDeliveryEntries([]);
+        setActiveTab("dashboard");
+      } else {
+        toast({
+          title: "Delivery Failed",
+          description: "Failed to submit delivery note.",
+          variant: "destructive"
+        });
+      }
+
     } catch (error) {
-      console.error('Error submitting delivery note:', error);
+      console.error('Failed to submit delivery:', error);
       toast({
         title: "Error",
-        description: `Failed to submit delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: "Failed to submit delivery to ERPNext",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const shortcuts = [
-    { label: 'Print Label', icon: Printer, action: () => navigate('/print-label') },
-    { label: 'Quality Check', icon: CheckCircle, action: () => navigate('/quality-check') },
-    { label: 'Transfer Stock', icon: ArrowRight, action: () => navigate('/stock-entry') }
-  ];
+  const handleBackToDashboard = () => {
+    setSalesOrder(null);
+    setDeliveryEntries([]);
+    setActiveTab("dashboard");
+  };
+
+  const handleReview = () => {
+    setActiveTab("review");
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const date = new Date(dateStr);
+      return format(date, 'dd-MMM-yyyy');
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return 'Invalid Date';
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <Truck className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Deliver</h1>
-          </div>
-          {selectedSO && (
-            <div className="flex items-center space-x-2">
-              <Badge variant="outline">{selectedSO.name}</Badge>
-              {currentDeliveryNote && (
-                <Badge variant="secondary">DN: {currentDeliveryNote}</Badge>
-              )}
-              <Button onClick={submitDeliveryNote} disabled={!currentDeliveryNote || loading}>
-                <Package className="w-4 h-4 mr-2" />
-                Submit Delivery
-              </Button>
-            </div>
-          )}
+    <div className="container mx-auto py-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Truck className="w-6 h-6 text-blue-600" />
+          <h1 className="text-2xl font-bold">Deliver Items</h1>
         </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="search">Search Orders</TabsTrigger>
-            <TabsTrigger value="deliver" disabled={!selectedSO && !currentDeliveryNote}>
-              Deliver Items
-            </TabsTrigger>
-            <TabsTrigger value="drafts">Draft Notes</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="search">
-            <SalesOrderSearch 
-              onSelectSO={selectSO}
-              shortcuts={shortcuts}
-            />
-          </TabsContent>
-
-          <TabsContent value="deliver">
-            {selectedSO && (
-              <DeliveryForm 
-                salesOrder={selectedSO}
-                onAddEntry={addDeliveryEntry}
-                deliveryEntries={deliveryEntries}
-              />
-            )}
-          </TabsContent>
-
-          <TabsContent value="drafts">
-            <DraftDeliveryNotes onSelectDraftNote={selectDraftDeliveryNote} />
-          </TabsContent>
-        </Tabs>
+        <Button variant="outline" onClick={() => navigate('/')}>
+          <FileText className="w-4 h-4 mr-2" />
+          Back to Dashboard
+        </Button>
       </div>
+
+      {loading && (
+        <div className="fixed top-0 left-0 w-full h-full bg-gray-100 bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      )}
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
+        <TabsList className="bg-gray-100 rounded-lg p-1 flex space-x-1">
+          <TabsTrigger value="dashboard" className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2 font-medium text-gray-700">Dashboard</TabsTrigger>
+          <TabsTrigger value="process" disabled={!salesOrder} className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2 font-medium text-gray-700">Process Delivery</TabsTrigger>
+          <TabsTrigger value="review" disabled={deliveryEntries.length === 0} className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2 font-medium text-gray-700">Review & Submit</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="outline-none">
+          <Card>
+            <CardHeader>
+              <CardTitle>Dashboard</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-blue-600 mb-1">Pending Orders</p>
+                        <p className="text-2xl font-bold text-blue-600">{dashboardData.pendingOrders}</p>
+                      </div>
+                      <AlertTriangle className="w-8 h-8 text-blue-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-600 mb-1">Ready to Ship</p>
+                        <p className="text-2xl font-bold text-green-600">{dashboardData.readyToShip}</p>
+                      </div>
+                      <Package className="w-8 h-8 text-green-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-red-50 border-red-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-red-600 mb-1">Overdue Deliveries</p>
+                        <p className="text-2xl font-bold text-red-600">{dashboardData.overdue}</p>
+                      </div>
+                      <Truck className="w-8 h-8 text-red-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-purple-50 border-purple-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-purple-600 mb-1">Delivered Today</p>
+                        <p className="text-2xl font-bold text-purple-600">{dashboardData.deliveredToday}</p>
+                      </div>
+                      <CheckCircle2 className="w-8 h-8 text-purple-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="mt-6">
+                <h2 className="text-xl font-semibold mb-4">Select Sales Order</h2>
+                <div className="flex space-x-2">
+                  <Input
+                    type="text"
+                    placeholder="Search by customer name"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <Button onClick={searchSalesOrders} disabled={loading}>
+                    Search
+                  </Button>
+                </div>
+
+                {searchResults.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-lg font-medium mb-2">Search Results</h3>
+                    <div className="max-h-40 overflow-y-auto">
+                      {searchResults.map((so) => (
+                        <div
+                          key={so.id}
+                          className="p-3 hover:bg-gray-100 cursor-pointer rounded-md"
+                          onClick={() => handleSOSelect(so)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold">{so.number}</p>
+                              <p className="text-sm text-gray-600">{so.customer}</p>
+                            </div>
+                            <Badge>{so.status}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="process" className="outline-none">
+          {salesOrder ? (
+            <DeliveryProcess
+              salesOrder={salesOrder}
+              onBack={handleBackToDashboard}
+              onNext={handleReview}
+              onAddEntry={handleAddDeliveryEntry}
+            />
+          ) : (
+            <Card>
+              <CardContent className="text-center py-8">
+                <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">No sales order selected. Please select a sales order from the dashboard to start processing the delivery.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="review" className="outline-none">
+          {deliveryEntries.length > 0 ? (
+            <div className="space-y-4">
+              <DeliveryTable
+                entries={deliveryEntries}
+                onRemoveEntry={handleRemoveDeliveryEntry}
+              />
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setActiveTab("process")}>
+                  Back to Delivery
+                </Button>
+                <Button onClick={handleSubmitDelivery} disabled={loading}>
+                  Submit Delivery
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-8">
+                <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">No items added for delivery. Please add items from the delivery process tab.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -1,34 +1,38 @@
-
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { Search, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { SalesOrder } from "../../pages/Deliver";
+import { SalesOrder } from "@/pages/Deliver";
 
 interface SalesOrderSearchProps {
-  onOrderSelected: (order: SalesOrder) => void;
-  loading: boolean;
+  onSelectSO: (salesOrder: SalesOrder) => void;
+  shortcuts: Array<{
+    label: string;
+    icon: any;
+    action: () => void;
+  }>;
 }
 
-const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) => {
-  const [soNumber, setSoNumber] = useState("");
+const SalesOrderSearch = ({ onSelectSO, shortcuts }: SalesOrderSearchProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SalesOrder[]>([]);
   const [searching, setSearching] = useState(false);
+  const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSearch = async () => {
-    if (!soNumber.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a Sales Order number.",
-        variant: "destructive"
-      });
-      return;
+  useEffect(() => {
+    if (searchQuery.length >= 2) {
+      searchSalesOrders();
+    } else {
+      setSearchResults([]);
     }
+  }, [searchQuery]);
 
+  const searchSalesOrders = async () => {
     try {
       setSearching(true);
       const erpnextAPI = await createERPNextAPI();
@@ -41,118 +45,100 @@ const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) =
         return;
       }
 
-      const company = await getUserDefaultCompany();
-      console.log('Searching SO with company:', company);
+      const searchResult = await erpnextAPI.getSalesOrders({
+        'customer': searchQuery
+      });
 
-      // First try to get the specific SO
-      try {
-        const soResult = await erpnextAPI.getSalesOrder(soNumber.trim());
-        console.log('SO search result:', soResult);
-        
-        if (soResult.data) {
-          const so = soResult.data;
-          
-          // Check if SO belongs to the correct company
-          if (company && so.company !== company) {
-            toast({
-              title: "Sales Order Not Found",
-              description: `SO ${soNumber} not found for company ${company}.`,
-              variant: "destructive"
-            });
-            return;
-          }
-          
-          // Transform ERPNext SO data to our interface
-          const transformedSO: SalesOrder = {
-            number: so.name,
-            customer: so.customer_name || so.customer,
-            status: so.status,
-            deliveryDate: so.delivery_date || so.transaction_date,
-            totalItems: so.items ? so.items.length : 0,
-            totalValue: so.grand_total || 0,
-            items: so.items ? so.items.map((item: any) => ({
-              itemCode: item.item_code,
-              itemName: item.item_name,
-              orderedQty: item.qty || 0,
-              deliveredQty: item.delivered_qty || 0,
-              pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
-              rate: item.rate || 0,
-              uom: item.stock_uom || item.uom,
-              warehouse: item.warehouse || 'Main Store',
-              qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
-            })) : []
-          };
-
-          onOrderSelected(transformedSO);
-          toast({
-            title: "Success",
-            description: `Sales Order ${soNumber} loaded successfully.`,
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching specific SO:', error);
-        
-        // If direct fetch fails, try searching
-        try {
-          const searchResult = await erpnextAPI.searchSalesOrders(soNumber.trim(), company);
-          console.log('SO search by term result:', searchResult);
-          
-          if (searchResult.data && searchResult.data.length > 0) {
-            const so = searchResult.data[0]; // Take first match
-            
-            // Get full SO details
-            const fullSOResult = await erpnextAPI.getSalesOrder(so.name);
-            if (fullSOResult.data) {
-              const fullSO = fullSOResult.data;
-              
-              const transformedSO: SalesOrder = {
-                number: fullSO.name,
-                customer: fullSO.customer_name || fullSO.customer,
-                status: fullSO.status,
-                deliveryDate: fullSO.delivery_date || fullSO.transaction_date,
-                totalItems: fullSO.items ? fullSO.items.length : 0,
-                totalValue: fullSO.grand_total || 0,
-                items: fullSO.items ? fullSO.items.map((item: any) => ({
-                  itemCode: item.item_code,
-                  itemName: item.item_name,
-                  orderedQty: item.qty || 0,
-                  deliveredQty: item.delivered_qty || 0,
-                  pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
-                  rate: item.rate || 0,
-                  uom: item.stock_uom || item.uom,
-                  warehouse: item.warehouse || 'Main Store',
-                  qtyToDeliver: (item.qty || 0) - (item.delivered_qty || 0)
-                })) : []
-              };
-
-              onOrderSelected(transformedSO);
-              toast({
-                title: "Success",
-                description: `Sales Order ${fullSO.name} loaded successfully.`,
-              });
-            }
-          } else {
-            toast({
-              title: "Sales Order Not Found",
-              description: `No sales order found matching "${soNumber}".`,
-              variant: "destructive"
-            });
-          }
-        } catch (searchError) {
-          console.error('Error searching SO:', searchError);
-          toast({
-            title: "Error",
-            description: "Failed to search for Sales Order in ERPNext",
-            variant: "destructive"
-          });
-        }
+      if (searchResult.data) {
+        // Ensure the data is transformed to match the SalesOrder interface
+        const transformedResults: SalesOrder[] = searchResult.data.map((so: any) => ({
+          name: so.name,
+          id: so.name,
+          number: so.name,
+          customer: so.customer,
+          customer_name: so.customer_name,
+          status: so.status,
+          delivery_date: so.delivery_date,
+          deliveryDate: so.delivery_date,
+          expectedDelivery: so.delivery_date,
+          grand_total: so.grand_total,
+          totalValue: so.grand_total,
+          totalItems: so.total_qty,
+          percentDelivered: so.per_delivered,
+          per_delivered: so.per_delivered,
+          items: [] // You might need to fetch items separately if needed
+        }));
+        setSearchResults(transformedResults);
       }
-      
     } catch (error) {
-      console.error('Error in SO search:', error);
+      console.error('Error searching sales orders:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch Sales Order from ERPNext",
+        title: "Search Error",
+        description: "Failed to search sales orders. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSalesOrderSelect = async (salesOrder: SalesOrder) => {
+    try {
+      setSearching(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Fetch the sales order items
+      const salesOrderResult = await erpnextAPI.getSalesOrder(salesOrder.name);
+
+      if (salesOrderResult.data) {
+        // Transform the sales order items to match the SOItem interface
+        const transformedItems = salesOrderResult.data.items.map((item: any) => ({
+          name: item.name,
+          item_code: item.item_code,
+          itemCode: item.item_code,
+          item_name: item.item_name,
+          itemName: item.item_name,
+          qty: item.qty,
+          orderedQty: item.qty,
+          delivered_qty: item.delivered_qty,
+          deliveredQty: item.delivered_qty,
+          pending_qty: item.pending_qty,
+          pendingQty: item.pending_qty,
+          rate: item.rate,
+          stock_uom: item.stock_uom,
+          uom: item.stock_uom,
+          warehouse: item.warehouse
+        }));
+
+        // Update the sales order with the transformed items
+        const updatedSalesOrder: SalesOrder = {
+          ...salesOrder,
+          items: transformedItems,
+        };
+
+        onSelectSO(updatedSalesOrder);
+        setSearchQuery(salesOrder.customer);
+        setSearchResults([]);
+      } else {
+        toast({
+          title: "Sales Order Error",
+          description: "Failed to fetch sales order details. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching sales order details:', error);
+      toast({
+        title: "Sales Order Error",
+        description: "Failed to fetch sales order details. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -164,32 +150,64 @@ const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) =
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
-          <Search className="w-5 h-5" />
-          <span>Search Sales Order</span>
+          <Search className="w-5 h-5 text-blue-600" />
+          <span>Select Sales Order</span>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="flex space-x-4">
-          <div className="flex-1">
-            <Label htmlFor="soNumber">Sales Order Number</Label>
+      <CardContent className="space-y-4">
+        <div className="flex space-x-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
-              id="soNumber"
-              value={soNumber}
-              onChange={(e) => setSoNumber(e.target.value)}
-              placeholder="Enter SO number..."
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch();
-                }
-              }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by customer name"
+              className="pl-10"
+              disabled={searching}
             />
           </div>
-          <div className="flex items-end">
-            <Button onClick={handleSearch} disabled={loading || searching}>
-              {searching ? 'Searching...' : 'Search'}
+          {shortcuts.map((shortcut) => (
+            <Button
+              key={shortcut.label}
+              variant="outline"
+              onClick={shortcut.action}
+              disabled={searching}
+            >
+              {shortcut.label}
             </Button>
-          </div>
+          ))}
         </div>
+
+        {searchResults.length > 0 && (
+          <div className="border rounded-lg max-h-60 overflow-y-auto">
+            {searchResults.map((salesOrder) => (
+              <div
+                key={salesOrder.id}
+                className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                onClick={() => handleSalesOrderSelect(salesOrder)}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{salesOrder.customer_name || salesOrder.customer}</p>
+                    <p className="text-sm text-gray-600">{salesOrder.number}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">Status: {salesOrder.status}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {searching && (
+          <div className="text-center py-4">
+            <div className="inline-flex items-center space-x-2">
+              <div className="animate-spin rounded-full w-4 h-4 border-b-2 border-blue-600"></div>
+              <span className="text-sm text-gray-600">Searching...</span>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

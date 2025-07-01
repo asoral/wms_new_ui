@@ -1,542 +1,246 @@
+import { ERPNextItemsAPI } from './itemsApi';
+import { ERPNextStockAPI } from './stockApi';
+import { ERPNextPurchaseAPI } from './purchaseApi';
+import { ERPNextSalesAPI } from './salesApi';
+import { ERPNextWarehouseAPI } from './warehouseApi';
+import { ERPNextResponse } from './types';
 
-interface ERPNextResponse<T = any> {
-  data: T;
-  message?: string;
-}
-
-export class ERPNextAPI {
-  private baseURL: string;
-  private apiKey: string;
-  private apiSecret: string;
+export class ERPNextAPI extends ERPNextItemsAPI {
+  private stockAPI: ERPNextStockAPI;
+  private purchaseAPI: ERPNextPurchaseAPI;
+  private salesAPI: ERPNextSalesAPI;
+  private warehouseAPI: ERPNextWarehouseAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
-    this.baseURL = baseURL.replace(/\/$/, '');
-    this.apiKey = apiKey;
-    this.apiSecret = apiSecret;
+    super(baseURL, apiKey, apiSecret);
+    this.stockAPI = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
+    this.purchaseAPI = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
+    this.salesAPI = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
+    this.warehouseAPI = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
   }
 
-  // Public getters for accessing private properties
-  get getBaseURL(): string {
-    return this.baseURL;
+  // Stock API methods
+  async getStockBalance(filters?: any[], company?: string) {
+    return this.stockAPI.getStockBalance(filters, company);
   }
 
-  get getApiKey(): string {
-    return this.apiKey;
+  async getBinStock(itemCode: string, warehouse?: string) {
+    return this.stockAPI.getBinStock(itemCode, warehouse);
   }
 
-  get getApiSecret(): string {
-    return this.apiSecret;
+  async getStockLedger(filters?: any[], company?: string) {
+    return this.stockAPI.getStockLedger(filters, company);
   }
 
-  private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<ERPNextResponse> {
-    const url = `${this.baseURL}${endpoint}`;
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
-      ...options.headers,
-    };
+  async createStockEntry(data: any) {
+    return this.stockAPI.createStockEntry(data);
+  }
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
+  async getStockEntries(filters?: any[], company?: string) {
+    return this.stockAPI.getStockEntries(filters, company);
+  }
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  // Purchase API methods
+  async getPurchaseOrders(filters?: any, company?: string) {
+    return this.purchaseAPI.getPurchaseOrders(filters, company);
+  }
+
+  async getPurchaseOrder(name: string) {
+    return this.purchaseAPI.getPurchaseOrder(name);
+  }
+
+  async getPurchaseReceipts(filters?: any[], company?: string) {
+    return this.purchaseAPI.getPurchaseReceipts(filters, company);
+  }
+
+  async getPurchaseReceipt(name: string) {
+    return this.purchaseAPI.getPurchaseReceipt(name);
+  }
+
+  async createPurchaseReceipt(data: any) {
+    return this.purchaseAPI.createPurchaseReceipt(data);
+  }
+
+  async updatePurchaseReceipt(name: string, data: any) {
+    return this.purchaseAPI.updatePurchaseReceipt(name, data);
+  }
+
+  async submitPurchaseReceipt(name: string) {
+    return this.purchaseAPI.submitPurchaseReceipt(name);
+  }
+
+  async deletePurchaseReceipt(name: string) {
+    return this.purchaseAPI.deletePurchaseReceipt(name);
+  }
+
+  // Sales API methods
+  async getSalesOrders(filters?: any, company?: string) {
+    return this.salesAPI.getSalesOrders(filters, company);
+  }
+
+  async getSalesOrder(name: string) {
+    return this.salesAPI.getSalesOrder(name);
+  }
+
+  async getDeliveryNotes(filters?: any[], company?: string) {
+    return this.salesAPI.getDeliveryNotes(filters, company);
+  }
+
+  async getDeliveryNote(name: string) {
+    return this.salesAPI.getDeliveryNote(name);
+  }
+
+  async createDeliveryNote(data: any) {
+    return this.salesAPI.createDeliveryNote(data);
+  }
+
+  async updateDeliveryNote(name: string, data: any) {
+    return this.salesAPI.updateDeliveryNote(name, data);
+  }
+
+  async submitDeliveryNote(name: string) {
+    return this.salesAPI.submitDeliveryNote(name);
+  }
+
+  async deleteDeliveryNote(name: string) {
+    return this.salesAPI.deleteDeliveryNote(name);
+  }
+
+  // Warehouse API methods
+  async getWarehouses(filters?: any, company?: string) {
+    return this.warehouseAPI.getWarehouses(filters, company);
+  }
+
+  async getWarehouse(name: string) {
+    return this.warehouseAPI.getWarehouse(name);
+  }
+
+  // Company API methods
+  async getCompanies(): Promise<ERPNextResponse<any[]>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Company`,
+      { headers: this.getHeaders() }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch companies: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return { data: result.data || [] };
+  }
+
+  async getCompany(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Company/${encodeURIComponent(name)}`,
+      { headers: this.getHeaders() }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch company: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return { data: result.data };
+  }
+
+  // Stock Reconciliation methods
+  async getStockReconciliations(filters?: any[], company?: string): Promise<ERPNextResponse<any[]>> {
+    const conditions: string[][] = [];
+    
+    if (filters && Array.isArray(filters)) {
+      conditions.push(...filters);
+    }
+    
+    if (company) {
+      conditions.push(['company', '=', company]);
+    }
+
+    const params = new URLSearchParams();
+    if (conditions.length > 0) {
+      params.append('filters', JSON.stringify(conditions));
+    }
+    params.append('fields', JSON.stringify(['name', 'posting_date', 'expense_account', 'company']));
+
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Stock Reconciliation?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock reconciliations: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return { data: result.data || [] };
+  }
+
+  async createStockReconciliation(data: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Stock Reconciliation`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(data)
       }
-
-      const data = await response.json();
-      return { data: data.data || data };
-    } catch (error) {
-      console.error('ERPNext API Error:', error);
-      throw error;
-    }
-  }
-
-  async get(endpoint: string, params?: Record<string, string>): Promise<ERPNextResponse> {
-    const url = new URL(`${this.baseURL}${endpoint}`);
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          url.searchParams.append(key, value);
-        }
-      });
-    }
-    return this.makeRequest(url.pathname + url.search);
-  }
-
-  async post(endpoint: string, data: any): Promise<ERPNextResponse> {
-    return this.makeRequest(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async put(endpoint: string, data: any): Promise<ERPNextResponse> {
-    return this.makeRequest(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async delete(endpoint: string): Promise<ERPNextResponse> {
-    return this.makeRequest(endpoint, {
-      method: 'DELETE',
-    });
-  }
-
-  // Company APIs
-  async getCompanies(): Promise<ERPNextResponse> {
-    return this.get('/api/resource/Company', {
-      fields: JSON.stringify(['name', 'company_name']),
-      limit_page_length: '50'
-    });
-  }
-
-  // Item APIs
-  async getItems(filters?: any, limit?: number): Promise<ERPNextResponse> {
-    const params: Record<string, string> = {
-      fields: JSON.stringify(['name', 'item_name', 'item_code', 'description', 'stock_uom']),
-      limit_page_length: limit?.toString() || '20'
-    };
+    );
     
-    if (filters) {
-      params.filters = JSON.stringify(filters);
+    if (!response.ok) {
+      throw new Error(`Failed to create stock reconciliation: ${response.statusText}`);
     }
 
-    return this.get('/api/resource/Item', params);
+    const result = await response.json();
+    return { data: result.data };
   }
 
-  async getItemDetails(itemCode: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Item/${itemCode}`);
-  }
-
-  async searchItems(query: string): Promise<ERPNextResponse> {
-    return this.get('/api/resource/Item', {
-      filters: JSON.stringify([['item_name', 'like', `%${query}%`]]),
-      or_filters: JSON.stringify([['item_code', 'like', `%${query}%`]]),
-      fields: JSON.stringify(['name', 'item_name', 'item_code']),
-      limit_page_length: '20'
-    });
-  }
-
-  async searchItemsByBarcode(barcode: string): Promise<ERPNextResponse> {
-    return this.get('/api/resource/Item', {
-      filters: JSON.stringify([['barcodes.barcode', '=', barcode]]),
-      fields: JSON.stringify(['name', 'item_name', 'item_code']),
-      limit_page_length: '5'
-    });
-  }
-
-  // Warehouse APIs
-  async getWarehouses(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filterArray = [];
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        filterArray.push([key, '=', value]);
-      });
-    }
-    if (company) {
-      filterArray.push(['company', '=', company]);
-    }
-
-    return this.get('/api/resource/Warehouse', {
-      filters: JSON.stringify(filterArray),
-      fields: JSON.stringify(['name', 'warehouse_name', 'company']),
-      limit_page_length: limit?.toString() || '50'
-    });
-  }
-
-  // Stock APIs
-  async getStockBalance(warehouse?: string, company?: string): Promise<ERPNextResponse> {
-    const filters = [];
-    if (warehouse) filters.push(['warehouse', '=', warehouse]);
-    if (company) filters.push(['company', '=', company]);
-
-    return this.get('/api/resource/Bin', {
-      filters: JSON.stringify(filters),
-      fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'reserved_qty']),
-      limit_page_length: '1000'
-    });
-  }
-
-  async getBinStock(warehouse: string, itemCode?: string): Promise<ERPNextResponse> {
-    const filters = [['warehouse', '=', warehouse]];
-    if (itemCode) {
-      filters.push(['item_code', '=', itemCode]);
-    }
-
-    return this.get('/api/resource/Bin', {
-      filters: JSON.stringify(filters),
-      fields: JSON.stringify(['item_code', 'warehouse', 'actual_qty', 'reserved_qty']),
-      limit_page_length: '1000'
-    });
-  }
-
-  async getCurrentStock(itemCode: string, warehouse: string): Promise<ERPNextResponse> {
-    return this.getBinStock(warehouse, itemCode);
-  }
-
-  // Material Request APIs
-  async getMaterialRequests(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filterArray = [];
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          filterArray.push([key, value[0], value[1]]);
-        } else {
-          filterArray.push([key, '=', value]);
-        }
-      });
-    }
-    if (company) {
-      filterArray.push(['company', '=', company]);
-    }
-
-    return this.get('/api/resource/Material Request', {
-      filters: JSON.stringify(filterArray),
-      limit_page_length: limit?.toString() || '20',
-      fields: JSON.stringify(['name', 'transaction_date', 'status', 'material_request_type', 'company', 'owner', 'total_qty', 'docstatus', 'items'])
-    });
-  }
-
-  async getMaterialRequest(name: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Material Request/${name}`);
-  }
-
-  async createMaterialRequest(data: any): Promise<ERPNextResponse> {
-    return this.post('/api/resource/Material Request', data);
-  }
-
-  async updateMaterialRequest(name: string, data: any): Promise<ERPNextResponse> {
-    return this.put(`/api/resource/Material Request/${name}`, data);
-  }
-
-  // Purchase Order APIs
-  async getPurchaseOrders(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filterArray = [];
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        filterArray.push([key, '=', value]);
-      });
-    }
-    if (company) {
-      filterArray.push(['company', '=', company]);
-    }
-
-    return this.get('/api/resource/Purchase Order', {
-      filters: JSON.stringify(filterArray),
-      limit_page_length: limit?.toString() || '20',
-      fields: JSON.stringify(['name', 'supplier', 'transaction_date', 'status', 'grand_total'])
-    });
-  }
-
-  async getPurchaseOrder(name: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Purchase Order/${name}`);
-  }
-
-  async getPurchaseReceipts(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filterArray = [];
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        filterArray.push([key, '=', value]);
-      });
-    }
-    if (company) {
-      filterArray.push(['company', '=', company]);
-    }
-
-    return this.get('/api/resource/Purchase Receipt', {
-      filters: JSON.stringify(filterArray),
-      limit_page_length: limit?.toString() || '20',
-      fields: JSON.stringify(['name', 'supplier', 'posting_date', 'status', 'grand_total'])
-    });
-  }
-
-  async getPurchaseReceipt(name: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Purchase Receipt/${name}`);
-  }
-
-  // Sales Order APIs
-  async getSalesOrders(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filterArray = [];
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          filterArray.push([key, value[0], value[1]]);
-        } else {
-          filterArray.push([key, '=', value]);
-        }
-      });
-    }
-    if (company) {
-      filterArray.push(['company', '=', company]);
-    }
-
-    return this.get('/api/resource/Sales Order', {
-      filters: JSON.stringify(filterArray),
-      limit_page_length: limit?.toString() || '20',
-      fields: JSON.stringify(['name', 'customer', 'customer_name', 'transaction_date', 'delivery_date', 'status', 'grand_total', 'per_delivered'])
-    });
-  }
-
-  async getSalesOrder(name: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Sales Order/${name}`);
-  }
-
-  async searchSalesOrders(query: string, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filters = [
-      ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
-    ];
+  async submitStockReconciliation(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Stock Reconciliation/${encodeURIComponent(name)}`,
+      {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ docstatus: 1 })
+      }
+    );
     
-    if (company) {
-      filters.push(['company', '=', company]);
+    if (!response.ok) {
+      throw new Error(`Failed to submit stock reconciliation: ${response.statusText}`);
     }
 
-    return this.get('/api/resource/Sales Order', {
-      filters: JSON.stringify(filters),
-      or_filters: JSON.stringify([
-        ['name', 'like', `%${query}%`],
-        ['customer', 'like', `%${query}%`],
-        ['customer_name', 'like', `%${query}%`]
-      ]),
-      limit_page_length: limit?.toString() || '20',
-      fields: JSON.stringify(['name', 'customer', 'customer_name', 'transaction_date', 'delivery_date', 'status', 'grand_total'])
-    });
+    const result = await response.json();
+    return { data: result.data };
   }
 
-  // Delivery Note APIs
-  async getDeliveryNotes(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filterArray = [];
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          filterArray.push([key, value[0], value[1]]);
-        } else {
-          filterArray.push([key, '=', value]);
-        }
-      });
-    }
-    if (company) {
-      filterArray.push(['company', '=', company]);
-    }
-
-    return this.get('/api/resource/Delivery Note', {
-      filters: JSON.stringify(filterArray),
-      limit_page_length: limit?.toString() || '20',
-      fields: JSON.stringify(['name', 'customer', 'customer_name', 'posting_date', 'docstatus', 'sales_order', 'total_qty', 'grand_total'])
-    });
-  }
-
-  async getDeliveryNote(name: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Delivery Note/${name}`);
-  }
-
-  async createDeliveryNote(data: any): Promise<ERPNextResponse> {
-    return this.post('/api/resource/Delivery Note', data);
-  }
-
-  async updateDeliveryNote(name: string, data: any): Promise<ERPNextResponse> {
-    return this.put(`/api/resource/Delivery Note/${name}`, data);
-  }
-
-  async submitDeliveryNote(name: string): Promise<ERPNextResponse> {
-    return this.put(`/api/resource/Delivery Note/${name}`, { docstatus: 1 });
-  }
-
-  // Pick List APIs
-  async getPickLists(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filterArray = [];
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          filterArray.push([key, value[0], value[1]]);
-        } else {
-          filterArray.push([key, '=', value]);
-        }
-      });
-    }
-    if (company) {
-      filterArray.push(['company', '=', company]);
-    }
-
-    return this.get('/api/resource/Pick List', {
-      filters: JSON.stringify(filterArray),
-      limit_page_length: limit?.toString() || '20',
-      fields: JSON.stringify(['name', 'purpose', 'company', 'docstatus', 'creation', 'owner', 'locations'])
-    });
-  }
-
-  async getPickList(name: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Pick List/${name}`);
-  }
-
-  async updatePickList(name: string, data: any): Promise<ERPNextResponse> {
-    return this.put(`/api/resource/Pick List/${name}`, data);
-  }
-
-  async createPickListFromDocument(data: any): Promise<ERPNextResponse> {
-    return this.post('/api/resource/Pick List', data);
-  }
-
-  async getPickListItems(pickListName: string): Promise<ERPNextResponse> {
-    const result = await this.get(`/api/resource/Pick List/${pickListName}`, {
-      fields: JSON.stringify(['locations'])
-    });
-    
-    // Return the locations array directly
-    return {
-      data: result.data?.locations || []
-    };
-  }
-
-  // Stock Entry APIs
-  async getStockEntries(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    const filterArray = [];
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          filterArray.push([key, value[0], value[1]]);
-        } else {
-          filterArray.push([key, '=', value]);
-        }
-      });
-    }
-    if (company) {
-      filterArray.push(['company', '=', company]);
-    }
-
-    return this.get('/api/resource/Stock Entry', {
-      filters: JSON.stringify(filterArray),
-      limit_page_length: limit?.toString() || '20',
-      fields: JSON.stringify(['name', 'stock_entry_type', 'docstatus', 'creation', 'owner', 'total_outgoing_value', 'total_incoming_value'])
-    });
-  }
-
-  async getStockEntry(name: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Stock Entry/${name}`);
-  }
-
-  async createStockEntry(data: any): Promise<ERPNextResponse> {
-    return this.post('/api/resource/Stock Entry', data);
-  }
-
-  async updateStockEntry(name: string, data: any): Promise<ERPNextResponse> {
-    return this.put(`/api/resource/Stock Entry/${name}`, data);
-  }
-
-  async submitStockEntry(name: string): Promise<ERPNextResponse> {
-    return this.put(`/api/resource/Stock Entry/${name}`, { docstatus: 1 });
-  }
-
-  // Stock Reconciliation APIs
-  async createStockReconciliation(data: any): Promise<ERPNextResponse> {
-    return this.post('/api/resource/Stock Reconciliation', data);
-  }
-
-  async updateStockReconciliation(name: string, data: any): Promise<ERPNextResponse> {
-    return this.put(`/api/resource/Stock Reconciliation/${name}`, data);
-  }
-
-  // Document Search APIs for Stock Entry
-  async searchMaterialRequestsForStockEntry(stockEntryType: string, company?: string): Promise<ERPNextResponse> {
-    const filters = [['docstatus', '=', 1]];
-    if (company) filters.push(['company', '=', company]);
-
-    return this.get('/api/resource/Material Request', {
-      filters: JSON.stringify(filters),
-      fields: JSON.stringify(['name', 'material_request_type', 'transaction_date', 'status']),
-      limit_page_length: '50'
-    });
-  }
-
-  async searchPurchaseOrdersForStockEntry(company?: string): Promise<ERPNextResponse> {
-    const filters = [['docstatus', '=', 1], ['status', '!=', 'Completed']];
-    if (company) filters.push(['company', '=', company]);
-
-    return this.get('/api/resource/Purchase Order', {
-      filters: JSON.stringify(filters),
-      fields: JSON.stringify(['name', 'supplier', 'transaction_date', 'status']),
-      limit_page_length: '50'
-    });
-  }
-
-  async searchSalesOrdersForStockEntry(company?: string): Promise<ERPNextResponse> {
-    const filters = [['docstatus', '=', 1], ['status', '!=', 'Completed']];
-    if (company) filters.push(['company', '=', company]);
-
-    return this.get('/api/resource/Sales Order', {
-      filters: JSON.stringify(filters),
-      fields: JSON.stringify(['name', 'customer', 'transaction_date', 'status']),
-      limit_page_length: '50'
-    });
-  }
-
-  async searchBOMs(company?: string): Promise<ERPNextResponse> {
-    const filters = [['docstatus', '=', 1]];
-    if (company) filters.push(['company', '=', company]);
-
-    return this.get('/api/resource/BOM', {
-      filters: JSON.stringify(filters),
-      fields: JSON.stringify(['name', 'item', 'item_name']),
-      limit_page_length: '50'
-    });
-  }
-
-  // Other APIs for completeness
-  async getPackingSlips(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    return this.get('/api/resource/Packing Slip', {
-      limit_page_length: limit?.toString() || '20'
-    });
-  }
-
-  async getQualityInspections(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    return this.get('/api/resource/Quality Inspection', {
-      limit_page_length: limit?.toString() || '20'
-    });
-  }
-
-  async getProductBundles(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
-    return this.get('/api/resource/Product Bundle', {
-      limit_page_length: limit?.toString() || '20'
-    });
-  }
-
-  // Dashboard analytics methods
-  async getPickListAnalytics(company?: string): Promise<ERPNextResponse> {
+  // Test connection method
+  async testConnection(): Promise<boolean> {
     try {
-      const filters = company ? [['company', '=', company]] : [];
-      
-      // Get pending pick lists
-      const pendingFilters = [...filters, ['docstatus', '=', 0]];
-      const pendingResponse = await this.get('/api/resource/Pick List', {
-        filters: JSON.stringify(pendingFilters),
-        limit_page_length: '1000',
-        fields: JSON.stringify(['name', 'purpose'])
-      });
-
-      // Get completed pick lists (today)
-      const today = new Date().toISOString().split('T')[0];
-      const completedFilters = [...filters, ['docstatus', '=', 1], ['creation', '>=', today]];
-      const completedResponse = await this.get('/api/resource/Pick List', {
-        filters: JSON.stringify(completedFilters),
-        limit_page_length: '1000',
-        fields: JSON.stringify(['name'])
-      });
-
-      return {
-        data: {
-          pending: pendingResponse.data?.length || 0,
-          completed: completedResponse.data?.length || 0,
-          typeAnalytics: []
-        }
-      };
+      const response = await fetch(
+        `${this.baseURL}/api/method/frappe.auth.get_logged_user`,
+        { headers: this.getHeaders() }
+      );
+      return response.ok;
     } catch (error) {
-      console.error('Error fetching pick list analytics:', error);
-      return { data: { pending: 0, completed: 0, typeAnalytics: [] } };
+      console.error('Connection test failed:', error);
+      return false;
     }
+  }
+
+  // Generic method to call any ERPNext API
+  async callAPI(method: string, params?: any): Promise<ERPNextResponse<any>> {
+    const url = params 
+      ? `${this.baseURL}/api/method/${method}?${new URLSearchParams(params).toString()}`
+      : `${this.baseURL}/api/method/${method}`;
+
+    const response = await fetch(url, { headers: this.getHeaders() });
+    
+    if (!response.ok) {
+      throw new Error(`API call failed: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return { data: result.message || result.data };
   }
 }
 
+// Re-export types for convenience
 export * from './types';

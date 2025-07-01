@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +6,7 @@ import { Package, Warehouse, TrendingUp, AlertTriangle, Calendar, DollarSign } f
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemScanner from "@/components/item-enquiry/ItemScanner";
+import { Item } from "@/services/erp/erpnext/types";
 
 interface StockItem {
   itemCode: string;
@@ -28,8 +28,11 @@ const ItemEnquiry = () => {
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
   const { toast } = useToast();
 
-  const loadItemStock = async (itemCode: string) => {
-    if (!itemCode.trim()) {
+  const loadItemStock = async (itemCode: string | Item) => {
+    // Handle both string and Item object inputs
+    const code = typeof itemCode === 'string' ? itemCode : (itemCode as Item).item_code;
+    
+    if (!code || !code.trim()) {
       toast({
         title: "Error",
         description: "Please enter an item code",
@@ -40,7 +43,7 @@ const ItemEnquiry = () => {
 
     try {
       setLoading(true);
-      setSelectedItem(itemCode);
+      setSelectedItem(code);
       
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
@@ -67,7 +70,7 @@ const ItemEnquiry = () => {
       }
 
       // Fetch item stock details
-      const response = await erpnextAPI.getBinStock(itemCode);
+      const response = await erpnextAPI.getBinStock(code);
       console.log('Item stock response:', response);
 
       if (response?.data) {
@@ -99,7 +102,7 @@ const ItemEnquiry = () => {
         if (transformedItems.length === 0) {
           toast({
             title: "No Stock Found",
-            description: `No stock found for item: ${itemCode}`,
+            description: `No stock found for item: ${code}`,
             variant: "destructive"
           });
         } else {
@@ -112,7 +115,7 @@ const ItemEnquiry = () => {
         setStockItems([]);
         toast({
           title: "No Data",
-          description: `No stock data available for item: ${itemCode}`,
+          description: `No stock data available for item: ${code}`,
           variant: "destructive"
         });
       }
