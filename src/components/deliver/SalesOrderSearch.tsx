@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Search, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { SalesOrder } from "@/pages/Deliver";
+import { SalesOrder } from "@/types";
 
 interface SalesOrderSearchProps {
   onSelectSO: (salesOrder: SalesOrder) => void;

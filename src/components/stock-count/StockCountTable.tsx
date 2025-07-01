@@ -1,96 +1,99 @@
-
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { StockCountEntry } from "@/types";
 
 interface StockCountTableProps {
   entries: StockCountEntry[];
   onUpdateEntry: (index: number, actualQty: number) => void;
+  readOnly?: boolean;
 }
 
-const StockCountTable = ({ entries, onUpdateEntry }: StockCountTableProps) => {
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState("");
+const StockCountTable = ({ entries, onUpdateEntry, readOnly }: StockCountTableProps) => {
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [tempQty, setTempQty] = useState("");
 
   const handleEdit = (index: number, currentQty: number) => {
-    setEditingIndex(index);
-    setEditValue(currentQty.toString());
+    setEditIndex(index);
+    setTempQty(currentQty.toString());
+  };
+
+  const handleCancel = () => {
+    setEditIndex(null);
+    setTempQty("");
   };
 
   const handleSave = (index: number) => {
-    onUpdateEntry(index, parseFloat(editValue) || 0);
-    setEditingIndex(null);
-    setEditValue("");
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      'matched': { variant: 'outline', color: 'text-green-600' },
-      'variance': { variant: 'destructive', color: 'text-red-600' },
-      'pending': { variant: 'secondary', color: 'text-gray-600' }
-    };
-    const config = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    return <Badge variant={config.variant as any}>{status}</Badge>;
+    const actualQty = parseFloat(tempQty);
+    if (!isNaN(actualQty)) {
+      onUpdateEntry(index, actualQty);
+    }
+    setEditIndex(null);
+    setTempQty("");
   };
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Item Code</TableHead>
-            <TableHead>Item Name</TableHead>
-            <TableHead>Warehouse</TableHead>
-            <TableHead>Current Qty</TableHead>
-            <TableHead>Actual Qty</TableHead>
-            <TableHead>Difference</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {entries.map((entry, index) => (
-            <TableRow key={index}>
-              <TableCell className="font-medium">{entry.itemCode}</TableCell>
-              <TableCell>{entry.itemName}</TableCell>
-              <TableCell>{entry.warehouse}</TableCell>
-              <TableCell>{entry.currentQty} {entry.uom}</TableCell>
-              <TableCell>
-                {editingIndex === index ? (
-                  <Input
-                    type="number"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    className="w-20"
-                  />
-                ) : (
-                  `${entry.actualQty} ${entry.uom}`
-                )}
-              </TableCell>
-              <TableCell className={entry.difference !== 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
-                {entry.difference > 0 ? '+' : ''}{entry.difference} {entry.uom}
-              </TableCell>
-              <TableCell>{getStatusBadge(entry.status)}</TableCell>
-              <TableCell>
-                {editingIndex === index ? (
-                  <div className="flex space-x-1">
-                    <Button size="sm" onClick={() => handleSave(index)}>Save</Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingIndex(null)}>Cancel</Button>
-                  </div>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => handleEdit(index, entry.actualQty)}>
-                    Edit
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Stock Count Entries</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="p-2 border text-left">Item</th>
+                <th className="p-2 border text-left">Warehouse</th>
+                <th className="p-2 border text-left">Current Qty</th>
+                <th className="p-2 border text-left">Actual Qty</th>
+                <th className="p-2 border text-left">UOM</th>
+                <th className="p-2 border text-left">Batch</th>
+                <th className="p-2 border text-left">Serial</th>
+                <th className="p-2 border text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry, index) => (
+                <tr key={index} className="border-b">
+                  <td className="p-2 border">{entry.itemName}</td>
+                  <td className="p-2 border">{entry.warehouse}</td>
+                  <td className="p-2 border">{entry.currentQty}</td>
+                  <td className="p-2 border">
+                    {editIndex === index ? (
+                      <Input
+                        type="number"
+                        value={tempQty}
+                        onChange={(e) => setTempQty(e.target.value)}
+                        className="w-24"
+                      />
+                    ) : (
+                      entry.actualQty
+                    )}
+                  </td>
+                  <td className="p-2 border">{entry.uom}</td>
+                  <td className="p-2 border">{entry.batch || '-'}</td>
+                  <td className="p-2 border">{entry.serial || '-'}</td>
+                  <td className="p-2 border">
+                    {readOnly ? null : (
+                      editIndex === index ? (
+                        <div className="flex space-x-2">
+                          <Button size="sm" onClick={() => handleSave(index)}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+                        </div>
+                      ) : (
+                        <Button size="sm" onClick={() => handleEdit(index, entry.actualQty)}>Edit</Button>
+                      )
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

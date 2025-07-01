@@ -127,10 +127,6 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockAPI.getStockBalance(filters, limitPageLength);
   }
 
-  async getStockBalanceForItem(itemCode: string, warehouse?: string): Promise<ERPNextResponse<StockBalance[]>> {
-    return this.stockAPI.getStockBalanceForItem(itemCode, warehouse);
-  }
-
   async getCurrentStock(itemCode: string, warehouse: string): Promise<ERPNextResponse<any>> {
     return this.stockAPI.getCurrentStock(itemCode, warehouse);
   }
@@ -217,10 +213,6 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     }
 
     return response.json();
-  }
-
-  async searchPurchaseOrders(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
-    return this.purchaseAPI.searchPurchaseOrders(searchTerm, company, limitPageLength);
   }
 
   async getPurchaseReceipts(filters?: any, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {

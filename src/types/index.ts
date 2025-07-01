@@ -1,5 +1,4 @@
 
-
 // Core Item Types
 export interface Item {
   name: string;
@@ -178,4 +177,3 @@ export interface DraftReceipt {
 export type ItemSelectCallback = (item: Item) => void;
 export type ItemCodeSelectCallback = (itemCode: string) => void;
 export type BarcodeScannedCallback = (barcode: string) => void;
-

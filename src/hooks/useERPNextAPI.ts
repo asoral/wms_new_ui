@@ -146,3 +146,83 @@ export const useStockAPI = () => {
     createStockEntry
   };
 };
+
+export const useMaterialRequestAPI = () => {
+  const { callAPI, loading } = useERPNextAPI();
+
+  const getMaterialRequests = useCallback((filters?: any) => {
+    return callAPI(
+      (api) => api.getMaterialRequests(filters),
+      "Failed to fetch material requests"
+    );
+  }, [callAPI]);
+
+  const getMaterialRequest = useCallback((mrNumber: string) => {
+    return callAPI(
+      (api) => api.getMaterialRequest(mrNumber),
+      "Failed to fetch material request"
+    );
+  }, [callAPI]);
+
+  const updateMaterialRequest = useCallback((name: string, requestData: any) => {
+    return callAPI(
+      (api) => api.updateMaterialRequest(name, requestData),
+      "Failed to update material request"
+    );
+  }, [callAPI]);
+
+  return {
+    loading,
+    getMaterialRequests,
+    getMaterialRequest,
+    updateMaterialRequest
+  };
+};
+
+export const usePickListAPI = () => {
+  const { callAPI, loading } = useERPNextAPI();
+
+  const getPickLists = useCallback((filters?: any) => {
+    return callAPI(
+      (api) => api.getPickLists(filters),
+      "Failed to fetch pick lists"
+    );
+  }, [callAPI]);
+
+  const getPickList = useCallback((pickListName: string) => {
+    return callAPI(
+      (api) => api.getPickList(pickListName),
+      "Failed to fetch pick list"
+    );
+  }, [callAPI]);
+
+  const getPickListItems = useCallback((pickListName: string) => {
+    return callAPI(
+      (api) => api.getPickListItems(pickListName),
+      "Failed to fetch pick list items"
+    );
+  }, [callAPI]);
+
+  const createPickListFromDocument = useCallback((documentType: string, documentName: string) => {
+    return callAPI(
+      (api) => api.createPickListFromDocument(documentType, documentName),
+      "Failed to create pick list"
+    );
+  }, [callAPI]);
+
+  const getPickListAnalytics = useCallback((company?: string) => {
+    return callAPI(
+      (api) => api.getPickListAnalytics(company),
+      "Failed to fetch pick list analytics"
+    );
+  }, [callAPI]);
+
+  return {
+    loading,
+    getPickLists,
+    getPickList,
+    getPickListItems,
+    createPickListFromDocument,
+    getPickListAnalytics
+  };
+};

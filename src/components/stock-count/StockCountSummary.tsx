@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CheckCircle, AlertTriangle, Clock } from "lucide-react";
 import { StockCountSession } from "@/types";
 
 interface StockCountSummaryProps {
@@ -9,12 +10,22 @@ interface StockCountSummaryProps {
 
 const StockCountSummary = ({ session }: StockCountSummaryProps) => {
   const getStatusBadge = (status: string) => {
-    const statusMap = {
-      'Draft': 'secondary',
-      'In Progress': 'default',
-      'Completed': 'outline'
+    const statusMap: Record<string, { variant: "default" | "destructive" | "outline" | "secondary", icon: any }> = {
+      'Draft': { variant: 'secondary', icon: Clock },
+      'In Progress': { variant: 'default', icon: Clock },
+      'Completed': { variant: 'outline', icon: CheckCircle },
+      'Submitted': { variant: 'default', icon: CheckCircle }
     };
-    return <Badge variant={statusMap[status as keyof typeof statusMap] || 'secondary'}>{status}</Badge>;
+    
+    const statusInfo = statusMap[status] || { variant: 'secondary', icon: AlertTriangle };
+    const IconComponent = statusInfo.icon;
+    
+    return (
+      <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
+        <IconComponent className="w-3 h-3" />
+        <span>{status}</span>
+      </Badge>
+    );
   };
 
   return (
