@@ -45,10 +45,10 @@ const EnhancedDeliveryForm = ({ soItems, onAddEntry }: EnhancedDeliveryFormProps
     try {
       setLoading(true);
       const erpnextAPI = await createERPNextAPI();
-      if (!erpnxtAPI) return;
+      if (!erpnextAPI) return;
 
       // Get current stock
-      const stockResult = await erpnxtAPI.getCurrentStock(
+      const stockResult = await erpnextAPI.getCurrentStock(
         currentItem.itemCode,
         formData.warehouse
       );

@@ -8,12 +8,19 @@ import PickListItemProcessor from "@/components/picking/PickListItemProcessor";
 // Export the types that other components need
 export interface PickList {
   name: string;
-  purpose: string;
+  purpose: PickListPurpose;
   company: string;
   docstatus: number;
   creation: string;
   owner: string;
   locations?: PickListItem[];
+  // Additional properties used by components
+  id?: string;
+  number?: string;
+  status?: PickListStatus;
+  createdDate?: string;
+  relatedDocument?: string;
+  items?: PickListItem[];
 }
 
 export interface PickListItem {
@@ -24,6 +31,16 @@ export interface PickListItem {
   warehouse: string;
   batch_no?: string;
   serial_no?: string;
+  // Additional properties used by components
+  id?: string;
+  code?: string;
+  name?: string;
+  requiredQty?: number;
+  pickedQty?: number;
+  bin?: string;
+  batch?: string;
+  serial?: string;
+  status?: string;
 }
 
 export type PickListPurpose = 'Delivery' | 'Material Transfer' | 'Material Issue' | 'Manufacturing';

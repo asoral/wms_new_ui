@@ -18,7 +18,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
   const [purpose, setPurpose] = useState<PickListPurpose>(pickList?.purpose || "Material Transfer");
   const [relatedDocument, setRelatedDocument] = useState(pickList?.relatedDocument || "");
 
-  const purposeOptions: PickListPurpose[] = ["Material Transfer", "Delivery", "Transfer for Manufacturing"];
+  const purposeOptions: PickListPurpose[] = ["Material Transfer", "Delivery", "Manufacturing"];
   
   const getRelatedDocumentOptions = (purpose: PickListPurpose) => {
     switch (purpose) {
@@ -26,7 +26,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
         return ["MAT-MR-2025-00005", "MAT-MR-2025-00006", "MAT-MR-2025-00007"];
       case "Delivery":
         return ["SO-2025-00012", "SO-2025-00013", "SO-2025-00014"];
-      case "Transfer for Manufacturing":
+      case "Manufacturing":
         return ["WO-2025-00003", "WO-2025-00004", "WO-2025-00005"];
       default:
         return [];
@@ -39,7 +39,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
         return "Material Request";
       case "Delivery":
         return "Sales Order";
-      case "Transfer for Manufacturing":
+      case "Manufacturing":
         return "Work Order";
       default:
         return "Related Document";
@@ -50,32 +50,46 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
     if (isCreatingNew) {
       // Create new pick list with the selected purpose and related document
       const newPickList: PickList = {
-        id: Date.now().toString(),
+        name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
         number: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
         purpose,
         relatedDocument,
-        status: "draft",
+        status: "Draft",
+        company: "Default Company",
+        docstatus: 0,
+        creation: new Date().toISOString(),
         createdDate: new Date().toISOString(),
+        owner: "Administrator",
         items: [
           {
             id: "1",
+            item_code: "7",
             code: "7",
+            item_name: "Finished Metal Chair",
             name: "Finished Metal Chair",
             warehouse: "Main Store",
             bin: "A-001",
+            batch_no: "BATCH-001",
             batch: "BATCH-001",
+            qty: 5,
             requiredQty: 5,
+            picked_qty: 0,
             pickedQty: 0,
             status: "pending"
           },
           {
             id: "2",
+            item_code: "8",
             code: "8",
+            item_name: "Office Desk",
             name: "Office Desk",
             warehouse: "Main Store", 
             bin: "B-002",
+            serial_no: "SN-12345",
             serial: "SN-12345",
+            qty: 2,
             requiredQty: 2,
+            picked_qty: 0,
             pickedQty: 0,
             status: "pending"
           }
@@ -110,11 +124,11 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-medium text-gray-600">Pick List Number:</span>
-                  <p className="text-gray-900">{pickList.number}</p>
+                  <p className="text-gray-900">{pickList.number || pickList.name}</p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-600">Created Date:</span>
-                  <p className="text-gray-900">{new Date(pickList.createdDate).toLocaleString()}</p>
+                  <p className="text-gray-900">{new Date(pickList.createdDate || pickList.creation).toLocaleString()}</p>
                 </div>
               </div>
             </div>
