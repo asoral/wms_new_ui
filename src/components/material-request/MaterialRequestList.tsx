@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,12 +10,11 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import MobileMaterialRequestCard from "./MobileMaterialRequestCard";
 
 interface MaterialRequestListProps {
-  onCreateNew?: () => void;
-  onEdit?: (request: any) => void;
+  onCreateNew: () => void;
 }
 
-const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) => {
-  const [materialRequests, setMaterialRequests] = useState<any[]>([]);
+const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
+  const [requests, setRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -24,14 +22,14 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    fetchMaterialRequests();
+    fetchRequests();
   }, []);
 
-  const fetchMaterialRequests = async () => {
+  const fetchRequests = async () => {
     setIsLoading(true);
     try {
       const api = await createERPNextAPI();
-      const company = getUserDefaultCompany();
+      const company = await getUserDefaultCompany();
       
       if (!api) {
         toast({
@@ -42,9 +40,9 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
         return;
       }
 
-      const result = await api.getMaterialRequests(undefined, company, 50);
+      const result = await api.getMaterialRequests(undefined, company || undefined, 50);
       if (result && result.data) {
-        setMaterialRequests(result.data);
+        setRequests(result.data);
       }
     } catch (error) {
       console.error('Error fetching material requests:', error);
@@ -58,7 +56,7 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
     }
   };
 
-  const filteredRequests = materialRequests.filter(request => {
+  const filteredRequests = requests.filter(request => {
     const matchesSearch = request.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          request.material_request_type.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -124,7 +122,7 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
                 <option value="ordered">Ordered</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <Button onClick={fetchMaterialRequests} variant="outline" size="icon">
+              <Button onClick={fetchRequests} variant="outline" size="icon">
                 <Filter className="w-4 h-4" />
               </Button>
             </div>
@@ -138,12 +136,10 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Material Requests ({filteredRequests.length})</span>
-              {onCreateNew && (
-                <Button onClick={onCreateNew} size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Request
-                </Button>
-              )}
+              <Button onClick={onCreateNew} size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                New Request
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -154,7 +150,7 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
                     key={index}
                     request={request}
                     onView={(request) => console.log('View request:', request)}
-                    onEdit={onEdit}
+                    onEdit={(request) => console.log('Edit request:', request)}
                   />
                 ))}
               </div>
@@ -168,6 +164,7 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
                       <th className="text-left p-3 border">Date</th>
                       <th className="text-left p-3 border">Status</th>
                       <th className="text-left p-3 border">Company</th>
+                      <th className="text-left p-3 border">Created By</th>
                       <th className="text-left p-3 border">Actions</th>
                     </tr>
                   </thead>
@@ -183,13 +180,14 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
                           {getStatusBadge(request.status)}
                         </td>
                         <td className="p-3 border">{request.company}</td>
+                        <td className="p-3 border">{request.owner}</td>
                         <td className="p-3 border">
                           <div className="flex space-x-2">
                             <Button size="sm" variant="outline">
                               View
                             </Button>
-                            {request.status === 'Draft' && onEdit && (
-                              <Button size="sm" onClick={() => onEdit(request)}>
+                            {request.status === 'Draft' && (
+                              <Button size="sm">
                                 Edit
                               </Button>
                             )}
@@ -207,12 +205,10 @@ const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) 
         <Card>
           <CardContent className="p-8 text-center">
             <p className="text-gray-500 mb-4">No material requests found</p>
-            {onCreateNew && (
-              <Button onClick={onCreateNew}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create First Material Request
-              </Button>
-            )}
+            <Button onClick={onCreateNew}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create First Material Request
+            </Button>
           </CardContent>
         </Card>
       )}

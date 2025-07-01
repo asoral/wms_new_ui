@@ -9,6 +9,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DraftReceipt {
   id: string;
@@ -48,6 +49,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
   const [metricsLoading, setMetricsLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchDashboardData();
@@ -143,6 +145,48 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
     }
   };
 
+  const MobileDraftReceiptCard = ({ receipt }: { receipt: DraftReceipt }) => (
+    <Card className="w-full">
+      <CardContent className="p-4">
+        <div className="space-y-3">
+          <div className="flex justify-between items-start">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-lg text-blue-600 truncate">{receipt.id}</h3>
+              <p className="text-sm text-gray-600 truncate">{receipt.supplier}</p>
+            </div>
+            <Badge variant="secondary">Draft</Badge>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-gray-500">Date</p>
+              <p className="font-medium">{receipt.date}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Items</p>
+              <p className="font-medium">{receipt.items} items</p>
+            </div>
+          </div>
+          
+          <div className="flex justify-between items-center pt-2">
+            <div>
+              <p className="text-gray-500 text-sm">Amount</p>
+              <p className="font-semibold">₹{receipt.amount.toLocaleString()}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDraftReceiptView(receipt.id)}
+            >
+              <Eye className="w-4 h-4 mr-1" />
+              View
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
       {/* Dashboard Metrics */}
@@ -195,15 +239,16 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
           <CardTitle>Receive Items from Purchase Order</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
             <Input
               type="text"
               placeholder="Enter Purchase Order Number"
               value={poNumber}
               onChange={(e) => setPONumber(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handlePOSearch()}
+              className="flex-1"
             />
-            <Button onClick={handlePOSearch}>
+            <Button onClick={handlePOSearch} className="w-full sm:w-auto">
               <Search className="w-4 h-4 mr-2" />
               Search
             </Button>
@@ -223,47 +268,57 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
               <span className="ml-2 text-gray-600">Loading draft receipts...</span>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Receipt ID</th>
-                    <th className="text-left py-2">Supplier</th>
-                    <th className="text-left py-2">Date</th>
-                    <th className="text-left py-2">Items</th>
-                    <th className="text-left py-2">Amount</th>
-                    <th className="text-left py-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <>
+              {isMobile ? (
+                <div className="space-y-4">
                   {draftReceipts.map((receipt) => (
-                    <tr key={receipt.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 font-medium text-blue-600">{receipt.id}</td>
-                      <td className="py-3">{receipt.supplier}</td>
-                      <td className="py-3">{receipt.date}</td>
-                      <td className="py-3">{receipt.items} items</td>
-                      <td className="py-3">₹{receipt.amount.toLocaleString()}</td>
-                      <td className="py-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDraftReceiptView(receipt.id)}
-                          className="flex items-center"
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </Button>
-                      </td>
-                    </tr>
+                    <MobileDraftReceiptCard key={receipt.id} receipt={receipt} />
                   ))}
-                </tbody>
-              </table>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">Receipt ID</th>
+                        <th className="text-left py-2">Supplier</th>
+                        <th className="text-left py-2">Date</th>
+                        <th className="text-left py-2">Items</th>
+                        <th className="text-left py-2">Amount</th>
+                        <th className="text-left py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {draftReceipts.map((receipt) => (
+                        <tr key={receipt.id} className="border-b hover:bg-gray-50">
+                          <td className="py-3 font-medium text-blue-600">{receipt.id}</td>
+                          <td className="py-3">{receipt.supplier}</td>
+                          <td className="py-3">{receipt.date}</td>
+                          <td className="py-3">{receipt.items} items</td>
+                          <td className="py-3">₹{receipt.amount.toLocaleString()}</td>
+                          <td className="py-3">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDraftReceiptView(receipt.id)}
+                              className="flex items-center"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               {draftReceipts.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   No draft purchase receipts found
                 </div>
               )}
-            </div>
+            </>
           )}
         </CardContent>
       </Card>

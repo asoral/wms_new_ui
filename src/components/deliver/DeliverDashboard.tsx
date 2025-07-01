@@ -1,76 +1,41 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Printer,
-  Package,
-  Warehouse,
-  Search,
-  TrendingUp,
-  AlertTriangle,
-  Calendar,
-  DollarSign,
-  CheckCircle,
-  ArrowRightLeft,
-  RefreshCw,
-  FileText,
-  User,
-  ChevronDown
-} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Truck, Package, TrendingUp, Clock, AlertTriangle, Loader2 } from "lucide-react";
+import { MetricCard } from "@/components/ui/metric-card";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import DraftDeliveryNotes from "./DraftDeliveryNotes";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { SalesOrderOption, DashboardData } from "../../pages/Deliver";
+import MobileDeliveryCard from "./MobileDeliveryCard";
 
 interface DeliverDashboardProps {
-  onSelectSalesOrder: (salesOrder: any) => void;
+  onSelectSalesOrder: (salesOrder: SalesOrderOption) => void;
   onViewSalesOrders: () => void;
-  dashboardData: {
-    todaysDelivery: number;
-    totalDeliveries: number;
-  };
+  dashboardData: DashboardData;
   isLoading: boolean;
 }
 
-interface SalesOrder {
-  name: string;
-  customer: string;
-  customer_name: string;
-  delivery_date: string;
-  grand_total: number;
-  status: string;
-  per_delivered: number;
-  total_qty: number;
-}
-
 const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData, isLoading }: DeliverDashboardProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<SalesOrder[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
+  const [salesOrders, setSalesOrders] = useState<SalesOrderOption[]>([]);
+  const [salesOrdersLoading, setSalesOrdersLoading] = useState(true);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
-    if (searchTerm.length >= 2) {
-      searchSalesOrders();
-    } else {
-      setSearchResults([]);
-      setShowDropdown(false);
-    }
-  }, [searchTerm]);
+    fetchSalesOrders();
+  }, []);
 
-  const searchSalesOrders = async () => {
+  const fetchSalesOrders = async () => {
+    setSalesOrdersLoading(true);
     try {
-      setSearching(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
           title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
+          description: "Please configure your ERPNext settings.",
           variant: "destructive"
         });
         return;
@@ -78,263 +43,191 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
 
       const company = await getUserDefaultCompany();
       
-      // Search for sales orders using the sales API
-      const result = await erpnextAPI.sales.searchSalesOrders(searchTerm.trim(), company, 20);
-      
-      if (result.data) {
-        const transformedOrders: SalesOrder[] = result.data.map((order: any) => ({
-          name: order.name || '',
-          customer: order.customer || '',
-          customer_name: order.customer_name || order.customer || '',
-          delivery_date: order.delivery_date || '',
-          grand_total: order.grand_total || 0,
-          status: order.status || '',
-          per_delivered: order.per_delivered || 0,
-          total_qty: order.total_qty || 0
-        }));
-        
-        setSearchResults(transformedOrders);
-        setShowDropdown(true);
-      }
+      // Fetch pending sales orders
+      const pendingSalesOrders = await erpnextAPI.getSalesOrders(
+        [
+          ['docstatus', '=', 1],
+          ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+        ],
+        company || undefined,
+        50
+      );
+
+      // Transform to SalesOrderOption format
+      const transformedOrders: SalesOrderOption[] = pendingSalesOrders.data?.map((so: any) => ({
+        value: so.name,
+        label: so.name,
+        customer: so.customer,
+        customer_name: so.customer_name || so.customer,
+        delivery_date: so.delivery_date,
+        grand_total: so.grand_total || 0,
+        status: so.status,
+        isDraft: false
+      })) || [];
+
+      // Add draft delivery notes as options
+      const draftDeliveryNotes = dashboardData.draftDeliveryNotes.map(dn => ({
+        value: dn.salesOrder || dn.name,
+        label: `${dn.salesOrder || dn.name} (Draft DN: ${dn.name})`,
+        customer: dn.customer,
+        customer_name: dn.customerName,
+        delivery_date: dn.postingDate,
+        grand_total: dn.grandTotal,
+        status: 'Draft',
+        isDraft: true,
+        draftName: dn.name
+      }));
+
+      setSalesOrders([...draftDeliveryNotes, ...transformedOrders]);
+
     } catch (error) {
-      console.error('Error searching sales orders:', error);
+      console.error('Error fetching sales orders:', error);
       toast({
-        title: "Search Error",
-        description: "Failed to search sales orders from ERPNext",
+        title: "Error",
+        description: "Failed to fetch sales orders",
         variant: "destructive"
       });
     } finally {
-      setSearching(false);
+      setSalesOrdersLoading(false);
     }
   };
 
-  const selectSalesOrder = async (so: SalesOrder) => {
-    try {
-      setSearching(true);
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { variant: any }> = {
+      'To Deliver': { variant: 'default' },
+      'To Deliver and Bill': { variant: 'default' },
+      'Partially Delivered': { variant: 'outline' },
+      'Draft': { variant: 'secondary' }
+    };
 
-      // Get full SO details
-      const fullSOResult = await erpnextAPI.sales.getSalesOrder(so.name);
-      if (fullSOResult.data) {
-        const fullSO = fullSOResult.data;
-        
-        const transformedSO = {
-          value: fullSO.name,
-          label: `${fullSO.name} - ${fullSO.customer_name || fullSO.customer}`,
-          customer: fullSO.customer,
-          customer_name: fullSO.customer_name || fullSO.customer,
-          delivery_date: fullSO.delivery_date || fullSO.transaction_date,
-          grand_total: fullSO.grand_total || 0,
-          status: fullSO.status,
-          totalItems: fullSO.items ? fullSO.items.length : 0,
-          items: fullSO.items ? fullSO.items.map((item: any) => ({
-            itemCode: item.item_code,
-            itemName: item.item_name,
-            orderedQty: item.qty || 0,
-            deliveredQty: item.delivered_qty || 0,
-            pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
-            rate: item.rate || 0,
-            uom: item.stock_uom || item.uom,
-            warehouse: item.warehouse || 'Main Store'
-          })) : []
-        };
-
-        setSelectedSO(so);
-        setShowDropdown(false);
-        setSearchTerm(so.name);
-        
-        // Call the parent handler to proceed to the next step
-        onSelectSalesOrder(transformedSO);
-      }
-    } catch (error) {
-      console.error('Error fetching SO details:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch Sales Order details",
-        variant: "destructive"
-      });
-    } finally {
-      setSearching(false);
-    }
+    const statusInfo = statusMap[status] || { variant: 'outline' };
+    return <Badge variant={statusInfo.variant}>{status}</Badge>;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "To Deliver": return "bg-yellow-100 text-yellow-800";
-      case "To Deliver and Bill": return "bg-blue-100 text-blue-800";
-      case "Partially Delivered": return "bg-orange-100 text-orange-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const handleDraftSelect = async (draftName: string, salesOrderNumber?: string) => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Get the draft delivery note details
-      const draftResult = await erpnextAPI.sales.getDeliveryNote(draftName);
-      if (draftResult.data) {
-        const draftData = draftResult.data;
-        
-        // Transform to the format expected by the delivery workflow
-        const transformedDraft = {
-          value: draftName,
-          label: `${draftName} - ${draftData.customer_name || draftData.customer}`,
-          customer: draftData.customer,
-          customer_name: draftData.customer_name || draftData.customer,
-          delivery_date: draftData.posting_date,
-          grand_total: draftData.grand_total || 0,
-          status: "Draft",
-          isDraft: true,
-          draftName: draftName,
-          items: draftData.items ? draftData.items.map((item: any) => ({
-            itemCode: item.item_code,
-            itemName: item.item_name,
-            orderedQty: item.qty || 0,
-            deliveredQty: 0,
-            pendingQty: item.qty || 0,
-            rate: item.rate || 0,
-            uom: item.stock_uom || item.uom,
-            warehouse: item.warehouse || 'Main Store'
-          })) : []
-        };
-
-        onSelectSalesOrder(transformedDraft);
-        
-        toast({
-          title: "Draft Delivery Note Selected",
-          description: `Continuing with draft delivery note: ${draftName}`,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading draft delivery note:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load draft delivery note details",
-        variant: "destructive"
-      });
-    }
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5" />
-            <span>Delivery Summary</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-blue-600 mb-1">Today's Deliveries</p>
-                    <p className="text-2xl font-bold text-blue-600">{dashboardData.todaysDelivery}</p>
+      {/* Dashboard Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="flex items-center p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <div className="w-6 h-6 bg-gray-300 rounded"></div>
                   </div>
-                  <Calendar className="w-8 h-8 text-blue-600" />
+                  <div>
+                    <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                    <div className="h-6 bg-gray-200 rounded w-16"></div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+          ))
+        ) : (
+          <>
+            <MetricCard
+              title="Today's Deliveries"
+              value={dashboardData.todaysDelivery.toString()}
+              icon={Truck}
+            />
+            <MetricCard
+              title="Total Deliveries"
+              value={dashboardData.totalDeliveries.toString()}
+              icon={Package}
+            />
+            <MetricCard
+              title="Pending Orders"
+              value={dashboardData.pendingOrders.toString()}
+              icon={Clock}
+            />
+            <MetricCard
+              title="Draft Delivery Notes"
+              value={dashboardData.draftDeliveryNotes.length.toString()}
+              icon={AlertTriangle}
+            />
+          </>
+        )}
+      </div>
 
-            <Card className="bg-green-50 border-green-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-green-600 mb-1">Total Deliveries</p>
-                    <p className="text-2xl font-bold text-green-600">{dashboardData.totalDeliveries}</p>
-                  </div>
-                  <Package className="w-8 h-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sales Order Search */}
+      {/* Sales Orders to Deliver */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Warehouse className="w-5 h-5" />
-            <span>Select Sales Order for Delivery</span>
+          <CardTitle className="flex items-center justify-between">
+            <span>Sales Orders to Deliver</span>
+            <Button onClick={fetchSalesOrders} variant="outline" size="sm">
+              Refresh
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="relative">
-              <Label htmlFor="soSearch">Search Sales Order</Label>
-              <div className="relative mt-1">
-                <Input
-                  id="soSearch"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by SO number, customer name..."
-                  className="pr-10"
-                />
-                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                {searching && (
-                  <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  </div>
-                )}
-              </div>
-
-              {/* Dropdown Results */}
-              {showDropdown && searchResults.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {searchResults.map((so, index) => (
-                    <div
+          {salesOrdersLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <span className="ml-2 text-gray-600">Loading sales orders...</span>
+            </div>
+          ) : (
+            <>
+              {isMobile ? (
+                <div className="space-y-4">
+                  {salesOrders.slice(0, 10).map((so, index) => (
+                    <MobileDeliveryCard
                       key={index}
-                      className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                      onClick={() => selectSalesOrder(so)}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900">{so.name}</div>
-                          <div className="text-sm text-gray-600 truncate">{so.customer_name}</div>
-                          <div className="flex items-center space-x-4 mt-1">
-                            <Badge className={getStatusColor(so.status)} variant="outline">
-                              {so.status}
-                            </Badge>
-                            <span className="text-xs text-gray-500">
-                              Due: {new Date(so.delivery_date).toLocaleDateString()}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              Delivered: {so.per_delivered}%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right ml-2">
-                          <div className="font-medium text-green-600">
-                            ₹{(so.grand_total || 0).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      salesOrder={so}
+                      onSelect={onSelectSalesOrder}
+                    />
                   ))}
                 </div>
-              )}
-
-              {showDropdown && searchResults.length === 0 && !searching && searchTerm.length >= 2 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-4 text-center text-gray-500">
-                  No sales orders found matching "{searchTerm}"
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">Sales Order</th>
+                        <th className="text-left py-2">Customer</th>
+                        <th className="text-left py-2">Delivery Date</th>
+                        <th className="text-left py-2">Amount</th>
+                        <th className="text-left py-2">Status</th>
+                        <th className="text-left py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesOrders.slice(0, 10).map((so, index) => (
+                        <tr key={index} className="border-b hover:bg-gray-50">
+                          <td className="py-3 font-medium text-blue-600">{so.value}</td>
+                          <td className="py-3">{so.customer_name}</td>
+                          <td className="py-3">{formatDate(so.delivery_date)}</td>
+                          <td className="py-3">₹{so.grand_total.toLocaleString()}</td>
+                          <td className="py-3">{getStatusBadge(so.status)}</td>
+                          <td className="py-3">
+                            <Button
+                              size="sm"
+                              onClick={() => onSelectSalesOrder(so)}
+                            >
+                              {so.isDraft ? 'Continue' : 'Start Delivery'}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
-            </div>
-          </div>
+              {salesOrders.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No sales orders to deliver
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -344,27 +237,26 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-20 flex-col space-y-2" onClick={onViewSalesOrders}>
-              <FileText className="w-6 h-6" />
-              <span>View All SOs</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button 
+              onClick={onViewSalesOrders} 
+              variant="outline"
+              className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
+            >
+              <Package className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium">View All Sales Orders</span>
             </Button>
-            
-            <Button variant="outline" className="h-20 flex-col space-y-2">
-              <Printer className="w-6 h-6" />
-              <span>Print Label</span>
-            </Button>
-            
-            <Button variant="outline" className="h-20 flex-col space-y-2">
-              <CheckCircle className="w-6 h-6" />
-              <span>Quality Check</span>
+            <Button 
+              onClick={() => {/* Navigate to draft delivery notes */}} 
+              variant="outline"
+              className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
+            >
+              <AlertTriangle className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium">Draft Delivery Notes</span>
             </Button>
           </div>
         </CardContent>
       </Card>
-
-      {/* Draft Delivery Notes */}
-      <DraftDeliveryNotes onSelectDraft={handleDraftSelect} />
     </div>
   );
 };

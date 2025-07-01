@@ -31,7 +31,7 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
     setIsLoading(true);
     try {
       const api = await createERPNextAPI();
-      const company = getUserDefaultCompany();
+      const company = await getUserDefaultCompany();
       
       if (!api) {
         toast({
@@ -42,7 +42,7 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
         return;
       }
 
-      const result = await api.getStockEntries(undefined, company, 50);
+      const result = await api.getStockEntries(undefined, company || undefined, 50);
       if (result && result.data) {
         setStockEntries(result.data);
       }
