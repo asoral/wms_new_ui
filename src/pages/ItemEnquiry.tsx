@@ -6,7 +6,7 @@ import { Package, Warehouse, TrendingUp, AlertTriangle, Calendar, DollarSign } f
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemScanner from "@/components/item-enquiry/ItemScanner";
-import { Item } from "@/services/erp/erpnext/types";
+import { Item } from "@/types";
 
 interface StockItem {
   itemCode: string;
@@ -28,9 +28,8 @@ const ItemEnquiry = () => {
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
   const { toast } = useToast();
 
-  const loadItemStock = async (itemCode: string | Item) => {
-    // Handle both string and Item object inputs
-    const code = typeof itemCode === 'string' ? itemCode : (itemCode as Item).item_code;
+  const loadItemStock = async (item: Item) => {
+    const code = item.item_code;
     
     if (!code || !code.trim()) {
       toast({

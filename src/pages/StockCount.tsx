@@ -18,43 +18,7 @@ import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { format } from 'date-fns';
-
-export interface StockCountSession {
-  id: string;
-  warehouse: string;
-  purpose: string;
-  status: string;
-  startedAt: Date;
-  completedAt?: Date;
-  totalItems: number;
-  matchedItems: number;
-  varianceItems: number;
-  entries: StockCountEntry[];
-}
-
-export interface StockCountEntry {
-  itemCode: string;
-  itemName: string;
-  warehouse: string;
-  currentQty: number;
-  actualQty: number;
-  difference: number;
-  status: 'matched' | 'variance' | 'pending';
-  batch?: string;
-  serial?: string;
-  uom: string;
-}
-
-export interface StockCountItem {
-  itemCode: string;
-  itemName: string;
-  warehouse: string;
-  currentQty: number;
-  actualQty: number;
-  uom: string;
-  batch?: string;
-  serial?: string;
-}
+import { StockCountSession, StockCountEntry, StockCountItem } from "@/types";
 
 const StockCount = () => {
   const navigate = useNavigate();
@@ -161,7 +125,7 @@ const StockCount = () => {
                       <TableCell>{session.purpose}</TableCell>
                       <TableCell>
                         {session.status === 'Open' ? (
-                          <Badge variant="outline">Open</Badge>
+                          <AlertTriangle className="w-4 h-4 mr-1 text-yellow-500 inline" />
                         ) : session.status === 'Completed' ? (
                           <div className="flex items-center">
                             <CheckCircle className="w-4 h-4 mr-1 text-green-500" />

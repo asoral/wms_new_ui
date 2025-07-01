@@ -1,598 +1,283 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Save } from "lucide-react";
-import { MaterialRequestPurpose, MaterialRequestItem, MaterialRequest } from "@/pages/MaterialRequest";
-import ItemSelector from "../item-enquiry/ItemSelector";
-import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { CalendarIcon, Package, Trash2 } from "lucide-react"
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import UOMSelector from "./UOMSelector";
+import ItemSelector from '../item-enquiry/ItemSelector';
+import { Item } from "@/types";
 
-interface MaterialRequestFormImprovedProps {
-  purpose: MaterialRequestPurpose;
-  draftRequest?: MaterialRequest | null;
-  onDraftCreated: (draft: MaterialRequest) => void;
-  onReviewAndSubmit: () => void;
-  onBack: () => void;
+interface MaterialRequestItem {
+  item_code: string;
+  item_name: string;
+  qty: number;
+  uom: string;
+  rate: number;
+  amount: number;
+  warehouse: string;
+  schedule_date: string;
+  description: string;
 }
 
-const MaterialRequestFormImproved = ({ 
-  purpose, 
-  draftRequest, 
-  onDraftCreated, 
-  onReviewAndSubmit, 
-  onBack 
-}: MaterialRequestFormImprovedProps) => {
-  const [items, setItems] = useState<MaterialRequestItem[]>(
-    draftRequest?.items || [
-      {
-        itemCode: "",
-        itemName: "",
-        qty: 0,
-        uom: "Nos",
-        description: ""
-      }
-    ]
-  );
+interface MaterialRequestFormProps {
+  onSubmit: (items: MaterialRequestItem[]) => void;
+  onCancel: () => void;
+}
+
+const MaterialRequestFormImproved = ({ onSubmit, onCancel }: MaterialRequestFormProps) => {
+  const [items, setItems] = useState<MaterialRequestItem[]>([]);
+  const [warehouses, setWarehouses] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    remarks: draftRequest?.remarks || "",
-    fromWarehouse: "",
-    toWarehouse: ""
-  });
   const { toast } = useToast();
 
-  const addNewItemRow = () => {
-    setItems([
-      ...items,
-      {
-        itemCode: "",
-        itemName: "",
-        qty: 0,
-        uom: "Nos",
-        description: ""
-      }
-    ]);
-  };
+  useEffect(() => {
+    loadWarehouses();
+  }, []);
 
-  const removeItem = (index: number) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateItem = (index: number, field: keyof MaterialRequestItem, value: any) => {
-    const updatedItems = [...items];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
-    setItems(updatedItems);
-  };
-
-  const handleItemSelected = async (index: number, itemCode: string) => {
-    console.log('Item selected for material request:', itemCode);
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const itemDetails = await erpnextAPI.getItemDetails(itemCode);
-      if (itemDetails.data) {
-        console.log('Item details fetched:', itemDetails.data);
-        const updatedItems = [...items];
-        updatedItems[index] = {
-          ...updatedItems[index],
-          itemCode: itemCode,
-          itemName: itemDetails.data.item_name || itemCode,
-          uom: itemDetails.data.stock_uom || 'Nos',
-          description: itemDetails.data.description || itemDetails.data.item_name || ''
-        };
-        setItems(updatedItems);
-        
-        toast({
-          title: "Item Details Loaded",
-          description: `Item ${itemDetails.data.item_name} details loaded successfully`,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching item details:', error);
-      updateItem(index, 'itemCode', itemCode);
-      updateItem(index, 'itemName', itemCode);
-      toast({
-        title: "Warning",
-        description: "Item selected but details could not be loaded",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const createOrUpdateDraft = async () => {
-    const validItems = items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0);
-    
-    if (validItems.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please add at least one valid item with quantity greater than 0",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const loadWarehouses = async () => {
     try {
       setLoading(true);
-      
-      if (!draftRequest) {
-        await createDraft(validItems);
-      } else {
-        await updateDraft(validItems);
-      }
-      
-    } catch (error) {
-      console.error('Error creating/updating draft:', error);
-      
-      // Check if it's a validation error that should be treated as a warning
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Allow Zero Valuation Rate') || 
-          errorMessage.includes('zero rate') || 
-          errorMessage.includes('ValidationError')) {
-        
-        // Show warning but allow the draft to be created with validation warnings
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
         toast({
-          title: "Validation Warnings",
-          description: "Draft saved with validation warnings. Please review before submitting.",
-          variant: "default"
-        });
-        
-        // Try to create draft anyway - ERPNext allows saving drafts with validation warnings
-        try {
-          await createDraftWithWarnings(validItems);
-        } catch (finalError) {
-          toast({
-            title: "Error",
-            description: "Failed to save material request draft",
-            variant: "destructive"
-          });
-        }
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to save material request",
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
           variant: "destructive"
         });
+        return;
       }
+
+      const response = await erpnextAPI.getWarehouses();
+      if (response?.data) {
+        const warehouseNames = response.data.map(warehouse => warehouse.name);
+        setWarehouses(warehouseNames);
+      } else {
+        setWarehouses([]);
+      }
+    } catch (error) {
+      console.error('Failed to load warehouses:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load warehouses from ERPNext",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const createDraftWithWarnings = async (itemsToAdd: MaterialRequestItem[]) => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const company = await getUserDefaultCompany();
-      
-      // Create simplified material request data for draft with warnings
-      const materialRequestData = {
-        material_request_type: purpose,
-        transaction_date: new Date().toISOString().split('T')[0],
-        company: company,
-        docstatus: 0, // Draft status
-        items: itemsToAdd.map(item => ({
-          item_code: item.itemCode,
-          qty: item.qty || 1,
-          uom: item.uom,
-          description: item.description || '',
-          schedule_date: item.requiredBy || new Date().toISOString().split('T')[0],
-          // Don't include rate and warehouse to avoid validation errors for draft
-          ...(purpose !== "Purchase" && item.warehouse && { warehouse: item.warehouse }),
-          ...(purpose === "Purchase" && item.rate && { rate: item.rate })
-        })),
-        remarks: formData.remarks,
-        // Allow zero valuation for drafts
-        ignore_validate: 1
-      };
-
-      console.log('Creating draft with warnings:', materialRequestData);
-
-      const result = await erpnextAPI.createMaterialRequest(materialRequestData);
-      
-      if (result.data) {
-        const draft: MaterialRequest = {
-          id: result.data.name,
-          name: result.data.name,
-          purpose: purpose,
-          status: "Draft",
-          transactionDate: new Date().toISOString().split('T')[0],
-          requestedBy: "Current User",
-          company: company || "",
-          items: itemsToAdd,
-          remarks: formData.remarks
-        };
-        
-        onDraftCreated(draft);
-        
-        toast({
-          title: "Draft Created with Warnings",
-          description: `Draft ${result.data.name} created. Please review validation warnings before submitting.`,
-        });
-      }
-    } catch (error) {
-      console.error('Error creating draft with warnings:', error);
-      throw error;
-    }
-  };
-
-  const createDraft = async (itemsToAdd: MaterialRequestItem[]) => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const company = await getUserDefaultCompany();
-      
-      const materialRequestData = {
-        material_request_type: purpose,
-        transaction_date: new Date().toISOString().split('T')[0],
-        company: company,
-        docstatus: 0, // Draft status
-        items: itemsToAdd.map(item => ({
-          item_code: item.itemCode,
-          qty: item.qty || 1,
-          uom: item.uom,
-          description: item.description || '',
-          // Pass warehouse from header fields to line items for Material Transfer
-          warehouse: purpose === "Material Transfer" 
-            ? (item.warehouse || formData.fromWarehouse) 
-            : (purpose === "Purchase" ? item.warehouse : undefined),
-          target_warehouse: purpose === "Material Transfer" 
-            ? (formData.toWarehouse) 
-            : undefined,
-          rate: purpose === "Purchase" ? item.rate : undefined,
-          schedule_date: item.requiredBy || new Date().toISOString().split('T')[0]
-        })),
-        remarks: formData.remarks,
-        // Add warehouse fields for Material Transfer at header level
-        ...(purpose === "Material Transfer" && {
-          from_warehouse: formData.fromWarehouse,
-          to_warehouse: formData.toWarehouse
-        })
-      };
-
-      console.log('Creating draft material request:', materialRequestData);
-
-      const result = await erpnextAPI.createMaterialRequest(materialRequestData);
-      
-      if (result.data) {
-        const draft: MaterialRequest = {
-          id: result.data.name,
-          name: result.data.name,
-          purpose: purpose,
-          status: "Draft",
-          transactionDate: new Date().toISOString().split('T')[0],
-          requestedBy: "Current User",
-          company: company || "",
-          items: itemsToAdd,
-          remarks: formData.remarks
-        };
-        
-        onDraftCreated(draft);
-        
-        toast({
-          title: "Draft Created",
-          description: `Draft material request ${result.data.name} created successfully with ${itemsToAdd.length} item(s)!`,
-        });
-      }
-    } catch (error) {
-      console.error('Error creating draft:', error);
-      
-      // Handle validation warnings gracefully
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Allow Zero Valuation Rate') || 
-          errorMessage.includes('zero rate') || 
-          errorMessage.includes('Warehouse is mandatory')) {
-        
-        toast({
-          title: "Validation Messages",
-          description: "Material request created with validation messages. ERPNext will handle these during submission.",
-          variant: "default"
-        });
-      } else {
-        throw error;
-      }
-    }
-  };
-
-  const updateDraft = async (updatedItems: MaterialRequestItem[]) => {
-    if (!draftRequest) return;
+  const handleItemScanned = (item: Item) => {
+    const itemCode = item.item_code;
     
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const updateData = {
-        items: updatedItems.map(item => ({
-          item_code: item.itemCode,
-          qty: item.qty,
-          uom: item.uom,
-          description: item.description || '',
-          warehouse: purpose === "Purchase" ? item.warehouse : undefined,
-          rate: purpose === "Purchase" ? item.rate : undefined,
-          schedule_date: item.requiredBy || new Date().toISOString().split('T')[0]
-        })),
-        remarks: formData.remarks
-      };
-
-      await erpnextAPI.updateMaterialRequest(draftRequest.name, updateData);
-      
-      // Update local draft state
-      const updatedDraft = {
-        ...draftRequest,
-        items: updatedItems,
-        remarks: formData.remarks
-      };
-      onDraftCreated(updatedDraft);
-      
+    // Check if item is already in the list
+    const existingItem = items.find(i => i.item_code === itemCode);
+    if (existingItem) {
       toast({
-        title: "Draft Updated",
-        description: `Draft updated successfully with ${updatedItems.length} item(s)!`,
+        title: "Item Already Added",
+        description: "This item is already in the material request.",
+        variant: "destructive"
       });
-      
-    } catch (error) {
-      console.error('Error updating draft:', error);
-      throw error;
+      return;
     }
+
+    // Add new item to the list
+    const newItem = {
+      item_code: itemCode,
+      item_name: item.item_name,
+      qty: 1,
+      uom: item.stock_uom || 'Nos',
+      rate: 0,
+      amount: 0,
+      warehouse: '',
+      schedule_date: new Date().toISOString().split('T')[0],
+      description: item.description || ''
+    };
+
+    setItems([...items, newItem]);
+    toast({
+      title: "Item Added",
+      description: `${item.item_name} has been added to the material request.`,
+    });
   };
 
-  const handleReviewSubmit = async () => {
-    await createOrUpdateDraft();
-    // Small delay to ensure state is updated
-    setTimeout(() => {
-      onReviewAndSubmit();
-    }, 500);
+  const handleItemRemove = (itemCode: string) => {
+    setItems(items.filter(item => item.item_code !== itemCode));
   };
 
-  const getValidItemsCount = () => {
-    return items.filter(item => item.itemCode && item.itemCode.trim() !== "" && item.qty > 0).length;
+  const handleQuantityChange = (itemCode: string, qty: number) => {
+    setItems(items.map(item => {
+      if (item.item_code === itemCode) {
+        return { ...item, qty: qty, amount: qty * item.rate };
+      }
+      return item;
+    }));
+  };
+
+  const handleRateChange = (itemCode: string, rate: number) => {
+    setItems(items.map(item => {
+      if (item.item_code === itemCode) {
+        return { ...item, rate: rate, amount: rate * item.qty };
+      }
+      return item;
+    }));
+  };
+
+  const handleWarehouseChange = (itemCode: string, warehouse: string) => {
+    setItems(items.map(item => {
+      if (item.item_code === itemCode) {
+        return { ...item, warehouse: warehouse };
+      }
+      return item;
+    }));
+  };
+
+  const handleScheduleDateChange = (itemCode: string, date: Date | undefined) => {
+    if (!date) return;
+    const formattedDate = date.toISOString().split('T')[0];
+    setItems(items.map(item => {
+      if (item.item_code === itemCode) {
+        return { ...item, schedule_date: formattedDate };
+      }
+      return item;
+    }));
+  };
+
+  const handleDescriptionChange = (itemCode: string, description: string) => {
+    setItems(items.map(item => {
+      if (item.item_code === itemCode) {
+        return { ...item, description: description };
+      }
+      return item;
+    }));
+  };
+
+  const handleSubmit = () => {
+    onSubmit(items);
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">
-          {draftRequest ? `Edit ${purpose} Request` : `Create ${purpose} Request`}
-        </h2>
-        {draftRequest && (
-          <div className="text-sm text-gray-600">
-            Draft: {draftRequest.name}
+    <div className="container mx-auto py-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Material Request</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold mb-2">Add Items</h2>
+            <ItemSelector onItemSelected={handleItemScanned} />
           </div>
-        )}
-      </div>
 
-      <div className="space-y-6">
-        {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Request Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {purpose === "Material Transfer" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>From Warehouse</Label>
-                  <WarehouseSelector
-                    onWarehouseSelected={(warehouse) => setFormData({...formData, fromWarehouse: warehouse})}
-                    isLoading={false}
-                  />
-                </div>
-                <div>
-                  <Label>To Warehouse</Label>
-                  <WarehouseSelector
-                    onWarehouseSelected={(warehouse) => setFormData({...formData, toWarehouse: warehouse})}
-                    isLoading={false}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <Label htmlFor="remarks">Remarks</Label>
-              <Textarea
-                id="remarks"
-                placeholder="Enter request remarks..."
-                rows={3}
-                value={formData.remarks}
-                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Items */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Items</CardTitle>
-            <Button type="button" onClick={addNewItemRow} size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item Row
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {items.map((item, index) => (
-                <ItemFormRow 
-                  key={index}
-                  item={item}
-                  index={index}
-                  purpose={purpose}
-                  onItemSelected={(itemCode) => handleItemSelected(index, itemCode)}
-                  onUpdateItem={updateItem}
-                  onRemoveItem={removeItem}
-                  canRemove={items.length > 1}
-                />
-              ))}
-            </div>
-            
-            {getValidItemsCount() > 0 && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-700">
-                  ✓ {getValidItemsCount()} item(s) ready for review and submission
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0 sm:space-x-4 pb-6">
-          <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
-            Back to Dashboard
-          </Button>
-          <div className="flex space-x-2">
-            <Button type="button" variant="outline" onClick={createOrUpdateDraft} disabled={loading} className="w-full sm:w-auto">
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? 'Saving...' : draftRequest ? 'Update Draft' : 'Save Draft'}
-            </Button>
-            <Button 
-              type="button" 
-              onClick={handleReviewSubmit} 
-              disabled={loading || getValidItemsCount() === 0}
-              className="w-full sm:w-auto"
-            >
-              {loading ? 'Processing...' : 'Review & Submit'}
-            </Button>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>UOM</TableHead>
+                  <TableHead>Rate</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Warehouse</TableHead>
+                  <TableHead>Schedule Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => (
+                  <TableRow key={item.item_code}>
+                    <TableCell className="font-medium">{item.item_name}</TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={item.qty}
+                        onChange={(e) => handleQuantityChange(item.item_code, parseFloat(e.target.value))}
+                        className="w-24"
+                      />
+                    </TableCell>
+                    <TableCell>{item.uom}</TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={item.rate}
+                        onChange={(e) => handleRateChange(item.item_code, parseFloat(e.target.value))}
+                        className="w-24"
+                      />
+                    </TableCell>
+                    <TableCell>{item.amount}</TableCell>
+                    <TableCell>
+                      <Select onValueChange={(value) => handleWarehouseChange(item.item_code, value)}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select Warehouse" defaultValue={item.warehouse} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {warehouses.map((warehouse) => (
+                            <SelectItem key={warehouse} value={warehouse}>{warehouse}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-[180px] justify-start text-left font-normal",
+                              !item.schedule_date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {item.schedule_date ? (
+                              format(new Date(item.schedule_date), "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="center">
+                          <Calendar
+                            mode="single"
+                            selected={item.schedule_date ? new Date(item.schedule_date) : undefined}
+                            onSelect={(date) => handleScheduleDateChange(item.item_code, date)}
+                            disabled={loading}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => handleDescriptionChange(item.item_code, e.target.value)}
+                        className="w-48"
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => handleItemRemove(item.item_code)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
-interface ItemFormRowProps {
-  item: MaterialRequestItem;
-  index: number;
-  purpose: MaterialRequestPurpose;
-  onItemSelected: (itemCode: string) => void;
-  onUpdateItem: (index: number, field: keyof MaterialRequestItem, value: any) => void;
-  onRemoveItem: (index: number) => void;
-  canRemove: boolean;
-}
-
-const ItemFormRow = ({ 
-  item, 
-  index, 
-  purpose, 
-  onItemSelected, 
-  onUpdateItem, 
-  onRemoveItem, 
-  canRemove
-}: ItemFormRowProps) => {
-  const isValidItem = item.itemCode && item.itemCode.trim() !== "" && item.qty > 0;
-
-  return (
-    <div className={`border rounded-lg p-4 space-y-4 ${isValidItem ? 'border-green-200 bg-green-50' : 'border-gray-200'}`}>
-      <div className="flex justify-between items-start">
-        <h4 className="font-medium">Item {index + 1}</h4>
-        <div className="flex space-x-2">
-          {isValidItem && (
-            <span className="text-sm text-green-600 font-medium bg-green-100 px-2 py-1 rounded">
-              ✓ Ready
-            </span>
-          )}
-          {canRemove && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => onRemoveItem(index)}
-              className="text-red-600 hover:text-red-700"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {/* Item Selection */}
-        <div>
-          <Label>Item Code / Name *</Label>
-          <ItemSelector
-            onItemSelected={onItemSelected}
-            isLoading={false}
-          />
-          {item.itemName && item.itemName !== item.itemCode && (
-            <p className="text-sm text-gray-600 mt-1">{item.itemName}</p>
-          )}
-        </div>
-
-        {/* Item Description */}
-        <div>
-          <Label>Description</Label>
-          <Textarea
-            value={item.description || ""}
-            onChange={(e) => onUpdateItem(index, 'description', e.target.value)}
-            placeholder="Item description..."
-            rows={2}
-          />
-        </div>
-
-        {/* Quantity and UOM */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <Label>Quantity *</Label>
-            <Input
-              type="number"
-              value={item.qty}
-              onChange={(e) => onUpdateItem(index, 'qty', parseFloat(e.target.value) || 0)}
-              placeholder="0"
-              min="0"
-              step="0.01"
-            />
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+            <Button onClick={handleSubmit}>Submit</Button>
           </div>
-          <div>
-            <Label>UOM</Label>
-            <UOMSelector
-              value={item.uom}
-              onValueChange={(uom) => onUpdateItem(index, 'uom', uom)}
-              disabled={false}
-            />
-          </div>
-          <div>
-            <Label>Required By</Label>
-            <Input
-              type="date"
-              value={item.requiredBy || ""}
-              onChange={(e) => onUpdateItem(index, 'requiredBy', e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Additional fields for Purchase */}
-        {purpose === "Purchase" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Expected Rate</Label>
-              <Input
-                type="number"
-                value={item.rate || ""}
-                onChange={(e) => onUpdateItem(index, 'rate', parseFloat(e.target.value) || 0)}
-                placeholder="0.00"
-                min="0"
-                step="0.01"
-              />
-            </div>
-            <div>
-              <Label>Warehouse</Label>
-              <WarehouseSelector
-                onWarehouseSelected={(warehouse) => onUpdateItem(index, 'warehouse', warehouse)}
-                isLoading={false}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

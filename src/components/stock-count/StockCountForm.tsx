@@ -1,487 +1,277 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Search, Package, ScanLine, CheckCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import ItemSelector from "../item-enquiry/ItemSelector";
-import SerialBatchBundleSelector from "./SerialBatchBundleSelector";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
-import { createSerialBatchBundleFromTraditionalEntry } from "@/services/serialBatchBundleApi";
-
-interface StockCountItem {
-  item_code: string;
-  item_name: string;
-  current_qty: number;
-  counted_qty: number;
-  difference: number;
-  uom: string;
-  batch_no?: string;
-  serial_no?: string;
-  serialBatchBundle?: string;
-  useTraditionalEntry?: boolean;
-}
+import { useToast } from "@/hooks/use-toast";
+import { Plus, CheckCircle, AlertTriangle, Loader2, Package } from "lucide-react";
+import ItemScanner from "@/components/item-enquiry/ItemScanner";
+import { StockCountEntry, StockCountItem } from "@/types";
+import { Item } from "@/types";
 
 interface StockCountFormProps {
-  onSubmit: (items: StockCountItem[]) => void;
-  isLoading?: boolean;
-  warehouse?: string;
-  onAddEntry?: (entry: any) => Promise<void>;
+  onEntryAdded: (entry: StockCountEntry) => void;
 }
 
-const StockCountForm = ({ onSubmit, isLoading = false, warehouse, onAddEntry }: StockCountFormProps) => {
-  const [selectedItems, setSelectedItems] = useState<StockCountItem[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedItemCode, setSelectedItemCode] = useState("");
-  const [countedQty, setCountedQty] = useState<number>(0);
-  const [batchNo, setBatchNo] = useState("");
-  const [serialNo, setSerialNo] = useState("");
-  const [selectedBundle, setSelectedBundle] = useState("");
-  const [useTraditionalEntry, setUseTraditionalEntry] = useState(true);
-  const [itemDetails, setItemDetails] = useState<any>(null);
+const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
+  const [currentItemCode, setCurrentItemCode] = useState<string>("");
+  const [currentItemName, setCurrentItemName] = useState<string>("");
+  const [warehouse, setWarehouse] = useState<string>("");
+  const [currentQty, setCurrentQty] = useState<number>(0);
+  const [actualQty, setActualQty] = useState<number>(0);
+  const [batch, setBatch] = useState<string>("");
+  const [serial, setSerial] = useState<string>("");
+  const [stockItems, setStockItems] = useState<StockCountItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [includeZeroQty, setIncludeZeroQty] = useState<boolean>(false);
   const { toast } = useToast();
 
-  const handleItemSelected = async (itemCode: string) => {
-    console.log('Item selected for stock count:', itemCode);
-    setSelectedItemCode(itemCode);
-    setSearchTerm(itemCode);
-    
-    // Fetch item details to check if it has serial/batch tracking
+  useEffect(() => {
+    if (currentItemCode) {
+      loadItemStock(currentItemCode);
+    }
+  }, [currentItemCode, includeZeroQty]);
+
+  const loadItemStock = async (itemCode: string) => {
     try {
+      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
-      if (erpnextAPI) {
-        const itemResult = await erpnextAPI.getItemDetails(itemCode);
-        if (itemResult.data) {
-          console.log('Item details loaded for stock count:', itemResult.data);
-          setItemDetails(itemResult.data);
-          // Reset bundle selection when item changes
-          setSelectedBundle("");
-          setBatchNo("");
-          setSerialNo("");
-        }
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching item details for stock count:', error);
-    }
-  };
 
-  const handleBundleCreated = (bundleName: string, totalQty: number) => {
-    setSelectedBundle(bundleName);
-    setCountedQty(totalQty);
-    toast({
-      title: "Bundle Created",
-      description: `Serial and Batch Bundle created: ${bundleName}`,
-    });
-  };
+      const company = await getUserDefaultCompany();
+      if (!company) {
+        toast({
+          title: "No Default Company",
+          description: "Please set a default company in your profile settings.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-  const addItemToCount = async () => {
-    if (!selectedItemCode) {
-      toast({
-        title: "No Item Selected",
-        description: "Please select an item to add to the count.",
-        variant: "destructive"
-      });
-      return;
-    }
+      const response = await erpnextAPI.getStockBalance([
+        ['item_code', '=', itemCode]
+      ], company);
 
-    if (countedQty === 0) {
-      toast({
-        title: "Invalid Quantity",
-        description: "Please enter a valid quantity greater than 0.",
-        variant: "destructive"
-      });
-      return;
-    }
+      if (response?.data) {
+        let transformedItems: StockCountItem[] = response.data.map((item: any) => ({
+          itemCode: item.item_code,
+          itemName: item.item_name || item.item_code,
+          warehouse: item.warehouse,
+          currentQty: item.actual_qty || 0,
+          actualQty: 0,
+          uom: item.stock_uom || 'Nos',
+          batch: item.batch_no,
+          serial: item.serial_no
+        }));
 
-    toast({
-      title: "Adding Item",
-      description: "Item is being added to the count...",
-    });
+        if (!includeZeroQty) {
+          transformedItems = transformedItems.filter(item => item.currentQty > 0);
+        }
 
-    try {
-      let serialBatchBundle = selectedBundle;
-      
-      // If using traditional entry and item has serial/batch tracking, create bundle
-      if (useTraditionalEntry && itemDetails && (itemDetails.has_serial_no || itemDetails.has_batch_no) && (batchNo || serialNo)) {
-        try {
-          console.log('Creating bundle for traditional entry');
-          serialBatchBundle = await createSerialBatchBundleFromTraditionalEntry(
-            selectedItemCode,
-            itemDetails.item_name || searchTerm,
-            itemDetails.item_group || 'All Item Groups',
-            itemDetails.has_serial_no || 0,
-            itemDetails.has_batch_no || 0,
-            warehouse || '',
-            countedQty,
-            itemDetails.stock_uom || 'Nos',
-            batchNo || undefined,
-            serialNo || undefined
-          );
-          
-          if (!serialBatchBundle) {
-            throw new Error('Failed to create Serial and Batch Bundle');
-          }
-          
+        setStockItems(transformedItems);
+
+        if (transformedItems.length === 0) {
           toast({
-            title: "Bundle Created",
-            description: `Serial and Batch Bundle created: ${serialBatchBundle}`,
-          });
-        } catch (bundleError) {
-          console.error('Error creating bundle:', bundleError);
-          toast({
-            title: "Bundle Creation Failed",
-            description: "Failed to create Serial and Batch Bundle. Item will be added without bundle.",
+            title: "No Stock Found",
+            description: `No stock found for item: ${itemCode}`,
             variant: "destructive"
           });
         }
-      }
-
-      if (onAddEntry) {
-        await onAddEntry({
-          itemCode: selectedItemCode,
-          itemName: itemDetails?.item_name || searchTerm,
-          warehouse: warehouse || '',
-          currentQty: 0,
-          actualQty: countedQty,
-          uom: itemDetails?.stock_uom || "Nos",
-          batch: useTraditionalEntry ? batchNo || undefined : undefined,
-          serial: useTraditionalEntry ? serialNo || undefined : undefined,
-          serialBatchBundle: serialBatchBundle || undefined,
-          useTraditionalEntry: useTraditionalEntry
-        });
       } else {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const newItem: StockCountItem = {
-          item_code: selectedItemCode,
-          item_name: itemDetails?.item_name || searchTerm,
-          current_qty: 0,
-          counted_qty: countedQty,
-          difference: countedQty - 0,
-          uom: itemDetails?.stock_uom || "Nos",
-          batch_no: useTraditionalEntry ? batchNo || undefined : undefined,
-          serial_no: useTraditionalEntry ? serialNo || undefined : undefined,
-          serialBatchBundle: serialBatchBundle || undefined,
-          useTraditionalEntry: useTraditionalEntry
-        };
-
-        setSelectedItems(prev => [...prev, newItem]);
+        setStockItems([]);
+        toast({
+          title: "No Data",
+          description: `No stock data available for item: ${itemCode}`,
+          variant: "destructive"
+        });
       }
-      
-      // Reset form
-      setSelectedItemCode("");
-      setSearchTerm("");
-      setCountedQty(0);
-      setBatchNo("");
-      setSerialNo("");
-      setSelectedBundle("");
-      setItemDetails(null);
 
-      toast({
-        title: "Item Added",
-        description: "Item has been successfully added to the count.",
-        variant: "default"
-      });
     } catch (error) {
-      console.error('Error adding item to stock count:', error);
+      console.error('Failed to load item stock:', error);
       toast({
         title: "Error",
-        description: "Failed to add item to count.",
+        description: `Failed to load item stock: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const removeItem = (index: number) => {
-    setSelectedItems(prev => prev.filter((_, i) => i !== index));
-    toast({
-      title: "Item Removed",
-      description: "Item has been removed from the count.",
-    });
-  };
-
-  const updateCountedQty = (index: number, qty: number) => {
-    setSelectedItems(prev => prev.map((item, i) => 
-      i === index 
-        ? { ...item, counted_qty: qty, difference: qty - item.current_qty }
-        : item
-    ));
-  };
-
-  const handleSubmit = () => {
-    if (selectedItems.length === 0) {
+  const handleSubmit = (item: StockCountItem) => {
+    if (!item) {
       toast({
-        title: "No Items",
-        description: "Please add at least one item to the count.",
+        title: "Invalid Item",
+        description: "Please select a valid item",
         variant: "destructive"
       });
       return;
     }
 
-    console.log('Submitting stock count with items:', selectedItems);
-    onSubmit(selectedItems);
+    if (!item.warehouse) {
+      toast({
+        title: "Invalid Warehouse",
+        description: "Please select a valid warehouse",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isNaN(item.actualQty)) {
+      toast({
+        title: "Invalid Quantity",
+        description: "Please enter a valid quantity",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const difference = item.actualQty - item.currentQty;
+    const status = difference === 0 ? 'matched' : 'variance';
+
+    const entry: StockCountEntry = {
+      itemCode: item.itemCode,
+      itemName: item.itemName,
+      warehouse: item.warehouse,
+      currentQty: item.currentQty,
+      actualQty: item.actualQty,
+      difference: difference,
+      status: status,
+      batch: item.batch,
+      serial: item.serial,
+      uom: item.uom
+    };
+
+    onEntryAdded(entry);
   };
 
-  const hasSerialBatchTracking = itemDetails && (itemDetails.has_serial_no || itemDetails.has_batch_no);
+  const handleItemScanned = async (item: Item) => {
+    const itemCode = item.item_code;
+    
+    if (!itemCode) {
+      toast({
+        title: "Invalid Item",
+        description: "Please scan a valid item code",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCurrentItemCode(itemCode);
+    setCurrentItemName(item.item_name);
+    
+    // Load item stock details
+    await loadItemStock(itemCode);
+  };
 
   return (
-    <div className="space-y-6">
-      <Tabs defaultValue="search" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="search" className="flex items-center space-x-2">
-            <Search className="w-4 h-4" />
-            <span>Search Item</span>
-          </TabsTrigger>
-          <TabsTrigger value="scan" className="flex items-center space-x-2">
-            <ScanLine className="w-4 h-4" />
-            <span>Scan Item</span>
-          </TabsTrigger>
-        </TabsList>
+    <div className="container mx-auto py-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Package className="w-5 h-5" />
+            <span>Add Stock Count Entry</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ItemScanner
+            onItemScanned={handleItemScanned}
+            isLoading={loading}
+          />
 
-        <TabsContent value="search" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Search className="w-5 h-5" />
-                <span>Search Item</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ItemSelector
-                onItemSelected={handleItemSelected}
-                isLoading={false}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="includeZeroQty"
+              checked={includeZeroQty}
+              onCheckedChange={(checked) => setIncludeZeroQty(!!checked)}
+            />
+            <Label htmlFor="includeZeroQty" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+              Include Zero Quantity Items
+            </Label>
+          </div>
 
-        <TabsContent value="scan" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <ScanLine className="w-5 h-5" />
-                <span>Scan Item Barcode</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="barcode">Barcode</Label>
-                <Input
-                  id="barcode"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Scan or enter barcode"
-                  className="text-lg"
-                  onKeyPress={async (e) => {
-                    if (e.key === 'Enter' && searchTerm) {
-                      await handleItemSelected(searchTerm);
-                    }
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Item Details Form */}
-      {selectedItemCode && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Package className="w-5 h-5" />
-              <span>Item Details</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Show selected item info */}
-            {itemDetails && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="text-sm">
-                  <div className="font-medium text-blue-900">{itemDetails.item_name}</div>
-                  <div className="text-blue-700">Code: {selectedItemCode}</div>
-                  <div className="text-blue-600">UOM: {itemDetails.stock_uom}</div>
-                  {hasSerialBatchTracking && (
-                    <div className="flex gap-2 mt-1">
-                      {itemDetails.has_serial_no && <Badge variant="outline">Serial Tracking</Badge>}
-                      {itemDetails.has_batch_no && <Badge variant="outline">Batch Tracking</Badge>}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="counted_qty">Counted Quantity *</Label>
-                <Input
-                  id="counted_qty"
-                  type="number"
-                  value={countedQty}
-                  onChange={(e) => setCountedQty(Number(e.target.value))}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <Loader2 className="w-6 h-6 mx-auto animate-spin text-gray-500 mb-2" />
+              <p className="text-gray-500">Loading item stock...</p>
             </div>
-
-            {/* Serial and Batch Bundle Section with Tabs */}
-            {hasSerialBatchTracking && selectedItemCode && warehouse && (
-              <div className="space-y-4">
-                <Label>Serial/Batch Entry Method</Label>
-                <Tabs 
-                  value={useTraditionalEntry ? "manual" : "bundle"} 
-                  onValueChange={(value) => setUseTraditionalEntry(value === "manual")}
-                  className="w-full"
-                >
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-                    <TabsTrigger value="bundle">Use Bundle</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="manual" className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {itemDetails.has_batch_no && (
-                        <div className="space-y-2">
-                          <Label htmlFor="batch_no">Batch No</Label>
-                          <Input
-                            id="batch_no"
-                            value={batchNo}
-                            onChange={(e) => setBatchNo(e.target.value)}
-                            placeholder="Enter batch number"
-                          />
-                        </div>
-                      )}
-                      {itemDetails.has_serial_no && (
-                        <div className="space-y-2">
-                          <Label htmlFor="serial_no">Serial No</Label>
-                          <Input
-                            id="serial_no"
-                            value={serialNo}
-                            onChange={(e) => setSerialNo(e.target.value)}
-                            placeholder="Enter serial number"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="bundle" className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Create Serial and Batch Bundle</Label>
-                      <SerialBatchBundleSelector
-                        itemCode={selectedItemCode}
-                        itemName={itemDetails.item_name || searchTerm}
-                        itemGroup={itemDetails.item_group || 'All Item Groups'}
-                        hasSerial={itemDetails.has_serial_no || false}
-                        hasBatch={itemDetails.has_batch_no || false}
-                        warehouse={warehouse}
-                        transactionType="Inward"
-                        onBundleCreated={handleBundleCreated}
-                        initialQuantity={countedQty || 1}
-                      />
-                      {selectedBundle && (
-                        <p className="text-sm text-muted-foreground">
-                          Selected Bundle: {selectedBundle}
-                        </p>
-                      )}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            )}
-
-            <Button 
-              onClick={addItemToCount} 
-              className="w-full"
-              disabled={!selectedItemCode || countedQty <= 0}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add to Count
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Selected Items - Only show if not using onAddEntry */}
-      {!onAddEntry && selectedItems.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5" />
-              <span>Items to Count ({selectedItems.length})</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {selectedItems.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h4 className="font-medium">{item.item_name}</h4>
-                      <Badge variant="outline">{item.item_code}</Badge>
-                    </div>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
-                      <span>Current: {item.current_qty}</span>
-                      <span>Counted: 
+          ) : stockItems.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item Code</TableHead>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead>Warehouse</TableHead>
+                    <TableHead>Current Qty</TableHead>
+                    <TableHead>Actual Qty</TableHead>
+                    <TableHead>UOM</TableHead>
+                    <TableHead>Batch</TableHead>
+                    <TableHead>Serial</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stockItems.map((item) => (
+                    <TableRow key={item.itemCode + item.warehouse}>
+                      <TableCell>{item.itemCode}</TableCell>
+                      <TableCell>{item.itemName}</TableCell>
+                      <TableCell>{item.warehouse}</TableCell>
+                      <TableCell>{item.currentQty}</TableCell>
+                      <TableCell>
                         <Input
                           type="number"
-                          value={item.counted_qty}
-                          onChange={(e) => updateCountedQty(index, Number(e.target.value))}
-                          className="w-20 h-8 ml-2 inline-block"
-                          min="0"
-                          step="0.01"
+                          value={item.actualQty}
+                          onChange={(e) => {
+                            const newQty = parseInt(e.target.value);
+                            setStockItems(prevItems =>
+                              prevItems.map(prevItem =>
+                                prevItem.itemCode === item.itemCode && prevItem.warehouse === item.warehouse
+                                  ? { ...prevItem, actualQty: newQty }
+                                  : prevItem
+                              )
+                            );
+                          }}
                         />
-                      </span>
-                      <span className={`font-medium ${item.difference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        Diff: {item.difference > 0 ? '+' : ''}{item.difference}
-                      </span>
-                    </div>
-                    {(item.batch_no || item.serial_no || item.serialBatchBundle) && (
-                      <div className="flex items-center space-x-2 mt-2">
-                        {item.serialBatchBundle && (
-                          <Badge variant="secondary">Bundle: {item.serialBatchBundle}</Badge>
-                        )}
-                        {item.batch_no && (
-                          <Badge variant="secondary">Batch: {item.batch_no}</Badge>
-                        )}
-                        {item.serial_no && (
-                          <Badge variant="secondary">Serial: {item.serial_no}</Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeItem(index)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+                      </TableCell>
+                      <TableCell>{item.uom}</TableCell>
+                      <TableCell>{item.batch}</TableCell>
+                      <TableCell>{item.serial}</TableCell>
+                      <TableCell className="text-right">
+                        <Button onClick={() => handleSubmit(item)}>
+                          Add Entry
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Submit Button - Only show if not using onAddEntry */}
-      {!onAddEntry && (
-        <Button 
-          onClick={handleSubmit} 
-          className="w-full" 
-          size="lg"
-          disabled={selectedItems.length === 0 || isLoading}
-        >
-          {isLoading ? "Processing..." : `Submit Stock Count (${selectedItems.length} items)`}
-        </Button>
-      )}
+          ) : (
+            <div className="text-center py-8">
+              <AlertTriangle className="w-6 h-6 mx-auto text-gray-500 mb-2" />
+              <p className="text-gray-500">No stock found for the selected item.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

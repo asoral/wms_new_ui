@@ -1,9 +1,9 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Search, ScanBarcode } from "lucide-react";
-import { POItem } from "../../pages/Receive";
+import { POItem } from "@/types";
+import { Item, ItemSelectCallback } from "@/types";
 import CameraScanner from "../item-enquiry/CameraScanner";
 import ItemSelector from "../item-enquiry/ItemSelector";
 
@@ -20,7 +20,8 @@ const ReceiveItemScanner = ({ poItems, onItemScanned, isLoading }: ReceiveItemSc
   // Filter to only show items with pending quantity
   const availableItems = poItems.filter(item => item.pendingQty > 0);
 
-  const handleItemSelected = (itemCode: string) => {
+  const handleItemSelected = (item: Item) => {
+    const itemCode = item.item_code;
     // Check if the selected item is in the PO and has pending quantity
     const matchingItem = availableItems.find(item => item.itemCode === itemCode);
     

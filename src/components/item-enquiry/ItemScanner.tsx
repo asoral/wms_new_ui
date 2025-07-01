@@ -3,11 +3,12 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Camera, Search } from "lucide-react";
+import { Item, ItemSelectCallback } from "@/types";
 import ItemSelector from "./ItemSelector";
 import CameraScanner from "./CameraScanner";
 
 interface ItemScannerProps {
-  onItemScanned: (item: Item) => void;
+  onItemScanned: ItemSelectCallback;
   isLoading: boolean;
 }
 
