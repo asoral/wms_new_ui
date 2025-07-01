@@ -1,285 +1,221 @@
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Plus, 
-  Search, 
-  MoreHorizontal,
-  FileText,
-  Eye,
-  Edit,
-  Trash2,
-  RefreshCw
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MaterialRequest, MaterialRequestPurpose, MaterialRequestStatus } from "@/pages/MaterialRequest";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { Badge } from "@/components/ui/badge";
+import { Search, Filter, Plus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { useIsMobile } from "@/hooks/use-mobile";
+import MobileMaterialRequestCard from "./MobileMaterialRequestCard";
 
 interface MaterialRequestListProps {
-  onCreateNew: (purpose: MaterialRequestPurpose) => void;
-  onEditRequest: (request: MaterialRequest) => void;
-  onBackToDashboard: () => void;
+  onCreateNew?: () => void;
+  onEdit?: (request: any) => void;
 }
 
-const MaterialRequestList = ({ onCreateNew, onEditRequest, onBackToDashboard }: MaterialRequestListProps) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [purposeFilter, setPurposeFilter] = useState<string>("all");
-  const [requests, setRequests] = useState<MaterialRequest[]>([]);
-  const [loading, setLoading] = useState(false);
+const MaterialRequestList = ({ onCreateNew, onEdit }: MaterialRequestListProps) => {
+  const [materialRequests, setMaterialRequests] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchMaterialRequests();
   }, []);
 
   const fetchMaterialRequests = async () => {
-    setLoading(true);
+    setIsLoading(true);
     try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
+      const api = await createERPNextAPI();
+      const company = getUserDefaultCompany();
+      
+      if (!api) {
         toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
+          title: "ERPNext Connection Error",
+          description: "Please configure ERPNext settings",
           variant: "destructive"
         });
         return;
       }
 
-      const company = await getUserDefaultCompany();
-      
-      const result = await erpnextAPI.getMaterialRequests(
-        undefined,
-        company || undefined,
-        100
-      );
-
-      if (result.data) {
-        // Transform ERPNext data to our MaterialRequest format
-        const transformedData: MaterialRequest[] = result.data.map((req: any) => ({
-          id: req.name,
-          name: req.name,
-          title: req.title || req.name,
-          purpose: req.material_request_type as MaterialRequestPurpose,
-          status: req.status as MaterialRequestStatus,
-          transactionDate: req.transaction_date,
-          requiredBy: req.required_by,
-          requestedBy: req.requested_by,
-          company: req.company,
-          priority: "Medium", // Default since ERPNext might not have this field
-          items: [], // Will be loaded when needed
-          remarks: req.remarks
-        }));
-        
-        setRequests(transformedData);
+      const result = await api.getMaterialRequests(undefined, company, 50);
+      if (result && result.data) {
+        setMaterialRequests(result.data);
       }
-
     } catch (error) {
       console.error('Error fetching material requests:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch material requests",
+        description: "Failed to fetch material requests from ERPNext",
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const getStatusColor = (status: MaterialRequestStatus) => {
-    switch (status) {
-      case "Draft": return "bg-gray-100 text-gray-800";
-      case "Submitted": 
-      case "Pending": return "bg-blue-100 text-blue-800";
-      case "Partially Ordered": return "bg-yellow-100 text-yellow-800";
-      case "Ordered": return "bg-green-100 text-green-800";
-      case "Cancelled": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const filteredRequests = requests.filter(request => {
-    const matchesSearch = request.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         request.requestedBy.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || request.status === statusFilter;
-    const matchesPurpose = purposeFilter === "all" || request.purpose === purposeFilter;
+  const filteredRequests = materialRequests.filter(request => {
+    const matchesSearch = request.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         request.material_request_type.toLowerCase().includes(searchTerm.toLowerCase());
     
-    return matchesSearch && matchesStatus && matchesPurpose;
+    if (filterStatus === "all") return matchesSearch;
+    return matchesSearch && request.status.toLowerCase() === filterStatus.toLowerCase();
   });
+
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { variant: any, color: string }> = {
+      'Draft': { variant: 'secondary', color: 'gray' },
+      'Submitted': { variant: 'default', color: 'blue' },
+      'Stopped': { variant: 'destructive', color: 'red' },
+      'Cancelled': { variant: 'destructive', color: 'red' },
+      'Pending': { variant: 'outline', color: 'orange' },
+      'Partially Ordered': { variant: 'outline', color: 'yellow' },
+      'Ordered': { variant: 'default', color: 'green' },
+      'Issued': { variant: 'default', color: 'green' },
+      'Transferred': { variant: 'default', color: 'green' },
+      'Received': { variant: 'default', color: 'green' }
+    };
+
+    const statusInfo = statusMap[status] || { variant: 'outline', color: 'gray' };
+    return <Badge variant={statusInfo.variant}>{status}</Badge>;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin" />
+        <span className="ml-2">Loading material requests...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header with Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <div className="flex-1 space-y-4 sm:space-y-0 sm:flex sm:gap-4">
-          {/* Search */}
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search material requests..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+      {/* Header with Search and Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Material Requests</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search material requests..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-3 py-2 border rounded-md text-sm"
+              >
+                <option value="all">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="submitted">Submitted</option>
+                <option value="pending">Pending</option>
+                <option value="ordered">Ordered</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <Button onClick={fetchMaterialRequests} variant="outline" size="icon">
+                <Filter className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-
-          {/* Filters */}
-          <div className="flex gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Draft">Draft</SelectItem>
-                <SelectItem value="Submitted">Submitted</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Ordered">Ordered</SelectItem>
-                <SelectItem value="Cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={purposeFilter} onValueChange={setPurposeFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Purpose" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Purpose</SelectItem>
-                <SelectItem value="Purchase">Purchase</SelectItem>
-                <SelectItem value="Material Transfer">Transfer</SelectItem>
-                <SelectItem value="Material Issue">Issue</SelectItem>
-                <SelectItem value="Manufacture">Manufacture</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Button variant="outline" size="icon" onClick={fetchMaterialRequests} disabled={loading}>
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </div>
-
-        {/* Create New Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Create New
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onCreateNew("Purchase")}>
-              Purchase Request
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onCreateNew("Material Transfer")}>
-              Material Transfer
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onCreateNew("Material Issue")}>
-              Material Issue
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onCreateNew("Manufacture")}>
-              Manufacturing Request
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Material Requests List */}
-      <div className="grid gap-4">
-        {loading ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <div className="flex items-center justify-center space-x-2">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Loading material requests...</span>
+      {filteredRequests.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Material Requests ({filteredRequests.length})</span>
+              {onCreateNew && (
+                <Button onClick={onCreateNew} size="sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Request
+                </Button>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isMobile ? (
+              <div className="space-y-4">
+                {filteredRequests.map((request, index) => (
+                  <MobileMaterialRequestCard
+                    key={index}
+                    request={request}
+                    onView={(request) => console.log('View request:', request)}
+                    onEdit={onEdit}
+                  />
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        ) : filteredRequests.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No material requests found</p>
-              <Button className="mt-4" onClick={() => onCreateNew("Purchase")}>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="text-left p-3 border">Request Number</th>
+                      <th className="text-left p-3 border">Type</th>
+                      <th className="text-left p-3 border">Date</th>
+                      <th className="text-left p-3 border">Status</th>
+                      <th className="text-left p-3 border">Company</th>
+                      <th className="text-left p-3 border">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRequests.map((request, index) => (
+                      <tr key={index} className="border-b hover:bg-gray-50">
+                        <td className="p-3 border font-medium">{request.name}</td>
+                        <td className="p-3 border">{request.material_request_type}</td>
+                        <td className="p-3 border">
+                          {new Date(request.transaction_date).toLocaleDateString()}
+                        </td>
+                        <td className="p-3 border">
+                          {getStatusBadge(request.status)}
+                        </td>
+                        <td className="p-3 border">{request.company}</td>
+                        <td className="p-3 border">
+                          <div className="flex space-x-2">
+                            <Button size="sm" variant="outline">
+                              View
+                            </Button>
+                            {request.status === 'Draft' && onEdit && (
+                              <Button size="sm" onClick={() => onEdit(request)}>
+                                Edit
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-gray-500 mb-4">No material requests found</p>
+            {onCreateNew && (
+              <Button onClick={onCreateNew}>
                 <Plus className="w-4 h-4 mr-2" />
-                Create First Request
+                Create First Material Request
               </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredRequests.map((request) => (
-            <Card key={request.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h3 className="font-medium">{request.name}</h3>
-                      <p className="text-sm text-gray-500">{request.purpose}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge className={getStatusColor(request.status)}>
-                      {request.status}
-                    </Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEditRequest(request)}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Requested By:</span>
-                    <p className="font-medium">{request.requestedBy}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Date:</span>
-                    <p className="font-medium">{new Date(request.transactionDate).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Required By:</span>
-                    <p className="font-medium">
-                      {request.requiredBy ? new Date(request.requiredBy).toLocaleDateString() : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Company:</span>
-                    <p className="font-medium">{request.company}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

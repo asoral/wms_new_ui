@@ -378,7 +378,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   async getPickListStats(company?: string) {
     try {
       // Get pending pick lists
-      const pendingFilters = [['docstatus', '=', 0]]; // Draft status - fix: use number instead of string
+      const pendingFilters = [['docstatus', '=', '0']]; // Draft status
       if (company) {
         pendingFilters.push(['company', '=', company]);
       }
@@ -388,7 +388,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
       // Get completed pick lists for today
       const today = new Date().toISOString().split('T')[0];
       const completedFilters = [
-        ['docstatus', '=', 1], // Submitted status - fix: use number instead of string
+        ['docstatus', '=', '1'], // Submitted status
         ['creation', '>=', today]
       ];
       if (company) {
