@@ -228,8 +228,34 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockAPI.getStockEntries(filters, limitPageLength);
   }
 
+  async getStockEntry(stockEntryName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry/${encodeURIComponent(stockEntryName)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stock entry: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async createStockEntry(stockEntryData: any): Promise<ERPNextResponse<any>> {
-    return this.stockAPI.createStockEntry(stockEntryData);
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(stockEntryData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create stock entry: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
   }
 
   async createStockReconciliation(reconciliationData: any): Promise<ERPNextResponse<any>> {
@@ -403,6 +429,52 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
     if (!response.ok) {
       throw new Error(`Failed to fetch pick list analytics: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Additional missing methods for completeness
+  async getPackingSlips(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
+    const finalFilters = this.convertToFrappeFilters(filters);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Packing Slip?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch packing slips: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getQualityInspections(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
+    const finalFilters = this.convertToFrappeFilters(filters);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Quality Inspection?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch quality inspections: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getProductBundles(filters?: any, limitPageLength: number = 20): Promise<ERPNextResponse<any[]>> {
+    const finalFilters = this.convertToFrappeFilters(filters);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Product Bundle?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch product bundles: ${response.statusText}`);
     }
 
     return response.json();

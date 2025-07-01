@@ -1,60 +1,72 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useItemAPI } from './useERPNextAPI';
 import { Item } from '@/types';
 
 export const useItemSearch = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Item[]>([]);
-  const { searchItems, searchItemsByBarcode, loading: searching } = useItemAPI();
+  const [items, setItems] = useState<Item[]>([]);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const { searchItems, getItemDetails, searchItemsByBarcode, loading } = useItemAPI();
 
-  useEffect(() => {
-    if (searchQuery.length >= 2) {
-      handleSearch();
-    } else {
-      setSearchResults([]);
+  const handleSearch = useCallback(async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setItems([]);
+      return;
     }
-  }, [searchQuery]);
 
-  const handleSearch = async () => {
-    // Check if it's a barcode search (numeric)
-    if (/^\d+$/.test(searchQuery)) {
-      const barcodeResult = await searchItemsByBarcode(searchQuery);
-      if (barcodeResult?.data && barcodeResult.data.length > 0) {
-        setSearchResults(barcodeResult.data);
-        return;
+    try {
+      const response = await searchItems(searchTerm);
+      if (response?.data && Array.isArray(response.data)) {
+        setItems(response.data);
+      } else {
+        setItems([]);
       }
+    } catch (error) {
+      console.error('Search failed:', error);
+      setItems([]);
     }
+  }, [searchItems]);
 
-    // Regular search by name/code
-    const searchResult = await searchItems(searchQuery);
-    if (searchResult?.data) {
-      setSearchResults(searchResult.data);
-    }
-  };
-
-  const searchByBarcode = async (barcode: string) => {
-    if (!barcode) return;
-    
-    setSearchQuery(barcode);
-    const result = await searchItemsByBarcode(barcode);
-    if (result?.data && result.data.length > 0) {
-      setSearchResults(result.data);
-    } else {
-      // Fallback to regular search
-      const searchResult = await searchItems(barcode);
-      if (searchResult?.data) {
-        setSearchResults(searchResult.data);
+  const handleBarcodeSearch = useCallback(async (barcode: string) => {
+    try {
+      const response = await searchItemsByBarcode(barcode);
+      if (response?.data && Array.isArray(response.data)) {
+        setItems(response.data);
+      } else {
+        setItems([]);
       }
+    } catch (error) {
+      console.error('Barcode search failed:', error);
+      setItems([]);
     }
-  };
+  }, [searchItemsByBarcode]);
+
+  const handleItemSelect = useCallback(async (item: Item) => {
+    try {
+      const response = await getItemDetails(item.item_code);
+      if (response?.data) {
+        setSelectedItem(response.data);
+      } else {
+        setSelectedItem(item);
+      }
+    } catch (error) {
+      console.error('Failed to get item details:', error);
+      setSelectedItem(item);
+    }
+  }, [getItemDetails]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedItem(null);
+    setItems([]);
+  }, []);
 
   return {
-    searchQuery,
-    setSearchQuery,
-    searchResults,
-    setSearchResults,
-    searching,
-    searchByBarcode
+    items,
+    selectedItem,
+    loading,
+    handleSearch,
+    handleBarcodeSearch,
+    handleItemSelect,
+    clearSelection
   };
 };

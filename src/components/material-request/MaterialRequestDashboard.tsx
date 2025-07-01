@@ -57,14 +57,15 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
         ['status', 'not in', ['Cancelled', 'Stopped']]
       ]);
 
-      if (response?.data) {
-        setMaterialRequests(response.data);
+      if (response && typeof response === 'object' && 'data' in response) {
+        const materialRequestsData = (response as any).data;
+        setMaterialRequests(materialRequestsData);
         
         // Calculate dashboard metrics
-        const draft = response.data.filter((mr: any) => mr.docstatus === 0).length;
-        const submitted = response.data.filter((mr: any) => mr.docstatus === 1 && mr.status === 'Submitted').length;
-        const ordered = response.data.filter((mr: any) => mr.status === 'Ordered').length;
-        const received = response.data.filter((mr: any) => mr.status === 'Received').length;
+        const draft = materialRequestsData.filter((mr: any) => mr.docstatus === 0).length;
+        const submitted = materialRequestsData.filter((mr: any) => mr.docstatus === 1 && mr.status === 'Submitted').length;
+        const ordered = materialRequestsData.filter((mr: any) => mr.status === 'Ordered').length;
+        const received = materialRequestsData.filter((mr: any) => mr.status === 'Received').length;
         
         setDashboardData({ draft, submitted, ordered, received });
       }
@@ -81,8 +82,8 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
   const handleSelectMaterialRequest = async (materialRequest: any) => {
     try {
       const response = await getMaterialRequest(materialRequest.name);
-      if (response?.data) {
-        onSelectMaterialRequest(response.data);
+      if (response && typeof response === 'object' && 'data' in response) {
+        onSelectMaterialRequest((response as any).data);
       }
     } catch (error) {
       console.error('Error fetching material request details:', error);

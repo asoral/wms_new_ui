@@ -1,54 +1,77 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge"; 
-import { Package, Plus, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { Plus, FileText, Package, CheckCircle, AlertTriangle } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { usePickListAPI } from "@/hooks/useERPNextAPI";
 import { useToast } from "@/hooks/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
-import MobilePickListCard from "./MobilePickListCard";
+import { getUserDefaultCompany } from "@/services/erpnextApi";
 
 interface PickListDashboardProps {
   onCreateNew: () => void;
   onSelectPickList: (pickList: any) => void;
 }
 
+interface DashboardAnalytics {
+  totalPickLists: number;
+  pendingPickLists: number;
+  completedPickLists: number;
+  totalItems: number;
+}
+
 const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardProps) => {
   const [pickLists, setPickLists] = useState<any[]>([]);
-  const [dashboardData, setDashboardData] = useState({
-    draft: 0,
-    open: 0,
-    completed: 0,
+  const [analytics, setAnalytics] = useState<DashboardAnalytics>({
+    totalPickLists: 0,
+    pendingPickLists: 0,
+    completedPickLists: 0,
     totalItems: 0
   });
-
   const { getPickLists, getPickListAnalytics, loading } = usePickListAPI();
   const { toast } = useToast();
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchPickLists();
-    fetchAnalytics();
   }, []);
+
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { variant: "default" | "destructive" | "outline" | "secondary", icon: any }> = {
+      'Draft': { variant: 'secondary', icon: AlertTriangle },
+      'Open': { variant: 'default', icon: Package },
+      'Completed': { variant: 'outline', icon: CheckCircle },
+    };
+    
+    const statusInfo = statusMap[status] || { variant: 'secondary', icon: AlertTriangle };
+    const IconComponent = statusInfo.icon;
+    
+    return (
+      <Button variant={statusInfo.variant} size="sm" className="gap-x-2">
+        <IconComponent className="w-4 h-4" />
+        {status}
+      </Button>
+    );
+  };
 
   const fetchPickLists = async () => {
     try {
-      const response = await getPickLists([
-        ['docstatus', 'in', [0, 1]],
-        ['status', '!=', 'Cancelled']
-      ]);
-
-      if (response?.data) {
-        setPickLists(response.data);
+      const company = await getUserDefaultCompany();
+      const response = await getPickLists(company ? [['company', '=', company]] : undefined);
+      
+      if (response && typeof response === 'object' && 'data' in response) {
+        const pickListsData = (response as any).data;
+        setPickLists(pickListsData);
         
-        // Calculate metrics
-        const draft = response.data.filter((pl: any) => pl.docstatus === 0).length;
-        const open = response.data.filter((pl: any) => pl.status === 'Open').length;
-        const completed = response.data.filter((pl: any) => pl.status === 'Completed').length;
-        const totalItems = response.data.reduce((acc: number, pl: any) => acc + (pl.locations?.length || 0), 0);
-        
-        setDashboardData({ draft, open, completed, totalItems });
+        // Get analytics data
+        const analyticsResponse = await getPickListAnalytics(company);
+        if (analyticsResponse && typeof analyticsResponse === 'object' && 'data' in analyticsResponse) {
+          const analyticsData = (analyticsResponse as any).data;
+          setAnalytics({
+            totalPickLists: pickListsData.length,
+            pendingPickLists: pickListsData.filter((pl: any) => pl.status === 'Draft').length,
+            completedPickLists: pickListsData.filter((pl: any) => pl.status === 'Completed').length,
+            totalItems: analyticsData.total_items || 0
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching pick lists:', error);
@@ -57,14 +80,6 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         description: "Failed to fetch pick lists",
         variant: "destructive"
       });
-    }
-  };
-
-  const fetchAnalytics = async () => {
-    try {
-      await getPickListAnalytics();
-    } catch (error) {
-      console.error('Error fetching pick list analytics:', error);
     }
   };
 
@@ -77,96 +92,59 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       {/* Dashboard Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="Draft Pick Lists"
-          value={dashboardData.draft.toString()}
+          title="Total Pick Lists"
+          value={analytics.totalPickLists.toString()}
           icon={FileText}
         />
         <MetricCard
-          title="Open Pick Lists"
-          value={dashboardData.open.toString()}
-          icon={Clock}
+          title="Pending Pick Lists"
+          value={analytics.pendingPickLists.toString()}
+          icon={Package}
         />
         <MetricCard
           title="Completed Pick Lists"
-          value={dashboardData.completed.toString()}
+          value={analytics.completedPickLists.toString()}
           icon={CheckCircle}
         />
-        <MetricCard
-          title="Total Items to Pick"
-          value={dashboardData.totalItems.toString()}
-          icon={Package}
+         <MetricCard
+          title="Total Items"
+          value={analytics.totalItems.toString()}
+          icon={AlertTriangle}
         />
       </div>
 
-      {/* Pick Lists */}
+      {/* Pick Lists List */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Pick Lists</span>
-            <Button onClick={fetchPickLists} variant="outline" size="sm">
-              Refresh
-            </Button>
-          </CardTitle>
+          <CardTitle>Pick Lists</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Clock className="w-6 h-6 animate-spin text-gray-400" />
-              <span className="ml-2 text-gray-600">Loading pick lists...</span>
-            </div>
+            <div className="text-center py-4">Loading pick lists...</div>
           ) : (
-            <>
-              {isMobile ? (
-                <div className="space-y-4">
-                  {pickLists.map((pickList, index) => (
-                    <MobilePickListCard
-                      key={index}
-                      pickList={pickList}
-                      onSelect={handleSelectPickList}
-                    />
-                  ))}
+            <div className="space-y-4">
+              {pickLists.map((pickList) => (
+                <div key={pickList.name} className="border rounded-lg p-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">{pickList.name}</h3>
+                    <p className="text-sm text-gray-600">
+                      {pickList.company} - {pickList.creation}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {getStatusBadge(pickList.status)}
+                    <Button size="sm" onClick={() => handleSelectPickList(pickList)}>
+                      View
+                    </Button>
+                  </div>
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2">Pick List</th>
-                        <th className="text-left py-2">Purpose</th>
-                        <th className="text-left py-2">Status</th>
-                        <th className="text-left py-2">Items</th>
-                        <th className="text-left py-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pickLists.map((pickList, index) => (
-                        <tr key={index} className="border-b hover:bg-gray-50">
-                          <td className="py-3 font-medium text-blue-600">{pickList.name}</td>
-                          <td className="py-3">{pickList.purpose}</td>
-                          <td className="py-3">
-                            <Badge variant="secondary">{pickList.status}</Badge>
-                          </td>
-                          <td className="py-3">{pickList.locations?.length || 0}</td>
-                          <td className="py-3">
-                            <Button
-                              size="sm"
-                              onClick={() => handleSelectPickList(pickList)}
-                            >
-                              Select
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              ))}
               {pickLists.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-4 text-gray-500">
                   No pick lists found
                 </div>
               )}
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

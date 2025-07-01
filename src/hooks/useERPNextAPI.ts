@@ -139,11 +139,27 @@ export const useStockAPI = () => {
     );
   }, [callAPI]);
 
+  const getStockEntries = useCallback((filters?: any) => {
+    return callAPI(
+      (api) => api.getStockEntries(filters),
+      "Failed to fetch stock entries"
+    );
+  }, [callAPI]);
+
+  const submitStockEntry = useCallback((stockEntryName: string) => {
+    return callAPI(
+      (api) => api.submitStockEntry(stockEntryName),
+      "Failed to submit stock entry"
+    );
+  }, [callAPI]);
+
   return {
     loading,
     getStockBalance,
     getCurrentStock,
-    createStockEntry
+    createStockEntry,
+    getStockEntries,
+    submitStockEntry
   };
 };
 
@@ -164,6 +180,13 @@ export const useMaterialRequestAPI = () => {
     );
   }, [callAPI]);
 
+  const createMaterialRequest = useCallback((requestData: any) => {
+    return callAPI(
+      (api) => api.createMaterialRequest(requestData),
+      "Failed to create material request"
+    );
+  }, [callAPI]);
+
   const updateMaterialRequest = useCallback((name: string, requestData: any) => {
     return callAPI(
       (api) => api.updateMaterialRequest(name, requestData),
@@ -175,6 +198,7 @@ export const useMaterialRequestAPI = () => {
     loading,
     getMaterialRequests,
     getMaterialRequest,
+    createMaterialRequest,
     updateMaterialRequest
   };
 };

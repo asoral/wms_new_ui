@@ -50,14 +50,15 @@ const StockCount = () => {
         // Transform the data to match our StockCountSession interface
         const transformedSessions: StockCountSession[] = response.data.map((session: any) => ({
           id: session.name,
+          name: session.name,
           warehouse: session.warehouse,
           purpose: session.purpose,
           status: session.status,
           startedAt: new Date(session.posting_date),
           completedAt: session.completion_date ? new Date(session.completion_date) : undefined,
-          totalItems: session.total_items,
-          matchedItems: session.matched_items,
-          varianceItems: session.variance_items,
+          totalItems: session.total_items || 0,
+          matchedItems: session.matched_items || 0,
+          varianceItems: session.variance_items || 0,
           entries: session.entries || []
         }));
 
@@ -79,6 +80,9 @@ const StockCount = () => {
   };
 
   const formatDate = (date: Date) => {
+    if (!date || isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
     return format(date, 'dd MMM yyyy, HH:mm');
   };
 
