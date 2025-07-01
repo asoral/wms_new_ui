@@ -47,6 +47,7 @@ const StockCount = () => {
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
   const [selectedPurpose, setSelectedPurpose] = useState<'reconciliation' | 'opening' | null>(null);
   const [isCreatingReconciliation, setIsCreatingReconciliation] = useState(false);
+  const [reconciliation, setReconciliation] = useState<any>(null);
 
   useEffect(() => {
     const savedSession = localStorage.getItem(STORAGE_KEY);
@@ -280,10 +281,10 @@ const StockCount = () => {
         return;
       }
 
-      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Stock Reconciliation/${session.stockReconciliationNumber}`, {
+      const response = await fetch(`${erpnextAPI.getBaseURL}/api/resource/Stock Reconciliation/${session.stockReconciliationNumber}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+          'Authorization': `token ${erpnextAPI.getApiKey}:${erpnextAPI.getApiSecret}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -332,6 +333,49 @@ const StockCount = () => {
   const handleFormSubmit = (items: any[]) => {
     // This is a placeholder for when onAddEntry is not used
     console.log('Form submitted with items:', items);
+  };
+
+  const generatePDF = async () => {
+    if (!reconciliation) return;
+
+    try {
+      const api = await createERPNextAPI();
+      if (!api) return;
+
+      const pdfUrl = `${api.getBaseURL}/api/method/frappe.utils.print_format.download_pdf`;
+      
+      const params = new URLSearchParams({
+        doctype: 'Stock Reconciliation',
+        name: reconciliation.name,
+        format: 'Standard',
+        _lang: 'en'
+      });
+
+      const response = await fetch(`${pdfUrl}?${params}`, {
+        headers: {
+          'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${reconciliation.name}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to generate PDF",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

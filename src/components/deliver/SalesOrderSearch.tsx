@@ -46,7 +46,7 @@ const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) =
 
       // First try to get the specific SO
       try {
-        const soResult = await erpnextAPI.sales.getSalesOrder(soNumber.trim());
+        const soResult = await erpnextAPI.getSalesOrder(soNumber.trim());
         console.log('SO search result:', soResult);
         
         if (soResult.data) {
@@ -94,14 +94,14 @@ const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) =
         
         // If direct fetch fails, try searching
         try {
-          const searchResult = await erpnextAPI.sales.searchSalesOrders(soNumber.trim(), company);
+          const searchResult = await erpnextAPI.searchSalesOrders(soNumber.trim(), company);
           console.log('SO search by term result:', searchResult);
           
           if (searchResult.data && searchResult.data.length > 0) {
             const so = searchResult.data[0]; // Take first match
             
             // Get full SO details
-            const fullSOResult = await erpnextAPI.sales.getSalesOrder(so.name);
+            const fullSOResult = await erpnxtAPI.getSalesOrder(so.name);
             if (fullSOResult.data) {
               const fullSO = fullSOResult.data;
               

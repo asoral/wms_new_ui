@@ -48,7 +48,7 @@ const SalesOrderSelector = ({ onOrderSelected, loading }: SalesOrderSelectorProp
       const company = await getUserDefaultCompany();
       
       // Search for sales orders that are ready for delivery
-      const result = await erpnextAPI.sales.searchSalesOrders(searchTerm.trim(), company, 20);
+      const result = await erpnextAPI.searchSalesOrders(searchTerm.trim(), company, 20);
       
       if (result.data) {
         setSearchResults(result.data);
@@ -73,7 +73,7 @@ const SalesOrderSelector = ({ onOrderSelected, loading }: SalesOrderSelectorProp
       if (!erpnextAPI) return;
 
       // Get full SO details
-      const fullSOResult = await erpnextAPI.sales.getSalesOrder(so.name);
+      const fullSOResult = await erpnextAPI.getSalesOrder(so.name);
       if (fullSOResult.data) {
         const fullSO = fullSOResult.data;
         

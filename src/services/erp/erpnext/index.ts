@@ -1,3 +1,4 @@
+
 interface ERPNextResponse<T = any> {
   data: T;
   message?: string;
@@ -12,6 +13,19 @@ export class ERPNextAPI {
     this.baseURL = baseURL.replace(/\/$/, '');
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
+  }
+
+  // Public getters for accessing private properties
+  get getBaseURL(): string {
+    return this.baseURL;
+  }
+
+  get getApiKey(): string {
+    return this.apiKey;
+  }
+
+  get getApiSecret(): string {
+    return this.apiSecret;
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<ERPNextResponse> {
@@ -160,6 +174,10 @@ export class ERPNextAPI {
     });
   }
 
+  async getCurrentStock(itemCode: string, warehouse: string): Promise<ERPNextResponse> {
+    return this.getBinStock(warehouse, itemCode);
+  }
+
   // Material Request APIs
   async getMaterialRequests(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
     const filterArray = [];
@@ -259,6 +277,31 @@ export class ERPNextAPI {
     });
   }
 
+  async getSalesOrder(name: string): Promise<ERPNextResponse> {
+    return this.get(`/api/resource/Sales Order/${name}`);
+  }
+
+  async searchSalesOrders(query: string, company?: string, limit?: number): Promise<ERPNextResponse> {
+    const filters = [
+      ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+    ];
+    
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+
+    return this.get('/api/resource/Sales Order', {
+      filters: JSON.stringify(filters),
+      or_filters: JSON.stringify([
+        ['name', 'like', `%${query}%`],
+        ['customer', 'like', `%${query}%`],
+        ['customer_name', 'like', `%${query}%`]
+      ]),
+      limit_page_length: limit?.toString() || '20',
+      fields: JSON.stringify(['name', 'customer', 'customer_name', 'transaction_date', 'delivery_date', 'status', 'grand_total'])
+    });
+  }
+
   // Delivery Note APIs
   async getDeliveryNotes(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
     const filterArray = [];
@@ -280,6 +323,22 @@ export class ERPNextAPI {
       limit_page_length: limit?.toString() || '20',
       fields: JSON.stringify(['name', 'customer', 'customer_name', 'posting_date', 'docstatus', 'sales_order', 'total_qty', 'grand_total'])
     });
+  }
+
+  async getDeliveryNote(name: string): Promise<ERPNextResponse> {
+    return this.get(`/api/resource/Delivery Note/${name}`);
+  }
+
+  async createDeliveryNote(data: any): Promise<ERPNextResponse> {
+    return this.post('/api/resource/Delivery Note', data);
+  }
+
+  async updateDeliveryNote(name: string, data: any): Promise<ERPNextResponse> {
+    return this.put(`/api/resource/Delivery Note/${name}`, data);
+  }
+
+  async submitDeliveryNote(name: string): Promise<ERPNextResponse> {
+    return this.put(`/api/resource/Delivery Note/${name}`, { docstatus: 1 });
   }
 
   // Pick List APIs
@@ -318,9 +377,14 @@ export class ERPNextAPI {
   }
 
   async getPickListItems(pickListName: string): Promise<ERPNextResponse> {
-    return this.get(`/api/resource/Pick List/${pickListName}`, {
+    const result = await this.get(`/api/resource/Pick List/${pickListName}`, {
       fields: JSON.stringify(['locations'])
     });
+    
+    // Return the locations array directly
+    return {
+      data: result.data?.locations || []
+    };
   }
 
   // Stock Entry APIs

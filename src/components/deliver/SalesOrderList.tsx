@@ -97,7 +97,7 @@ const SalesOrderList = ({ onSelectOrder }: SalesOrderListProps) => {
         filters.push(['status', '=', selectedStatus]);
       }
 
-      const salesOrdersResult = await api.sales.getSalesOrders(
+      const salesOrdersResult = await api.getSalesOrders(
         filters,
         company || undefined,
         20

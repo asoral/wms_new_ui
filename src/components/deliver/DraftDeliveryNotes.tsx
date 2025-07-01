@@ -34,7 +34,7 @@ const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
     setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
+      if (!erpnxtAPI) {
         toast({
           title: "ERPNext Not Configured",
           description: "Please configure your ERPNext settings in the Profile page.",
@@ -46,7 +46,7 @@ const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
       const company = await getUserDefaultCompany();
       
       // Fetch draft delivery notes with more details
-      const result = await erpnextAPI.sales.getDeliveryNotes([
+      const result = await erpnextAPI.getDeliveryNotes([
         ['docstatus', '=', 0] // Draft status
       ], company || undefined);
       
@@ -55,7 +55,7 @@ const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
         const detailedNotes = await Promise.all(
           result.data.map(async (note: any) => {
             try {
-              const detailResult = await erpnextAPI.sales.getDeliveryNote(note.name);
+              const detailResult = await erpnextAPI.getDeliveryNote(note.name);
               const detailData = detailResult.data;
               
               // Find the sales order from the items
