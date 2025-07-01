@@ -1,87 +1,41 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { StockCountEntry } from "../../pages/StockCount";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { StockCountEntry } from "@/types";
 
 interface StockCountTableProps {
   entries: StockCountEntry[];
+  onUpdateEntry: (index: number, actualQty: number) => void;
 }
 
-const StockCountTable = ({ entries }: StockCountTableProps) => {
-  const isMobile = useIsMobile();
+const StockCountTable = ({ entries, onUpdateEntry }: StockCountTableProps) => {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
 
-  const getStatusBadge = (status: StockCountEntry['status'], difference: number) => {
-    switch (status) {
-      case 'matched':
-        return <Badge className="bg-green-100 text-green-800">Matched</Badge>;
-      case 'variance':
-        return (
-          <Badge className={difference > 0 ? "bg-blue-100 text-blue-800" : "bg-red-100 text-red-800"}>
-            {difference > 0 ? `+${difference}` : difference}
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">New</Badge>;
-    }
+  const handleEdit = (index: number, currentQty: number) => {
+    setEditingIndex(index);
+    setEditValue(currentQty.toString());
   };
 
-  if (isMobile) {
-    return (
-      <div className="space-y-4">
-        {entries.map((entry, index) => (
-          <Card key={index} className="border-l-4 border-l-orange-500">
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-lg">{entry.itemCode}</h3>
-                    <p className="text-gray-600 text-sm">{entry.itemName}</p>
-                  </div>
-                  <div className="text-right">
-                    {getStatusBadge(entry.status, entry.difference)}
-                  </div>
-                </div>
+  const handleSave = (index: number) => {
+    onUpdateEntry(index, parseFloat(editValue) || 0);
+    setEditingIndex(null);
+    setEditValue("");
+  };
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Current Qty:</span>
-                    <p className="font-medium">{entry.currentQty} {entry.uom}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Actual Qty:</span>
-                    <p className="font-medium">{entry.actualQty} {entry.uom}</p>
-                  </div>
-                </div>
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      'matched': { variant: 'outline', color: 'text-green-600' },
+      'variance': { variant: 'destructive', color: 'text-red-600' },
+      'pending': { variant: 'secondary', color: 'text-gray-600' }
+    };
+    const config = statusMap[status as keyof typeof statusMap] || statusMap.pending;
+    return <Badge variant={config.variant as any}>{status}</Badge>;
+  };
 
-                {(entry.batch || entry.serial) && (
-                  <div className="flex flex-wrap gap-2">
-                    {entry.batch && (
-                      <Badge variant="outline">Batch: {entry.batch}</Badge>
-                    )}
-                    {entry.serial && (
-                      <Badge variant="outline">Serial: {entry.serial}</Badge>
-                    )}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-
-        {entries.length === 0 && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-gray-500">No items scanned yet. Start scanning items to populate the count.</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    );
-  }
-
-  // Desktop table view
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -89,11 +43,12 @@ const StockCountTable = ({ entries }: StockCountTableProps) => {
           <TableRow>
             <TableHead>Item Code</TableHead>
             <TableHead>Item Name</TableHead>
-            <TableHead>Batch/Serial</TableHead>
-            <TableHead className="text-right">Current Qty</TableHead>
-            <TableHead className="text-right">Actual Qty</TableHead>
-            <TableHead>UOM</TableHead>
-            <TableHead className="text-center">Status</TableHead>
+            <TableHead>Warehouse</TableHead>
+            <TableHead>Current Qty</TableHead>
+            <TableHead>Actual Qty</TableHead>
+            <TableHead>Difference</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -101,36 +56,40 @@ const StockCountTable = ({ entries }: StockCountTableProps) => {
             <TableRow key={index}>
               <TableCell className="font-medium">{entry.itemCode}</TableCell>
               <TableCell>{entry.itemName}</TableCell>
+              <TableCell>{entry.warehouse}</TableCell>
+              <TableCell>{entry.currentQty} {entry.uom}</TableCell>
               <TableCell>
-                {entry.batch && (
-                  <Badge variant="outline" className="mr-1">
-                    Batch: {entry.batch}
-                  </Badge>
-                )}
-                {entry.serial && (
-                  <Badge variant="outline">
-                    Serial: {entry.serial}
-                  </Badge>
-                )}
-                {!entry.batch && !entry.serial && (
-                  <span className="text-gray-400">-</span>
+                {editingIndex === index ? (
+                  <Input
+                    type="number"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    className="w-20"
+                  />
+                ) : (
+                  `${entry.actualQty} ${entry.uom}`
                 )}
               </TableCell>
-              <TableCell className="text-right font-medium">{entry.currentQty}</TableCell>
-              <TableCell className="text-right font-medium">{entry.actualQty}</TableCell>
-              <TableCell>{entry.uom}</TableCell>
-              <TableCell className="text-center">
-                {getStatusBadge(entry.status, entry.difference)}
+              <TableCell className={entry.difference !== 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
+                {entry.difference > 0 ? '+' : ''}{entry.difference} {entry.uom}
+              </TableCell>
+              <TableCell>{getStatusBadge(entry.status)}</TableCell>
+              <TableCell>
+                {editingIndex === index ? (
+                  <div className="flex space-x-1">
+                    <Button size="sm" onClick={() => handleSave(index)}>Save</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingIndex(null)}>Cancel</Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => handleEdit(index, entry.actualQty)}>
+                    Edit
+                  </Button>
+                )}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-      {entries.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No items scanned yet. Start scanning items to populate the count.
-        </div>
-      )}
     </div>
   );
 };

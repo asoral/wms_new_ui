@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Scan, Package } from "lucide-react";
-import { DeliveryEntry, SOItem } from "../../pages/Deliver";
+import { DeliveryEntry, SOItem } from "@/types";
 
 interface DeliveryFormProps {
   soItems: SOItem[];
@@ -47,7 +47,7 @@ const DeliveryForm = ({ soItems, onAddEntry }: DeliveryFormProps) => {
       warehouse: formData.warehouse,
       batch: formData.batch || undefined,
       serial: formData.serial || undefined,
-      qtyToDeliver: currentItem.pendingQty,
+      deliveredQty: parseInt(formData.actualQty),
       actualQty: parseInt(formData.actualQty),
       rate: currentItem.rate,
       uom: currentItem.uom

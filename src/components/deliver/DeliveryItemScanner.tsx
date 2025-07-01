@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Scan } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DeliveryEntry, SOItem } from "../../pages/Deliver";
+import { DeliveryEntry, SOItem } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 
 interface DeliveryItemScannerProps {
@@ -71,7 +71,7 @@ const DeliveryItemScanner = ({ soItems, onAddEntry }: DeliveryItemScannerProps) 
       warehouse: warehouse,
       batch: batchNumber || undefined,
       serial: serialNumber || undefined,
-      qtyToDeliver: qty,
+      deliveredQty: qty,
       actualQty: qty,
       rate: selectedItem.rate,
       uom: selectedItem.uom

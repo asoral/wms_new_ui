@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { SalesOrderOption, DashboardData } from "../../pages/Deliver";
+import { SalesOrderOption, DashboardData } from "@/types";
 import MobileDeliveryCard from "./MobileDeliveryCard";
 
 interface DeliverDashboardProps {
@@ -44,41 +43,25 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
       const company = await getUserDefaultCompany();
       
       // Fetch pending sales orders
-      const pendingSalesOrders = await erpnextAPI.getSalesOrders(
-        [
-          ['docstatus', '=', 1],
-          ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
-        ],
-        company || undefined,
-        50
-      );
+      const pendingSalesOrders = await erpnextAPI.getSalesOrders([
+        ['docstatus', '=', 1],
+        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+      ], company || undefined);
 
       // Transform to SalesOrderOption format
       const transformedOrders: SalesOrderOption[] = pendingSalesOrders.data?.map((so: any) => ({
-        value: so.name,
-        label: so.name,
+        id: so.name,
+        number: so.name,
         customer: so.customer,
-        customer_name: so.customer_name || so.customer,
-        delivery_date: so.delivery_date,
-        grand_total: so.grand_total || 0,
         status: so.status,
-        isDraft: false
+        delivery_date: so.delivery_date,
+        totalValue: so.grand_total || 0,
+        totalItems: so.items?.length || 0,
+        expectedDelivery: so.delivery_date,
+        percentDelivered: so.per_delivered || 0
       })) || [];
 
-      // Add draft delivery notes as options
-      const draftDeliveryNotes = dashboardData.draftDeliveryNotes.map(dn => ({
-        value: dn.salesOrder || dn.name,
-        label: `${dn.salesOrder || dn.name} (Draft DN: ${dn.name})`,
-        customer: dn.customer,
-        customer_name: dn.customerName,
-        delivery_date: dn.postingDate,
-        grand_total: dn.grandTotal,
-        status: 'Draft',
-        isDraft: true,
-        draftName: dn.name
-      }));
-
-      setSalesOrders([...draftDeliveryNotes, ...transformedOrders]);
+      setSalesOrders(transformedOrders);
 
     } catch (error) {
       console.error('Error fetching sales orders:', error);
@@ -136,13 +119,8 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
           <>
             <MetricCard
               title="Today's Deliveries"
-              value={dashboardData.todaysDelivery.toString()}
+              value={dashboardData.deliveredToday.toString()}
               icon={Truck}
-            />
-            <MetricCard
-              title="Total Deliveries"
-              value={dashboardData.totalDeliveries.toString()}
-              icon={Package}
             />
             <MetricCard
               title="Pending Orders"
@@ -150,8 +128,13 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
               icon={Clock}
             />
             <MetricCard
-              title="Draft Delivery Notes"
-              value={dashboardData.draftDeliveryNotes.length.toString()}
+              title="Ready to Ship"
+              value={dashboardData.readyToShip.toString()}
+              icon={Package}
+            />
+            <MetricCard
+              title="Overdue"
+              value={dashboardData.overdue.toString()}
               icon={AlertTriangle}
             />
           </>
@@ -202,17 +185,17 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
                     <tbody>
                       {salesOrders.slice(0, 10).map((so, index) => (
                         <tr key={index} className="border-b hover:bg-gray-50">
-                          <td className="py-3 font-medium text-blue-600">{so.value}</td>
-                          <td className="py-3">{so.customer_name}</td>
-                          <td className="py-3">{formatDate(so.delivery_date)}</td>
-                          <td className="py-3">₹{so.grand_total.toLocaleString()}</td>
+                          <td className="py-3 font-medium text-blue-600">{so.number}</td>
+                          <td className="py-3">{so.customer}</td>
+                          <td className="py-3">{formatDate(so.delivery_date || '')}</td>
+                          <td className="py-3">₹{so.totalValue.toLocaleString()}</td>
                           <td className="py-3">{getStatusBadge(so.status)}</td>
                           <td className="py-3">
                             <Button
                               size="sm"
                               onClick={() => onSelectSalesOrder(so)}
                             >
-                              {so.isDraft ? 'Continue' : 'Start Delivery'}
+                              Start Delivery
                             </Button>
                           </td>
                         </tr>
@@ -245,14 +228,6 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
             >
               <Package className="w-5 h-5 text-blue-600" />
               <span className="text-sm font-medium">View All Sales Orders</span>
-            </Button>
-            <Button 
-              onClick={() => {/* Navigate to draft delivery notes */}} 
-              variant="outline"
-              className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
-            >
-              <AlertTriangle className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-medium">Draft Delivery Notes</span>
             </Button>
           </div>
         </CardContent>

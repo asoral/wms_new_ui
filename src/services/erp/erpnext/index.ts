@@ -1,246 +1,383 @@
-import { ERPNextItemsAPI } from './itemsApi';
-import { ERPNextStockAPI } from './stockApi';
-import { ERPNextPurchaseAPI } from './purchaseApi';
-import { ERPNextSalesAPI } from './salesApi';
-import { ERPNextWarehouseAPI } from './warehouseApi';
-import { ERPNextResponse } from './types';
 
-export class ERPNextAPI extends ERPNextItemsAPI {
-  private stockAPI: ERPNextStockAPI;
-  private purchaseAPI: ERPNextPurchaseAPI;
+import { ERPNextBaseAPI } from './baseApi';
+import { ERPNextSalesAPI } from './salesApi';
+import { ERPNextPurchaseAPI } from './purchaseApi';
+import { ERPNextStockAPI } from './stockApi';
+import { ERPNextWarehouseAPI } from './warehouseApi';
+import { ERPNextResponse, Item, Warehouse, StockBalance } from './types';
+
+export class ERPNextAPI extends ERPNextBaseAPI {
+  // Create instances of specialized APIs
   private salesAPI: ERPNextSalesAPI;
+  private purchaseAPI: ERPNextPurchaseAPI;
+  private stockAPI: ERPNextStockAPI;
   private warehouseAPI: ERPNextWarehouseAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
     super(baseURL, apiKey, apiSecret);
-    this.stockAPI = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
-    this.purchaseAPI = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
     this.salesAPI = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
+    this.purchaseAPI = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
+    this.stockAPI = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
     this.warehouseAPI = new ERPNextWarehouseAPI(baseURL, apiKey, apiSecret);
   }
 
-  // Stock API methods
-  async getStockBalance(filters?: any[], company?: string) {
-    return this.stockAPI.getStockBalance(filters, company);
+  // Items API
+  async getItems(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<Item[]>> {
+    const finalFilters = this.convertToFrappeFilters(filters);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch items: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
-  async getBinStock(itemCode: string, warehouse?: string) {
-    return this.stockAPI.getBinStock(itemCode, warehouse);
+  async getItemDetails(itemCode: string): Promise<ERPNextResponse<Item>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Item/${encodeURIComponent(itemCode)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch item details: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
-  async getStockLedger(filters?: any[], company?: string) {
-    return this.stockAPI.getStockLedger(filters, company);
+  async searchItems(searchTerm: string, limitPageLength: number = 20): Promise<ERPNextResponse<Item[]>> {
+    const orFilters = [
+      ['item_code', 'like', `%${searchTerm}%`],
+      ['item_name', 'like', `%${searchTerm}%`],
+      ['barcode', 'like', `%${searchTerm}%`]
+    ];
+
+    const params = new URLSearchParams({
+      or_filters: JSON.stringify(orFilters),
+      fields: JSON.stringify(['item_code', 'item_name', 'stock_uom', 'description', 'has_batch_no', 'has_serial_no']),
+      limit_page_length: limitPageLength.toString()
+    });
+
+    const response = await fetch(`${this.baseURL}/api/resource/Item?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search items: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
-  async createStockEntry(data: any) {
-    return this.stockAPI.createStockEntry(data);
+  // Warehouse API
+  async getWarehouses(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<Warehouse[]>> {
+    return this.warehouseAPI.getWarehouses(filters, limitPageLength);
   }
 
-  async getStockEntries(filters?: any[], company?: string) {
-    return this.stockAPI.getStockEntries(filters, company);
+  async searchWarehouses(searchTerm: string, limitPageLength?: number): Promise<ERPNextResponse<Warehouse[]>> {
+    return this.warehouseAPI.searchWarehouses(searchTerm, limitPageLength);
   }
 
-  // Purchase API methods
-  async getPurchaseOrders(filters?: any, company?: string) {
-    return this.purchaseAPI.getPurchaseOrders(filters, company);
+  // Stock API
+  async getStockBalance(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<StockBalance[]>> {
+    return this.stockAPI.getStockBalance(filters, limitPageLength);
   }
 
-  async getPurchaseOrder(name: string) {
-    return this.purchaseAPI.getPurchaseOrder(name);
+  async getStockBalanceForItem(itemCode: string, warehouse?: string): Promise<ERPNextResponse<StockBalance[]>> {
+    return this.stockAPI.getStockBalanceForItem(itemCode, warehouse);
   }
 
-  async getPurchaseReceipts(filters?: any[], company?: string) {
-    return this.purchaseAPI.getPurchaseReceipts(filters, company);
-  }
-
-  async getPurchaseReceipt(name: string) {
-    return this.purchaseAPI.getPurchaseReceipt(name);
-  }
-
-  async createPurchaseReceipt(data: any) {
-    return this.purchaseAPI.createPurchaseReceipt(data);
-  }
-
-  async updatePurchaseReceipt(name: string, data: any) {
-    return this.purchaseAPI.updatePurchaseReceipt(name, data);
-  }
-
-  async submitPurchaseReceipt(name: string) {
-    return this.purchaseAPI.submitPurchaseReceipt(name);
-  }
-
-  async deletePurchaseReceipt(name: string) {
-    return this.purchaseAPI.deletePurchaseReceipt(name);
+  async getCurrentStock(itemCode: string, warehouse: string): Promise<ERPNextResponse<any>> {
+    return this.stockAPI.getCurrentStock(itemCode, warehouse);
   }
 
   // Sales API methods
-  async getSalesOrders(filters?: any, company?: string) {
-    return this.salesAPI.getSalesOrders(filters, company);
+  async getSalesOrders(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    return this.salesAPI.getSalesOrders(filters, company, limitPageLength);
   }
 
-  async getSalesOrder(name: string) {
-    return this.salesAPI.getSalesOrder(name);
+  async getSalesOrder(soNumber: string): Promise<ERPNextResponse<any>> {
+    return this.salesAPI.getSalesOrder(soNumber);
   }
 
-  async getDeliveryNotes(filters?: any[], company?: string) {
-    return this.salesAPI.getDeliveryNotes(filters, company);
+  async searchSalesOrders(searchTerm: string, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    return this.salesAPI.searchSalesOrders(searchTerm, company, limitPageLength);
   }
 
-  async getDeliveryNote(name: string) {
-    return this.salesAPI.getDeliveryNote(name);
+  async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
   }
 
-  async createDeliveryNote(data: any) {
-    return this.salesAPI.createDeliveryNote(data);
+  async getDeliveryNote(deliveryNoteName: string): Promise<ERPNextResponse<any>> {
+    return this.salesAPI.getDeliveryNote(deliveryNoteName);
   }
 
-  async updateDeliveryNote(name: string, data: any) {
-    return this.salesAPI.updateDeliveryNote(name, data);
+  async createDeliveryNote(deliveryData: any): Promise<ERPNextResponse<any>> {
+    return this.salesAPI.createDeliveryNote(deliveryData);
   }
 
-  async submitDeliveryNote(name: string) {
-    return this.salesAPI.submitDeliveryNote(name);
+  async updateDeliveryNote(name: string, deliveryData: any): Promise<ERPNextResponse<any>> {
+    return this.salesAPI.updateDeliveryNote(name, deliveryData);
   }
 
-  async deleteDeliveryNote(name: string) {
-    return this.salesAPI.deleteDeliveryNote(name);
+  // Purchase API methods
+  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength);
   }
 
-  // Warehouse API methods
-  async getWarehouses(filters?: any, company?: string) {
-    return this.warehouseAPI.getWarehouses(filters, company);
+  async getPurchaseOrder(poNumber: string): Promise<ERPNextResponse<any>> {
+    return this.purchaseAPI.getPurchaseOrder(poNumber);
   }
 
-  async getWarehouse(name: string) {
-    return this.warehouseAPI.getWarehouse(name);
+  async searchPurchaseOrders(searchTerm: string, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    return this.purchaseAPI.searchPurchaseOrders(searchTerm, company, limitPageLength);
   }
 
-  // Company API methods
-  async getCompanies(): Promise<ERPNextResponse<any[]>> {
-    const response = await fetch(
-      `${this.baseURL}/api/resource/Company`,
-      { headers: this.getHeaders() }
-    );
-    
+  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength);
+  }
+
+  async createPurchaseReceipt(receiptData: any): Promise<ERPNextResponse<any>> {
+    return this.purchaseAPI.createPurchaseReceipt(receiptData);
+  }
+
+  // Stock Entry API methods
+  async getStockEntries(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    return this.stockAPI.getStockEntries(filters, limitPageLength);
+  }
+
+  async createStockEntry(stockEntryData: any): Promise<ERPNextResponse<any>> {
+    return this.stockAPI.createStockEntry(stockEntryData);
+  }
+
+  async createStockReconciliation(reconciliationData: any): Promise<ERPNextResponse<any>> {
+    return this.stockAPI.createStockReconciliation(reconciliationData);
+  }
+
+  // Material Request API methods
+  async getMaterialRequests(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    const finalFilters = this.convertToFrappeFilters(filters);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request?${params}`, {
+      headers: this.getHeaders(),
+    });
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch companies: ${response.statusText}`);
+      throw new Error(`Failed to fetch material requests: ${response.statusText}`);
     }
 
-    const result = await response.json();
-    return { data: result.data || [] };
+    return response.json();
   }
 
-  async getCompany(name: string): Promise<ERPNextResponse<any>> {
-    const response = await fetch(
-      `${this.baseURL}/api/resource/Company/${encodeURIComponent(name)}`,
-      { headers: this.getHeaders() }
-    );
-    
+  async getMaterialRequest(mrNumber: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request/${encodeURIComponent(mrNumber)}`, {
+      headers: this.getHeaders(),
+    });
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch company: ${response.statusText}`);
+      throw new Error(`Failed to fetch material request: ${response.statusText}`);
     }
 
-    const result = await response.json();
-    return { data: result.data };
+    return response.json();
   }
 
-  // Stock Reconciliation methods
-  async getStockReconciliations(filters?: any[], company?: string): Promise<ERPNextResponse<any[]>> {
-    const conditions: string[][] = [];
-    
-    if (filters && Array.isArray(filters)) {
-      conditions.push(...filters);
-    }
-    
-    if (company) {
-      conditions.push(['company', '=', company]);
-    }
+  async createMaterialRequest(requestData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
+    });
 
-    const params = new URLSearchParams();
-    if (conditions.length > 0) {
-      params.append('filters', JSON.stringify(conditions));
-    }
-    params.append('fields', JSON.stringify(['name', 'posting_date', 'expense_account', 'company']));
-
-    const response = await fetch(
-      `${this.baseURL}/api/resource/Stock Reconciliation?${params.toString()}`,
-      { headers: this.getHeaders() }
-    );
-    
     if (!response.ok) {
-      throw new Error(`Failed to fetch stock reconciliations: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to create material request: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const result = await response.json();
-    return { data: result.data || [] };
+    return response.json();
   }
 
-  async createStockReconciliation(data: any): Promise<ERPNextResponse<any>> {
-    const response = await fetch(
-      `${this.baseURL}/api/resource/Stock Reconciliation`,
-      {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(data)
-      }
-    );
-    
+  async updateMaterialRequest(name: string, requestData: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
+    });
+
     if (!response.ok) {
-      throw new Error(`Failed to create stock reconciliation: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to update material request: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const result = await response.json();
-    return { data: result.data };
+    return response.json();
   }
 
-  async submitStockReconciliation(name: string): Promise<ERPNextResponse<any>> {
-    const response = await fetch(
-      `${this.baseURL}/api/resource/Stock Reconciliation/${encodeURIComponent(name)}`,
-      {
-        method: 'PUT',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ docstatus: 1 })
-      }
-    );
-    
+  // Pick List API methods
+  async getPickLists(filters?: any, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    const finalFilters = this.convertToFrappeFilters(filters);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List?${params}`, {
+      headers: this.getHeaders(),
+    });
+
     if (!response.ok) {
-      throw new Error(`Failed to submit stock reconciliation: ${response.statusText}`);
+      throw new Error(`Failed to fetch pick lists: ${response.statusText}`);
     }
 
-    const result = await response.json();
-    return { data: result.data };
+    return response.json();
   }
 
-  // Test connection method
-  async testConnection(): Promise<boolean> {
-    try {
-      const response = await fetch(
-        `${this.baseURL}/api/method/frappe.auth.get_logged_user`,
-        { headers: this.getHeaders() }
-      );
-      return response.ok;
-    } catch (error) {
-      console.error('Connection test failed:', error);
-      return false;
+  async getPickList(pickListName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List/${encodeURIComponent(pickListName)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pick list: ${response.statusText}`);
     }
+
+    return response.json();
   }
 
-  // Generic method to call any ERPNext API
+  async getPickListItems(pickListName: string): Promise<ERPNextResponse<any[]>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List Item?filters=[["parent","=","${pickListName}"]]`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pick list items: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createPickListFromDocument(documentType: string, documentName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.doctype.pick_list.pick_list.create_pick_list`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        source_name: documentName,
+        reference_doctype: documentType
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create pick list: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPickListAnalytics(company?: string): Promise<ERPNextResponse<any>> {
+    // This would be a custom method to get pick list analytics
+    const response = await fetch(`${this.baseURL}/api/method/frappe.desk.query_report.run?report_name=Pick List Summary`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pick list analytics: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Generic API call method
   async callAPI(method: string, params?: any): Promise<ERPNextResponse<any>> {
     const url = params 
-      ? `${this.baseURL}/api/method/${method}?${new URLSearchParams(params).toString()}`
+      ? `${this.baseURL}/api/method/${method}?${new URLSearchParams(params)}`
       : `${this.baseURL}/api/method/${method}`;
 
-    const response = await fetch(url, { headers: this.getHeaders() });
-    
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+
     if (!response.ok) {
       throw new Error(`API call failed: ${response.statusText}`);
     }
 
-    const result = await response.json();
-    return { data: result.message || result.data };
+    return response.json();
+  }
+
+  // Search methods for stock entry
+  async searchMaterialRequestsForStockEntry(searchTerm: string): Promise<ERPNextResponse<any[]>> {
+    return this.getMaterialRequests([
+      ['name', 'like', `%${searchTerm}%`],
+      ['docstatus', '=', 1],
+      ['status', '!=', 'Stopped']
+    ]);
+  }
+
+  async searchPurchaseOrdersForStockEntry(searchTerm: string): Promise<ERPNextResponse<any[]>> {
+    return this.getPurchaseOrders([
+      ['name', 'like', `%${searchTerm}%`],
+      ['docstatus', '=', 1],
+      ['status', '!=', 'Closed']
+    ]);
+  }
+
+  async searchSalesOrdersForStockEntry(searchTerm: string): Promise<ERPNextResponse<any[]>> {
+    return this.getSalesOrders([
+      ['name', 'like', `%${searchTerm}%`],
+      ['docstatus', '=', 1],
+      ['status', '!=', 'Closed']
+    ]);
+  }
+
+  async searchBOMs(searchTerm: string): Promise<ERPNextResponse<any[]>> {
+    const orFilters = [
+      ['name', 'like', `%${searchTerm}%`],
+      ['item', 'like', `%${searchTerm}%`]
+    ];
+
+    const params = new URLSearchParams({
+      or_filters: JSON.stringify(orFilters),
+      filters: JSON.stringify([['docstatus', '=', 1]]),
+      limit_page_length: '20'
+    });
+
+    const response = await fetch(`${this.baseURL}/api/resource/BOM?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search BOMs: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async submitStockEntry(stockEntryName: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Stock Entry/${encodeURIComponent(stockEntryName)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        docstatus: 1
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to submit stock entry: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
   }
 }
-
-// Re-export types for convenience
-export * from './types';

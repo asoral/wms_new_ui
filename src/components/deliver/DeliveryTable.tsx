@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trash2 } from "lucide-react";
-import { DeliveryEntry } from "../../pages/Deliver";
+import { DeliveryEntry } from "@/types";
 
 interface DeliveryTableProps {
   entries: DeliveryEntry[];
@@ -19,7 +19,7 @@ const DeliveryTable = ({ entries, onRemoveEntry }: DeliveryTableProps) => {
     }).format(amount);
   };
 
-  const totalValue = entries.reduce((sum, entry) => sum + (entry.qtyToDeliver * entry.rate), 0);
+  const totalValue = entries.reduce((sum, entry) => sum + (entry.deliveredQty * entry.rate), 0);
 
   return (
     <Card>
@@ -42,7 +42,7 @@ const DeliveryTable = ({ entries, onRemoveEntry }: DeliveryTableProps) => {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <span className="text-gray-500">Quantity:</span>
-                      <p className="font-medium">{entry.qtyToDeliver} {entry.uom}</p>
+                      <p className="font-medium">{entry.deliveredQty} {entry.uom}</p>
                     </div>
                     <div>
                       <span className="text-gray-500">Rate:</span>
@@ -50,7 +50,7 @@ const DeliveryTable = ({ entries, onRemoveEntry }: DeliveryTableProps) => {
                     </div>
                     <div>
                       <span className="text-gray-500">Total:</span>
-                      <p className="font-medium">{formatCurrency(entry.qtyToDeliver * entry.rate)}</p>
+                      <p className="font-medium">{formatCurrency(entry.deliveredQty * entry.rate)}</p>
                     </div>
                     <div className="flex justify-end">
                       <Button

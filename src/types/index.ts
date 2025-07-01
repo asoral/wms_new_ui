@@ -1,4 +1,5 @@
 
+
 // Core Item Types
 export interface Item {
   name: string;
@@ -75,6 +76,7 @@ export interface DeliveryEntry {
   uom: string;
   rate: number;
   salesOrderItem?: string;
+  serial_batch_bundle?: string;
 }
 
 // Stock Count Types
@@ -137,6 +139,21 @@ export interface DashboardData {
 }
 
 // Purchase Order Types
+export interface PurchaseOrder {
+  name: string;
+  supplier: string;
+  supplier_name?: string;
+  schedule_date?: string;
+  transaction_date?: string;
+  grand_total?: number;
+  status?: string;
+  items?: any[];
+  company: string;
+  base_grand_total: number;
+  currency: string;
+  per_received?: number;
+}
+
 export interface POItem {
   itemCode: string;
   itemName: string;
@@ -148,7 +165,17 @@ export interface POItem {
   warehouse?: string;
 }
 
+// Draft Receipt Types
+export interface DraftReceipt {
+  name: string;
+  supplier: string;
+  posting_date: string;
+  grand_total: number;
+  status: string;
+}
+
 // Common Callback Types
 export type ItemSelectCallback = (item: Item) => void;
 export type ItemCodeSelectCallback = (itemCode: string) => void;
 export type BarcodeScannedCallback = (barcode: string) => void;
+
