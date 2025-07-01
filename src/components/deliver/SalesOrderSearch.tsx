@@ -101,7 +101,7 @@ const SalesOrderSearch = ({ onOrderSelected, loading }: SalesOrderSearchProps) =
             const so = searchResult.data[0]; // Take first match
             
             // Get full SO details
-            const fullSOResult = await erpnxtAPI.getSalesOrder(so.name);
+            const fullSOResult = await erpnextAPI.getSalesOrder(so.name);
             if (fullSOResult.data) {
               const fullSO = fullSOResult.data;
               

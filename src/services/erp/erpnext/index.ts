@@ -254,6 +254,10 @@ export class ERPNextAPI {
     });
   }
 
+  async getPurchaseReceipt(name: string): Promise<ERPNextResponse> {
+    return this.get(`/api/resource/Purchase Receipt/${name}`);
+  }
+
   // Sales Order APIs
   async getSalesOrders(filters?: any, company?: string, limit?: number): Promise<ERPNextResponse> {
     const filterArray = [];

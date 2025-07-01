@@ -1,10 +1,35 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import PickListDashboard from "@/components/picking/PickListDashboard";
 import PickListItemProcessor from "@/components/picking/PickListItemProcessor";
 
-const PickList = () => {
+// Export the types that other components need
+export interface PickList {
+  name: string;
+  purpose: string;
+  company: string;
+  docstatus: number;
+  creation: string;
+  owner: string;
+  locations?: PickListItem[];
+}
+
+export interface PickListItem {
+  item_code: string;
+  item_name: string;
+  qty: number;
+  picked_qty?: number;
+  warehouse: string;
+  batch_no?: string;
+  serial_no?: string;
+}
+
+export type PickListPurpose = 'Delivery' | 'Material Transfer' | 'Material Issue' | 'Manufacturing';
+export type PickListStatus = 'Draft' | 'Open' | 'Completed';
+
+const PickListPage = () => {
   const [showDashboard, setShowDashboard] = useState(true);
   const [selectedPickList, setSelectedPickList] = useState<any>(null);
   const [processedItems, setProcessedItems] = useState<any[]>([]);
@@ -75,4 +100,4 @@ const PickList = () => {
   );
 };
 
-export default PickList;
+export default PickListPage;

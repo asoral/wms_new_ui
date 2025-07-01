@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search } from 'lucide-react';
-import { getAvailableSerialBatch, createSerialBatchBundle, getUserDefaultCompany } from '@/services/serialBatchBundleApi';
+import { fetchAvailableBatches, createSerialBatchBundle } from '@/services/serialBatchBundleApi';
+import { getUserDefaultCompany } from '@/services/erpnextApi';
 import { useToast } from '@/hooks/use-toast';
 
 interface BatchInfo {
@@ -52,7 +54,7 @@ const BatchSelector = ({
 
   useEffect(() => {
     if (isOpen && itemCode && warehouse) {
-      fetchAvailableBatches();
+      fetchAvailableBatchesData();
     }
   }, [isOpen, itemCode, warehouse]);
 
@@ -60,26 +62,26 @@ const BatchSelector = ({
     setQtyToFetch(requiredQty);
   }, [requiredQty]);
 
-  const fetchAvailableBatches = async () => {
+  const fetchAvailableBatchesData = async () => {
     setLoading(true);
     try {
       console.log('Fetching batches for item:', itemCode, 'warehouse:', warehouse);
 
-      const result = await getAvailableSerialBatch(itemCode, warehouse, false, true);
-      console.log('getAvailableSerialBatch result:', result);
+      const batchData = await fetchAvailableBatches(itemCode, warehouse);
+      console.log('fetchAvailableBatches result:', batchData);
       
-      if (result.batch_nos && Array.isArray(result.batch_nos)) {
-        const batchData = result.batch_nos.map((batch: any) => ({
+      if (batchData && Array.isArray(batchData)) {
+        const processedBatches = batchData.map((batch: any) => ({
           batch_no: batch.batch_no,
           qty: 0,
           available_qty: batch.qty || 0,
           expiry_date: batch.expiry_date || null
         })).filter((batch: BatchInfo) => batch.available_qty && batch.available_qty > 0);
 
-        console.log('Processed batch data:', batchData);
-        setAvailableBatches(batchData);
+        console.log('Processed batch data:', processedBatches);
+        setAvailableBatches(processedBatches);
         
-        if (batchData.length === 0) {
+        if (processedBatches.length === 0) {
           toast({
             title: "No Batches Available",
             description: `No batches found with available stock in warehouse: ${warehouse}`,
@@ -88,7 +90,7 @@ const BatchSelector = ({
         } else {
           toast({
             title: "Batches Loaded",
-            description: `Found ${batchData.length} batches with available stock`,
+            description: `Found ${processedBatches.length} batches with available stock`,
           });
         }
       } else {

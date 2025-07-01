@@ -34,7 +34,7 @@ const DraftDeliveryNotes = ({ onSelectDraft }: DraftDeliveryNotesProps) => {
     setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
-      if (!erpnxtAPI) {
+      if (!erpnextAPI) {
         toast({
           title: "ERPNext Not Configured",
           description: "Please configure your ERPNext settings in the Profile page.",
