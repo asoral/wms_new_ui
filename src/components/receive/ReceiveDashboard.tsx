@@ -2,63 +2,68 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Search, Loader2, Eye, Package, TrendingUp, Clock, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { MetricCard } from "@/components/ui/metric-card";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Truck, 
+  Package, 
+  FileText, 
+  Search, 
+  Calendar,
+  Building2,
+  Clock,
+  CheckCircle,
+  AlertCircle
+} from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-import { useIsMobile } from "@/hooks/use-mobile";
 
-interface DraftReceipt {
-  id: string;
+interface PurchaseOrder {
+  name: string;
   supplier: string;
-  date: string;
-  items: number;
-  amount: number;
+  supplier_name?: string;
+  transaction_date: string;
+  schedule_date?: string;
+  grand_total: number;
+  status: string;
+  per_received: number;
 }
 
-interface DashboardMetrics {
-  todaysReceipts: number;
-  draftReceipts: number;
-  itemsReceived: number;
-  overdueReceipts: number;
+interface DraftReceipt {
+  name: string;
+  supplier: string;
+  supplier_name?: string;
+  posting_date: string;
+  grand_total: number;
+  status: string;
 }
 
 interface ReceiveDashboardProps {
   onSelectPO: (poNumber: string) => void;
-  onSelectDraftReceipt?: (receiptId: string) => void;
-  shortcuts: Array<{
+  onSelectDraftReceipt: (receiptId: string) => void;
+  shortcuts?: Array<{
     label: string;
     icon: any;
     action: () => void;
   }>;
 }
 
-const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: ReceiveDashboardProps) => {
-  const [poNumber, setPONumber] = useState("");
+const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: ReceiveDashboardProps) => {
+  const [pendingPOs, setPendingPOs] = useState<PurchaseOrder[]>([]);
   const [draftReceipts, setDraftReceipts] = useState<DraftReceipt[]>([]);
-  const [metrics, setMetrics] = useState<DashboardMetrics>({
-    todaysReceipts: 0,
-    draftReceipts: 0,
-    itemsReceived: 0,
-    overdueReceipts: 0
-  });
   const [loading, setLoading] = useState(false);
-  const [metricsLoading, setMetricsLoading] = useState(true);
-  const navigate = useNavigate();
+  const [searchPO, setSearchPO] = useState("");
   const { toast } = useToast();
-  const isMobile = useIsMobile();
 
   useEffect(() => {
-    fetchDashboardData();
+    loadDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    setMetricsLoading(true);
+  const loadDashboardData = async () => {
     try {
+      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -69,186 +74,103 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
         return;
       }
 
-      // Fetch draft purchase receipts
-      const draftFilters = { docstatus: 0 }; // 0 for draft
-      const receiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(draftFilters);
+      const defaultCompany = await getUserDefaultCompany();
 
-      let transformedReceipts: DraftReceipt[] = [];
+      // Load pending purchase orders
+      const poResponse = await erpnextAPI.getPurchaseOrders({
+        status: ['To Receive', 'To Receive and Bill', 'Partially Received']
+      }, defaultCompany || undefined);
       
-      if (receiptsResult.data) {
-        transformedReceipts = receiptsResult.data.map((receipt: any) => ({
-          id: receipt.name,
-          supplier: receipt.supplier,
-          date: receipt.posting_date,
-          items: receipt.items ? receipt.items.length : 0,
-          amount: receipt.grand_total || 0
-        }));
-        setDraftReceipts(transformedReceipts);
+      if (poResponse?.data) {
+        setPendingPOs(poResponse.data);
       }
 
-      // Fetch today's submitted receipts
-      const today = new Date().toISOString().split('T')[0];
-      const todayFilters = { 
-        docstatus: 1,
-        posting_date: today
-      };
-      const todayReceiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(todayFilters);
-
-      // Fetch all submitted receipts for total items count
-      const submittedFilters = { docstatus: 1 };
-      const allReceiptsResult = await erpnextAPI.purchase.getPurchaseReceipts(submittedFilters, undefined, 1000);
+      // Load draft purchase receipts
+      const receiptResponse = await erpnextAPI.getPurchaseReceipts({
+        docstatus: 0 // Draft status
+      }, defaultCompany || undefined);
       
-      let totalItemsReceived = 0;
-      if (allReceiptsResult.data) {
-        totalItemsReceived = allReceiptsResult.data.reduce((total: number, receipt: any) => {
-          return total + (receipt.items ? receipt.items.length : 0);
-        }, 0);
+      if (receiptResponse?.data) {
+        setDraftReceipts(receiptResponse.data);
       }
-
-      // Calculate overdue receipts (POs past schedule date that are still pending)
-      const overdueFilters = {
-        docstatus: 1,
-        status: ['To Receive', 'To Receive and Bill', 'Partially Received'],
-        schedule_date: ['<', today]
-      };
-      const overduePOsResult = await erpnextAPI.purchase.getPurchaseOrders(overdueFilters);
-
-      setMetrics({
-        todaysReceipts: todayReceiptsResult.data ? todayReceiptsResult.data.length : 0,
-        draftReceipts: transformedReceipts.length,
-        itemsReceived: totalItemsReceived,
-        overdueReceipts: overduePOsResult.data ? overduePOsResult.data.length : 0
-      });
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error loading dashboard data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch dashboard data",
+        description: "Failed to load dashboard data from ERPNext",
         variant: "destructive"
       });
     } finally {
       setLoading(false);
-      setMetricsLoading(false);
     }
   };
 
   const handlePOSearch = () => {
-    if (poNumber.trim()) {
-      onSelectPO(poNumber.trim());
+    if (searchPO.trim()) {
+      onSelectPO(searchPO.trim());
     }
   };
 
-  const handleDraftReceiptView = (receiptId: string) => {
-    if (onSelectDraftReceipt) {
-      onSelectDraftReceipt(receiptId);
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'To Receive': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'To Receive and Bill': return 'bg-red-100 text-red-800 border-red-200';
+      case 'Partially Received': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Completed': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const MobileDraftReceiptCard = ({ receipt }: { receipt: DraftReceipt }) => (
-    <Card className="w-full">
-      <CardContent className="p-4">
-        <div className="space-y-3">
-          <div className="flex justify-between items-start">
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-lg text-blue-600 truncate">{receipt.id}</h3>
-              <p className="text-sm text-gray-600 truncate">{receipt.supplier}</p>
-            </div>
-            <Badge variant="secondary">Draft</Badge>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-gray-500">Date</p>
-              <p className="font-medium">{receipt.date}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Items</p>
-              <p className="font-medium">{receipt.items} items</p>
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center pt-2">
-            <div>
-              <p className="text-gray-500 text-sm">Amount</p>
-              <p className="font-semibold">₹{receipt.amount.toLocaleString()}</p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDraftReceiptView(receipt.id)}
-            >
-              <Eye className="w-4 h-4 mr-1" />
-              View
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'To Receive': return <AlertCircle className="w-3 h-3" />;
+      case 'Partially Received': return <Clock className="w-3 h-3" />;
+      case 'Completed': return <CheckCircle className="w-3 h-3" />;
+      default: return <Package className="w-3 h-3" />;
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Dashboard Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {metricsLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="flex items-center p-6">
-                <div className="flex items-center space-x-4">
-                  <div className="p-2 bg-gray-100 rounded-lg animate-pulse">
-                    <div className="w-6 h-6 bg-gray-300 rounded"></div>
-                  </div>
-                  <div>
-                    <div className="h-4 bg-gray-200 rounded w-20 mb-2 animate-pulse"></div>
-                    <div className="h-6 bg-gray-200 rounded w-16 animate-pulse"></div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <>
-            <MetricCard
-              title="Today's Receipts"
-              value={metrics.todaysReceipts.toString()}
-              icon={Package}
-            />
-            <MetricCard
-              title="Draft Receipts"
-              value={metrics.draftReceipts.toString()}
-              icon={Clock}
-            />
-            <MetricCard
-              title="Items Received"
-              value={metrics.itemsReceived.toString()}
-              icon={TrendingUp}
-            />
-            <MetricCard
-              title="Overdue Receipts"
-              value={metrics.overdueReceipts.toString()}
-              icon={AlertTriangle}
-            />
-          </>
-        )}
-      </div>
-
-      {/* PO Search */}
+      {/* Quick PO Search */}
       <Card>
         <CardHeader>
-          <CardTitle>Receive Items from Purchase Order</CardTitle>
+          <CardTitle className="flex items-center space-x-2">
+            <Search className="w-5 h-5 text-blue-600" />
+            <span>Quick PO Search</span>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
-            <Input
-              type="text"
-              placeholder="Enter Purchase Order Number"
-              value={poNumber}
-              onChange={(e) => setPONumber(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handlePOSearch()}
-              className="flex-1"
-            />
-            <Button onClick={handlePOSearch} className="w-full sm:w-auto">
+          <div className="flex space-x-2">
+            <div className="flex-1">
+              <Label htmlFor="po-search" className="sr-only">Purchase Order Number</Label>
+              <Input
+                id="po-search"
+                placeholder="Enter PO number (e.g., PO-2025-00001)"
+                value={searchPO}
+                onChange={(e) => setSearchPO(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handlePOSearch()}
+              />
+            </div>
+            <Button onClick={handlePOSearch} disabled={!searchPO.trim() || loading}>
               <Search className="w-4 h-4 mr-2" />
               Search
             </Button>
@@ -256,94 +178,160 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts }: Recei
         </CardContent>
       </Card>
 
-      {/* Draft Purchase Receipts */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Draft Purchase Receipts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-              <span className="ml-2 text-gray-600">Loading draft receipts...</span>
-            </div>
-          ) : (
-            <>
-              {isMobile ? (
-                <div className="space-y-4">
-                  {draftReceipts.map((receipt) => (
-                    <MobileDraftReceiptCard key={receipt.id} receipt={receipt} />
-                  ))}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2">Receipt ID</th>
-                        <th className="text-left py-2">Supplier</th>
-                        <th className="text-left py-2">Date</th>
-                        <th className="text-left py-2">Items</th>
-                        <th className="text-left py-2">Amount</th>
-                        <th className="text-left py-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {draftReceipts.map((receipt) => (
-                        <tr key={receipt.id} className="border-b hover:bg-gray-50">
-                          <td className="py-3 font-medium text-blue-600">{receipt.id}</td>
-                          <td className="py-3">{receipt.supplier}</td>
-                          <td className="py-3">{receipt.date}</td>
-                          <td className="py-3">{receipt.items} items</td>
-                          <td className="py-3">₹{receipt.amount.toLocaleString()}</td>
-                          <td className="py-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDraftReceiptView(receipt.id)}
-                              className="flex items-center"
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {draftReceipts.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No draft purchase receipts found
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {/* Dashboard Tabs */}
+      <Tabs defaultValue="pending-pos" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="pending-pos" className="flex items-center space-x-2">
+            <Truck className="w-4 h-4" />
+            <span>Pending POs ({pendingPOs.length})</span>
+          </TabsTrigger>
+          <TabsTrigger value="draft-receipts" className="flex items-center space-x-2">
+            <FileText className="w-4 h-4" />
+            <span>Draft Receipts ({draftReceipts.length})</span>
+          </TabsTrigger>
+          <TabsTrigger value="shortcuts" className="flex items-center space-x-2">
+            <Package className="w-4 h-4" />
+            <span>Shortcuts</span>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <TabsContent value="pending-pos" className="mt-6">
+          <div className="space-y-4">
+            {loading ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <div className="animate-spin rounded-full w-8 h-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading purchase orders...</p>
+                </CardContent>
+              </Card>
+            ) : pendingPOs.length > 0 ? (
+              pendingPOs.map((po) => (
+                <Card 
+                  key={po.name} 
+                  className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-orange-500"
+                  onClick={() => onSelectPO(po.name)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <Truck className="w-4 h-4 text-gray-600" />
+                        <span className="font-semibold text-gray-900">{po.name}</span>
+                      </div>
+                      <Badge className={`${getStatusColor(po.status)} flex items-center space-x-1`}>
+                        {getStatusIcon(po.status)}
+                        <span>{po.status}</span>
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-600">
+                      <div>
+                        <span className="font-medium">Supplier:</span>
+                        <p className="text-gray-900">{po.supplier_name || po.supplier}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Amount:</span>
+                        <p className="text-gray-900">{formatCurrency(po.grand_total)}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Date:</span>
+                        <p className="text-gray-900">{formatDate(po.schedule_date || po.transaction_date)}</p>
+                      </div>
+                    </div>
+                    
+                    {po.per_received > 0 && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                          <span>Received Progress</span>
+                          <span>{po.per_received}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${po.per_received}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Truck className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600">No pending purchase orders found</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="draft-receipts" className="mt-6">
+          <div className="space-y-4">
+            {loading ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <div className="animate-spin rounded-full w-8 h-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading draft receipts...</p>
+                </CardContent>
+              </Card>
+            ) : draftReceipts.length > 0 ? (
+              draftReceipts.map((receipt) => (
+                <Card 
+                  key={receipt.name} 
+                  className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-blue-500"
+                  onClick={() => onSelectDraftReceipt(receipt.name)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-4 h-4 text-gray-600" />
+                        <span className="font-semibold text-gray-900">{receipt.name}</span>
+                      </div>
+                      <Badge variant="secondary">Draft</Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-600">
+                      <div>
+                        <span className="font-medium">Supplier:</span>
+                        <p className="text-gray-900">{receipt.supplier_name || receipt.supplier}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Amount:</span>
+                        <p className="text-gray-900">{formatCurrency(receipt.grand_total)}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Date:</span>
+                        <p className="text-gray-900">{formatDate(receipt.posting_date)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600">No draft receipts found</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="shortcuts" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {shortcuts.map((shortcut, index) => (
-              <Button 
-                key={index} 
-                onClick={shortcut.action} 
-                variant="outline"
-                className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
-              >
-                <shortcut.icon className="w-5 h-5 text-blue-600" />
-                <span className="text-sm font-medium">{shortcut.label}</span>
-              </Button>
+              <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer" onClick={shortcut.action}>
+                <CardContent className="p-6 text-center">
+                  <shortcut.icon className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+                  <p className="font-medium">{shortcut.label}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

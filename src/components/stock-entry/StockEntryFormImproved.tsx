@@ -1,453 +1,515 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Download, ArrowLeft } from "lucide-react";
-import { StockEntryType } from "@/pages/StockEntry";
-import WarehouseSelector from "../bin-enquiry/WarehouseSelector";
-import DocumentSelector from "./DocumentSelector";
-import MaterialRequestItemProcessor from "./MaterialRequestItemProcessor";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Plus, ArrowRight, Package2, Building, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 
-interface StockEntryFormImprovedProps {
-  type: StockEntryType;
-  draftEntry?: any | null;
-  onDraftCreated: (draft: any) => void;
-  onReviewAndSubmit: () => void;
-  onBack: () => void;
+export type StockEntryType = 
+  | "Material Issue"
+  | "Material Receipt" 
+  | "Material Transfer"
+  | "Manufacture"
+  | "Repack"
+  | "Send to Subcontractor"
+  | "Material Transfer for Manufacture"
+  | "Material Consumption for Manufacture";
+
+export interface StockEntryItem {
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  uom?: string;
+  stock_uom?: string;
+  conversion_factor?: number;
+  transfer_qty?: number;
+  basic_rate?: number;
+  basic_amount?: number;
+  s_warehouse?: string;
+  t_warehouse?: string;
+  batch_no?: string;
+  serial_no?: string;
+  expense_account?: string;
+  cost_center?: string;
 }
 
-const StockEntryFormImproved = ({ 
-  type, 
-  draftEntry, 
-  onDraftCreated, 
-  onReviewAndSubmit, 
-  onBack 
-}: StockEntryFormImprovedProps) => {
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    fromWarehouse: draftEntry?.from_warehouse || "",
-    toWarehouse: draftEntry?.to_warehouse || "",
-    getItemsFrom: "",
-    selectedDocument: null as any,
-    processedItems: [] as any[]
+export interface StockEntry {
+  stock_entry_type: StockEntryType;
+  company?: string;
+  posting_date?: string;
+  posting_time?: string;
+  set_posting_time?: number;
+  from_warehouse?: string;
+  to_warehouse?: string;
+  purpose?: string;
+  items: StockEntryItem[];
+  total_outgoing_value?: number;
+  total_incoming_value?: number;
+  value_difference?: number;
+  remarks?: string;
+}
+
+interface StockEntryFormImprovedProps {
+  onSubmit: (stockEntry: StockEntry) => void;
+  isLoading?: boolean;
+}
+
+const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormImprovedProps) => {
+  const [stockEntryType, setStockEntryType] = useState<StockEntryType>("Material Transfer");
+  const [fromWarehouse, setFromWarehouse] = useState<string>("");
+  const [toWarehouse, setToWarehouse] = useState<string>("");
+  const [postingDate, setPostingDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [remarks, setRemarks] = useState<string>("");
+  const [items, setItems] = useState<StockEntryItem[]>([]);
+  
+  // Form state for current item
+  const [currentItem, setCurrentItem] = useState<Partial<StockEntryItem>>({
+    item_code: "",
+    qty: 0,
+    uom: "Nos"
   });
   
-  // Material Request processing state
-  const [showMRProcessor, setShowMRProcessor] = useState(false);
-  const [mrItems, setMRItems] = useState<any[]>([]);
-  
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [availableItems, setAvailableItems] = useState<any[]>([]);
+  const [company, setCompany] = useState<string>("");
   const { toast } = useToast();
 
-  const isTransferType = type.includes("Transfer") || type === "Material Issue" || type === "Material Receipt";
-  const requiresBothWarehouses = type.includes("Transfer");
-  const requiresFromWarehouse = type === "Material Issue" || requiresBothWarehouses || type === "Send to Warehouse" || type === "Send to Subcontractor";
-  const requiresToWarehouse = type === "Material Receipt" || requiresBothWarehouses || type === "Receive at Warehouse";
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-  // Get Items From options based on stock entry type
-  const getGetItemsFromOptions = () => {
-    const options = [];
+  const loadInitialData = async () => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const defaultCompany = await getUserDefaultCompany();
+      if (defaultCompany) {
+        setCompany(defaultCompany);
+      }
+
+      // Load warehouses
+      const warehouseResponse = await erpnextAPI.getWarehouses({}, defaultCompany);
+      if (warehouseResponse?.data) {
+        setWarehouses(warehouseResponse.data);
+      }
+
+      // Load some items for selection
+      const itemsResponse = await erpnextAPI.getItems({}, 50);
+      if (itemsResponse?.data) {
+        setAvailableItems(itemsResponse.data);
+      }
+
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load form data",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const addItem = () => {
+    if (!currentItem.item_code || !currentItem.qty) {
+      toast({
+        title: "Incomplete Item",
+        description: "Please fill in item code and quantity",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newItem: StockEntryItem = {
+      item_code: currentItem.item_code,
+      item_name: currentItem.item_name,
+      qty: currentItem.qty || 0,
+      uom: currentItem.uom || "Nos",
+      stock_uom: currentItem.stock_uom || currentItem.uom || "Nos",
+      conversion_factor: 1,
+      transfer_qty: currentItem.qty || 0,
+      s_warehouse: stockEntryType === "Material Receipt" ? undefined : fromWarehouse,
+      t_warehouse: stockEntryType === "Material Issue" ? undefined : toWarehouse,
+      batch_no: currentItem.batch_no,
+      serial_no: currentItem.serial_no
+    };
+
+    setItems([...items, newItem]);
     
+    // Reset current item
+    setCurrentItem({
+      item_code: "",
+      qty: 0,
+      uom: "Nos"
+    });
+
+    toast({
+      title: "Item Added",
+      description: `${newItem.item_name || newItem.item_code} added to stock entry`,
+    });
+  };
+
+  const removeItem = (index: number) => {
+    const updatedItems = items.filter((_, i) => i !== index);
+    setItems(updatedItems);
+  };
+
+  const handleSubmit = () => {
+    if (!stockEntryType) {
+      toast({
+        title: "Missing Stock Entry Type",
+        description: "Please select a stock entry type",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (items.length === 0) {
+      toast({
+        title: "No Items",
+        description: "Please add at least one item to the stock entry",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate warehouses based on entry type
+    if (stockEntryType === "Material Transfer" && (!fromWarehouse || !toWarehouse)) {
+      toast({
+        title: "Missing Warehouses",
+        description: "Material Transfer requires both source and target warehouses",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (stockEntryType === "Material Issue" && !fromWarehouse) {
+      toast({
+        title: "Missing Source Warehouse",
+        description: "Material Issue requires a source warehouse",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (stockEntryType === "Material Receipt" && !toWarehouse) {
+      toast({
+        title: "Missing Target Warehouse",
+        description: "Material Receipt requires a target warehouse",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const stockEntry: StockEntry = {
+      stock_entry_type: stockEntryType,
+      company: company,
+      posting_date: postingDate,
+      set_posting_time: 1,
+      from_warehouse: fromWarehouse || undefined,
+      to_warehouse: toWarehouse || undefined,
+      purpose: stockEntryType,
+      items: items,
+      remarks: remarks || undefined
+    };
+
+    onSubmit(stockEntry);
+  };
+
+  const stockEntryTypes: StockEntryType[] = [
+    "Material Issue",
+    "Material Receipt", 
+    "Material Transfer",
+    "Manufacture",
+    "Repack",
+    "Send to Subcontractor",
+    "Material Transfer for Manufacture",
+    "Material Consumption for Manufacture"
+  ];
+
+  const getWarehouseLabel = (type: StockEntryType) => {
     switch (type) {
-      case "Material Transfer":
-      case "Material Issue":
-      case "Material Receipt":
-        options.push({ value: "Material Request", label: "Material Request" });
-        break;
-      case "Material Transfer for Manufacture":
-      case "Material Consumption for Manufacture":
-        options.push({ value: "Material Request", label: "Material Request" });
-        options.push({ value: "Sales Order", label: "Sales Order" });
-        options.push({ value: "BOM", label: "Bill of Materials" });
-        break;
-      case "Manufacture":
-        options.push({ value: "BOM", label: "Bill of Materials" });
-        break;
-      case "Send to Subcontractor":
-        options.push({ value: "Purchase Order", label: "Purchase Order" });
-        break;
-      default:
-        options.push({ value: "Material Request", label: "Material Request" });
-        options.push({ value: "Purchase Order", label: "Purchase Order" });
-        options.push({ value: "Sales Order", label: "Sales Order" });
-        options.push({ value: "BOM", label: "Bill of Materials" });
-    }
-    
-    return options;
-  };
-
-  const handleDocumentSelected = async (document: any) => {
-    setFormData({...formData, selectedDocument: document});
-    
-    toast({
-      title: "Document Selected",
-      description: `${formData.getItemsFrom} ${document.name} selected. You can now fetch items from this document.`,
-    });
-  };
-
-  const fetchItemsFromDocument = async () => {
-    if (!formData.selectedDocument || !formData.getItemsFrom) {
-      toast({
-        title: "Error",
-        description: "Please select a document first",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      if (formData.getItemsFrom === "Material Request") {
-        console.log('Fetching items from Material Request:', formData.selectedDocument.name);
-        
-        // Fetch items from Material Request
-        const itemsResult = await erpnextAPI.stockEntryAPI.getItemsFromMaterialRequest(formData.selectedDocument.name);
-        
-        if (itemsResult.data && itemsResult.data.length > 0) {
-          console.log('Material Request items fetched:', itemsResult.data);
-          setMRItems(itemsResult.data);
-          setShowMRProcessor(true);
-          
-          toast({
-            title: "Items Retrieved",
-            description: `${itemsResult.data.length} items found. You can now process them step by step.`,
-          });
-        } else {
-          toast({
-            title: "No Items Found",
-            description: "No items found in the selected Material Request",
-            variant: "destructive"
-          });
-        }
-      } else {
-        // For other document types, show placeholder message for now
-        toast({
-          title: "Feature Coming Soon",
-          description: `Fetching items from ${formData.getItemsFrom} will be implemented soon`,
-        });
-      }
-      
-    } catch (error) {
-      console.error('Error fetching items from document:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch items from selected document",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
+      case "Material Issue": return { from: "Source Warehouse", to: null };
+      case "Material Receipt": return { from: null, to: "Target Warehouse" };
+      case "Material Transfer": return { from: "From Warehouse", to: "To Warehouse" };
+      default: return { from: "Source Warehouse", to: "Target Warehouse" };
     }
   };
 
-  const handleMRItemsProcessed = (processedItems: any[]) => {
-    setFormData(prev => ({...prev, processedItems}));
-    setShowMRProcessor(false);
-    
-    toast({
-      title: "Items Added Successfully",
-      description: `${processedItems.length} items processed for Stock Entry`,
-    });
-  };
-
-  const handleBackFromProcessor = () => {
-    setShowMRProcessor(false);
-    setMRItems([]);
-  };
-
-  // Show Material Request processor if active
-  if (showMRProcessor && mrItems.length > 0) {
-    return (
-      <MaterialRequestItemProcessor
-        materialRequestName={formData.selectedDocument?.name || ""}
-        materialRequestItems={mrItems}
-        onItemsProcessed={handleMRItemsProcessed}
-        onBack={handleBackFromProcessor}
-      />
-    );
-  }
-
-  const createOrUpdateDraft = async () => {
-    if (formData.processedItems.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please process items from a document first",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      if (!draftEntry) {
-        await createDraft();
-      } else {
-        await updateDraft();
-      }
-      
-    } catch (error) {
-      console.error('Error creating/updating draft:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save stock entry",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createDraft = async () => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const company = await getUserDefaultCompany();
-      
-      const stockEntryData = {
-        stock_entry_type: type,
-        purpose: type,
-        posting_date: new Date().toISOString().split('T')[0],
-        posting_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-        company: company,
-        from_warehouse: formData.fromWarehouse || undefined,
-        to_warehouse: formData.toWarehouse || undefined,
-        docstatus: 0, // Draft status
-        items: formData.processedItems.map(item => ({
-          item_code: item.item_code,
-          qty: item.qty,
-          uom: item.uom,
-          s_warehouse: item.warehouse || formData.fromWarehouse || undefined,
-          t_warehouse: formData.toWarehouse || undefined,
-          basic_rate: 0,
-          batch_no: item.batch_no || undefined,
-          serial_no: item.serial_no || undefined
-        })),
-        // Link to selected document if available
-        material_request: formData.getItemsFrom === "Material Request" ? formData.selectedDocument?.name : undefined,
-        purchase_order: formData.getItemsFrom === "Purchase Order" ? formData.selectedDocument?.name : undefined,
-        sales_order: formData.getItemsFrom === "Sales Order" ? formData.selectedDocument?.name : undefined,
-        bom_no: formData.getItemsFrom === "BOM" ? formData.selectedDocument?.name : undefined
-      };
-
-      console.log('Creating draft stock entry:', stockEntryData);
-
-      const result = await erpnextAPI.createStockEntry(stockEntryData);
-      
-      if (result.data) {
-        const draft = {
-          id: result.data.name,
-          name: result.data.name,
-          type: type,
-          status: "draft",
-          items: formData.processedItems,
-          from_warehouse: formData.fromWarehouse,
-          to_warehouse: formData.toWarehouse
-        };
-        
-        onDraftCreated(draft);
-        
-        toast({
-          title: "Draft Created",
-          description: `Draft stock entry ${result.data.name} created successfully with ${formData.processedItems.length} item(s)!`,
-        });
-      }
-    } catch (error) {
-      console.error('Error creating draft:', error);
-      throw error;
-    }
-  };
-
-  const updateDraft = async () => {
-    if (!draftEntry) return;
-    
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const updateData = {
-        items: formData.processedItems.map(item => ({
-          item_code: item.item_code,
-          qty: item.qty,
-          uom: item.uom,
-          s_warehouse: item.warehouse || formData.fromWarehouse || undefined,
-          t_warehouse: formData.toWarehouse || undefined,
-          basic_rate: 0,
-          batch_no: item.batch_no || undefined,
-          serial_no: item.serial_no || undefined
-        }))
-      };
-
-      await erpnextAPI.updateStockEntry(draftEntry.name, updateData);
-      
-      const updatedDraft = {
-        ...draftEntry,
-        items: formData.processedItems
-      };
-      onDraftCreated(updatedDraft);
-      
-      toast({
-        title: "Draft Updated",
-        description: `Draft updated successfully with ${formData.processedItems.length} item(s)!`,
-      });
-      
-    } catch (error) {
-      console.error('Error updating draft:', error);
-      throw error;
-    }
-  };
-
-  const handleReviewSubmit = async () => {
-    await createOrUpdateDraft();
-    setTimeout(() => {
-      onReviewAndSubmit();
-    }, 500);
-  };
-
-  const truncateText = (text: string, maxLength: number = 50) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + "...";
-  };
+  const warehouseLabels = getWarehouseLabel(stockEntryType);
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">
-          {draftEntry ? `Edit ${type}` : `Create ${type}`}
-        </h2>
-        {draftEntry && (
-          <div className="text-sm text-gray-600">
-            Draft: {draftEntry.name}
-          </div>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Package2 className="w-5 h-5 text-blue-600" />
+            <span>Create Stock Entry</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Basic Information */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="stock-entry-type">Stock Entry Type</Label>
+              <Select value={stockEntryType} onValueChange={(value: StockEntryType) => setStockEntryType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {stockEntryTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      <div className="space-y-6">
-        {/* Entry Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Entry Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Get Items From</Label>
-                <Select value={formData.getItemsFrom} onValueChange={(value) => setFormData({...formData, getItemsFrom: value, selectedDocument: null})}>
+            <div className="space-y-2">
+              <Label htmlFor="posting-date">Posting Date</Label>
+              <Input
+                id="posting-date"
+                type="date"
+                value={postingDate}
+                onChange={(e) => setPostingDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company">Company</Label>
+              <Input
+                id="company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Company name"
+              />
+            </div>
+          </div>
+
+          {/* Warehouse Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {warehouseLabels.from && (
+              <div className="space-y-2">
+                <Label htmlFor="from-warehouse">{warehouseLabels.from}</Label>
+                <Select value={fromWarehouse} onValueChange={setFromWarehouse}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select source document" />
+                    <SelectValue placeholder={`Select ${warehouseLabels.from.toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    {getGetItemsFromOptions().map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.name} value={warehouse.name}>
+                        {warehouse.warehouse_name || warehouse.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-end">
-                <Button 
-                  type="button" 
-                  onClick={fetchItemsFromDocument}
-                  disabled={!formData.selectedDocument || loading}
-                  className="w-full"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  {loading ? 'Loading...' : 'Get Items'}
-                </Button>
+            )}
+
+            {warehouseLabels.to && (
+              <div className="space-y-2">
+                <Label htmlFor="to-warehouse">{warehouseLabels.to}</Label>
+                <Select value={toWarehouse} onValueChange={setToWarehouse}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Select ${warehouseLabels.to.toLowerCase()}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.name} value={warehouse.name}>
+                        {warehouse.warehouse_name || warehouse.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* Transfer Indication */}
+          {stockEntryType === "Material Transfer" && fromWarehouse && toWarehouse && (
+            <div className="flex items-center justify-center p-4 bg-blue-50 rounded-lg">
+              <div className="flex items-center space-x-4 text-blue-800">
+                <div className="flex items-center space-x-2">
+                  <Building className="w-4 h-4" />
+                  <span className="font-medium">{fromWarehouse}</span>
+                </div>
+                <ArrowRight className="w-5 h-5" />
+                <div className="flex items-center space-x-2">
+                  <Building className="w-4 h-4" />
+                  <span className="font-medium">{toWarehouse}</span>
+                </div>
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
 
-            {/* Document Selector */}
-            {formData.getItemsFrom && (
-              <div>
-                <Label>Select {formData.getItemsFrom}</Label>
-                <DocumentSelector
-                  doctype={formData.getItemsFrom}
-                  stockEntryType={type}
-                  onDocumentSelected={handleDocumentSelected}
-                  isLoading={loading}
-                />
-              </div>
-            )}
+      {/* Add Items Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Add Items</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="item-code">Item Code</Label>
+              <Select
+                value={currentItem.item_code || ""}
+                onValueChange={(value) => {
+                  const item = availableItems.find(i => i.name === value);
+                  setCurrentItem({
+                    ...currentItem,
+                    item_code: item?.name || "",
+                    item_name: item?.item_name || "",
+                    uom: item?.stock_uom || "Nos",
+                    stock_uom: item?.stock_uom || "Nos"
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select item" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableItems.map((item) => (
+                    <SelectItem key={item.name} value={item.name}>
+                      {item.item_name} ({item.item_code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            {formData.selectedDocument && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <strong>Selected:</strong> {formData.selectedDocument.name} - {truncateText(formData.selectedDocument.title || formData.selectedDocument.supplier || formData.selectedDocument.customer || formData.selectedDocument.item || "")}
-                </p>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="qty">Quantity</Label>
+              <Input
+                id="qty"
+                type="number"
+                placeholder="Enter quantity"
+                value={currentItem.qty || ""}
+                onChange={(e) => setCurrentItem({ ...currentItem, qty: Number(e.target.value) })}
+              />
+            </div>
 
-            {/* Warehouse Selection */}
-            {(requiresFromWarehouse || requiresToWarehouse) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {requiresFromWarehouse && (
-                  <div>
-                    <Label>From Warehouse</Label>
-                    <WarehouseSelector
-                      onWarehouseSelected={(warehouse) => setFormData({...formData, fromWarehouse: warehouse})}
-                      isLoading={false}
-                    />
+            <div className="space-y-2">
+              <Label htmlFor="uom">UOM</Label>
+              <Input
+                id="uom"
+                value={currentItem.uom || "Nos"}
+                onChange={(e) => setCurrentItem({ ...currentItem, uom: e.target.value })}
+                placeholder="Unit of Measure"
+                disabled
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="batch-no">Batch No (Optional)</Label>
+              <Input
+                id="batch-no"
+                placeholder="Enter batch number"
+                value={currentItem.batch_no || ""}
+                onChange={(e) => setCurrentItem({ ...currentItem, batch_no: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="serial-no">Serial No (Optional)</Label>
+              <Input
+                id="serial-no"
+                placeholder="Enter serial number"
+                value={currentItem.serial_no || ""}
+                onChange={(e) => setCurrentItem({ ...currentItem, serial_no: e.target.value })}
+              />
+            </div>
+          </div>
+          <Button onClick={addItem} className="w-full">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Item
+          </Button>
+        </CardContent>
+      </Card>
+      
+      {/* Items List */}
+      {items.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Items ({items.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="font-medium">{item.item_name || item.item_code}</span>
+                      <Badge variant="outline">{item.item_code}</Badge>
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                      <span>Qty: {item.qty} {item.uom}</span>
+                      {item.s_warehouse && <span>From: {item.s_warehouse}</span>}
+                      {item.t_warehouse && <span>To: {item.t_warehouse}</span>}
+                      {item.batch_no && <span>Batch: {item.batch_no}</span>}
+                      {item.serial_no && <span>Serial: {item.serial_no}</span>}
+                    </div>
                   </div>
-                )}
-                {requiresToWarehouse && (
-                  <div>
-                    <Label>To Warehouse</Label>
-                    <WarehouseSelector
-                      onWarehouseSelected={(warehouse) => setFormData({...formData, toWarehouse: warehouse})}
-                      isLoading={false}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Processed Items Summary */}
-            {formData.processedItems.length > 0 && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-700">
-                  ✓ {formData.processedItems.length} item(s) processed and ready for review
-                </p>
-              </div>
-            )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeItem(index)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
+      )}
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0 sm:space-x-4 pb-6">
-          <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-          <div className="flex space-x-2">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={createOrUpdateDraft} 
-              disabled={loading || formData.processedItems.length === 0} 
-              className="w-full sm:w-auto"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? 'Saving...' : draftEntry ? 'Update Draft' : 'Save Draft'}
-            </Button>
-            <Button 
-              type="button" 
-              onClick={handleReviewSubmit} 
-              disabled={loading || formData.processedItems.length === 0}
-              className="w-full sm:w-auto"
-            >
-              {loading ? 'Processing...' : 'Review & Submit'}
-            </Button>
+      {/* Remarks */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Additional Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="remarks">Remarks (Optional)</Label>
+            <Input
+              id="remarks"
+              placeholder="Enter any additional remarks"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+            />
           </div>
-        </div>
+        </CardContent>
+      </Card>
+
+      {/* Submit Button */}
+      <div className="flex justify-end">
+        <Button 
+          onClick={handleSubmit} 
+          disabled={isLoading || items.length === 0}
+          className="min-w-[200px]"
+        >
+          {isLoading ? (
+            <>
+              <div className="animate-spin rounded-full w-4 h-4 border-b-2 border-white mr-2"></div>
+              Creating...
+            </>
+          ) : (
+            <>
+              <Package2 className="w-4 h-4 mr-2" />
+              Create Stock Entry
+            </>
+          )}
+        </Button>
       </div>
     </div>
   );

@@ -43,7 +43,7 @@ const DraftReceipts = () => {
       const defaultCompany = await getUserDefaultCompany();
       
       // Fetch draft purchase receipts
-      const response = await erpnextAPI.purchase.getPurchaseReceipts([
+      const response = await erpnextAPI.getPurchaseReceipts([
         ['docstatus', '=', 0] // Draft status = 0
       ], defaultCompany || undefined);
       
@@ -120,56 +120,57 @@ const DraftReceipts = () => {
         <CardContent>
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading draft receipts...</p>
+              <div className="animate-spin rounded-full w-8 h-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading draft receipts...</p>
             </div>
           ) : draftReceipts.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Receipt ID</th>
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Supplier</th>
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Date</th>
-                    <th className="py-3 px-4 text-left font-semibold text-sm text-gray-600">Items</th>
-                    <th className="py-3 px-4 text-right font-semibold text-sm text-gray-600">Amount</th>
-                    <th className="py-3 px-4 text-right font-semibold text-sm text-gray-600">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {draftReceipts.map((receipt) => (
-                    <tr key={receipt.name} className="border-b hover:bg-gray-50">
-                      <td className="py-4 px-4">{receipt.name}</td>
-                      <td className="py-4 px-4">{receipt.supplier_name || receipt.supplier}</td>
-                      <td className="py-4 px-4">{formatDate(receipt.posting_date)}</td>
-                      <td className="py-4 px-4">{receipt.items?.length || 0} items</td>
-                      <td className="py-4 px-4 text-right">{formatCurrency(receipt.grand_total)}</td>
-                      <td className="py-4 px-4 text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => viewReceipt(receipt.name)}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              {draftReceipts.map((receipt) => (
+                <div key={receipt.name} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="w-4 h-4 text-gray-600" />
+                      <span className="font-semibold text-gray-900">{receipt.name}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                        Draft
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => viewReceipt(receipt.name)}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                    <div>
+                      <span className="font-medium">Supplier:</span>
+                      <p className="text-gray-900">{receipt.supplier_name || receipt.supplier}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Amount:</span>
+                      <p className="text-gray-900">{formatCurrency(receipt.grand_total)}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Date:</span>
+                      <p className="text-gray-900">{formatDate(receipt.posting_date)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <FileText className="w-12 h-12 mx-auto text-gray-400" />
-              <h3 className="mt-4 text-lg font-medium">No Draft Receipts</h3>
-              <p className="mt-1 text-gray-500">You don't have any draft purchase receipts at the moment.</p>
-              <Button 
-                className="mt-6" 
-                onClick={() => navigate('/receive')}
-              >
-                Create New Receipt
-              </Button>
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600">No draft receipts found</p>
+              <p className="text-gray-500 text-sm mt-1">
+                Draft receipts will appear here when you start receiving items
+              </p>
             </div>
           )}
         </CardContent>

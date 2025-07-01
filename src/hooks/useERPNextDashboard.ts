@@ -43,9 +43,9 @@ export function useERPNextDashboard() {
 
         // Fetch data in parallel
         const [warehousesRes, salesOrdersRes, stockBalanceRes] = await Promise.all([
-          api.warehouse.getWarehouses({}, company),
-          api.sales.getSalesOrders({}, company),
-          api.stock.getStockBalance() // No parameters needed for getting all stock
+          api.getWarehouses({}, company),
+          api.getSalesOrders({}, company),
+          api.getStockBalance() // No parameters needed for getting all stock
         ]);
 
         // Calculate dashboard metrics
@@ -73,7 +73,7 @@ export function useERPNextDashboard() {
         }
 
         // Get pending purchase receipts
-        const purchaseOrdersRes = await api.purchase.getPurchaseOrders({ 
+        const purchaseOrdersRes = await api.getPurchaseOrders({ 
           status: ['To Receive', 'To Receive and Bill']
         }, company);
         

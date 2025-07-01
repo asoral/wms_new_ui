@@ -1,586 +1,404 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Truck, ArrowLeft } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-// Import components
-import DeliverDashboard from "@/components/deliver/DeliverDashboard";
-import DeliverySalesOrderList from "@/components/deliver/DeliverySalesOrderList";
-import EnhancedDeliveryItemScanner from "@/components/deliver/EnhancedDeliveryItemScanner";
-import SOItemsDisplay from "@/components/deliver/SOItemsDisplay";
-import DeliveryProcess from "@/components/deliver/DeliveryProcess";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-
-export interface DeliveryItem {
-  itemCode: string;
-  itemName: string;
-  qty: number;
-  deliveredQty?: number;
-  uom: string;
-  warehouse: string;
-  rate?: number;
-  amount?: number;
-  serialNo?: string;
-  batchNo?: string;
-}
-
-export interface DeliveryNote {
-  id: string;
-  name: string;
-  customer: string;
-  customerName: string;
-  postingDate: string;
-  status: "Draft" | "Submitted" | "Cancelled";
-  salesOrder?: string;
-  items: DeliveryItem[];
-  totalQty: number;
-  grandTotal: number;
-  company: string;
-}
-
-export interface SalesOrderOption {
-  value: string;
-  label: string;
-  customer: string;
-  customer_name: string;
-  delivery_date: string;
-  grand_total: number;
-  status: string;
-  isDraft?: boolean;
-  draftName?: string;
-  items?: SOItem[];
-}
-
-// Add missing types that components need
-export interface SOItem {
-  itemCode: string;
-  itemName: string;
-  orderedQty: number;
-  deliveredQty: number;
-  pendingQty: number;
-  rate: number;
-  uom: string;
-  warehouse: string;
-  qtyToDeliver: number;
-}
+import SalesOrderSearch from "../components/deliver/SalesOrderSearch";
+import DeliveryForm from "../components/deliver/DeliveryForm";
+import DraftDeliveryNotes from "../components/deliver/DraftDeliveryNotes";
 
 export interface SalesOrder {
-  id?: string;
-  number: string;
+  name: string;
   customer: string;
+  customer_name?: string;
+  transaction_date: string;
+  delivery_date?: string;
   status: string;
-  deliveryDate: string;
-  expectedDelivery?: string;
-  totalItems: number;
-  totalValue: number;
-  percentDelivered?: number;
-  items: SOItem[];
+  grand_total: number;
   per_delivered?: number;
+  items?: SalesOrderItem[];
+}
+
+export interface SalesOrderItem {
+  name: string;
+  item_code: string;
+  item_name: string;
+  qty: number;
+  delivered_qty?: number;
+  pending_qty?: number;
+  uom: string;
+  rate: number;
+  warehouse: string;
+  description?: string;
+  stock_qty?: number;
+  conversion_factor?: number;
 }
 
 export interface DeliveryEntry {
   itemCode: string;
   itemName: string;
+  deliveredQty: number;
   warehouse: string;
   batch?: string;
   serial?: string;
-  serial_batch_bundle?: string;
-  qtyToDeliver: number;
-  actualQty: number;
-  rate: number;
+  serialBatchBundle?: string;
   uom: string;
-}
-
-export interface DashboardData {
-  todaysDelivery: number;
-  totalDeliveries: number;
-  pendingOrders: number;
-  draftDeliveryNotes: DeliveryNote[];
+  rate: number;
+  salesOrderItem?: string;
+  useTraditionalEntry?: boolean;
 }
 
 const Deliver = () => {
-  const [currentStep, setCurrentStep] = useState<"dashboard" | "deliverItems" | "reviewSubmit">("dashboard");
-  const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrderOption | null>(null);
-  const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
-  const [currentDeliveryNote, setCurrentDeliveryNote] = useState<string | null>(null);
-  const [dashboardData, setDashboardData] = useState<DashboardData>({
-    todaysDelivery: 0,
-    totalDeliveries: 0,
-    pendingOrders: 0,
-    draftDeliveryNotes: []
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const [selectedSO, setSelectedSO] = useState<SalesOrder | null>(null);
+  const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
+  const [activeTab, setActiveTab] = useState("search");
+  const [loading, setLoading] = useState(false);
+  const [currentDeliveryNote, setCurrentDeliveryNote] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    setIsLoading(true);
+  const selectSO = async (soNumber: string) => {
+    setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
-        console.warn('ERPNext API not configured');
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
         return;
       }
 
-      const company = await getUserDefaultCompany();
-      
-      // Fetch delivery metrics - Fix: Remove the third argument
-      const deliveryMetrics = await erpnextAPI.sales.getDeliveryMetrics(company || undefined);
-      
-      // Fetch draft delivery notes
-      const draftDeliveryNotes = await erpnextAPI.getDeliveryNotes(
-        [['docstatus', '=', 0]], // Draft status
-        company || undefined
-      );
+      // Fetch SO data from ERPNext
+      const soResult = await erpnextAPI.getSalesOrder(soNumber);
+      if (!soResult.data) {
+        toast({
+          title: "Sales Order Not Found",
+          description: `SO ${soNumber} could not be found in ERPNext.`,
+          variant: "destructive"
+        });
+        return;
+      }
 
-      // Fetch pending sales orders
-      const pendingSalesOrders = await erpnextAPI.getSalesOrders(
-        [
-          ['docstatus', '=', 1],
-          ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
-        ],
-        company || undefined,
-        100
-      );
+      const so = soResult.data;
+      
+      // Transform ERPNext SO data to our interface
+      const transformedSO: SalesOrder = {
+        name: so.name,
+        customer: so.customer,
+        customer_name: so.customer_name,
+        transaction_date: so.transaction_date,
+        delivery_date: so.delivery_date,
+        status: so.status,
+        grand_total: so.grand_total || 0,
+        per_delivered: so.per_delivered || 0,
+        items: so.items ? so.items.map((item: any) => ({
+          name: item.name,
+          item_code: item.item_code,
+          item_name: item.item_name,
+          qty: item.qty || 0,
+          delivered_qty: item.delivered_qty || 0,
+          pending_qty: (item.qty || 0) - (item.delivered_qty || 0),
+          uom: item.stock_uom || item.uom,
+          rate: item.rate || 0,
+          warehouse: item.warehouse || 'Main Store',
+          description: item.description,
+          stock_qty: item.stock_qty,
+          conversion_factor: item.conversion_factor || 1
+        })) : []
+      };
 
-      setDashboardData({
-        todaysDelivery: deliveryMetrics.data?.todaysDelivery || 0,
-        totalDeliveries: deliveryMetrics.data?.totalDeliveries || 0,
-        pendingOrders: pendingSalesOrders.data?.length || 0,
-        draftDeliveryNotes: draftDeliveryNotes.data?.map((dn: any) => ({
-          id: dn.name,
-          name: dn.name,
-          customer: dn.customer,
-          customerName: dn.customer_name || dn.customer,
-          postingDate: dn.posting_date,
-          status: dn.docstatus === 0 ? "Draft" : dn.docstatus === 1 ? "Submitted" : "Cancelled",
-          salesOrder: dn.sales_order,
-          items: [], // Will be loaded when needed
-          totalQty: dn.total_qty || 0,
-          grandTotal: dn.grand_total || 0,
-          company: dn.company
-        })) || []
+      setSelectedSO(transformedSO);
+      setActiveTab("deliver");
+      
+      toast({
+        title: "Sales Order Loaded",
+        description: `SO ${soNumber} loaded successfully with ${transformedSO.items?.length || 0} items`,
       });
-
+      
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching SO:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch dashboard data",
+        description: "Failed to fetch Sales Order from ERPNext",
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const createDraftDeliveryNote = async (salesOrder: SalesOrderOption, firstEntry: DeliveryEntry) => {
+  const selectDraftDeliveryNote = async (deliveryNoteId: string) => {
+    setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
-        throw new Error('ERPNext API not configured');
-      }
-
-      const company = await getUserDefaultCompany();
-
-      // Get the full sales order details to get the SO item reference
-      const salesOrderDetails = await erpnextAPI.sales.getSalesOrder(salesOrder.value);
-      
-      // Find the corresponding SO item for the first entry
-      const soItem = salesOrderDetails.data.items?.find((item: any) => 
-        item.item_code === firstEntry.itemCode
-      );
-
-      // Create delivery note with the first item
-      const deliveryNoteData = {
-        doctype: "Delivery Note",
-        customer: salesOrder.customer,
-        company: company,
-        posting_date: new Date().toISOString().split('T')[0],
-        set_posting_time: 0,
-        posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
-        docstatus: 0, // Draft
-        items: [{
-          item_code: firstEntry.itemCode,
-          item_name: firstEntry.itemName,
-          qty: firstEntry.qtyToDeliver,
-          rate: firstEntry.rate,
-          amount: firstEntry.qtyToDeliver * firstEntry.rate,
-          warehouse: firstEntry.warehouse,
-          uom: firstEntry.uom,
-          against_sales_order: salesOrder.value,
-          so_detail: soItem?.name || '', // Link to sales order item
-          ...(firstEntry.serial_batch_bundle && { 
-            serial_and_batch_bundle: firstEntry.serial_batch_bundle 
-          })
-        }],
-        territory: "All Territories",
-        currency: "INR",
-        selling_price_list: "Standard Selling",
-        ignore_pricing_rule: 1
-      };
-
-      console.log('Creating draft delivery note with first item:', deliveryNoteData);
-
-      const result = await erpnextAPI.sales.createDeliveryNote(deliveryNoteData);
-      
-      if (result.data && result.data.name) {
-        setCurrentDeliveryNote(result.data.name);
-        console.log('Draft delivery note created:', result.data.name);
-        
         toast({
-          title: "Draft Created",
-          description: `Draft delivery note ${result.data.name} created successfully with first item`,
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings.",
+          variant: "destructive"
         });
-
-        return result.data.name;
+        return;
       }
+
+      // Fetch draft delivery note data
+      const deliveryNoteResult = await erpnextAPI.getDeliveryNote(deliveryNoteId);
+      if (!deliveryNoteResult.data) {
+        toast({
+          title: "Delivery Note Not Found",
+          description: `Delivery Note ${deliveryNoteId} could not be found.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const deliveryNote = deliveryNoteResult.data;
+      
+      // If delivery note has a sales order, load it first
+      if (deliveryNote.sales_order) {
+        await selectSO(deliveryNote.sales_order);
+      }
+
+      // Set current delivery note and populate entries
+      setCurrentDeliveryNote(deliveryNoteId);
+      
+      // Transform delivery note items to delivery entries
+      const entries: DeliveryEntry[] = deliveryNote.items ? deliveryNote.items.map((item: any) => ({
+        itemCode: item.item_code,
+        itemName: item.item_name || item.item_code,
+        deliveredQty: item.qty || 0,
+        warehouse: item.warehouse || 'Main Store',
+        batch: item.batch_no,
+        serial: item.serial_no,
+        serialBatchBundle: item.serial_batch_bundle,
+        uom: item.uom || 'Nos',
+        rate: item.rate || 0,
+        salesOrderItem: item.so_detail,
+        useTraditionalEntry: item.batch_no || item.serial_no ? true : false
+      })) : [];
+
+      setDeliveryEntries(entries);
+      setActiveTab("deliver");
+      
+      toast({
+        title: "Draft Delivery Note Loaded",
+        description: `Draft delivery note ${deliveryNoteId} loaded with ${entries.length} items`,
+      });
+      
     } catch (error) {
-      console.error('Error creating draft delivery note:', error);
+      console.error('Error fetching draft delivery note:', error);
       toast({
         title: "Error",
-        description: "Failed to create draft delivery note",
+        description: "Failed to fetch draft delivery note",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
-    return null;
   };
 
-  const addItemToExistingDeliveryNote = async (entry: DeliveryEntry) => {
-    try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI || !currentDeliveryNote || !selectedSalesOrder) {
-        throw new Error('Missing required data for adding item');
-      }
-
-      // Get current delivery note
-      const currentDN = await erpnextAPI.sales.getDeliveryNote(currentDeliveryNote);
-      
-      // Get sales order details for SO item reference
-      const salesOrderDetails = await erpnextAPI.sales.getSalesOrder(selectedSalesOrder.value);
-      const soItem = salesOrderDetails.data.items?.find((item: any) => 
-        item.item_code === entry.itemCode
-      );
-
-      // Add the new item to existing items
-      const newItem = {
-        item_code: entry.itemCode,
-        item_name: entry.itemName,
-        qty: entry.qtyToDeliver,
-        rate: entry.rate,
-        amount: entry.qtyToDeliver * entry.rate,
-        warehouse: entry.warehouse,
-        uom: entry.uom,
-        against_sales_order: selectedSalesOrder.value,
-        so_detail: soItem?.name || '',
-        ...(entry.serial_batch_bundle && { 
-          serial_and_batch_bundle: entry.serial_batch_bundle 
-        })
-      };
-
-      const updatedItems = [...(currentDN.data.items || []), newItem];
-
-      await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, {
-        items: updatedItems
-      });
-
-      console.log('Item added to existing delivery note:', currentDeliveryNote);
-      
-    } catch (error) {
-      console.error('Error adding item to delivery note:', error);
+  const addDeliveryEntry = async (entry: DeliveryEntry) => {
+    console.log('addDeliveryEntry called with:', entry);
+    
+    if (!selectedSO) {
+      console.error('No SO selected');
       toast({
-        title: "Warning",
-        description: "Item tracked but failed to add to delivery note",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleSelectSalesOrder = async (salesOrder: SalesOrderOption) => {
-    console.log('Sales order selected:', salesOrder);
-    setSelectedSalesOrder(salesOrder);
-    setDeliveryEntries([]);
-    
-    // Set current delivery note if it's a draft
-    if (salesOrder.isDraft) {
-      setCurrentDeliveryNote(salesOrder.draftName || null);
-    } else {
-      setCurrentDeliveryNote(null);
-    }
-    
-    setCurrentStep("deliverItems");
-    
-    toast({
-      title: "Sales Order Selected",
-      description: `Selected ${salesOrder.label} for delivery processing`,
-    });
-  };
-
-  const handleAddDeliveryEntry = async (entry: DeliveryEntry) => {
-    console.log('Adding delivery entry:', entry);
-    
-    // If this is the first item and we don't have a delivery note, create one
-    if (!currentDeliveryNote && selectedSalesOrder && !selectedSalesOrder.isDraft) {
-      console.log('Creating new draft delivery note with first item');
-      const draftName = await createDraftDeliveryNote(selectedSalesOrder, entry);
-      if (draftName) {
-        setCurrentDeliveryNote(draftName);
-      }
-    } else if (currentDeliveryNote) {
-      // Add item to existing delivery note
-      console.log('Adding item to existing delivery note');
-      await addItemToExistingDeliveryNote(entry);
-    }
-    
-    // Add to local state
-    setDeliveryEntries([...deliveryEntries, entry]);
-  };
-
-  const handleBackToDashboard = () => {
-    setCurrentStep("dashboard");
-    setSelectedSalesOrder(null);
-    setDeliveryEntries([]);
-    setCurrentDeliveryNote(null);
-  };
-
-  const handleViewSalesOrders = () => {
-    // This could navigate to a separate sales order list view if needed
-    toast({
-      title: "View Sales Orders",
-      description: "Feature to be implemented",
-    });
-  };
-
-  const handleNextToReview = () => {
-    if (deliveryEntries.length === 0) {
-      toast({
-        title: "No Items to Deliver",
-        description: "Please add at least one item to the delivery",
-        variant: "destructive"
-      });
-      return;
-    }
-    setCurrentStep("reviewSubmit");
-  };
-
-  const handleSubmitDeliveryNote = async () => {
-    if (!currentDeliveryNote || deliveryEntries.length === 0) {
-      toast({
-        title: "Cannot Submit",
-        description: "No delivery note or items to submit",
+        title: "Error",
+        description: "No Sales Order selected",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      setIsLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
-        throw new Error('ERPNext API not configured');
+        console.error('ERPNext API not configured');
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings.",
+          variant: "destructive"
+        });
+        return;
       }
 
-      // Submit the delivery note (change docstatus to 1)
-      await erpnextAPI.sales.updateDeliveryNote(currentDeliveryNote, {
-        docstatus: 1
-      });
+      // Find the corresponding SO item to get the SO item ID
+      const soItem = selectedSO.items?.find(item => item.item_code === entry.itemCode);
+      if (!soItem || !soItem.name) {
+        console.error('SO item not found or missing ID:', entry.itemCode);
+        toast({
+          title: "Error",
+          description: "Sales Order item reference not found",
+          variant: "destructive"
+        });
+        return;
+      }
 
+      const entryWithSOItem = {
+        ...entry,
+        salesOrderItem: soItem.name
+      };
+
+      console.log('Processing entry with SO item reference:', entryWithSOItem);
+
+      // Get the company from the SO
+      const soDetails = await erpnextAPI.getSalesOrder(selectedSO.name);
+      const company = soDetails.data.company;
+
+      if (!currentDeliveryNote) {
+        console.log('Creating new Delivery Note...');
+        
+        const deliveryNoteItem = {
+          item_code: entryWithSOItem.itemCode,
+          qty: entryWithSOItem.deliveredQty,
+          warehouse: entryWithSOItem.warehouse,
+          rate: entryWithSOItem.rate,
+          uom: entryWithSOItem.uom,
+          sales_order: selectedSO.name,
+          so_detail: entryWithSOItem.salesOrderItem,
+          ...(entryWithSOItem.batch && { batch_no: entryWithSOItem.batch }),
+          ...(entryWithSOItem.serial && { serial_no: entryWithSOItem.serial }),
+          ...(entryWithSOItem.serialBatchBundle && { serial_batch_bundle: entryWithSOItem.serialBatchBundle })
+        };
+
+        const deliveryNoteData = {
+          customer: selectedSO.customer,
+          company: company,
+          posting_date: new Date().toISOString().split('T')[0],
+          sales_order: selectedSO.name,
+          set_posting_time: 1,
+          items: [deliveryNoteItem]
+        };
+
+        console.log('Creating new Delivery Note with data:', deliveryNoteData);
+        
+        const result = await erpnextAPI.createDeliveryNote(deliveryNoteData);
+        console.log('Delivery Note creation result:', result);
+        
+        if (result.data?.name) {
+          setCurrentDeliveryNote(result.data.name);
+          console.log('Delivery Note created successfully:', result.data.name);
+          toast({
+            title: "Delivery Note Created",
+            description: `Draft Delivery Note ${result.data.name} created successfully`,
+          });
+        } else {
+          console.error('No name returned from delivery note creation:', result);
+          throw new Error('Delivery Note creation failed - no name returned');
+        }
+      } else {
+        console.log('Adding item to existing Delivery Note:', currentDeliveryNote);
+        
+        // Get current delivery note data
+        const currentDeliveryNoteResponse = await erpnextAPI.getDeliveryNote(currentDeliveryNote);
+        const currentDeliveryNoteData = currentDeliveryNoteResponse.data;
+        
+        console.log('Current delivery note data:', currentDeliveryNoteData);
+        
+        // Add new item to existing items array
+        const newItem = {
+          item_code: entryWithSOItem.itemCode,
+          qty: entryWithSOItem.deliveredQty,
+          warehouse: entryWithSOItem.warehouse,
+          rate: entryWithSOItem.rate,
+          uom: entryWithSOItem.uom,
+          sales_order: selectedSO.name,
+          so_detail: entryWithSOItem.salesOrderItem,
+          ...(entryWithSOItem.batch && { batch_no: entryWithSOItem.batch }),
+          ...(entryWithSOItem.serial && { serial_no: entryWithSOItem.serial }),
+          ...(entryWithSOItem.serialBatchBundle && { serial_batch_bundle: entryWithSOItem.serialBatchBundle })
+        };
+        
+        const updatedItems = [...(currentDeliveryNoteData.items || []), newItem];
+        
+        // Update the delivery note with new items
+        const updateResult = await erpnextAPI.updateDeliveryNote(currentDeliveryNote, {
+          items: updatedItems
+        });
+        
+        console.log('Item added to existing delivery note successfully:', updateResult);
+        toast({
+          title: "Item Added",
+          description: `Item ${entryWithSOItem.itemCode} added to Delivery Note ${currentDeliveryNote}`,
+        });
+      }
+
+      // Add to local state
+      console.log('Adding entry to local state:', entryWithSOItem);
+      setDeliveryEntries(prev => [...prev, entryWithSOItem]);
+      
+    } catch (error) {
+      console.error('Error in addDeliveryEntry:', error);
       toast({
-        title: "Delivery Note Submitted",
-        description: `Delivery note ${currentDeliveryNote} has been submitted successfully`,
+        title: "Error",
+        description: `Failed to create/update delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
       });
+    }
+  };
 
-      // Reset and go back to dashboard
-      handleBackToDashboard();
-      fetchDashboardData(); // Refresh dashboard data
+  const submitDeliveryNote = async () => {
+    if (!currentDeliveryNote) {
+      toast({
+        title: "No Delivery Note to Submit",
+        description: "Please add items first to create a delivery note.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Show processing toast immediately
+    toast({
+      title: "Processing Transaction",
+      description: "Delivery note is being submitted. You may continue your work.",
+    });
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings.",
+          variant: "destructive"
+        });
+        return;
+      }
 
+      // Submit the Delivery Note
+      await erpnextAPI.submitDeliveryNote(currentDeliveryNote);
+      
+      toast({
+        title: "Success",
+        description: `Delivery note ${currentDeliveryNote} submitted successfully!`,
+      });
+      
+      // Reset form
+      setDeliveryEntries([]);
+      setSelectedSO(null);
+      setCurrentDeliveryNote(null);
+      setActiveTab("search");
+      
     } catch (error) {
       console.error('Error submitting delivery note:', error);
       toast({
-        title: "Submission Error",
-        description: "Failed to submit delivery note",
+        title: "Error",
+        description: `Failed to submit delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const renderTabContent = () => {
-    switch (currentStep) {
-      case "dashboard":
-        return (
-          <DeliverDashboard
-            onSelectSalesOrder={handleSelectSalesOrder}
-            onViewSalesOrders={handleViewSalesOrders}
-            dashboardData={dashboardData}
-            isLoading={isLoading}
-          />
-        );
-      
-      case "deliverItems":
-        if (!selectedSalesOrder) return null;
-        
-        return (
-          <div className="space-y-6">
-            {/* Sales Order Info */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-medium text-blue-900 mb-2">Selected Sales Order</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Order:</span>
-                  <div className="font-medium">{selectedSalesOrder.value}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Customer:</span>
-                  <div className="font-medium">{selectedSalesOrder.customer_name}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Amount:</span>
-                  <div className="font-medium">₹{selectedSalesOrder.grand_total.toLocaleString()}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Draft DN:</span>
-                  <div className="font-medium text-green-600">{currentDeliveryNote || 'Will create after first item'}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Item Scanner - Moved above SO Items Display */}
-            {selectedSalesOrder.items && (
-              <EnhancedDeliveryItemScanner
-                soItems={selectedSalesOrder.items}
-                onAddEntry={handleAddDeliveryEntry}
-                company={getUserDefaultCompany()?.toString()}
-                deliveryNoteName={currentDeliveryNote || undefined}
-              />
-            )}
-
-            {/* Sales Order Items Display - Moved below Scanner */}
-            {selectedSalesOrder.items && (
-              <SOItemsDisplay
-                items={selectedSalesOrder.items}
-                title={`Items in ${selectedSalesOrder.value}`}
-              />
-            )}
-
-            {/* Delivery Entries Table */}
-            {deliveryEntries.length > 0 && (
-              <div className="bg-white border rounded-lg p-4">
-                <h3 className="font-medium mb-4">Items to Deliver ({deliveryEntries.length})</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">Item Code</th>
-                        <th className="text-left p-2">Item Name</th>
-                        <th className="text-left p-2">Warehouse</th>
-                        <th className="text-left p-2">Quantity</th>
-                        <th className="text-left p-2">UOM</th>
-                        <th className="text-left p-2">Rate</th>
-                        <th className="text-left p-2">Bundle</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {deliveryEntries.map((entry, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="p-2">{entry.itemCode}</td>
-                          <td className="p-2">{entry.itemName}</td>
-                          <td className="p-2">{entry.warehouse}</td>
-                          <td className="p-2">{entry.qtyToDeliver}</td>
-                          <td className="p-2">{entry.uom}</td>
-                          <td className="p-2">₹{entry.rate}</td>
-                          <td className="p-2 text-xs text-gray-500">
-                            {entry.serial_batch_bundle || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      
-      case "reviewSubmit":
-        return (
-          <div className="space-y-6">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="font-medium text-green-900 mb-2">Review & Submit Delivery</h3>
-              <p className="text-sm text-green-700">
-                Review the delivery details below and submit to create the delivery note.
-              </p>
-            </div>
-
-            {/* Summary */}
-            <div className="bg-white border rounded-lg p-4">
-              <h3 className="font-medium mb-4">Delivery Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
-                <div>
-                  <span className="text-gray-600">Sales Order:</span>
-                  <div className="font-medium">{selectedSalesOrder?.value}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Customer:</span>
-                  <div className="font-medium">{selectedSalesOrder?.customer_name}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Total Items:</span>
-                  <div className="font-medium">{deliveryEntries.length}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Draft DN:</span>
-                  <div className="font-medium text-green-600">{currentDeliveryNote}</div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-3">Item Code</th>
-                      <th className="text-left p-3">Item Name</th>
-                      <th className="text-left p-3">Warehouse</th>
-                      <th className="text-left p-3">Quantity</th>
-                      <th className="text-left p-3">Rate</th>
-                      <th className="text-left p-3">Amount</th>
-                      <th className="text-left p-3">Bundle</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deliveryEntries.map((entry, index) => (
-                      <tr key={index} className="border-b">
-                        <td className="p-3">{entry.itemCode}</td>
-                        <td className="p-3">{entry.itemName}</td>
-                        <td className="p-3">{entry.warehouse}</td>
-                        <td className="p-3">{entry.qtyToDeliver} {entry.uom}</td>
-                        <td className="p-3">₹{entry.rate}</td>
-                        <td className="p-3">₹{(entry.qtyToDeliver * entry.rate).toLocaleString()}</td>
-                        <td className="p-3 text-xs text-gray-500">{entry.serial_batch_bundle || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="flex justify-center">
-              <Button size="lg" className="px-8" onClick={handleSubmitDeliveryNote} disabled={isLoading}>
-                {isLoading ? 'Submitting...' : 'Submit Delivery Note'}
-              </Button>
-            </div>
-          </div>
-        );
-      
-      default:
-        return null;
-    }
-  };
+  const shortcuts = [
+    { label: 'Print Label', icon: Printer, action: () => navigate('/print-label') },
+    { label: 'Quality Check', icon: CheckCircle, action: () => navigate('/quality-check') },
+    { label: 'Transfer Stock', icon: ArrowRight, action: () => navigate('/stock-entry') }
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -589,63 +407,52 @@ const Deliver = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <Truck className="w-6 h-6 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Deliver</h1>
-              {selectedSalesOrder && (
-                <p className="text-sm text-gray-600">
-                  Selected: {selectedSalesOrder.label}
-                  {currentDeliveryNote && <span className="text-green-600 ml-2">• DN: {currentDeliveryNote}</span>}
-                </p>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Deliver</h1>
           </div>
-
-          {/* Back Button - Only show when not on dashboard */}
-          {currentStep !== "dashboard" && (
-            <Button variant="outline" onClick={handleBackToDashboard}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
+          {selectedSO && (
+            <div className="flex items-center space-x-2">
+              <Badge variant="outline">{selectedSO.name}</Badge>
+              {currentDeliveryNote && (
+                <Badge variant="secondary">DN: {currentDeliveryNote}</Badge>
+              )}
+              <Button onClick={submitDeliveryNote} disabled={!currentDeliveryNote || loading}>
+                <Package className="w-4 h-4 mr-2" />
+                Submit Delivery
+              </Button>
+            </div>
           )}
         </div>
 
-        {/* Tabs - Only show when we have selected an SO or draft */}
-        {selectedSalesOrder ? (
-          <Tabs value={currentStep} onValueChange={(value) => setCurrentStep(value as any)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="dashboard" disabled>Dashboard</TabsTrigger>
-              <TabsTrigger value="deliverItems">Deliver Items</TabsTrigger>
-              <TabsTrigger value="reviewSubmit" disabled={deliveryEntries.length === 0} className="relative">
-                Review & Submit
-                {deliveryEntries.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-                )}
-              </TabsTrigger>
-            </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="search">Search Orders</TabsTrigger>
+            <TabsTrigger value="deliver" disabled={!selectedSO && !currentDeliveryNote}>
+              Deliver Items
+            </TabsTrigger>
+            <TabsTrigger value="drafts">Draft Notes</TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="deliverItems" className="mt-6">
-              {renderTabContent()}
-            </TabsContent>
+          <TabsContent value="search">
+            <SalesOrderSearch 
+              onSelectSO={selectSO}
+              shortcuts={shortcuts}
+            />
+          </TabsContent>
 
-            <TabsContent value="reviewSubmit" className="mt-6">
-              {renderTabContent()}
-            </TabsContent>
-          </Tabs>
-        ) : (
-          /* Dashboard View */
-          <div className="mt-6">
-            {renderTabContent()}
-          </div>
-        )}
+          <TabsContent value="deliver">
+            {selectedSO && (
+              <DeliveryForm 
+                salesOrder={selectedSO}
+                onAddEntry={addDeliveryEntry}
+                deliveryEntries={deliveryEntries}
+              />
+            )}
+          </TabsContent>
 
-        {/* Navigation Buttons for Deliver Items Tab */}
-        {currentStep === "deliverItems" && deliveryEntries.length > 0 && (
-          <div className="mt-6 flex justify-end">
-            <Button onClick={handleNextToReview} size="lg">
-              Next: Review & Submit ({deliveryEntries.length} items)
-            </Button>
-          </div>
-        )}
+          <TabsContent value="drafts">
+            <DraftDeliveryNotes onSelectDraftNote={selectDraftDeliveryNote} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

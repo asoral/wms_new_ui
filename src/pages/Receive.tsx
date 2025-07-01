@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,8 +71,8 @@ const Receive = () => {
         return;
       }
 
-      // Fetch PO data from ERPNext - use purchase API
-      const poResult = await erpnextAPI.purchase.getPurchaseOrder(poNumber);
+      // Fetch PO data from ERPNext
+      const poResult = await erpnextAPI.getPurchaseOrder(poNumber);
       if (!poResult.data) {
         toast({
           title: "Purchase Order Not Found",
@@ -139,7 +139,7 @@ const Receive = () => {
       }
 
       // Fetch draft receipt data
-      const receiptResult = await erpnextAPI.purchase.getPurchaseReceipt(receiptId);
+      const receiptResult = await erpnextAPI.getPurchaseReceipt(receiptId);
       if (!receiptResult.data) {
         toast({
           title: "Purchase Receipt Not Found",
@@ -249,21 +249,8 @@ const Receive = () => {
       console.log('Processing entry with warehouse and PO item reference:', entryWithWarehouse);
 
       // Get the company from the PO
-      const poDetails = await erpnextAPI.purchase.getPurchaseOrder(selectedPO.poNumber);
+      const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
       const company = poDetails.data.company;
-
-      // Ensure batch exists if batch tracking is used
-      if (entryWithWarehouse.batch) {
-        const batchExists = await erpnextAPI.purchase.ensureBatchExists(entryWithWarehouse.batch, entryWithWarehouse.itemCode);
-        if (!batchExists) {
-          toast({
-            title: "Error",
-            description: "Failed to create or find batch number",
-            variant: "destructive"
-          });
-          return;
-        }
-      }
 
       // Always add to the same Purchase Receipt instead of creating multiple ones
       if (!currentPurchaseReceipt) {
@@ -292,7 +279,7 @@ const Receive = () => {
 
         console.log('Creating new Purchase Receipt with data:', receiptData);
         
-        const result = await erpnextAPI.purchase.createPurchaseReceipt(receiptData);
+        const result = await erpnextAPI.createPurchaseReceipt(receiptData);
         console.log('Purchase Receipt creation result:', result);
         
         if (result.data?.name) {
@@ -309,24 +296,10 @@ const Receive = () => {
       } else {
         console.log('Adding item to existing Purchase Receipt:', currentPurchaseReceipt);
         
-        // Fetch current receipt data using manual authentication
-        const storedApiKey = localStorage.getItem('erpnextApiKey');
-        const storedApiSecret = localStorage.getItem('erpnextApiSecret');
-        const storedBaseURL = localStorage.getItem('erpnextBaseURL');
-        const authString = btoa(`${storedApiKey}:${storedApiSecret}`);
+        // Fetch current receipt data
+        const currentReceiptResponse = await erpnextAPI.getPurchaseReceipt(currentPurchaseReceipt);
+        const currentReceiptData = currentReceiptResponse.data;
         
-        const currentReceiptResponse = await fetch(`${storedBaseURL}/api/resource/Purchase Receipt/${currentPurchaseReceipt}`, {
-          headers: {
-            'Authorization': `Basic ${authString}`,
-            'Content-Type': 'application/json'
-          },
-        });
-        
-        if (!currentReceiptResponse.ok) {
-          throw new Error('Failed to fetch current receipt data');
-        }
-        
-        const currentReceiptData = await currentReceiptResponse.json();
         console.log('Current receipt data:', currentReceiptData);
         
         // Add new item to existing items array - this ensures all batches go into one receipt
@@ -342,10 +315,10 @@ const Receive = () => {
           ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
         };
         
-        const updatedItems = [...(currentReceiptData.data.items || []), newItem];
+        const updatedItems = [...(currentReceiptData.items || []), newItem];
         
         // Update the receipt with new items
-        const updateResult = await erpnextAPI.purchase.updatePurchaseReceipt(currentPurchaseReceipt, {
+        const updateResult = await erpnextAPI.updatePurchaseReceipt(currentPurchaseReceipt, {
           items: updatedItems
         });
         
@@ -397,8 +370,8 @@ const Receive = () => {
         return;
       }
 
-      // Submit the Purchase Receipt using purchase API
-      await erpnextAPI.purchase.submitPurchaseReceipt(currentPurchaseReceipt);
+      // Submit the Purchase Receipt
+      await erpnextAPI.submitPurchaseReceipt(currentPurchaseReceipt);
       
       toast({
         title: "Success",
