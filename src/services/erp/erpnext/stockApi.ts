@@ -24,7 +24,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       ['warehouse', '=', warehouse]
     ];
     
-    // Include all necessary fields for stock data
+    // Use only basic fields that are typically accessible
     const fields = [
       'name',
       'item_code', 
@@ -33,9 +33,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       'reserved_qty',
       'planned_qty',
       'ordered_qty',
-      'projected_qty',
-      'valuation_rate',
-      'stock_value'
+      'projected_qty'
     ];
     
     const params = this.buildQueryParams(filters, fields);

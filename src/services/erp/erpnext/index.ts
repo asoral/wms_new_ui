@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
@@ -37,7 +38,6 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   async searchItems(searchTerm: string, limitPageLength?: number) {
     console.log('ERPNextAPI.searchItems called with:', searchTerm, 'limit:', limitPageLength);
-    // Ensure we pass the limit parameter correctly
     const limit = limitPageLength || 10;
     console.log('Calling itemsAPI.searchItems with limit:', limit);
     return this.itemsAPI.searchItems(searchTerm, limit);
@@ -115,19 +115,16 @@ export class ERPNextAPI extends ERPNextBaseAPI {
       filters.push(['warehouse', '=', warehouse]);
     }
     
-    // Include all necessary fields for proper stock data
+    // Use only basic accessible fields for Bin doctype
     const fields = [
       'name',
       'item_code',
-      'item_name', 
       'warehouse',
       'actual_qty',
       'reserved_qty',
       'planned_qty',
       'ordered_qty',
-      'projected_qty',
-      'valuation_rate',
-      'stock_value'
+      'projected_qty'
     ];
     
     console.log('Fetching Bin stock with filters:', filters);
