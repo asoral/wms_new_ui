@@ -55,25 +55,36 @@ const ItemEnquiry = () => {
         return;
       }
 
-      // Get company currency
+      // Get user's default company
       const company = await getUserDefaultCompany();
-      if (company) {
-        try {
-          const companiesResult = await erpnextAPI.getCompanies();
-          const companyData = companiesResult.data?.find(c => c.name === company);
-          if (companyData) {
-            setCompanyCurrency("INR");
-          }
-        } catch (error) {
-          console.error('Failed to fetch company currency:', error);
+      console.log('User default company:', company);
+      
+      if (!company) {
+        toast({
+          title: "No Default Company",
+          description: "Please set your default company in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Get company currency
+      try {
+        const companiesResult = await erpnextAPI.getCompanies();
+        const companyData = companiesResult.data?.find(c => c.name === company);
+        if (companyData) {
+          setCompanyCurrency(companyData.default_currency || "INR");
         }
+      } catch (error) {
+        console.error('Failed to fetch company currency:', error);
       }
 
       // Fetch item stock details using company-filtered approach
-      const response = await erpnextAPI.getBinStock(code);
+      console.log('Fetching stock for item:', code, 'company:', company);
+      const response = await erpnextAPI.stockAPI.getBinStockForCompany(code, company);
       console.log('Item stock response:', response);
 
-      if (response?.data) {
+      if (response?.data && response.data.length > 0) {
         // Get additional item details for valuation
         let itemDetails = null;
         try {
@@ -84,18 +95,54 @@ const ItemEnquiry = () => {
           console.warn('Could not fetch item details:', error);
         }
 
+        // Get stock ledger entries for accurate valuation
+        const warehouses = response.data.map((item: any) => item.warehouse);
+        console.log('Fetching stock ledger for warehouses:', warehouses);
+        
+        let stockLedgerData: any[] = [];
+        try {
+          const stockLedgerResponse = await erpnextAPI.stockAPI.getStockLedgerEntries(code, warehouses);
+          stockLedgerData = stockLedgerResponse?.data || [];
+          console.log('Stock ledger entries:', stockLedgerData);
+        } catch (error) {
+          console.warn('Could not fetch stock ledger entries:', error);
+        }
+
         const transformedItems: StockItem[] = response.data
           .filter((item: any) => (item.actual_qty || 0) > 0)
           .map((item: any) => {
             const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
             
-            // Use standard rate from item details if available
-            const standardRate = itemDetails?.standard_rate || itemDetails?.valuation_rate || 0;
+            // Try to get valuation rate from stock ledger
+            let valuationRate = 0;
             let totalValuation = 0;
             
-            if (standardRate && actualQty > 0) {
-              totalValuation = Math.round(actualQty * standardRate * 100) / 100;
+            // Find the latest stock ledger entry for this warehouse
+            const warehouseLedgerEntries = stockLedgerData
+              .filter((entry: any) => entry.warehouse === item.warehouse && entry.item_code === code)
+              .sort((a: any, b: any) => {
+                const dateA = new Date(a.posting_date + ' ' + (a.posting_time || '00:00:00'));
+                const dateB = new Date(b.posting_date + ' ' + (b.posting_time || '00:00:00'));
+                return dateB.getTime() - dateA.getTime();
+              });
+
+            if (warehouseLedgerEntries.length > 0) {
+              const latestEntry = warehouseLedgerEntries[0];
+              valuationRate = latestEntry.valuation_rate || 0;
+              console.log(`Latest valuation rate for ${item.warehouse}:`, valuationRate);
             }
+
+            // Fallback to item details if no stock ledger data
+            if (!valuationRate && itemDetails) {
+              valuationRate = itemDetails.standard_rate || itemDetails.valuation_rate || 0;
+              console.log(`Fallback valuation rate from item details:`, valuationRate);
+            }
+
+            if (valuationRate && actualQty > 0) {
+              totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
+            }
+
+            console.log(`Item: ${code}, Warehouse: ${item.warehouse}, Qty: ${actualQty}, Rate: ${valuationRate}, Total: ${totalValuation}`);
 
             return {
               itemCode: item.item_code,
@@ -114,20 +161,20 @@ const ItemEnquiry = () => {
         if (transformedItems.length === 0) {
           toast({
             title: "No Stock Found",
-            description: `No stock found for item: ${code}`,
+            description: `No stock found for item: ${code} in company: ${company}`,
             variant: "destructive"
           });
         } else {
           toast({
             title: "Stock Loaded",
-            description: `Found stock in ${transformedItems.length} locations`,
+            description: `Found stock in ${transformedItems.length} locations for company: ${company}`,
           });
         }
       } else {
         setStockItems([]);
         toast({
           title: "No Data",
-          description: `No stock data available for item: ${code}`,
+          description: `No stock data available for item: ${code} in company: ${company}`,
           variant: "destructive"
         });
       }

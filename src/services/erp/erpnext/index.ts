@@ -26,6 +26,9 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   get getApiKey() { return this.apiKey; }
   get getApiSecret() { return this.apiSecret; }
 
+  // Expose stockAPI for direct access when needed
+  get stockAPI() { return this.stockAPI; }
+
   // Item methods - delegate to itemsAPI with correct signatures
   async getItems(filters?: any, limitPageLength?: number) {
     return this.itemsAPI.getItems(filters, undefined, limitPageLength || 20, 0);
