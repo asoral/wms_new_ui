@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Camera, Search } from "lucide-react";
 import { Item, ItemSelectCallback } from "@/types";
-import ItemSelector from "./ItemSelector";
+import ItemDropdown from "../common/ItemDropdown";
 import CameraScanner from "./CameraScanner";
 
 interface ItemScannerProps {
@@ -57,10 +57,13 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
         </TabsList>
 
         <TabsContent value="manual" className="mt-4">
-          <ItemSelector 
-            onItemSelected={handleItemSelected}
-            isLoading={isLoading}
-          />
+          <div className="space-y-4">
+            <ItemDropdown 
+              onItemSelect={handleItemSelected}
+              placeholder="Search by item name or code..."
+              disabled={isLoading}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="scan" className="mt-4">
