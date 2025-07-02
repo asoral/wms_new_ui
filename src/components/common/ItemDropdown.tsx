@@ -152,22 +152,22 @@ const ItemDropdown = ({
       </div>
 
       {showResults && items.length > 0 && isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {items.map((item) => (
             <div
               key={item.name}
-              className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+              className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b last:border-b-0"
               onClick={() => handleItemSelect(item)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Package className="w-4 h-4 text-gray-400" />
                   <div>
-                    <p className="font-medium text-sm">{item.item_name}</p>
-                    <p className="text-xs text-gray-600">{item.item_code}</p>
+                    <p className="font-medium text-sm dark:text-gray-100">{item.item_name}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{item.item_code}</p>
                   </div>
                 </div>
-                <span className="text-xs text-gray-500">{item.stock_uom}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{item.stock_uom}</span>
               </div>
             </div>
           ))}
@@ -175,14 +175,14 @@ const ItemDropdown = ({
       )}
 
       {loading && isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-3">
-          <div className="text-center text-sm text-gray-500">Searching...</div>
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg p-3">
+          <div className="text-center text-sm text-gray-500 dark:text-gray-400">Searching...</div>
         </div>
       )}
 
       {showResults && items.length === 0 && !loading && searchTerm && isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-3">
-          <div className="text-center text-sm text-gray-500">No items found</div>
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg p-3">
+          <div className="text-center text-sm text-gray-500 dark:text-gray-400">No items found</div>
         </div>
       )}
     </div>
