@@ -29,7 +29,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   // Item methods - delegate to itemsAPI
   async getItems(filters?: any, limitPageLength?: number) {
-    return this.itemsAPI.getItems(filters, limitPageLength);
+    return this.itemsAPI.getItems(filters, undefined, limitPageLength || 20, 0);
   }
 
   async getItemDetails(itemCode: string) {
@@ -37,7 +37,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async searchItems(searchTerm: string, limitPageLength?: number) {
-    return this.itemsAPI.searchItems(searchTerm, limitPageLength);
+    return this.itemsAPI.searchItems(searchTerm, limitPageLength || 20);
   }
 
   async searchItemsByBarcode(barcode: string) {
