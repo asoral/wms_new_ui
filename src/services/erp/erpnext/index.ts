@@ -1,3 +1,4 @@
+
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
@@ -7,7 +8,7 @@ import { ERPNextItemsAPI } from './itemsApi';
 
 export class ERPNextAPI extends ERPNextBaseAPI {
   private salesAPI: ERPNextSalesAPI;
-  private stockAPI: ERPNextStockAPI;
+  public stockAPI: ERPNextStockAPI;
   private materialAPI: ERPNextMaterialAPI;
   private purchaseAPI: ERPNextPurchaseAPI;
   private itemsAPI: ERPNextItemsAPI;
@@ -25,9 +26,6 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   get getBaseURL() { return this.baseURL; }
   get getApiKey() { return this.apiKey; }
   get getApiSecret() { return this.apiSecret; }
-
-  // Expose stockAPI for direct access when needed
-  get stockAPI() { return this.stockAPI; }
 
   // Item methods - delegate to itemsAPI with correct signatures
   async getItems(filters?: any, limitPageLength?: number) {
