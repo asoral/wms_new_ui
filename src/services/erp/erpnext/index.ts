@@ -29,7 +29,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   // Item methods - delegate to itemsAPI
   async getItems(filters?: any, limitPageLength?: number) {
-    return this.itemsAPI.getItems(filters, undefined, limitPageLength);
+    return this.itemsAPI.getItems(filters, limitPageLength);
   }
 
   async getItemDetails(itemCode: string) {
