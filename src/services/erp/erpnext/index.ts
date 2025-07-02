@@ -4,12 +4,14 @@ import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
 import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
+import { ERPNextItemsAPI } from './itemsApi';
 
 export class ERPNextAPI extends ERPNextBaseAPI {
   private salesAPI: ERPNextSalesAPI;
   private stockAPI: ERPNextStockAPI;
   private materialAPI: ERPNextMaterialAPI;
   private purchaseAPI: ERPNextPurchaseAPI;
+  private itemsAPI: ERPNextItemsAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
     super(baseURL, apiKey, apiSecret);
@@ -17,6 +19,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     this.stockAPI = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
     this.materialAPI = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
     this.purchaseAPI = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
+    this.itemsAPI = new ERPNextItemsAPI(baseURL, apiKey, apiSecret);
   }
 
   // Public getters for API properties
@@ -24,26 +27,21 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   get getApiKey() { return this.apiKey; }
   get getApiSecret() { return this.apiSecret; }
 
-  // Item methods
+  // Item methods - delegate to itemsAPI
   async getItems(filters?: any, limitPageLength?: number) {
-    return this.callAPI('Item', 'GET', undefined, filters, limitPageLength);
+    return this.itemsAPI.getItems(filters, undefined, limitPageLength);
   }
 
   async getItemDetails(itemCode: string) {
-    return this.callAPI(`Item/${itemCode}`, 'GET');
+    return this.itemsAPI.getItemDetails(itemCode);
   }
 
   async searchItems(searchTerm: string, limitPageLength?: number) {
-    const filters = [
-      ['item_name', 'like', `%${searchTerm}%`],
-      ['item_code', 'like', `%${searchTerm}%`]
-    ];
-    return this.callAPI('Item', 'GET', undefined, filters, limitPageLength);
+    return this.itemsAPI.searchItems(searchTerm, limitPageLength);
   }
 
   async searchItemsByBarcode(barcode: string) {
-    const filters = [['barcode', '=', barcode]];
-    return this.callAPI('Item', 'GET', undefined, filters);
+    return this.itemsAPI.searchItemsByBarcode(barcode);
   }
 
   // Sales methods
