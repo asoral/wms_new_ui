@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -5,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Package, Warehouse, TrendingUp, AlertTriangle, Calendar, DollarSign } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import ItemScanner from "@/components/item-enquiry/ItemScanner";
+import ItemDropdown from "@/components/common/ItemDropdown";
 import { Item } from "@/types";
 
 interface StockItem {
@@ -24,7 +25,7 @@ interface StockItem {
 const ItemEnquiry = () => {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<string>("");
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
   const { toast } = useToast();
 
@@ -42,7 +43,7 @@ const ItemEnquiry = () => {
 
     try {
       setLoading(true);
-      setSelectedItem(code);
+      setSelectedItem(item);
       
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
@@ -68,8 +69,8 @@ const ItemEnquiry = () => {
         }
       }
 
-      // Fetch item stock details with correct number of arguments
-      const response = await erpnextAPI.getBinStock(code, "");
+      // Fetch item stock details
+      const response = await erpnextAPI.getBinStock(code);
       console.log('Item stock response:', response);
 
       if (response?.data) {
@@ -132,7 +133,7 @@ const ItemEnquiry = () => {
   };
 
   const handleClear = () => {
-    setSelectedItem("");
+    setSelectedItem(null);
     setStockItems([]);
   };
 
@@ -171,9 +172,11 @@ const ItemEnquiry = () => {
             <CardTitle>Select Item</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ItemScanner 
-              onItemScanned={loadItemStock}
-              isLoading={loading}
+            <ItemDropdown 
+              onItemSelect={loadItemStock}
+              selectedItem={selectedItem}
+              placeholder="Search and select an item..."
+              disabled={loading}
             />
             <div className="flex justify-end">
               <Button 
@@ -195,7 +198,7 @@ const ItemEnquiry = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <TrendingUp className="w-5 h-5" />
-                <span>Item Summary - {selectedItem}</span>
+                <span>Item Summary - {selectedItem.item_code}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -244,7 +247,7 @@ const ItemEnquiry = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Warehouse className="w-5 h-5" />
-                <span>Stock of {selectedItem}</span>
+                <span>Stock of {selectedItem.item_code}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -348,10 +351,10 @@ const ItemEnquiry = () => {
         <Card>
           <CardContent className="text-center py-8">
             <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500 mb-4">Select an item using the dropdown or scan a barcode to view stock levels.</p>
+            <p className="text-gray-500 mb-4">Select an item using the dropdown to view stock levels.</p>
             <div className="text-sm text-gray-400">
               <p>• Use the item selector dropdown for quick selection</p>
-              <p>• Use the camera to scan barcodes for instant lookup</p>
+              <p>• Search by item name or code</p>
               <p>• View stock across all warehouses</p>
             </div>
           </CardContent>
