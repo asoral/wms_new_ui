@@ -78,6 +78,7 @@ const CompanyDropdown = ({
   };
 
   const handleCompanySelect = (company: Company) => {
+    console.log('Company selected:', company);
     onCompanySelect(company);
     setShowResults(false);
   };
@@ -104,25 +105,25 @@ const CompanyDropdown = ({
         <div className="flex items-center space-x-2">
           <Building2 className="w-4 h-4" />
           <span className="truncate">
-            {selectedCompany ? selectedCompany.company_name : "Select Company"}
+            {selectedCompany?.company_name || "Select Company"}
           </span>
         </div>
         <ChevronDown className="w-4 h-4" />
       </Button>
 
       {showResults && companies.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {companies.map((company) => (
             <div
               key={company.name}
-              className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+              className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b last:border-b-0"
               onClick={() => handleCompanySelect(company)}
             >
               <div className="flex items-center space-x-2">
                 <Building2 className="w-4 h-4 text-gray-400" />
                 <div>
-                  <p className="font-medium text-sm">{company.company_name}</p>
-                  <p className="text-xs text-gray-600">{company.name}</p>
+                  <p className="font-medium text-sm dark:text-gray-100">{company.company_name}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">{company.name}</p>
                 </div>
               </div>
             </div>
@@ -131,14 +132,14 @@ const CompanyDropdown = ({
       )}
 
       {loading && (
-        <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-3">
-          <div className="text-center text-sm text-gray-500">Loading companies...</div>
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg p-3">
+          <div className="text-center text-sm text-gray-500 dark:text-gray-400">Loading companies...</div>
         </div>
       )}
 
       {showResults && companies.length === 0 && !loading && (
-        <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-3">
-          <div className="text-center text-sm text-gray-500">No companies found</div>
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg p-3">
+          <div className="text-center text-sm text-gray-500 dark:text-gray-400">No companies found</div>
         </div>
       )}
     </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,10 +100,11 @@ const Profile = () => {
   };
 
   const handleCompanySelect = (company: any) => {
-    setERPNextConfig({
-      ...erpNextConfig,
+    console.log('Profile - Company selected:', company);
+    setERPNextConfig(prev => ({
+      ...prev,
       erpnext_default_company: company.company_name
-    });
+    }));
   };
 
   if (loading) {
@@ -252,13 +252,14 @@ const Profile = () => {
                         company_name: erpNextConfig.erpnext_default_company 
                       } : null}
                       disabled={!erpNextConfig.erpnext_url || !erpNextConfig.erpnext_api_key || !erpNextConfig.erpnext_api_secret}
+                      className="mt-1"
                     />
                   ) : (
                     <Input
                       id="erpnext_default_company"
                       value={erpNextConfig.erpnext_default_company}
                       readOnly
-                      className="bg-gray-50 dark:bg-gray-700"
+                      className="bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
                     />
                   )}
                 </div>
