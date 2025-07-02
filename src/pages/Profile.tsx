@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { getERPNextConfig, saveERPNextConfig } from "@/services/authService";
 import DarkModeToggle from "@/components/DarkModeToggle";
+import CompanyDropdown from "@/components/common/CompanyDropdown";
 
 const Profile = () => {
   const { user, signOut, loading } = useAuth();
@@ -97,6 +98,13 @@ const Profile = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleCompanySelect = (company: any) => {
+    setERPNextConfig({
+      ...erpNextConfig,
+      erpnext_default_company: company.company_name
+    });
   };
 
   if (loading) {
@@ -236,14 +244,23 @@ const Profile = () => {
                     <Building2 className="w-4 h-4" />
                     <span>Default Company</span>
                   </Label>
-                  <Input
-                    id="erpnext_default_company"
-                    placeholder="Enter your default company name"
-                    value={erpNextConfig.erpnext_default_company}
-                    onChange={(e) => setERPNextConfig({...erpNextConfig, erpnext_default_company: e.target.value})}
-                    readOnly={!isEditing}
-                    className={!isEditing ? "bg-gray-50 dark:bg-gray-700" : ""}
-                  />
+                  {isEditing ? (
+                    <CompanyDropdown
+                      onCompanySelect={handleCompanySelect}
+                      selectedCompany={erpNextConfig.erpnext_default_company ? { 
+                        name: erpNextConfig.erpnext_default_company, 
+                        company_name: erpNextConfig.erpnext_default_company 
+                      } : null}
+                      disabled={!erpNextConfig.erpnext_url || !erpNextConfig.erpnext_api_key || !erpNextConfig.erpnext_api_secret}
+                    />
+                  ) : (
+                    <Input
+                      id="erpnext_default_company"
+                      value={erpNextConfig.erpnext_default_company}
+                      readOnly
+                      className="bg-gray-50 dark:bg-gray-700"
+                    />
+                  )}
                 </div>
 
                 <div>
