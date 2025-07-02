@@ -60,15 +60,20 @@ const ItemDropdown = ({
 
   const searchItems = async (term: string) => {
     if (!term.trim()) {
+      console.log('Empty search term, clearing results');
       setItems([]);
       setShowResults(false);
       return;
     }
 
+    console.log('=== SEARCH ITEMS DEBUG ===');
+    console.log('Search term:', term);
+
     try {
       setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
+        console.error('ERPNext API not available');
         toast({
           title: "ERPNext Not Configured",
           description: "Please configure your ERPNext settings in the Profile page.",
@@ -77,27 +82,28 @@ const ItemDropdown = ({
         return;
       }
 
-      console.log('Searching for:', term);
-      const response = await erpnextAPI.searchItems(term, 10); // Use 10 as requested
-      console.log('Search API response:', response);
+      console.log('Calling searchItems with term:', term, 'limit: 10');
+      // Call the API with exactly 10 items as requested
+      const response = await erpnextAPI.searchItems(term, 10);
+      console.log('API Response:', response);
       
-      // Handle the response properly
       if (response && response.data && Array.isArray(response.data)) {
-        console.log('Found items:', response.data);
+        console.log('Found items count:', response.data.length);
+        console.log('Items:', response.data);
         setItems(response.data);
         setShowResults(true);
         setIsOpen(true);
       } else {
-        console.warn('No valid items found in response:', response);
+        console.warn('Invalid response format:', response);
         setItems([]);
         setShowResults(false);
       }
     } catch (error) {
-      console.error('Error searching items:', error);
+      console.error('Search error:', error);
       setItems([]);
       setShowResults(false);
       toast({
-        title: "Error",
+        title: "Search Error",
         description: "Failed to search items. Please check your ERPNext connection.",
         variant: "destructive"
       });
@@ -106,8 +112,10 @@ const ItemDropdown = ({
     }
   };
 
-  // Trigger search when user types
+  // Debounced search effect
   useEffect(() => {
+    console.log('Search term changed to:', searchTerm);
+    
     if (!searchTerm.trim()) {
       setItems([]);
       setShowResults(false);
@@ -115,11 +123,14 @@ const ItemDropdown = ({
     }
 
     const timer = setTimeout(() => {
-      console.log('Triggering search for:', searchTerm);
+      console.log('Triggering search after debounce for:', searchTerm);
       searchItems(searchTerm);
-    }, 300); // 300ms debounce
+    }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      console.log('Clearing search timer');
+      clearTimeout(timer);
+    };
   }, [searchTerm]);
 
   const handleItemSelect = (item: Item) => {
@@ -131,16 +142,17 @@ const ItemDropdown = ({
   };
 
   const handleInputFocus = () => {
+    console.log('Input focused, searchTerm:', searchTerm);
     setIsOpen(true);
-    // Only search if there's a term and we don't have results
     if (searchTerm.trim() && items.length === 0) {
+      console.log('Triggering search on focus');
       searchItems(searchTerm);
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    console.log('Input changed to:', value);
+    console.log('Input changed from', searchTerm, 'to', value);
     setSearchTerm(value);
     setIsOpen(true);
     

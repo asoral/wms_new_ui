@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
@@ -37,8 +36,11 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async searchItems(searchTerm: string, limitPageLength?: number) {
-    console.log('ERPNextAPI.searchItems called with:', searchTerm, limitPageLength);
-    return this.itemsAPI.searchItems(searchTerm, limitPageLength || 10);
+    console.log('ERPNextAPI.searchItems called with:', searchTerm, 'limit:', limitPageLength);
+    // Ensure we pass the limit parameter correctly
+    const limit = limitPageLength || 10;
+    console.log('Calling itemsAPI.searchItems with limit:', limit);
+    return this.itemsAPI.searchItems(searchTerm, limit);
   }
 
   async searchItemsByBarcode(barcode: string) {
