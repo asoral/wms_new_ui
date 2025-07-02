@@ -13,7 +13,8 @@ const ItemSearchResults = ({
   onItemSelect, 
   maxHeight = "max-h-60" 
 }: ItemSearchResultsProps) => {
-  if (results.length === 0) return null;
+  // Add safety check to ensure results is an array
+  if (!results || !Array.isArray(results) || results.length === 0) return null;
 
   return (
     <div className={`border rounded-lg ${maxHeight} overflow-y-auto`}>

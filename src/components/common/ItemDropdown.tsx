@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Search, Package, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI } from "@/services/erpnextApi";
@@ -79,17 +78,22 @@ const ItemDropdown = ({
       }
 
       const response = await erpnextAPI.searchItems(term, 20);
+      console.log('Search response:', response);
       
+      // Ensure we have valid data and it's an array
       if (response?.data && Array.isArray(response.data)) {
         setItems(response.data);
         setShowResults(true);
         setIsOpen(true);
       } else {
+        console.warn('Invalid search response:', response);
         setItems([]);
         setShowResults(false);
       }
     } catch (error) {
       console.error('Error searching items:', error);
+      setItems([]);
+      setShowResults(false);
       toast({
         title: "Error",
         description: "Failed to search items",

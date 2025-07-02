@@ -43,7 +43,10 @@ export const useItemSearch = (): UseItemSearchReturn => {
     try {
       setSearching(true);
       const response = await searchItems(searchTerm);
-      const results = (response?.data || []) as Item[];
+      console.log('Search response in hook:', response);
+      
+      // Ensure we always work with arrays
+      const results = Array.isArray(response?.data) ? response.data : [];
       setItems(results);
       setSearchResults(results);
     } catch (error) {
@@ -59,7 +62,10 @@ export const useItemSearch = (): UseItemSearchReturn => {
     try {
       setSearching(true);
       const response = await searchItemsByBarcode(barcode);
-      const results = (response?.data || []) as Item[];
+      console.log('Barcode search response in hook:', response);
+      
+      // Ensure we always work with arrays
+      const results = Array.isArray(response?.data) ? response.data : [];
       setItems(results);
       setSearchResults(results);
     } catch (error) {
