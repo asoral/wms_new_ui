@@ -27,7 +27,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   get getApiKey() { return this.apiKey; }
   get getApiSecret() { return this.apiSecret; }
 
-  // Item methods - delegate to itemsAPI
+  // Item methods - delegate to itemsAPI with correct signatures
   async getItems(filters?: any, limitPageLength?: number) {
     return this.itemsAPI.getItems(filters, undefined, limitPageLength || 20, 0);
   }
@@ -69,7 +69,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI(`Delivery Note/${name}`, 'GET');
   }
 
-  // Stock methods
+  // Stock methods - fixed parameter delegation
   async getStockBalance(filters?: any) {
     return this.stockAPI.getStockBalance(filters);
   }
