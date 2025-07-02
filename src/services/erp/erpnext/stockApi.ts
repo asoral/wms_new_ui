@@ -23,7 +23,22 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       ['item_code', '=', itemCode],
       ['warehouse', '=', warehouse]
     ];
-    const params = this.buildQueryParams(filters);
+    
+    // Include all necessary fields for stock data
+    const fields = [
+      'name',
+      'item_code', 
+      'warehouse',
+      'actual_qty',
+      'reserved_qty',
+      'planned_qty',
+      'ordered_qty',
+      'projected_qty',
+      'valuation_rate',
+      'stock_value'
+    ];
+    
+    const params = this.buildQueryParams(filters, fields);
     
     const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
       headers: this.getHeaders(),

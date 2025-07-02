@@ -114,7 +114,26 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     if (warehouse) {
       filters.push(['warehouse', '=', warehouse]);
     }
-    return this.callAPI('Bin', 'GET', undefined, filters);
+    
+    // Include all necessary fields for proper stock data
+    const fields = [
+      'name',
+      'item_code',
+      'item_name', 
+      'warehouse',
+      'actual_qty',
+      'reserved_qty',
+      'planned_qty',
+      'ordered_qty',
+      'projected_qty',
+      'valuation_rate',
+      'stock_value'
+    ];
+    
+    console.log('Fetching Bin stock with filters:', filters);
+    console.log('Fetching Bin stock with fields:', fields);
+    
+    return this.callAPI('Bin', 'GET', undefined, filters, undefined, fields);
   }
 
   async getCompanies(filters?: any, limitPageLength?: number) {
@@ -236,10 +255,12 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI('Packing Slip', 'GET', undefined, filters, limitPageLength);
   }
 
-  // Generic API call method
-  async callAPI(endpoint: string, method: string = 'GET', data?: any, filters?: any, limitPageLength?: number) {
-    const params = this.buildQueryParams(filters, undefined, limitPageLength);
+  // Generic API call method - updated to support fields parameter
+  async callAPI(endpoint: string, method: string = 'GET', data?: any, filters?: any, limitPageLength?: number, fields?: string[]) {
+    const params = this.buildQueryParams(filters, fields, limitPageLength);
     const url = `${this.baseURL}/api/resource/${endpoint}${params ? '?' + params : ''}`;
+    
+    console.log('API URL:', url);
     
     const options: RequestInit = {
       method,

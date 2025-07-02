@@ -35,6 +35,7 @@ const ItemDropdown = ({
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Set initial search term from selectedItem
   useEffect(() => {
@@ -59,8 +60,8 @@ const ItemDropdown = ({
   }, []);
 
   const searchItems = async (term: string) => {
-    if (!term.trim()) {
-      console.log('Empty search term, clearing results');
+    if (!term.trim() || term.length < 2) {
+      console.log('Search term too short, clearing results');
       setItems([]);
       setShowResults(false);
       return;
@@ -83,7 +84,6 @@ const ItemDropdown = ({
       }
 
       console.log('Calling searchItems with term:', term, 'limit: 10');
-      // Call the API with exactly 10 items as requested
       const response = await erpnextAPI.searchItems(term, 10);
       console.log('API Response:', response);
       
@@ -112,24 +112,32 @@ const ItemDropdown = ({
     }
   };
 
-  // Debounced search effect
+  // Improved debounced search effect - longer delay and minimum length
   useEffect(() => {
     console.log('Search term changed to:', searchTerm);
     
-    if (!searchTerm.trim()) {
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    if (!searchTerm.trim() || searchTerm.length < 2) {
       setItems([]);
       setShowResults(false);
       return;
     }
 
-    const timer = setTimeout(() => {
+    // Set longer timeout to reduce interruptions while typing
+    searchTimeoutRef.current = setTimeout(() => {
       console.log('Triggering search after debounce for:', searchTerm);
       searchItems(searchTerm);
-    }, 300);
+    }, 800); // Increased from 300ms to 800ms
 
     return () => {
-      console.log('Clearing search timer');
-      clearTimeout(timer);
+      if (searchTimeoutRef.current) {
+        console.log('Clearing search timer');
+        clearTimeout(searchTimeoutRef.current);
+      }
     };
   }, [searchTerm]);
 
@@ -144,7 +152,8 @@ const ItemDropdown = ({
   const handleInputFocus = () => {
     console.log('Input focused, searchTerm:', searchTerm);
     setIsOpen(true);
-    if (searchTerm.trim() && items.length === 0) {
+    // Don't trigger search on focus to avoid interrupting typing
+    if (searchTerm.trim() && searchTerm.length >= 2 && items.length === 0) {
       console.log('Triggering search on focus');
       searchItems(searchTerm);
     }
@@ -156,7 +165,7 @@ const ItemDropdown = ({
     setSearchTerm(value);
     setIsOpen(true);
     
-    if (!value.trim()) {
+    if (!value.trim() || value.length < 2) {
       setItems([]);
       setShowResults(false);
     }
@@ -206,7 +215,7 @@ const ItemDropdown = ({
         </div>
       )}
 
-      {showResults && items.length === 0 && !loading && searchTerm.trim() && isOpen && (
+      {showResults && items.length === 0 && !loading && searchTerm.trim() && searchTerm.length >= 2 && isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg p-3">
           <div className="text-center text-sm text-gray-500 dark:text-gray-400">No items found</div>
         </div>
