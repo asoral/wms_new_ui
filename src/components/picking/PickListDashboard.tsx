@@ -48,8 +48,8 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         // Get analytics data
         try {
           const analyticsResponse = await getPickListAnalytics(company);
-          if (analyticsResponse?.data) {
-            const analyticsData = analyticsResponse.data;
+          if (analyticsResponse?.data && typeof analyticsResponse.data === 'object') {
+            const analyticsData = analyticsResponse.data as any;
             setAnalytics({
               totalPickLists: pickListsData.length,
               pendingPickLists: pickListsData.filter((pl: any) => pl.status === 'Draft').length,

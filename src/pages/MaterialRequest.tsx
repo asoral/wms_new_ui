@@ -1,18 +1,17 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FileText, ArrowLeft } from "lucide-react";
+import { Database } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Import components
 import MaterialRequestDashboard from "@/components/material-request/MaterialRequestDashboard";
 import MaterialRequestList from "@/components/material-request/MaterialRequestList";
-// Import the new improved form
-import MaterialRequestFormImproved from "@/components/material-request/MaterialRequestFormImproved";
+import MaterialRequestForm from "@/components/material-request/MaterialRequestForm";
 import MaterialRequestReview from "@/components/material-request/MaterialRequestReview";
 
-export type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture" | "Customer Provided";
-export type MaterialRequestStatus = "Draft" | "Submitted" | "Stopped" | "Cancelled" | "Pending" | "Partially Ordered" | "Partially Received" | "Ordered" | "Issued" | "Transferred" | "Received";
+export type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture";
+export type MaterialRequestStatus = "draft" | "submitted" | "stopped" | "cancelled";
 
 export interface MaterialRequestItem {
   itemCode: string;
@@ -20,36 +19,26 @@ export interface MaterialRequestItem {
   qty: number;
   uom: string;
   warehouse?: string;
-  fromWarehouse?: string;
-  toWarehouse?: string;
-  rate?: number;
-  requiredBy?: string;
+  requiredDate?: string;
   description?: string;
-  brand?: string;
-  itemGroup?: string;
 }
 
 export interface MaterialRequest {
   id: string;
-  name: string;
+  number: string;
   purpose: MaterialRequestPurpose;
   status: MaterialRequestStatus;
-  transactionDate: string;
-  requiredBy?: string;
-  requestedBy: string;
-  company: string;
-  costCenter?: string;
-  project?: string;
+  createdDate: string;
+  createdBy: string;
   items: MaterialRequestItem[];
   totalValue?: number;
-  remarks?: string;
-  printHeading?: string;
+  warehouse?: string;
 }
 
 const MaterialRequest = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedPurpose, setSelectedPurpose] = useState<MaterialRequestPurpose | null>(null);
-  const [draftRequest, setDraftRequest] = useState<MaterialRequest | null>(null);
+  const [draftRequest, setDraftRequest] = useState<any | null>(null);
 
   const handleCreateNew = (purpose: MaterialRequestPurpose) => {
     setSelectedPurpose(purpose);
@@ -57,13 +46,13 @@ const MaterialRequest = () => {
     setActiveTab("create");
   };
 
-  const handleEditDraft = (draft: MaterialRequest) => {
-    setSelectedPurpose(draft.purpose);
+  const handleEditDraft = (draft: any) => {
+    setSelectedPurpose(draft.material_request_type as MaterialRequestPurpose);
     setDraftRequest(draft);
     setActiveTab("create");
   };
 
-  const handleDraftCreated = (draft: MaterialRequest) => {
+  const handleDraftCreated = (draft: any) => {
     setDraftRequest(draft);
   };
 
@@ -91,42 +80,40 @@ const MaterialRequest = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <FileText className="w-6 h-6 text-blue-600" />
+            <Database className="w-6 h-6 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Material Request</h1>
               {selectedPurpose && (
                 <p className="text-sm text-gray-600">
-                  {selectedPurpose} Request
+                  {selectedPurpose}
                 </p>
               )}
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="create" disabled={!selectedPurpose}>
-              Create MR
-            </TabsTrigger>
-            <TabsTrigger value="review" disabled={!draftRequest}>
-              Review & Submit
-            </TabsTrigger>
+            <TabsTrigger value="list">Request List</TabsTrigger>
+            <TabsTrigger value="create" disabled={!selectedPurpose}>Create Request</TabsTrigger>
+            <TabsTrigger value="review" disabled={!draftRequest}>Review & Submit</TabsTrigger>
           </TabsList>
-
+          
           <TabsContent value="dashboard">
-            <MaterialRequestDashboard
+            <MaterialRequestDashboard 
               onCreateNew={handleCreateNew}
-              onViewList={() => {}}
               onEditDraft={handleEditDraft}
             />
           </TabsContent>
 
+          <TabsContent value="list">
+            <MaterialRequestList onCreateNew={handleCreateNew} />
+          </TabsContent>
+
           <TabsContent value="create">
             {selectedPurpose && (
-              <MaterialRequestFormImproved
-                purpose={selectedPurpose}
+              <MaterialRequestForm
                 draftRequest={draftRequest}
                 onDraftCreated={handleDraftCreated}
                 onReviewAndSubmit={handleReviewAndSubmit}

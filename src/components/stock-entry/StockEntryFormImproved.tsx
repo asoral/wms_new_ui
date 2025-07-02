@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,12 +56,15 @@ export interface StockEntry {
 }
 
 interface StockEntryFormImprovedProps {
-  onSubmit: (stockEntry: StockEntry) => void;
-  isLoading?: boolean;
+  type: StockEntryType;
+  draftEntry?: any;
+  onDraftCreated: (draft: any) => void;
+  onReviewAndSubmit: () => void;
+  onBack: () => void;
 }
 
-const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormImprovedProps) => {
-  const [stockEntryType, setStockEntryType] = useState<StockEntryType>("Material Transfer");
+const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndSubmit, onBack }: StockEntryFormImprovedProps) => {
+  const [stockEntryType, setStockEntryType] = useState<StockEntryType>(type);
   const [fromWarehouse, setFromWarehouse] = useState<string>("");
   const [toWarehouse, setToWarehouse] = useState<string>("");
   const [postingDate, setPostingDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -94,13 +98,13 @@ const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormI
       }
 
       // Load warehouses
-      const warehouseResponse = await erpnextAPI.getWarehouses({}, defaultCompany);
+      const warehouseResponse = await erpnextAPI.getWarehouses(undefined, defaultCompany);
       if (warehouseResponse?.data) {
         setWarehouses(warehouseResponse.data);
       }
 
       // Load some items for selection
-      const itemsResponse = await erpnextAPI.getItems({}, 50);
+      const itemsResponse = await erpnextAPI.getItems(undefined, 50);
       if (itemsResponse?.data) {
         setAvailableItems(itemsResponse.data);
       }
@@ -159,7 +163,7 @@ const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormI
     setItems(updatedItems);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!stockEntryType) {
       toast({
         title: "Missing Stock Entry Type",
@@ -218,7 +222,23 @@ const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormI
       remarks: remarks || undefined
     };
 
-    onSubmit(stockEntry);
+    // Create draft stock entry
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const response = await erpnextAPI.createStockEntry(stockEntry);
+      if (response?.data) {
+        onDraftCreated(response.data);
+      }
+    } catch (error) {
+      console.error('Error creating stock entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create stock entry",
+        variant: "destructive"
+      });
+    }
   };
 
   const stockEntryTypes: StockEntryType[] = [
@@ -250,7 +270,7 @@ const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormI
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Package2 className="w-5 h-5 text-blue-600" />
-            <span>Create Stock Entry</span>
+            <span>Create Stock Entry - {type}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -417,24 +437,15 @@ const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormI
                 onChange={(e) => setCurrentItem({ ...currentItem, batch_no: e.target.value })}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="serial-no">Serial No (Optional)</Label>
-              <Input
-                id="serial-no"
-                placeholder="Enter serial number"
-                value={currentItem.serial_no || ""}
-                onChange={(e) => setCurrentItem({ ...currentItem, serial_no: e.target.value })}
-              />
-            </div>
           </div>
+
           <Button onClick={addItem} className="w-full">
             <Plus className="w-4 h-4 mr-2" />
             Add Item
           </Button>
         </CardContent>
       </Card>
-      
+
       {/* Items List */}
       {items.length > 0 && (
         <Card>
@@ -442,27 +453,20 @@ const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormI
             <CardTitle>Items ({items.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {items.map((item, index) => (
                 <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium">{item.item_name || item.item_code}</span>
-                      <Badge variant="outline">{item.item_code}</Badge>
-                    </div>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
-                      <span>Qty: {item.qty} {item.uom}</span>
-                      {item.s_warehouse && <span>From: {item.s_warehouse}</span>}
-                      {item.t_warehouse && <span>To: {item.t_warehouse}</span>}
-                      {item.batch_no && <span>Batch: {item.batch_no}</span>}
-                      {item.serial_no && <span>Serial: {item.serial_no}</span>}
-                    </div>
+                  <div>
+                    <span className="font-medium">{item.item_name || item.item_code}</span>
+                    <p className="text-sm text-gray-600">
+                      Qty: {item.qty} {item.uom}
+                      {item.batch_no && ` | Batch: ${item.batch_no}`}
+                    </p>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => removeItem(index)}
-                    className="text-red-600 hover:text-red-700"
                   >
                     Remove
                   </Button>
@@ -475,15 +479,12 @@ const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormI
 
       {/* Remarks */}
       <Card>
-        <CardHeader>
-          <CardTitle>Additional Information</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="space-y-2">
             <Label htmlFor="remarks">Remarks (Optional)</Label>
             <Input
               id="remarks"
-              placeholder="Enter any additional remarks"
+              placeholder="Enter any remarks or notes"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
             />
@@ -491,25 +492,21 @@ const StockEntryFormImproved = ({ onSubmit, isLoading = false }: StockEntryFormI
         </CardContent>
       </Card>
 
-      {/* Submit Button */}
-      <div className="flex justify-end">
-        <Button 
-          onClick={handleSubmit} 
-          disabled={isLoading || items.length === 0}
-          className="min-w-[200px]"
-        >
-          {isLoading ? (
-            <>
-              <div className="animate-spin rounded-full w-4 h-4 border-b-2 border-white mr-2"></div>
-              Creating...
-            </>
-          ) : (
-            <>
-              <Package2 className="w-4 h-4 mr-2" />
-              Create Stock Entry
-            </>
-          )}
+      {/* Action Buttons */}
+      <div className="flex justify-between">
+        <Button variant="outline" onClick={onBack}>
+          Back to Dashboard
         </Button>
+        <div className="space-x-2">
+          <Button onClick={handleSubmit}>
+            Create Draft
+          </Button>
+          {items.length > 0 && (
+            <Button onClick={onReviewAndSubmit}>
+              Review & Submit
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

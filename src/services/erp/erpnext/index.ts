@@ -129,10 +129,13 @@ export class ERPNextAPI {
     });
   }
 
-  async getItems() {
-    return this.get('/api/resource/Item', {
+  async getItems(filters?: any[], limitPageLength?: number) {
+    const params: any = {
       fields: JSON.stringify(['name', 'item_code', 'item_name', 'item_group', 'stock_uom'])
-    });
+    };
+    if (filters) params.filters = JSON.stringify(filters);
+    if (limitPageLength) params.limit_page_length = limitPageLength;
+    return this.get('/api/resource/Item', params);
   }
 
   async getItemDetails(itemCode: string) {
@@ -150,7 +153,7 @@ export class ERPNextAPI {
   }
 
   // Stock Methods
-  async getStockBalance(filters?: any, company?: string) {
+  async getStockBalance(filters?: any[], company?: string) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
     if (company) params.company = company;
@@ -178,9 +181,11 @@ export class ERPNextAPI {
     return this.post('/api/resource/Stock Entry', stockEntryData);
   }
 
-  async getStockEntries(filters?: any) {
+  async getStockEntries(filters?: any[], company?: string, limitPageLength?: number) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
+    if (company) params.company = company;
+    if (limitPageLength) params.limit_page_length = limitPageLength;
     return this.get('/api/resource/Stock Entry', params);
   }
 
@@ -194,16 +199,18 @@ export class ERPNextAPI {
     });
   }
 
-  async getStockReconciliations(filters?: any) {
+  async getStockReconciliations(filters?: any[]) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
     return this.get('/api/resource/Stock Reconciliation', params);
   }
 
   // Material Request Methods
-  async getMaterialRequests(filters?: any) {
+  async getMaterialRequests(filters?: any[], company?: string, limitPageLength?: number) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
+    if (company) params.company = company;
+    if (limitPageLength) params.limit_page_length = limitPageLength;
     return this.get('/api/resource/Material Request', params);
   }
 
@@ -229,9 +236,11 @@ export class ERPNextAPI {
   }
 
   // Pick List Methods
-  async getPickLists(filters?: any) {
+  async getPickLists(filters?: any[], company?: string, limitPageLength?: number) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
+    if (company) params.company = company;
+    if (limitPageLength) params.limit_page_length = limitPageLength;
     return this.get('/api/resource/Pick List', params);
   }
 
@@ -244,8 +253,11 @@ export class ERPNextAPI {
     return response?.locations || [];
   }
 
-  async createPickListFromDocument(data: any) {
-    return this.post('/api/method/erpnext.stock.doctype.pick_list.pick_list.create_pick_list', data);
+  async createPickListFromDocument(documentType: string, documentName: string) {
+    return this.post('/api/method/erpnext.stock.doctype.pick_list.pick_list.create_pick_list', {
+      doctype: documentType,
+      name: documentName
+    });
   }
 
   async getPickListAnalytics(company?: string) {
@@ -255,7 +267,7 @@ export class ERPNextAPI {
   }
 
   // Purchase Order Methods
-  async getPurchaseOrders(filters?: any, company?: string) {
+  async getPurchaseOrders(filters?: any[], company?: string) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
     if (company) params.company = company;
@@ -276,7 +288,7 @@ export class ERPNextAPI {
   }
 
   // Purchase Receipt Methods
-  async getPurchaseReceipts(filters?: any, company?: string) {
+  async getPurchaseReceipts(filters?: any[], company?: string) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
     if (company) params.company = company;
@@ -285,6 +297,20 @@ export class ERPNextAPI {
 
   async getPurchaseReceipt(prNumber: string) {
     return this.get(`/api/resource/Purchase Receipt/${prNumber}`);
+  }
+
+  async createPurchaseReceipt(receiptData: any) {
+    return this.post('/api/resource/Purchase Receipt', receiptData);
+  }
+
+  async updatePurchaseReceipt(name: string, receiptData: any) {
+    return this.put(`/api/resource/Purchase Receipt/${name}`, receiptData);
+  }
+
+  async submitPurchaseReceipt(receiptName: string) {
+    return this.put(`/api/resource/Purchase Receipt/${receiptName}`, {
+      docstatus: 1
+    });
   }
 
   // BOM Methods
@@ -299,9 +325,10 @@ export class ERPNextAPI {
   }
 
   // Warehouse Methods
-  async getWarehouses(filters?: any) {
+  async getWarehouses(filters?: any[], company?: string) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
+    if (company) params.company = company;
     return this.get('/api/resource/Warehouse', params);
   }
 
@@ -318,19 +345,19 @@ export class ERPNextAPI {
   }
 
   // Additional methods for missing functionality
-  async getPackingSlips(filters?: any) {
+  async getPackingSlips(filters?: any[]) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
     return this.get('/api/resource/Packing Slip', params);
   }
 
-  async getQualityInspections(filters?: any) {
+  async getQualityInspections(filters?: any[]) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
     return this.get('/api/resource/Quality Inspection', params);
   }
 
-  async getProductBundles(filters?: any) {
+  async getProductBundles(filters?: any[]) {
     const params: any = {};
     if (filters) params.filters = JSON.stringify(filters);
     return this.get('/api/resource/Product Bundle', params);

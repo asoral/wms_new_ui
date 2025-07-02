@@ -2,27 +2,34 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { Plus, FileText, Package, CheckCircle, AlertTriangle } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { useMaterialRequestAPI } from "@/hooks/useERPNextAPI";
 import { useToast } from "@/hooks/use-toast";
+import { getUserDefaultCompany } from "@/services/erpnextApi";
 import StatusBadge from "@/components/ui/status-badge";
 
-interface MaterialRequestDashboardProps {
-  onCreateNew: (purpose?: string) => void;
-  onSelectMaterialRequest: (materialRequest: any) => void;
+export interface MaterialRequestDashboardProps {
+  onCreateNew: (purpose: string) => void;
+  onEditDraft?: (draft: any) => void;
 }
 
-const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: MaterialRequestDashboardProps) => {
+interface DashboardAnalytics {
+  totalRequests: number;
+  pendingRequests: number;
+  completedRequests: number;
+  totalItems: number;
+}
+
+const MaterialRequestDashboard = ({ onCreateNew, onEditDraft }: MaterialRequestDashboardProps) => {
   const [materialRequests, setMaterialRequests] = useState<any[]>([]);
-  const [dashboardData, setDashboardData] = useState({
-    draft: 0,
-    submitted: 0,
-    ordered: 0,
-    received: 0
+  const [analytics, setAnalytics] = useState<DashboardAnalytics>({
+    totalRequests: 0,
+    pendingRequests: 0,
+    completedRequests: 0,
+    totalItems: 0
   });
-  
-  const { getMaterialRequests, getMaterialRequest, loading } = useMaterialRequestAPI();
+  const { getMaterialRequests, loading } = useMaterialRequestAPI();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -31,22 +38,19 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
 
   const fetchMaterialRequests = async () => {
     try {
-      const response = await getMaterialRequests([
-        ['docstatus', 'in', [0, 1]],
-        ['status', 'not in', ['Cancelled', 'Stopped']]
-      ]);
-
+      const company = await getUserDefaultCompany();
+      const response = await getMaterialRequests(company ? [['company', '=', company]] : undefined);
+      
       if (response?.data && Array.isArray(response.data)) {
-        const materialRequestsData = response.data;
-        setMaterialRequests(materialRequestsData);
+        const requestsData = response.data;
+        setMaterialRequests(requestsData);
         
-        // Calculate dashboard metrics
-        const draft = materialRequestsData.filter((mr: any) => mr.docstatus === 0).length;
-        const submitted = materialRequestsData.filter((mr: any) => mr.docstatus === 1 && mr.status === 'Submitted').length;
-        const ordered = materialRequestsData.filter((mr: any) => mr.status === 'Ordered').length;
-        const received = materialRequestsData.filter((mr: any) => mr.status === 'Received').length;
-        
-        setDashboardData({ draft, submitted, ordered, received });
+        setAnalytics({
+          totalRequests: requestsData.length,
+          pendingRequests: requestsData.filter((mr: any) => mr.status === 'Draft').length,
+          completedRequests: requestsData.filter((mr: any) => mr.status === 'Stopped').length,
+          totalItems: 0
+        });
       }
     } catch (error) {
       console.error('Error fetching material requests:', error);
@@ -58,19 +62,9 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
     }
   };
 
-  const handleSelectMaterialRequest = async (materialRequest: any) => {
-    try {
-      const response = await getMaterialRequest(materialRequest.name);
-      if (response?.data) {
-        onSelectMaterialRequest(response.data);
-      }
-    } catch (error) {
-      console.error('Error fetching material request details:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch material request details",
-        variant: "destructive"
-      });
+  const handleSelectMaterialRequest = (materialRequest: any) => {
+    if (onEditDraft) {
+      onEditDraft(materialRequest);
     }
   };
 
@@ -79,23 +73,23 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
       {/* Dashboard Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="Draft Requests"
-          value={dashboardData.draft.toString()}
+          title="Total Requests"
+          value={analytics.totalRequests.toString()}
           icon={FileText}
         />
         <MetricCard
-          title="Submitted Requests"
-          value={dashboardData.submitted.toString()}
-          icon={Clock}
+          title="Pending Requests"
+          value={analytics.pendingRequests.toString()}
+          icon={Package}
         />
         <MetricCard
-          title="Ordered Items"
-          value={dashboardData.ordered.toString()}
+          title="Completed Requests"
+          value={analytics.completedRequests.toString()}
           icon={CheckCircle}
         />
         <MetricCard
-          title="Received Items"
-          value={dashboardData.received.toString()}
+          title="Total Items"
+          value={analytics.totalItems.toString()}
           icon={AlertTriangle}
         />
       </div>
@@ -110,17 +104,17 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
             <div className="text-center py-4">Loading material requests...</div>
           ) : (
             <div className="space-y-4">
-              {materialRequests.map((mr) => (
-                <div key={mr.name} className="border rounded-lg p-4 flex items-center justify-between">
+              {materialRequests.map((materialRequest) => (
+                <div key={materialRequest.name} className="border rounded-lg p-4 flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold">{mr.name}</h3>
+                    <h3 className="font-semibold">{materialRequest.name}</h3>
                     <p className="text-sm text-gray-600">
-                      {mr.company} - {mr.transaction_date}
+                      {materialRequest.company} - {materialRequest.creation}
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <StatusBadge status={mr.status} />
-                    <Button size="sm" onClick={() => handleSelectMaterialRequest(mr)}>
+                    <StatusBadge status={materialRequest.status} />
+                    <Button size="sm" onClick={() => handleSelectMaterialRequest(materialRequest)}>
                       View
                     </Button>
                   </div>
@@ -142,14 +136,30 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
-              onClick={() => onCreateNew()}
+              onClick={() => onCreateNew("Purchase")}
               variant="outline"
               className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
             >
               <Plus className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-medium">Create New Request</span>
+              <span className="text-sm font-medium">Purchase Request</span>
+            </Button>
+            <Button
+              onClick={() => onCreateNew("Material Transfer")}
+              variant="outline"
+              className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-green-50 hover:border-green-200"
+            >
+              <Plus className="w-5 h-5 text-green-600" />
+              <span className="text-sm font-medium">Transfer Request</span>
+            </Button>
+            <Button
+              onClick={() => onCreateNew("Material Issue")}
+              variant="outline"
+              className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-red-50 hover:border-red-200"
+            >
+              <Plus className="w-5 h-5 text-red-600" />
+              <span className="text-sm font-medium">Issue Request</span>
             </Button>
           </div>
         </CardContent>

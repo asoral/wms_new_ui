@@ -1,116 +1,83 @@
 
 import { useState, useEffect } from 'react';
 import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
-import { offlineStorage } from '@/services/offlineStorage';
+import { useToast } from '@/hooks/use-toast';
 
-export function useERPNextData<T>(
-  endpoint: string,
-  filters?: any,
-  cacheKey?: string,
-  cacheTTL: number = 300000 // 5 minutes default
-) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export const useERPNextData = () => {
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Check cache first if cache key is provided
-        if (cacheKey) {
-          const cachedData = await offlineStorage.getCachedData(cacheKey);
-          if (cachedData) {
-            setData(cachedData);
-            setLoading(false);
-            return;
-          }
-        }
-
-        // Fetch from ERPNext API
-        const erpnextAPI = await createERPNextAPI();
-        if (!erpnextAPI) {
-          throw new Error('ERPNext API not configured');
-        }
-
-        // Get user's default company
-        const defaultCompany = await getUserDefaultCompany();
-        console.log('Using company for API call:', defaultCompany);
-
-        let result;
-        
-        // Dynamic method calling based on endpoint with corrected API calls
-        switch (endpoint) {
-          case 'items':
-            result = await erpnextAPI.getItems(filters, 20);
-            break;
-          case 'warehouses':
-            result = await erpnextAPI.getWarehouses(filters, undefined, 20);
-            break;
-          case 'stock-balance':
-            result = await erpnextAPI.getStockBalance(undefined, defaultCompany || undefined);
-            break;
-          case 'sales-orders':
-            result = await erpnextAPI.getSalesOrders(filters, undefined, 20);
-            break;
-          case 'delivery-notes':
-            result = await erpnextAPI.getDeliveryNotes(filters, defaultCompany || undefined);
-            break;
-          case 'purchase-orders':
-            result = await erpnextAPI.getPurchaseOrders(filters, undefined, 20);
-            break;
-          case 'purchase-receipts':
-            result = await erpnextAPI.getPurchaseReceipts(filters, defaultCompany || undefined, 20);
-            break;
-          case 'material-requests':
-            result = await erpnextAPI.getMaterialRequests(filters, defaultCompany || undefined, 20);
-            break;
-          case 'stock-entries':
-            result = await erpnextAPI.getStockEntries(filters, defaultCompany || undefined, 20);
-            break;
-          case 'pick-lists':
-            result = await erpnextAPI.getPickLists(filters, defaultCompany || undefined, 20);
-            break;
-          case 'packing-slips':
-            result = await erpnextAPI.getPackingSlips(filters, defaultCompany || undefined, 20);
-            break;
-          case 'quality-inspections':
-            result = await erpnextAPI.getQualityInspections(filters, defaultCompany || undefined, 20);
-            break;
-          case 'product-bundles':
-            result = await erpnextAPI.getProductBundles(filters, defaultCompany || undefined, 20);
-            break;
-          default:
-            throw new Error(`Unknown endpoint: ${endpoint}`);
-        }
-
-        setData(result.data);
-
-        // Cache the result if cache key is provided
-        if (cacheKey) {
-          await offlineStorage.cacheData(cacheKey, result.data, cacheTTL);
-        }
-
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-        
-        // Try to load from cache if available
-        if (cacheKey) {
-          const cachedData = await offlineStorage.getCachedData(cacheKey);
-          if (cachedData) {
-            setData(cachedData);
-            setError('Using cached data - connection failed');
-          }
-        }
-      } finally {
-        setLoading(false);
+  const fetchData = async (dataType: string, filters?: any[], company?: string) => {
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured');
       }
-    };
 
-    fetchData();
-  }, [endpoint, JSON.stringify(filters), cacheKey, cacheTTL]);
+      const defaultCompany = company || await getUserDefaultCompany();
+      let response;
 
-  return { data, loading, error };
-}
+      switch (dataType) {
+        case 'items':
+          response = await erpnextAPI.getItems(filters, 50);
+          break;
+        case 'sales_orders':
+          response = await erpnextAPI.getSalesOrders(filters, defaultCompany);
+          break;
+        case 'material_requests':
+          response = await erpnextAPI.getMaterialRequests(filters, defaultCompany);
+          break;
+        case 'pick_lists':
+          response = await erpnextAPI.getPickLists(filters, defaultCompany);
+          break;
+        case 'delivery_notes':
+          response = await erpnextAPI.getDeliveryNotes(filters, defaultCompany);
+          break;
+        case 'purchase_orders':
+          response = await erpnextAPI.getPurchaseOrders(filters, defaultCompany);
+          break;
+        case 'purchase_receipts':
+          response = await erpnextAPI.getPurchaseReceipts(filters, defaultCompany);
+          break;
+        case 'stock_entries':
+          response = await erpnextAPI.getStockEntries(filters, defaultCompany);
+          break;
+        case 'stock_reconciliations':
+          response = await erpnextAPI.getStockReconciliations(filters);
+          break;
+        case 'warehouses':
+          response = await erpnextAPI.getWarehouses(filters, defaultCompany);
+          break;
+        case 'packing_slips':
+          response = await erpnextAPI.getPackingSlips(filters);
+          break;
+        case 'quality_inspections':
+          response = await erpnextAPI.getQualityInspections(filters);
+          break;
+        case 'product_bundles':
+          response = await erpnextAPI.getProductBundles(filters);
+          break;
+        default:
+          throw new Error(`Unknown data type: ${dataType}`);
+      }
+
+      return response?.data || [];
+    } catch (error) {
+      console.error(`Error fetching ${dataType}:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to fetch ${dataType}`,
+        variant: "destructive"
+      });
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    loading,
+    fetchData
+  };
+};
