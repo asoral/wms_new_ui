@@ -1,80 +1,113 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
-import { SalesOrder } from "@/types";
+import { Label } from "@/components/ui/label";
+import { Search, Plus } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import SalesOrderList from "./SalesOrderList";
+import { SalesOrder, SalesOrderOption } from "@/types";
 
 interface SalesOrderSelectorProps {
-  onSelectSalesOrder: (salesOrder: SalesOrder) => void;
+  onSelectSO: (salesOrder: SalesOrder) => void;
+  shortcuts?: Array<{
+    label: string;
+    icon: any;
+    action: () => void;
+  }>;
 }
 
-const SalesOrderSelector = ({ onSelectSalesOrder }: SalesOrderSelectorProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<SalesOrder[]>([]);
-  const [searching, setSearching] = useState(false);
+const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorProps) => {
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) return;
+  const searchSalesOrders = async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setSalesOrders([]);
+      return;
+    }
 
     try {
-      setSearching(true);
+      setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
       const response = await erpnextAPI.searchSalesOrders(searchTerm);
-      if (response.data) {
-        setSearchResults(response.data);
+      
+      if (response?.data && Array.isArray(response.data)) {
+        // Transform the data to match our SalesOrder interface
+        const transformedOrders: SalesOrder[] = response.data.map((order: any) => ({
+          id: order.name,
+          name: order.name,
+          number: order.name,
+          customer: order.customer,
+          status: order.status,
+          delivery_date: order.delivery_date,
+          grand_total: order.grand_total,
+          totalValue: order.grand_total,
+          totalItems: order.items?.length || 0,
+          percentDelivered: order.per_delivered || 0,
+          items: order.items || []
+        }));
+        
+        setSalesOrders(transformedOrders);
+      } else {
+        setSalesOrders([]);
       }
     } catch (error) {
       console.error('Error searching sales orders:', error);
       toast({
-        title: "Search Error",
+        title: "Error",
         description: "Failed to search sales orders",
         variant: "destructive"
       });
     } finally {
-      setSearching(false);
+      setLoading(false);
     }
+  };
+
+  const handleSOSelect = (salesOrder: SalesOrder) => {
+    onSelectSO(salesOrder);
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Search Sales Orders</CardTitle>
+        <CardTitle>Select Sales Order</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex space-x-2">
-          <Input
-            placeholder="Search by SO number or customer..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          />
-          <Button 
-            onClick={handleSearch}
-            disabled={searching || !searchTerm.trim()}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
+          <div className="flex-1">
+            <Label htmlFor="so-search">Search Sales Order</Label>
+            <Input
+              id="so-search"
+              placeholder="Enter SO number (e.g., SO-2024-00001)"
+              onChange={(e) => searchSalesOrders(e.target.value)}
+            />
+          </div>
         </div>
 
-        {searchResults.length > 0 && (
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {searchResults.map((so) => (
-              <div
-                key={so.id}
-                className="p-3 border rounded cursor-pointer hover:bg-gray-50"
-                onClick={() => onSelectSalesOrder(so)}
-              >
-                <div className="font-medium">{so.number}</div>
-                <div className="text-sm text-gray-600">{so.customer}</div>
-              </div>
-            ))}
+        <SalesOrderList onSelectSO={handleSOSelect} />
+
+        {/* Quick Actions */}
+        {shortcuts.length > 0 && (
+          <div className="mt-4">
+            <CardTitle>Quick Actions</CardTitle>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {shortcuts.map((shortcut, index) => (
+                <Button
+                  key={index}
+                  onClick={shortcut.action}
+                  variant="outline"
+                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
+                >
+                  <shortcut.icon className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium">{shortcut.label}</span>
+                </Button>
+              ))}
+            </div>
           </div>
         )}
       </CardContent>

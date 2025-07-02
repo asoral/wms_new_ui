@@ -1,45 +1,49 @@
 
 import { ERPNextBaseAPI } from './baseApi';
-import { ERPNextItemAPI } from './itemApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
 import { ERPNextMaterialAPI } from './materialApi';
 import { ERPNextPurchaseAPI } from './purchaseApi';
-import { ERPNextPickListAPI } from './pickListApi';
 
 export class ERPNextAPI extends ERPNextBaseAPI {
-  private itemAPI: ERPNextItemAPI;
   private salesAPI: ERPNextSalesAPI;
   private stockAPI: ERPNextStockAPI;
   private materialAPI: ERPNextMaterialAPI;
   private purchaseAPI: ERPNextPurchaseAPI;
-  private pickListAPI: ERPNextPickListAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
     super(baseURL, apiKey, apiSecret);
-    this.itemAPI = new ERPNextItemAPI(baseURL, apiKey, apiSecret);
     this.salesAPI = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
     this.stockAPI = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
     this.materialAPI = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
     this.purchaseAPI = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
-    this.pickListAPI = new ERPNextPickListAPI(baseURL, apiKey, apiSecret);
   }
+
+  // Public getters for API properties
+  get getBaseURL() { return this.baseURL; }
+  get getApiKey() { return this.apiKey; }
+  get getApiSecret() { return this.apiSecret; }
 
   // Item methods
   async getItems(filters?: any, limitPageLength?: number) {
-    return this.itemAPI.getItems(filters, limitPageLength);
+    return this.callAPI('Item', 'GET', undefined, filters, limitPageLength);
   }
 
   async getItemDetails(itemCode: string) {
-    return this.itemAPI.getItemDetails(itemCode);
+    return this.callAPI(`Item/${itemCode}`, 'GET');
   }
 
   async searchItems(searchTerm: string, limitPageLength?: number) {
-    return this.itemAPI.searchItems(searchTerm, limitPageLength);
+    const filters = [
+      ['item_name', 'like', `%${searchTerm}%`],
+      ['item_code', 'like', `%${searchTerm}%`]
+    ];
+    return this.callAPI('Item', 'GET', undefined, filters, limitPageLength);
   }
 
   async searchItemsByBarcode(barcode: string) {
-    return this.itemAPI.searchItemsByBarcode(barcode);
+    const filters = [['barcode', '=', barcode]];
+    return this.callAPI('Item', 'GET', undefined, filters);
   }
 
   // Sales methods
@@ -63,6 +67,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
   }
 
+  async getDeliveryNote(name: string) {
+    return this.callAPI(`Delivery Note/${name}`, 'GET');
+  }
+
   // Stock methods
   async getStockBalance(filters?: any) {
     return this.stockAPI.getStockBalance(filters);
@@ -73,27 +81,39 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async createStockEntry(stockEntryData: any) {
-    return this.stockAPI.createStockEntry(stockEntryData);
+    return this.callAPI('Stock Entry', 'POST', stockEntryData);
   }
 
   async updateStockEntry(name: string, data: any) {
-    return this.stockAPI.updateStockEntry(name, data);
+    return this.callAPI(`Stock Entry/${name}`, 'PUT', data);
   }
 
   async getStockEntries(filters?: any, company?: string, limitPageLength?: number) {
     return this.stockAPI.getStockEntries(filters, company, limitPageLength);
   }
 
+  async getStockEntry(name: string) {
+    return this.callAPI(`Stock Entry/${name}`, 'GET');
+  }
+
   async submitStockEntry(stockEntryName: string) {
-    return this.stockAPI.submitStockEntry(stockEntryName);
+    return this.callAPI(`Stock Entry/${stockEntryName}`, 'PUT', { docstatus: 1 });
   }
 
   async getStockReconciliations(filters?: any, limitPageLength?: number) {
-    return this.stockAPI.getStockReconciliations(filters, limitPageLength);
+    return this.callAPI('Stock Reconciliation', 'GET', undefined, filters, limitPageLength);
   }
 
   async getWarehouses(filters?: any, company?: string, limitPageLength?: number) {
-    return this.stockAPI.getWarehouses(filters, company, limitPageLength);
+    return this.callAPI('Warehouse', 'GET', undefined, filters, limitPageLength);
+  }
+
+  async getBinStock(itemCode: string, warehouse: string) {
+    return this.callAPI('Bin', 'GET', undefined, [['item_code', '=', itemCode], ['warehouse', '=', warehouse]]);
+  }
+
+  async getCompanies(filters?: any, limitPageLength?: number) {
+    return this.callAPI('Company', 'GET', undefined, filters, limitPageLength);
   }
 
   // Material Request methods
@@ -117,6 +137,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.materialAPI.searchMaterialRequests(searchTerm, company, limitPageLength);
   }
 
+  async searchMaterialRequestsForStockEntry(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.materialAPI.searchMaterialRequests(searchTerm, company, limitPageLength);
+  }
+
   // Purchase methods
   async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
     return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength);
@@ -127,7 +151,19 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async searchPurchaseOrders(searchTerm: string, company?: string, limitPageLength?: number) {
-    return this.purchaseAPI.searchPurchaseOrders(searchTerm, company, limitPageLength);
+    return this.purchaseAPI.getPurchaseOrders([['name', 'like', `%${searchTerm}%`]], company, limitPageLength);
+  }
+
+  async searchPurchaseOrdersForStockEntry(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.purchaseAPI.getPurchaseOrders([['name', 'like', `%${searchTerm}%`]], company, limitPageLength);
+  }
+
+  async searchSalesOrdersForStockEntry(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.salesAPI.searchSalesOrders(searchTerm, company, limitPageLength);
+  }
+
+  async searchBOMs(searchTerm: string, limitPageLength?: number) {
+    return this.callAPI('BOM', 'GET', undefined, [['name', 'like', `%${searchTerm}%`]], limitPageLength);
   }
 
   async createPurchaseReceipt(receiptData: any) {
@@ -152,23 +188,32 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   // Pick List methods
   async getPickLists(filters?: any, company?: string, limitPageLength?: number) {
-    return this.pickListAPI.getPickLists(filters, company, limitPageLength);
+    return this.callAPI('Pick List', 'GET', undefined, filters, limitPageLength);
   }
 
   async getPickList(name: string) {
-    return this.pickListAPI.getPickList(name);
+    return this.callAPI(`Pick List/${name}`, 'GET');
   }
 
   async searchPickLists(searchTerm: string, company?: string, limitPageLength?: number) {
-    return this.pickListAPI.searchPickLists(searchTerm, company, limitPageLength);
+    return this.callAPI('Pick List', 'GET', undefined, [['name', 'like', `%${searchTerm}%`]], limitPageLength);
   }
 
   async createPickList(data: any) {
-    return this.pickListAPI.createPickList(data);
+    return this.callAPI('Pick List', 'POST', data);
   }
 
   async updatePickList(name: string, data: any) {
-    return this.pickListAPI.updatePickList(name, data);
+    return this.callAPI(`Pick List/${name}`, 'PUT', data);
+  }
+
+  async getPickListItems(pickListName: string) {
+    const response = await this.getPickList(pickListName);
+    return response?.data?.locations || [];
+  }
+
+  async createPickListFromDocument(data: any) {
+    return this.callAPI('Pick List', 'POST', data);
   }
 
   // Quality Inspections

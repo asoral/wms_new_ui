@@ -40,12 +40,21 @@ const ReceiptDetail = () => {
 
       const result = await api.getPurchaseReceipt(receiptNumber);
       if (result.data) {
+        // Transform the data to match our interface
+        const transformedItems = result.data.items?.map((item: any) => ({
+          item_code: item.item_code,
+          item_name: item.item_name || item.description,
+          qty: item.qty,
+          rate: item.rate,
+          amount: item.amount || (item.qty * item.rate)
+        })) || [];
+
         setReceipt({
           name: result.data.name,
           supplier: result.data.supplier,
           posting_date: result.data.posting_date,
           grand_total: result.data.grand_total,
-          items: result.data.items
+          items: transformedItems
         });
       }
     } catch (error) {
@@ -65,7 +74,6 @@ const ReceiptDetail = () => {
       const api = await createERPNextAPI();
       if (!api) return;
 
-      // Use the public getters instead of private properties
       const pdfUrl = `${api.getBaseURL}/api/method/frappe.utils.print_format.download_pdf`;
       
       const params = new URLSearchParams({
@@ -110,7 +118,6 @@ const ReceiptDetail = () => {
       const api = await createERPNextAPI();
       if (!api) return;
 
-      // Use the public getters instead of private properties
       const excelUrl = `${api.getBaseURL}/api/method/frappe.desk.query_report.export_query`;
       
       const params = new URLSearchParams({

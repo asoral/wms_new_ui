@@ -1,4 +1,3 @@
-
 import { createERPNextAPI } from './erpnextApi';
 
 interface BatchInfo {
