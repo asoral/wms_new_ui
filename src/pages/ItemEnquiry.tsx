@@ -69,34 +69,46 @@ const ItemEnquiry = () => {
         }
       }
 
-      // Fetch item stock details
+      // Fetch item stock details using company-filtered approach
       const response = await erpnextAPI.getBinStock(code);
       console.log('Item stock response:', response);
 
       if (response?.data) {
+        // Get additional item details for valuation
+        let itemDetails = null;
+        try {
+          const itemDetailResponse = await erpnextAPI.getItemDetails(code);
+          itemDetails = itemDetailResponse?.data;
+          console.log('Item details:', itemDetails);
+        } catch (error) {
+          console.warn('Could not fetch item details:', error);
+        }
+
         const transformedItems: StockItem[] = response.data
           .filter((item: any) => (item.actual_qty || 0) > 0)
           .map((item: any) => {
             const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
-            const valuationRate = item.valuation_rate || 0;
-            const stockValue = item.stock_value || 0;
             
-            let totalValuation = stockValue;
-            if (!stockValue && valuationRate && actualQty > 0) {
-              totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
+            // Use standard rate from item details if available
+            const standardRate = itemDetails?.standard_rate || itemDetails?.valuation_rate || 0;
+            let totalValuation = 0;
+            
+            if (standardRate && actualQty > 0) {
+              totalValuation = Math.round(actualQty * standardRate * 100) / 100;
             }
 
             return {
               itemCode: item.item_code,
-              itemName: item.item_name || item.item_code,
+              itemName: itemDetails?.item_name || item.item_code,
               warehouse: item.warehouse,
               qty: actualQty,
-              uom: 'Nos',
+              uom: itemDetails?.stock_uom || 'Nos',
               valuation: totalValuation,
-              age: Math.floor(Math.random() * 120),
+              age: Math.floor(Math.random() * 120), // Mock age data
               binLocation: item.warehouse
             };
           });
+          
         setStockItems(transformedItems);
         
         if (transformedItems.length === 0) {

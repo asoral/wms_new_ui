@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
@@ -110,27 +109,57 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async getBinStock(itemCode: string, warehouse?: string) {
-    const filters = [['item_code', '=', itemCode]];
     if (warehouse) {
-      filters.push(['warehouse', '=', warehouse]);
+      // If specific warehouse is provided, use the existing method
+      const filters = [
+        ['item_code', '=', itemCode],
+        ['warehouse', '=', warehouse]
+      ];
+      
+      const fields = [
+        'name',
+        'item_code',
+        'warehouse',
+        'actual_qty',
+        'reserved_qty',
+        'planned_qty',
+        'ordered_qty',
+        'projected_qty'
+      ];
+      
+      console.log('Fetching Bin stock with filters:', filters);
+      console.log('Fetching Bin stock with fields:', fields);
+      
+      return this.callAPI('Bin', 'GET', undefined, filters, undefined, fields);
+    } else {
+      // No specific warehouse - get company-filtered bins
+      console.log('Fetching company-filtered bin stock for item:', itemCode);
+      
+      // Get user's default company
+      const { getUserDefaultCompany } = await import('@/services/erpnextApi');
+      const defaultCompany = await getUserDefaultCompany();
+      
+      if (!defaultCompany) {
+        console.warn('No default company found, fetching all bins for item');
+        // Fallback to all bins for the item
+        const filters = [['item_code', '=', itemCode]];
+        const fields = [
+          'name',
+          'item_code',
+          'warehouse',
+          'actual_qty',
+          'reserved_qty',
+          'planned_qty',
+          'ordered_qty',
+          'projected_qty'
+        ];
+        
+        return this.callAPI('Bin', 'GET', undefined, filters, undefined, fields);
+      }
+      
+      console.log('Using company for bin filtering:', defaultCompany);
+      return this.stockAPI.getBinStockForCompany(itemCode, defaultCompany);
     }
-    
-    // Use only basic accessible fields for Bin doctype
-    const fields = [
-      'name',
-      'item_code',
-      'warehouse',
-      'actual_qty',
-      'reserved_qty',
-      'planned_qty',
-      'ordered_qty',
-      'projected_qty'
-    ];
-    
-    console.log('Fetching Bin stock with filters:', filters);
-    console.log('Fetching Bin stock with fields:', fields);
-    
-    return this.callAPI('Bin', 'GET', undefined, filters, undefined, fields);
   }
 
   async getCompanies(filters?: any, limitPageLength?: number) {

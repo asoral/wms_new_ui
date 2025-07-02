@@ -51,6 +51,64 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
+  async getBinStockForCompany(itemCode: string, company: string): Promise<ERPNextResponse<any[]>> {
+    try {
+      // First, get warehouses for the company
+      const warehouseFilters = [['company', '=', company]];
+      const warehouseParams = this.buildQueryParams(warehouseFilters, ['name']);
+      
+      const warehouseResponse = await fetch(`${this.baseURL}/api/resource/Warehouse?${warehouseParams}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (!warehouseResponse.ok) {
+        throw new Error(`Failed to fetch warehouses: ${warehouseResponse.statusText}`);
+      }
+
+      const warehouseData = await warehouseResponse.json();
+      const warehouses = warehouseData.data?.map((w: any) => w.name) || [];
+      
+      if (warehouses.length === 0) {
+        return { data: [] };
+      }
+
+      // Now get bins for this item in company warehouses
+      const binFilters = [
+        ['item_code', '=', itemCode],
+        ['warehouse', 'in', warehouses]
+      ];
+
+      const binFields = [
+        'name',
+        'item_code',
+        'warehouse', 
+        'actual_qty',
+        'reserved_qty',
+        'planned_qty',
+        'ordered_qty',
+        'projected_qty'
+      ];
+
+      const binParams = this.buildQueryParams(binFilters, binFields);
+      
+      const binResponse = await fetch(`${this.baseURL}/api/resource/Bin?${binParams}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (!binResponse.ok) {
+        const errorText = await binResponse.text();
+        console.error('Bin API Error:', binResponse.status, errorText);
+        throw new Error(`Failed to fetch bin stock: ${binResponse.status} ${binResponse.statusText}`);
+      }
+
+      return binResponse.json();
+
+    } catch (error) {
+      console.error('Error in getBinStockForCompany:', error);
+      throw error;
+    }
+  }
+
   async getStockEntries(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
