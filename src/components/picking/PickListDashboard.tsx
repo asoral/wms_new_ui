@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { usePickListAPI } from "@/hooks/useERPNextAPI";
 import { useToast } from "@/hooks/use-toast";
 import { getUserDefaultCompany } from "@/services/erpnextApi";
+import StatusBadge from "@/components/ui/status-badge";
 
 interface PickListDashboardProps {
   onCreateNew: () => void;
@@ -34,37 +36,19 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
     fetchPickLists();
   }, []);
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { variant: "default" | "destructive" | "outline" | "secondary", icon: any }> = {
-      'Draft': { variant: 'secondary', icon: AlertTriangle },
-      'Open': { variant: 'default', icon: Package },
-      'Completed': { variant: 'outline', icon: CheckCircle },
-    };
-    
-    const statusInfo = statusMap[status] || { variant: 'secondary', icon: AlertTriangle };
-    const IconComponent = statusInfo.icon;
-    
-    return (
-      <Button variant={statusInfo.variant} size="sm" className="gap-x-2">
-        <IconComponent className="w-4 h-4" />
-        {status}
-      </Button>
-    );
-  };
-
   const fetchPickLists = async () => {
     try {
       const company = await getUserDefaultCompany();
       const response = await getPickLists(company ? [['company', '=', company]] : undefined);
       
-      if (response && typeof response === 'object' && 'data' in response) {
-        const pickListsData = (response as any).data;
+      if (response?.data && Array.isArray(response.data)) {
+        const pickListsData = response.data;
         setPickLists(pickListsData);
         
         // Get analytics data
         const analyticsResponse = await getPickListAnalytics(company);
-        if (analyticsResponse && typeof analyticsResponse === 'object' && 'data' in analyticsResponse) {
-          const analyticsData = (analyticsResponse as any).data;
+        if (analyticsResponse?.data) {
+          const analyticsData = analyticsResponse.data;
           setAnalytics({
             totalPickLists: pickListsData.length,
             pendingPickLists: pickListsData.filter((pl: any) => pl.status === 'Draft').length,
@@ -132,7 +116,7 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {getStatusBadge(pickList.status)}
+                    <StatusBadge status={pickList.status} />
                     <Button size="sm" onClick={() => handleSelectPickList(pickList)}>
                       View
                     </Button>

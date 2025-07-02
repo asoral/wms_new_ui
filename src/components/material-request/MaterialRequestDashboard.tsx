@@ -1,14 +1,15 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, Clock, CheckCircle, AlertTriangle } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { useMaterialRequestAPI } from "@/hooks/useERPNextAPI";
 import { useToast } from "@/hooks/use-toast";
+import StatusBadge from "@/components/ui/status-badge";
 
 interface MaterialRequestDashboardProps {
-  onCreateNew: () => void;
+  onCreateNew: (purpose?: string) => void;
   onSelectMaterialRequest: (materialRequest: any) => void;
 }
 
@@ -28,28 +29,6 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
     fetchMaterialRequests();
   }, []);
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { variant: "default" | "destructive" | "outline" | "secondary", icon: any }> = {
-      'Draft': { variant: 'secondary', icon: Clock },
-      'Submitted': { variant: 'default', icon: Clock },
-      'Ordered': { variant: 'outline', icon: CheckCircle },
-      'Received': { variant: 'outline', icon: CheckCircle },
-      'Closed': { variant: 'outline', icon: CheckCircle },
-      'Cancelled': { variant: 'destructive', icon: AlertTriangle },
-      'Stopped': { variant: 'destructive', icon: AlertTriangle }
-    };
-    
-    const statusInfo = statusMap[status] || { variant: 'secondary', icon: AlertTriangle };
-    const IconComponent = statusInfo.icon;
-    
-    return (
-      <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
-        <IconComponent className="w-3 h-3" />
-        <span>{status}</span>
-      </Badge>
-    );
-  };
-
   const fetchMaterialRequests = async () => {
     try {
       const response = await getMaterialRequests([
@@ -57,8 +36,8 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
         ['status', 'not in', ['Cancelled', 'Stopped']]
       ]);
 
-      if (response && typeof response === 'object' && 'data' in response) {
-        const materialRequestsData = (response as any).data;
+      if (response?.data && Array.isArray(response.data)) {
+        const materialRequestsData = response.data;
         setMaterialRequests(materialRequestsData);
         
         // Calculate dashboard metrics
@@ -82,8 +61,8 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
   const handleSelectMaterialRequest = async (materialRequest: any) => {
     try {
       const response = await getMaterialRequest(materialRequest.name);
-      if (response && typeof response === 'object' && 'data' in response) {
-        onSelectMaterialRequest((response as any).data);
+      if (response?.data) {
+        onSelectMaterialRequest(response.data);
       }
     } catch (error) {
       console.error('Error fetching material request details:', error);
@@ -140,7 +119,7 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {getStatusBadge(mr.status)}
+                    <StatusBadge status={mr.status} />
                     <Button size="sm" onClick={() => handleSelectMaterialRequest(mr)}>
                       View
                     </Button>
@@ -165,7 +144,7 @@ const MaterialRequestDashboard = ({ onCreateNew, onSelectMaterialRequest }: Mate
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Button
-              onClick={onCreateNew}
+              onClick={() => onCreateNew()}
               variant="outline"
               className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
             >

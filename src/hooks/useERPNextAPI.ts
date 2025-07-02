@@ -3,6 +3,11 @@ import { useState, useCallback } from 'react';
 import { createERPNextAPI } from '@/services/erpnextApi';
 import { useToast } from '@/hooks/use-toast';
 
+interface APIResponse<T = any> {
+  data?: T;
+  error?: string;
+}
+
 export const useERPNextAPI = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -10,7 +15,7 @@ export const useERPNextAPI = () => {
   const callAPI = useCallback(async <T>(
     apiCall: (api: any) => Promise<T>,
     errorMessage: string = "API call failed"
-  ): Promise<T | null> => {
+  ): Promise<APIResponse<T>> => {
     try {
       setLoading(true);
       const erpnextAPI = await createERPNextAPI();
@@ -20,10 +25,11 @@ export const useERPNextAPI = () => {
           description: "Please configure your ERPNext settings in the Profile page.",
           variant: "destructive"
         });
-        return null;
+        return { error: "ERPNext not configured" };
       }
 
-      return await apiCall(erpnextAPI);
+      const data = await apiCall(erpnextAPI);
+      return { data };
     } catch (error) {
       console.error('API Error:', error);
       toast({
@@ -31,7 +37,7 @@ export const useERPNextAPI = () => {
         description: errorMessage,
         variant: "destructive"
       });
-      return null;
+      return { error: errorMessage };
     } finally {
       setLoading(false);
     }
