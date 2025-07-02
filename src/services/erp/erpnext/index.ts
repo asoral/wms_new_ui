@@ -1,370 +1,217 @@
 
-import axios, { AxiosInstance } from 'axios';
+import { ERPNextBaseAPI } from './baseApi';
+import { ERPNextItemAPI } from './itemApi';
+import { ERPNextSalesAPI } from './salesApi';
+import { ERPNextStockAPI } from './stockApi';
+import { ERPNextMaterialAPI } from './materialApi';
+import { ERPNextPurchaseAPI } from './purchaseApi';
+import { ERPNextPickListAPI } from './pickListApi';
 
-export class ERPNextAPI {
-  private api: AxiosInstance;
-  private apiKey: string;
-  private apiSecret: string;
-  private baseURL: string;
+export class ERPNextAPI extends ERPNextBaseAPI {
+  private itemAPI: ERPNextItemAPI;
+  private salesAPI: ERPNextSalesAPI;
+  private stockAPI: ERPNextStockAPI;
+  private materialAPI: ERPNextMaterialAPI;
+  private purchaseAPI: ERPNextPurchaseAPI;
+  private pickListAPI: ERPNextPickListAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
-    this.baseURL = baseURL;
-    this.apiKey = apiKey;
-    this.apiSecret = apiSecret;
-
-    this.api = axios.create({
-      baseURL: this.baseURL,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    });
-
-    this.api.interceptors.request.use(config => {
-      config.headers['Authorization'] = `token ${this.apiKey}:${this.apiSecret}`;
-      return config;
-    });
+    super(baseURL, apiKey, apiSecret);
+    this.itemAPI = new ERPNextItemAPI(baseURL, apiKey, apiSecret);
+    this.salesAPI = new ERPNextSalesAPI(baseURL, apiKey, apiSecret);
+    this.stockAPI = new ERPNextStockAPI(baseURL, apiKey, apiSecret);
+    this.materialAPI = new ERPNextMaterialAPI(baseURL, apiKey, apiSecret);
+    this.purchaseAPI = new ERPNextPurchaseAPI(baseURL, apiKey, apiSecret);
+    this.pickListAPI = new ERPNextPickListAPI(baseURL, apiKey, apiSecret);
   }
 
-  // Getter methods for accessing private properties
-  get getBaseURL() { return this.baseURL; }
-  get getApiKey() { return this.apiKey; }
-  get getApiSecret() { return this.apiSecret; }
-
-  async get(endpoint: string, params?: any) {
-    try {
-      const response = await this.api.get(endpoint, { params });
-      return response.data;
-    } catch (error: any) {
-      console.error(`GET request failed for ${endpoint}:`, error.response ? error.response.data : error.message);
-      throw error;
-    }
-  }
-
-  async post(endpoint: string, data: any) {
-    try {
-      const response = await this.api.post(endpoint, data);
-      return response.data;
-    } catch (error: any) {
-      console.error(`POST request failed for ${endpoint}:`, error.response ? error.response.data : error.message);
-      throw error;
-    }
-  }
-
-  async put(endpoint: string, data: any) {
-    try {
-      const response = await this.api.put(endpoint, data);
-      return response.data;
-    } catch (error: any) {
-      console.error(`PUT request failed for ${endpoint}:`, error.response ? error.response.data : error.message);
-      throw error;
-    }
-  }
-
-  async delete(endpoint: string) {
-    try {
-      const response = await this.api.delete(endpoint);
-      return response.data;
-    } catch (error: any) {
-      console.error(`DELETE request failed for ${endpoint}:`, error.response ? error.response.data : error.message);
-      throw error;
-    }
-  }
-
-  // Sales Order Methods
-  async getSalesOrders(filters?: any[], company?: string) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    
-    return this.get('/api/resource/Sales Order', params);
-  }
-
-  async getSalesOrder(soNumber: string) {
-    return this.get(`/api/resource/Sales Order/${soNumber}`);
-  }
-
-  async searchSalesOrders(searchTerm: string, company?: string) {
-    const filters = [
-      ['name', 'like', `%${searchTerm}%`]
-    ];
-    if (company) {
-      filters.push(['company', '=', company]);
-    }
-    return this.getSalesOrders(filters);
-  }
-
-  async searchSalesOrdersForStockEntry(company?: string) {
-    const filters = [
-      ['docstatus', '=', 1],
-      ['status', 'in', ['To Deliver', 'To Deliver and Bill']]
-    ];
-    if (company) filters.push(['company', '=', company]);
-    return this.getSalesOrders(filters);
-  }
-
-  async createDeliveryNote(deliveryData: any) {
-    return this.post('/api/resource/Delivery Note', deliveryData);
-  }
-
-  async getDeliveryNotes(filters?: any[], company?: string) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    return this.get('/api/resource/Delivery Note', params);
-  }
-
-  async getDeliveryNote(dnNumber: string) {
-    return this.get(`/api/resource/Delivery Note/${dnNumber}`);
-  }
-
-  // Item Methods
-  async searchItems(searchTerm: string) {
-    const filters = [
-      ['item_name', 'like', `%${searchTerm}%`]
-    ];
-    return this.get('/api/resource/Item', { 
-      filters: JSON.stringify(filters),
-      fields: JSON.stringify(['name', 'item_code', 'item_name', 'item_group', 'stock_uom', 'description'])
-    });
-  }
-
-  async getItems(filters?: any[], limitPageLength?: number) {
-    const params: any = {
-      fields: JSON.stringify(['name', 'item_code', 'item_name', 'item_group', 'stock_uom'])
-    };
-    if (filters) params.filters = JSON.stringify(filters);
-    if (limitPageLength) params.limit_page_length = limitPageLength;
-    return this.get('/api/resource/Item', params);
+  // Item methods
+  async getItems(filters?: any, limitPageLength?: number) {
+    return this.itemAPI.getItems(filters, limitPageLength);
   }
 
   async getItemDetails(itemCode: string) {
-    return this.get(`/api/resource/Item/${itemCode}`);
+    return this.itemAPI.getItemDetails(itemCode);
+  }
+
+  async searchItems(searchTerm: string, limitPageLength?: number) {
+    return this.itemAPI.searchItems(searchTerm, limitPageLength);
   }
 
   async searchItemsByBarcode(barcode: string) {
-    const filters = [
-      ['barcodes.barcode', '=', barcode]
-    ];
-    return this.get('/api/resource/Item', { 
-      filters: JSON.stringify(filters),
-      fields: JSON.stringify(['name', 'item_code', 'item_name', 'item_group', 'stock_uom'])
-    });
+    return this.itemAPI.searchItemsByBarcode(barcode);
   }
 
-  // Stock Methods
-  async getStockBalance(filters?: any[], company?: string) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    return this.get('/api/resource/Bin', params);
+  // Sales methods
+  async getSalesOrders(filters?: any, company?: string, limitPageLength?: number) {
+    return this.salesAPI.getSalesOrders(filters, company, limitPageLength);
   }
 
-  async getBinStock(itemCode?: string, warehouse?: string) {
-    const filters = [];
-    if (itemCode) filters.push(['item_code', '=', itemCode]);
-    if (warehouse) filters.push(['warehouse', '=', warehouse]);
-    return this.getStockBalance(filters);
+  async getSalesOrder(soNumber: string) {
+    return this.salesAPI.getSalesOrder(soNumber);
+  }
+
+  async searchSalesOrders(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.salesAPI.searchSalesOrders(searchTerm, company, limitPageLength);
+  }
+
+  async createDeliveryNote(deliveryData: any) {
+    return this.salesAPI.createDeliveryNote(deliveryData);
+  }
+
+  async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number) {
+    return this.salesAPI.getDeliveryNotes(filters, company, limitPageLength);
+  }
+
+  // Stock methods
+  async getStockBalance(filters?: any) {
+    return this.stockAPI.getStockBalance(filters);
   }
 
   async getCurrentStock(itemCode: string, warehouse: string) {
-    const filters = [
-      ['item_code', '=', itemCode],
-      ['warehouse', '=', warehouse]
-    ];
-    return this.get('/api/resource/Bin', { 
-      filters: JSON.stringify(filters) 
-    });
+    return this.stockAPI.getCurrentStock(itemCode, warehouse);
   }
 
   async createStockEntry(stockEntryData: any) {
-    return this.post('/api/resource/Stock Entry', stockEntryData);
+    return this.stockAPI.createStockEntry(stockEntryData);
   }
 
-  async getStockEntries(filters?: any[], company?: string, limitPageLength?: number) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    if (limitPageLength) params.limit_page_length = limitPageLength;
-    return this.get('/api/resource/Stock Entry', params);
+  async updateStockEntry(name: string, data: any) {
+    return this.stockAPI.updateStockEntry(name, data);
   }
 
-  async getStockEntry(stockEntryName: string) {
-    return this.get(`/api/resource/Stock Entry/${stockEntryName}`);
+  async getStockEntries(filters?: any, company?: string, limitPageLength?: number) {
+    return this.stockAPI.getStockEntries(filters, company, limitPageLength);
   }
 
   async submitStockEntry(stockEntryName: string) {
-    return this.put(`/api/resource/Stock Entry/${stockEntryName}`, {
-      docstatus: 1
-    });
+    return this.stockAPI.submitStockEntry(stockEntryName);
   }
 
-  async getStockReconciliations(filters?: any[]) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    return this.get('/api/resource/Stock Reconciliation', params);
+  async getStockReconciliations(filters?: any, limitPageLength?: number) {
+    return this.stockAPI.getStockReconciliations(filters, limitPageLength);
   }
 
-  // Material Request Methods
-  async getMaterialRequests(filters?: any[], company?: string, limitPageLength?: number) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    if (limitPageLength) params.limit_page_length = limitPageLength;
-    return this.get('/api/resource/Material Request', params);
+  async getWarehouses(filters?: any, company?: string, limitPageLength?: number) {
+    return this.stockAPI.getWarehouses(filters, company, limitPageLength);
   }
 
-  async getMaterialRequest(mrNumber: string) {
-    return this.get(`/api/resource/Material Request/${mrNumber}`);
+  // Material Request methods
+  async getMaterialRequests(filters?: any, company?: string, limitPageLength?: number) {
+    return this.materialAPI.getMaterialRequests(filters, company, limitPageLength);
   }
 
-  async createMaterialRequest(requestData: any) {
-    return this.post('/api/resource/Material Request', requestData);
+  async getMaterialRequest(name: string) {
+    return this.materialAPI.getMaterialRequest(name);
   }
 
-  async updateMaterialRequest(name: string, requestData: any) {
-    return this.put(`/api/resource/Material Request/${name}`, requestData);
+  async createMaterialRequest(data: any) {
+    return this.materialAPI.createMaterialRequest(data);
   }
 
-  async searchMaterialRequestsForStockEntry(stockEntryType: string, company?: string) {
-    const filters = [
-      ['docstatus', '=', 1],
-      ['status', '!=', 'Stopped']
-    ];
-    if (company) filters.push(['company', '=', company]);
-    return this.getMaterialRequests(filters);
+  async updateMaterialRequest(name: string, data: any) {
+    return this.materialAPI.updateMaterialRequest(name, data);
   }
 
-  // Pick List Methods
-  async getPickLists(filters?: any[], company?: string, limitPageLength?: number) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    if (limitPageLength) params.limit_page_length = limitPageLength;
-    return this.get('/api/resource/Pick List', params);
+  async searchMaterialRequests(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.materialAPI.searchMaterialRequests(searchTerm, company, limitPageLength);
   }
 
-  async getPickList(pickListName: string) {
-    return this.get(`/api/resource/Pick List/${pickListName}`);
-  }
-
-  async getPickListItems(pickListName: string) {
-    const response = await this.getPickList(pickListName);
-    return response?.locations || [];
-  }
-
-  async createPickListFromDocument(documentType: string, documentName: string) {
-    return this.post('/api/method/erpnext.stock.doctype.pick_list.pick_list.create_pick_list', {
-      doctype: documentType,
-      name: documentName
-    });
-  }
-
-  async getPickListAnalytics(company?: string) {
-    const params: any = {};
-    if (company) params.company = company;
-    return this.get('/api/method/erpnext.stock.dashboard.get_data', params);
-  }
-
-  // Purchase Order Methods
-  async getPurchaseOrders(filters?: any[], company?: string) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    return this.get('/api/resource/Purchase Order', params);
+  // Purchase methods
+  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
+    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength);
   }
 
   async getPurchaseOrder(poNumber: string) {
-    return this.get(`/api/resource/Purchase Order/${poNumber}`);
+    return this.purchaseAPI.getPurchaseOrder(poNumber);
   }
 
-  async searchPurchaseOrdersForStockEntry(company?: string) {
-    const filters = [
-      ['docstatus', '=', 1],
-      ['status', 'in', ['To Receive', 'To Receive and Bill']]
-    ];
-    if (company) filters.push(['company', '=', company]);
-    return this.getPurchaseOrders(filters);
-  }
-
-  // Purchase Receipt Methods
-  async getPurchaseReceipts(filters?: any[], company?: string) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    return this.get('/api/resource/Purchase Receipt', params);
-  }
-
-  async getPurchaseReceipt(prNumber: string) {
-    return this.get(`/api/resource/Purchase Receipt/${prNumber}`);
+  async searchPurchaseOrders(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.purchaseAPI.searchPurchaseOrders(searchTerm, company, limitPageLength);
   }
 
   async createPurchaseReceipt(receiptData: any) {
-    return this.post('/api/resource/Purchase Receipt', receiptData);
+    return this.purchaseAPI.createPurchaseReceipt(receiptData);
   }
 
-  async updatePurchaseReceipt(name: string, receiptData: any) {
-    return this.put(`/api/resource/Purchase Receipt/${name}`, receiptData);
+  async updatePurchaseReceipt(name: string, data: any) {
+    return this.purchaseAPI.updatePurchaseReceipt(name, data);
   }
 
-  async submitPurchaseReceipt(receiptName: string) {
-    return this.put(`/api/resource/Purchase Receipt/${receiptName}`, {
-      docstatus: 1
-    });
+  async getPurchaseReceipt(name: string) {
+    return this.purchaseAPI.getPurchaseReceipt(name);
   }
 
-  // BOM Methods
-  async searchBOMs(company?: string) {
-    const filters = [
-      ['docstatus', '=', 1],
-      ['is_active', '=', 1]
-    ];
-    if (company) filters.push(['company', '=', company]);
-    const params: any = { filters: JSON.stringify(filters) };
-    return this.get('/api/resource/BOM', params);
+  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
+    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength);
   }
 
-  // Warehouse Methods
-  async getWarehouses(filters?: any[], company?: string) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    if (company) params.company = company;
-    return this.get('/api/resource/Warehouse', params);
+  async submitPurchaseReceipt(name: string) {
+    return this.purchaseAPI.submitPurchaseReceipt(name);
   }
 
-  // Company Methods
-  async getCompanies() {
-    return this.get('/api/resource/Company', {
-      fields: JSON.stringify(['name', 'company_name'])
-    });
+  // Pick List methods
+  async getPickLists(filters?: any, company?: string, limitPageLength?: number) {
+    return this.pickListAPI.getPickLists(filters, company, limitPageLength);
   }
 
-  async getDefaultCompany() {
-    const companies = await this.getCompanies();
-    return companies?.data?.[0]?.name || null;
+  async getPickList(name: string) {
+    return this.pickListAPI.getPickList(name);
   }
 
-  // Additional methods for missing functionality
-  async getPackingSlips(filters?: any[]) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    return this.get('/api/resource/Packing Slip', params);
+  async searchPickLists(searchTerm: string, company?: string, limitPageLength?: number) {
+    return this.pickListAPI.searchPickLists(searchTerm, company, limitPageLength);
   }
 
-  async getQualityInspections(filters?: any[]) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    return this.get('/api/resource/Quality Inspection', params);
+  async createPickList(data: any) {
+    return this.pickListAPI.createPickList(data);
   }
 
-  async getProductBundles(filters?: any[]) {
-    const params: any = {};
-    if (filters) params.filters = JSON.stringify(filters);
-    return this.get('/api/resource/Product Bundle', params);
+  async updatePickList(name: string, data: any) {
+    return this.pickListAPI.updatePickList(name, data);
+  }
+
+  // Quality Inspections
+  async getQualityInspections(filters?: any, limitPageLength?: number) {
+    return this.callAPI('Quality Inspection', 'GET', undefined, filters, limitPageLength);
+  }
+
+  // Product Bundles
+  async getProductBundles(filters?: any, limitPageLength?: number) {
+    return this.callAPI('Product Bundle', 'GET', undefined, filters, limitPageLength);
+  }
+
+  // Packing Slips
+  async getPackingSlips(filters?: any, limitPageLength?: number) {
+    return this.callAPI('Packing Slip', 'GET', undefined, filters, limitPageLength);
   }
 
   // Generic API call method
-  async callAPI(method: string, params?: any) {
-    return this.get(`/api/method/${method}`, params);
+  async callAPI(endpoint: string, method: string = 'GET', data?: any, filters?: any, limitPageLength?: number) {
+    const params = this.buildQueryParams(filters, undefined, limitPageLength);
+    const url = `${this.baseURL}/api/resource/${endpoint}${params ? '?' + params : ''}`;
+    
+    const options: RequestInit = {
+      method,
+      headers: this.getHeaders(),
+    };
+
+    if (data && method !== 'GET') {
+      options.headers = {
+        ...options.headers,
+        'Content-Type': 'application/json'
+      };
+      options.body = JSON.stringify(data);
+    }
+
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`${endpoint} API Error:`, response.status, errorText);
+      throw new Error(`Failed to ${method} ${endpoint}: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
   }
 }

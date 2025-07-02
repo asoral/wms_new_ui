@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Send, Edit } from "lucide-react";
-import { MaterialRequest } from "@/pages/MaterialRequest";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
 interface MaterialRequestReviewProps {
-  draftRequest: MaterialRequest;
+  draftRequest: any; // Use any for now to avoid interface conflicts
   onSubmitComplete: () => void;
   onBack: () => void;
 }
@@ -31,11 +30,12 @@ const MaterialRequestReview = ({ draftRequest, onSubmitComplete, onBack }: Mater
         docstatus: 1
       };
 
-      await erpnextAPI.updateMaterialRequest(draftRequest.name, submitData);
+      const requestName = draftRequest.name || draftRequest.id;
+      await erpnextAPI.updateMaterialRequest(requestName, submitData);
       
       toast({
         title: "Success",
-        description: `Material request ${draftRequest.name} submitted successfully!`,
+        description: `Material request ${requestName} submitted successfully!`,
       });
 
       onSubmitComplete();
@@ -52,10 +52,16 @@ const MaterialRequestReview = ({ draftRequest, onSubmitComplete, onBack }: Mater
   };
 
   const getTotalValue = () => {
-    return draftRequest.items.reduce((total, item) => {
-      return total + (item.rate || 0) * item.qty;
+    if (!draftRequest.items || !Array.isArray(draftRequest.items)) return 0;
+    
+    return draftRequest.items.reduce((total: number, item: any) => {
+      const rate = item.rate || item.amount || 0;
+      const qty = item.qty || item.quantity || 0;
+      return total + (rate * qty);
     }, 0);
   };
+
+  const requestName = draftRequest.name || draftRequest.id || draftRequest.number || 'Draft Request';
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -67,7 +73,7 @@ const MaterialRequestReview = ({ draftRequest, onSubmitComplete, onBack }: Mater
           </Button>
           <div>
             <h2 className="text-xl font-semibold">Review & Submit</h2>
-            <p className="text-sm text-gray-600">{draftRequest.name}</p>
+            <p className="text-sm text-gray-600">{requestName}</p>
           </div>
         </div>
         <Badge variant="secondary">Draft</Badge>
@@ -82,15 +88,15 @@ const MaterialRequestReview = ({ draftRequest, onSubmitComplete, onBack }: Mater
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <span className="text-sm text-gray-500">Request Type:</span>
-              <p className="font-medium">{draftRequest.purpose}</p>
+              <p className="font-medium">{draftRequest.purpose || draftRequest.material_request_type || 'Purchase'}</p>
             </div>
             <div>
               <span className="text-sm text-gray-500">Company:</span>
-              <p className="font-medium">{draftRequest.company}</p>
+              <p className="font-medium">{draftRequest.company || 'Default Company'}</p>
             </div>
             <div>
               <span className="text-sm text-gray-500">Total Items:</span>
-              <p className="font-medium">{draftRequest.items.length}</p>
+              <p className="font-medium">{draftRequest.items?.length || 0}</p>
             </div>
           </div>
           {draftRequest.remarks && (
@@ -109,18 +115,18 @@ const MaterialRequestReview = ({ draftRequest, onSubmitComplete, onBack }: Mater
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {draftRequest.items.map((item, index) => (
+            {(draftRequest.items || []).map((item: any, index: number) => (
               <div key={index} className="border rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <h4 className="font-medium">{item.itemName || item.itemCode}</h4>
-                    <p className="text-sm text-gray-600">Code: {item.itemCode}</p>
+                    <h4 className="font-medium">{item.itemName || item.item_name || item.itemCode || item.item_code}</h4>
+                    <p className="text-sm text-gray-600">Code: {item.itemCode || item.item_code}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{item.qty} {item.uom}</p>
-                    {item.rate && (
+                    <p className="font-medium">{item.qty || item.quantity || 0} {item.uom || 'Nos'}</p>
+                    {(item.rate || item.amount) && (
                       <p className="text-sm text-gray-600">
-                        Rate: {item.rate} = {(item.rate * item.qty).toFixed(2)}
+                        Rate: {item.rate || item.amount} = {((item.rate || item.amount || 0) * (item.qty || item.quantity || 0)).toFixed(2)}
                       </p>
                     )}
                   </div>
@@ -128,9 +134,9 @@ const MaterialRequestReview = ({ draftRequest, onSubmitComplete, onBack }: Mater
                 {item.description && (
                   <p className="text-sm text-gray-600 mt-2">{item.description}</p>
                 )}
-                {item.requiredBy && (
+                {(item.requiredBy || item.required_by || item.schedule_date) && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Required by: {new Date(item.requiredBy).toLocaleDateString()}
+                    Required by: {new Date(item.requiredBy || item.required_by || item.schedule_date).toLocaleDateString()}
                   </p>
                 )}
               </div>

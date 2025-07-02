@@ -114,6 +114,7 @@ const MaterialRequest = () => {
           <TabsContent value="create">
             {selectedPurpose && (
               <MaterialRequestForm
+                purpose={selectedPurpose}
                 draftRequest={draftRequest}
                 onDraftCreated={handleDraftCreated}
                 onReviewAndSubmit={handleReviewAndSubmit}

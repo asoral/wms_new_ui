@@ -1,162 +1,175 @@
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Minus, Package, User, Calendar } from "lucide-react";
+import { Plus, Trash2, Save, ArrowRight, ArrowLeft } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { MaterialRequestPurpose } from "@/pages/MaterialRequest";
+import ItemSearch from "@/components/common/ItemSearch";
 
-interface MaterialRequestItem {
-  item_code: string;
-  item_name: string;
-  required_qty: number;
+interface MaterialRequestFormProps {
+  purpose: MaterialRequestPurpose;
+  draftRequest?: any;
+  onDraftCreated: (draft: any) => void;
+  onReviewAndSubmit: () => void;
+  onBack: () => void;
+}
+
+interface FormItem {
+  itemCode: string;
+  itemName: string;
+  qty: number;
   uom: string;
-  warehouse: string;
+  warehouse?: string;
+  requiredBy?: string;
   description?: string;
 }
 
-interface MaterialRequest {
-  title: string;
-  company: string;
-  mr_date: string;
-  status: string;
-  description: string;
-  items: MaterialRequestItem[];
-}
-
-const MaterialRequestForm = () => {
-  const [materialRequest, setMaterialRequest] = useState<MaterialRequest>({
-    title: "",
-    company: "",
-    mr_date: new Date().toISOString().slice(0, 10),
-    status: "Draft",
-    description: "",
-    items: [],
-  });
-  const [newItem, setNewItem] = useState<MaterialRequestItem>({
-    item_code: "",
-    item_name: "",
-    required_qty: 1,
-    uom: "Nos",
-    warehouse: "Stores",
-    description: "",
-  });
-  const [companies, setCompanies] = useState<string[]>([]);
-  const [items, setItems] = useState<any[]>([]);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
+const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAndSubmit, onBack }: MaterialRequestFormProps) => {
+  const [items, setItems] = useState<FormItem[]>([]);
+  const [remarks, setRemarks] = useState("");
+  const [company, setCompany] = useState("");
   const [loading, setLoading] = useState(false);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    loadCompanies();
-    loadItems();
-    loadWarehouses();
+    loadInitialData();
   }, []);
 
-  const loadCompanies = async () => {
-    try {
-      const api = await createERPNextAPI();
-      if (!api) return;
-
-      // This would load companies from ERPNext - for now using mock data
-      setCompanies(["ABC Ltd", "XYZ Corp"]);
-    } catch (error) {
-      console.error("Error loading companies:", error);
+  useEffect(() => {
+    if (draftRequest) {
+      loadDraftData();
     }
-  };
+  }, [draftRequest]);
 
-  const loadItems = async () => {
+  const loadInitialData = async () => {
     try {
-      const api = await createERPNextAPI();
-      if (!api) return;
-
-      // This would load items from ERPNext - for now using mock data
-      setItems([
-        { item_code: "ITEM001", item_name: "Product A" },
-        { item_code: "ITEM002", item_name: "Product B" },
-      ]);
-    } catch (error) {
-      console.error("Error loading items:", error);
-    }
-  };
-
-  const loadWarehouses = async () => {
-    try {
-      const api = await createERPNextAPI();
-      if (!api) return;
-
-      // This would load warehouses from ERPNext - for now using mock data
-      setWarehouses(["Warehouse A", "Warehouse B"]);
-    } catch (error) {
-      console.error("Error loading warehouses:", error);
-    }
-  };
-
-  const handleInputChange = (e: any) => {
-    const { name, value } = e.target;
-    setMaterialRequest((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddItem = () => {
-    setMaterialRequest((prev) => ({
-      ...prev,
-      items: [...prev.items, newItem],
-    }));
-    setNewItem({
-      item_code: "",
-      item_name: "",
-      required_qty: 1,
-      uom: "Nos",
-      warehouse: "Stores",
-      description: "",
-    });
-  };
-
-  const handleRemoveItem = (index: number) => {
-    setMaterialRequest((prev) => {
-      const newItems = [...prev.items];
-      newItems.splice(index, 1);
-      return { ...prev, items: newItems };
-    });
-  };
-
-  const handleNewItemChange = (e: any) => {
-    const { name, value } = e.target;
-    setNewItem((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const api = await createERPNextAPI();
-      if (!api) {
-        toast({
-          title: "ERPNext Not Configured",
-          description:
-            "Please configure your ERPNext settings in the Profile page.",
-          variant: "destructive",
-        });
-        return;
+      const defaultCompany = await getUserDefaultCompany();
+      if (defaultCompany) {
+        setCompany(defaultCompany);
       }
 
-      // Simulate submitting the material request to ERPNext
-      console.log("Submitting Material Request:", materialRequest);
-      toast({
-        title: "Success",
-        description: "Material Request submitted successfully!",
-      });
+      // Load warehouses
+      const erpnextAPI = await createERPNextAPI();
+      if (erpnextAPI) {
+        const warehouseResponse = await erpnextAPI.getWarehouses();
+        if (warehouseResponse?.data) {
+          setWarehouses(warehouseResponse.data);
+        }
+      }
     } catch (error) {
-      console.error("Error submitting material request:", error);
+      console.error('Error loading initial data:', error);
+    }
+  };
+
+  const loadDraftData = () => {
+    if (draftRequest) {
+      setRemarks(draftRequest.remarks || "");
+      setCompany(draftRequest.company || company);
+      
+      if (draftRequest.items && Array.isArray(draftRequest.items)) {
+        const formItems: FormItem[] = draftRequest.items.map((item: any) => ({
+          itemCode: item.item_code || item.itemCode || "",
+          itemName: item.item_name || item.itemName || "",
+          qty: item.qty || item.quantity || 0,
+          uom: item.uom || item.stock_uom || "Nos",
+          warehouse: item.warehouse || "",
+          requiredBy: item.schedule_date || item.requiredBy || "",
+          description: item.description || ""
+        }));
+        setItems(formItems);
+      }
+    }
+  };
+
+  const addItem = () => {
+    setItems([...items, {
+      itemCode: "",
+      itemName: "",
+      qty: 1,
+      uom: "Nos",
+      warehouse: "",
+      requiredBy: "",
+      description: ""
+    }]);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof FormItem, value: any) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    setItems(updatedItems);
+  };
+
+  const handleItemSelect = (index: number, item: any) => {
+    updateItem(index, 'itemCode', item.item_code);
+    updateItem(index, 'itemName', item.item_name);
+    updateItem(index, 'uom', item.stock_uom || 'Nos');
+  };
+
+  const saveDraft = async () => {
+    if (items.length === 0) {
+      toast({
+        title: "No Items",
+        description: "Please add at least one item to the material request.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not configured');
+      }
+
+      const requestData = {
+        material_request_type: purpose,
+        company: company,
+        remarks: remarks,
+        items: items.map(item => ({
+          item_code: item.itemCode,
+          qty: item.qty,
+          uom: item.uom,
+          warehouse: item.warehouse,
+          schedule_date: item.requiredBy || new Date().toISOString().split('T')[0],
+          description: item.description
+        }))
+      };
+
+      let response;
+      if (draftRequest?.name) {
+        // Update existing draft
+        response = await erpnextAPI.updateMaterialRequest(draftRequest.name, requestData);
+      } else {
+        // Create new draft
+        response = await erpnextAPI.createMaterialRequest(requestData);
+      }
+
+      if (response?.data) {
+        onDraftCreated(response.data);
+        toast({
+          title: "Draft Saved",
+          description: `Material request draft ${response.data.name} saved successfully.`,
+        });
+      }
+
+    } catch (error) {
+      console.error('Error saving draft:', error);
       toast({
         title: "Error",
-        description: "Failed to submit material request",
-        variant: "destructive",
+        description: `Failed to save material request: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -164,186 +177,215 @@ const MaterialRequestForm = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h2 className="text-xl font-semibold">Create Material Request</h2>
+            <p className="text-sm text-gray-600">{purpose}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Create Material Request</CardTitle>
+          <CardTitle>Request Details</CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Title and Company */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  type="text"
-                  id="title"
-                  name="title"
-                  value={materialRequest.title}
-                  onChange={handleInputChange}
-                  placeholder="Material Request Title"
-                />
-              </div>
-              <div>
-                <Label htmlFor="company">Company</Label>
-                <Select
-                  value={materialRequest.company}
-                  onValueChange={(value) =>
-                    setMaterialRequest((prev) => ({ ...prev, company: value }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select company" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map((company) => (
-                      <SelectItem key={company} value={company}>
-                        {company}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* MR Date */}
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="mr_date">MR Date</Label>
+              <Label htmlFor="company">Company</Label>
               <Input
-                type="date"
-                id="mr_date"
-                name="mr_date"
-                value={materialRequest.mr_date}
-                onChange={handleInputChange}
+                id="company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Company name"
               />
             </div>
-
-            {/* Description */}
             <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={materialRequest.description}
-                onChange={handleInputChange}
-                placeholder="Description of the material request"
+              <Label htmlFor="purpose">Purpose</Label>
+              <Input
+                id="purpose"
+                value={purpose}
+                readOnly
+                className="bg-gray-50"
               />
             </div>
+          </div>
 
-            {/* Items List */}
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Items</h3>
-              <div className="space-y-2">
-                {materialRequest.items.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between border rounded-md p-2"
-                  >
-                    <div>
-                      {item.item_name} ({item.item_code}) - {item.required_qty}{" "}
-                      {item.uom} from {item.warehouse}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleRemoveItem(index)}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                {materialRequest.items.length === 0 && (
-                  <div className="text-gray-500">No items added.</div>
-                )}
-              </div>
-            </div>
-
-            {/* Add Item Form */}
-            <div className="border rounded-md p-4">
-              <h4 className="text-md font-semibold mb-2">Add New Item</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <Label htmlFor="item_code">Item</Label>
-                  <Select
-                    value={newItem.item_code}
-                    onValueChange={(value) => {
-                      const selectedItem = items.find(
-                        (item) => item.item_code === value
-                      );
-                      setNewItem((prev) => ({
-                        ...prev,
-                        item_code: value,
-                        item_name: selectedItem?.item_name || "",
-                      }));
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {items.map((item) => (
-                        <SelectItem key={item.item_code} value={item.item_code}>
-                          {item.item_name} ({item.item_code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="required_qty">Required Quantity</Label>
-                  <Input
-                    type="number"
-                    id="required_qty"
-                    name="required_qty"
-                    value={newItem.required_qty}
-                    onChange={handleNewItemChange}
-                    placeholder="Required Quantity"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="uom">UOM</Label>
-                  <Input
-                    type="text"
-                    id="uom"
-                    name="uom"
-                    value={newItem.uom}
-                    onChange={handleNewItemChange}
-                    placeholder="UOM"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="warehouse">Warehouse</Label>
-                  <Select
-                    value={newItem.warehouse}
-                    onValueChange={(value) =>
-                      setNewItem((prev) => ({ ...prev, warehouse: value }))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select warehouse" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {warehouses.map((warehouse) => (
-                        <SelectItem key={warehouse} value={warehouse}>
-                          {warehouse}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button type="button" variant="secondary" onClick={handleAddItem} className="mt-4">
-                Add Item
-              </Button>
-            </div>
-
-            {/* Submit Button */}
-            <Button type="submit" disabled={loading}>
-              {loading ? "Submitting..." : "Submit Material Request"}
-            </Button>
-          </form>
+          <div>
+            <Label htmlFor="remarks">Remarks</Label>
+            <Textarea
+              id="remarks"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Additional remarks or notes"
+              rows={3}
+            />
+          </div>
         </CardContent>
       </Card>
+
+      {/* Items */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Items</CardTitle>
+            <Button onClick={addItem} size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {items.map((item, index) => (
+              <div key={index} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">Item {index + 1}</h4>
+                  {items.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeItem(index)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="lg:col-span-2">
+                    <Label>Item</Label>
+                    <ItemSearch
+                      onItemSelect={(selectedItem) => handleItemSelect(index, selectedItem)}
+                      placeholder="Search for items..."
+                      selectedItem={item.itemCode ? {
+                        item_code: item.itemCode,
+                        item_name: item.itemName,
+                        stock_uom: item.uom
+                      } : null}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor={`qty-${index}`}>Quantity</Label>
+                    <Input
+                      id={`qty-${index}`}
+                      type="number"
+                      value={item.qty}
+                      onChange={(e) => updateItem(index, 'qty', parseFloat(e.target.value) || 0)}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor={`uom-${index}`}>UOM</Label>
+                    <Input
+                      id={`uom-${index}`}
+                      value={item.uom}
+                      onChange={(e) => updateItem(index, 'uom', e.target.value)}
+                      placeholder="Unit"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor={`warehouse-${index}`}>Warehouse</Label>
+                    <Select
+                      value={item.warehouse}
+                      onValueChange={(value) => updateItem(index, 'warehouse', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select warehouse" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {warehouses.map((warehouse) => (
+                          <SelectItem key={warehouse.name} value={warehouse.name}>
+                            {warehouse.warehouse_name || warehouse.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor={`required-${index}`}>Required By</Label>
+                    <Input
+                      id={`required-${index}`}
+                      type="date"
+                      value={item.requiredBy}
+                      onChange={(e) => updateItem(index, 'requiredBy', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <Label htmlFor={`description-${index}`}>Description</Label>
+                  <Textarea
+                    id={`description-${index}`}
+                    value={item.description}
+                    onChange={(e) => updateItem(index, 'description', e.target.value)}
+                    placeholder="Item description or notes"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            ))}
+
+            {items.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <p>No items added yet.</p>
+                <Button onClick={addItem} className="mt-2">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add First Item
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0 sm:space-x-4 pb-6">
+        <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Dashboard
+        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={saveDraft} 
+            disabled={loading}
+            className="flex-1 sm:flex-none"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {loading ? 'Saving...' : 'Save Draft'}
+          </Button>
+          <Button 
+            type="button" 
+            onClick={() => {
+              saveDraft().then(() => {
+                if (!loading) {
+                  onReviewAndSubmit();
+                }
+              });
+            }} 
+            disabled={loading || items.length === 0}
+            className="flex-1 sm:flex-none"
+          >
+            <ArrowRight className="w-4 h-4 mr-2" />
+            Review & Submit
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
