@@ -3,11 +3,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Warehouse, TrendingUp, AlertTriangle, Calendar, DollarSign } from "lucide-react";
+import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import ItemDropdown from "@/components/common/ItemDropdown";
 import { Item } from "@/types";
+import ItemScanner from "@/components/item-enquiry/ItemScanner";
 
 interface StockItem {
   itemCode: string;
@@ -172,11 +172,9 @@ const ItemEnquiry = () => {
             <CardTitle>Select Item</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ItemDropdown 
-              onItemSelect={loadItemStock}
-              selectedItem={selectedItem}
-              placeholder="Search and select an item..."
-              disabled={loading}
+            <ItemScanner 
+              onItemScanned={loadItemStock}
+              isLoading={loading}
             />
             <div className="flex justify-end">
               <Button 
