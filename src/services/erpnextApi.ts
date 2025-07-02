@@ -1,5 +1,6 @@
 
 import { ERPNextAPI } from './erp/erpnext/index';
+import { ERPNextCompanyAPI } from './erp/erpnext/companyApi';
 import { supabase } from '../integrations/supabase/client';
 
 export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
@@ -31,6 +32,39 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
     return api;
   } catch (error) {
     console.error('Failed to create ERPNext API:', error);
+    return null;
+  }
+};
+
+export const createERPNextCompanyAPI = async (): Promise<ERPNextCompanyAPI | null> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      return null;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('erpnext_url, erpnext_api_key, erpnext_api_secret')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || !profile.erpnext_url || !profile.erpnext_api_key || !profile.erpnext_api_secret) {
+      console.error('ERPNext configuration not found or incomplete');
+      return null;
+    }
+
+    const api = new ERPNextCompanyAPI(
+      profile.erpnext_url,
+      profile.erpnext_api_key,
+      profile.erpnext_api_secret
+    );
+
+    return api;
+  } catch (error) {
+    console.error('Failed to create ERPNext Company API:', error);
     return null;
   }
 };

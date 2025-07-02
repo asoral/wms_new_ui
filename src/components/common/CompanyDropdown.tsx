@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextCompanyAPI } from "@/services/erpnextApi";
 
 interface Company {
   name: string;
@@ -46,8 +46,8 @@ const CompanyDropdown = ({
   const fetchCompanies = async () => {
     try {
       setLoading(true);
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
+      const erpnextCompanyAPI = await createERPNextCompanyAPI();
+      if (!erpnextCompanyAPI) {
         toast({
           title: "ERPNext Not Configured",
           description: "Please configure your ERPNext settings first.",
@@ -56,7 +56,7 @@ const CompanyDropdown = ({
         return;
       }
 
-      const response = await erpnextAPI.getCompanies();
+      const response = await erpnextCompanyAPI.getCompanies();
       
       if (response?.data && Array.isArray(response.data)) {
         setCompanies(response.data);
