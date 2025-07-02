@@ -43,7 +43,7 @@ export const useItemSearch = (): UseItemSearchReturn => {
     try {
       setSearching(true);
       const response = await searchItems(searchTerm);
-      const results = response?.data || [];
+      const results = (response?.data || []) as Item[];
       setItems(results);
       setSearchResults(results);
     } catch (error) {
@@ -59,7 +59,7 @@ export const useItemSearch = (): UseItemSearchReturn => {
     try {
       setSearching(true);
       const response = await searchItemsByBarcode(barcode);
-      const results = response?.data || [];
+      const results = (response?.data || []) as Item[];
       setItems(results);
       setSearchResults(results);
     } catch (error) {
@@ -78,7 +78,7 @@ export const useItemSearch = (): UseItemSearchReturn => {
   const handleItemSelect = useCallback(async (item: Item) => {
     try {
       const response = await getItemDetails(item.item_code);
-      setSelectedItem(response?.data || item);
+      setSelectedItem((response?.data || item) as Item);
     } catch (error) {
       console.error('Failed to get item details:', error);
       setSelectedItem(item);

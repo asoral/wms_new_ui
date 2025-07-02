@@ -46,14 +46,32 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         setPickLists(pickListsData);
         
         // Get analytics data
-        const analyticsResponse = await getPickListAnalytics(company);
-        if (analyticsResponse?.data) {
-          const analyticsData = analyticsResponse.data;
+        try {
+          const analyticsResponse = await getPickListAnalytics(company);
+          if (analyticsResponse?.data) {
+            const analyticsData = analyticsResponse.data;
+            setAnalytics({
+              totalPickLists: pickListsData.length,
+              pendingPickLists: pickListsData.filter((pl: any) => pl.status === 'Draft').length,
+              completedPickLists: pickListsData.filter((pl: any) => pl.status === 'Completed').length,
+              totalItems: analyticsData.total_items || 0
+            });
+          } else {
+            // Fallback analytics calculation
+            setAnalytics({
+              totalPickLists: pickListsData.length,
+              pendingPickLists: pickListsData.filter((pl: any) => pl.status === 'Draft').length,
+              completedPickLists: pickListsData.filter((pl: any) => pl.status === 'Completed').length,
+              totalItems: 0
+            });
+          }
+        } catch (analyticsError) {
+          console.warn('Failed to fetch analytics, using fallback:', analyticsError);
           setAnalytics({
             totalPickLists: pickListsData.length,
             pendingPickLists: pickListsData.filter((pl: any) => pl.status === 'Draft').length,
             completedPickLists: pickListsData.filter((pl: any) => pl.status === 'Completed').length,
-            totalItems: analyticsData.total_items || 0
+            totalItems: 0
           });
         }
       }
