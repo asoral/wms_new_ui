@@ -77,16 +77,18 @@ const ItemDropdown = ({
         return;
       }
 
-      const response = await erpnextAPI.searchItems(term, 20);
-      console.log('Search response:', response);
+      console.log('Searching for:', term);
+      const response = await erpnextAPI.searchItems(term, 10); // Use 10 as requested
+      console.log('Search API response:', response);
       
-      // Ensure we have valid data and it's an array
-      if (response?.data && Array.isArray(response.data)) {
+      // Handle the response properly
+      if (response && response.data && Array.isArray(response.data)) {
+        console.log('Found items:', response.data);
         setItems(response.data);
         setShowResults(true);
         setIsOpen(true);
       } else {
-        console.warn('Invalid search response:', response);
+        console.warn('No valid items found in response:', response);
         setItems([]);
         setShowResults(false);
       }
@@ -96,7 +98,7 @@ const ItemDropdown = ({
       setShowResults(false);
       toast({
         title: "Error",
-        description: "Failed to search items",
+        description: "Failed to search items. Please check your ERPNext connection.",
         variant: "destructive"
       });
     } finally {
@@ -104,17 +106,24 @@ const ItemDropdown = ({
     }
   };
 
+  // Trigger search when user types
   useEffect(() => {
+    if (!searchTerm.trim()) {
+      setItems([]);
+      setShowResults(false);
+      return;
+    }
+
     const timer = setTimeout(() => {
-      if (searchTerm && isOpen) {
-        searchItems(searchTerm);
-      }
-    }, 300);
+      console.log('Triggering search for:', searchTerm);
+      searchItems(searchTerm);
+    }, 300); // 300ms debounce
 
     return () => clearTimeout(timer);
-  }, [searchTerm, isOpen]);
+  }, [searchTerm]);
 
   const handleItemSelect = (item: Item) => {
+    console.log('Item selected:', item);
     onItemSelect(item);
     setSearchTerm(item.item_name);
     setShowResults(false);
@@ -123,16 +132,19 @@ const ItemDropdown = ({
 
   const handleInputFocus = () => {
     setIsOpen(true);
-    if (searchTerm) {
+    // Only search if there's a term and we don't have results
+    if (searchTerm.trim() && items.length === 0) {
       searchItems(searchTerm);
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    console.log('Input changed to:', value);
     setSearchTerm(value);
     setIsOpen(true);
-    if (!value) {
+    
+    if (!value.trim()) {
       setItems([]);
       setShowResults(false);
     }
@@ -140,20 +152,24 @@ const ItemDropdown = ({
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      <div className="flex space-x-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            value={searchTerm}
-            onChange={handleInputChange}
-            onFocus={handleInputFocus}
-            placeholder={placeholder}
-            className="pl-10 pr-10"
-            disabled={disabled || loading}
-          />
-          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Input
+          value={searchTerm}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
+          placeholder={placeholder}
+          className="pl-10 pr-10"
+          disabled={disabled || loading}
+        />
+        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
       </div>
+
+      {loading && isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg p-3">
+          <div className="text-center text-sm text-gray-500 dark:text-gray-400">Searching...</div>
+        </div>
+      )}
 
       {showResults && items.length > 0 && isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -178,13 +194,7 @@ const ItemDropdown = ({
         </div>
       )}
 
-      {loading && isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg p-3">
-          <div className="text-center text-sm text-gray-500 dark:text-gray-400">Searching...</div>
-        </div>
-      )}
-
-      {showResults && items.length === 0 && !loading && searchTerm && isOpen && (
+      {showResults && items.length === 0 && !loading && searchTerm.trim() && isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg p-3">
           <div className="text-center text-sm text-gray-500 dark:text-gray-400">No items found</div>
         </div>

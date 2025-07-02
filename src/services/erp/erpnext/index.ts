@@ -37,7 +37,8 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async searchItems(searchTerm: string, limitPageLength?: number) {
-    return this.itemsAPI.searchItems(searchTerm, limitPageLength || 20);
+    console.log('ERPNextAPI.searchItems called with:', searchTerm, limitPageLength);
+    return this.itemsAPI.searchItems(searchTerm, limitPageLength || 10);
   }
 
   async searchItemsByBarcode(barcode: string) {
