@@ -68,8 +68,8 @@ const ItemEnquiry = () => {
         }
       }
 
-      // Fetch item stock details
-      const response = await erpnextAPI.getBinStock(code);
+      // Fetch item stock details with correct number of arguments
+      const response = await erpnextAPI.getBinStock(code, "");
       console.log('Item stock response:', response);
 
       if (response?.data) {

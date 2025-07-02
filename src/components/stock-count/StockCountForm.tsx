@@ -66,7 +66,7 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
       }
 
       const filters = [['item_code', '=', itemCode]];
-      const response = await erpnextAPI.getStockBalance(filters, company);
+      const response = await erpnextAPI.getStockBalance(filters);
 
       if (response?.data) {
         let transformedItems: StockCountItem[] = response.data.map((item: any) => ({

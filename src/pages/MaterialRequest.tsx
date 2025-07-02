@@ -74,6 +74,15 @@ const MaterialRequest = () => {
     setDraftRequest(null);
   };
 
+  // Create wrapper functions to match expected signatures
+  const handleCreateNewWrapper = () => {
+    // This will be called without parameters from MaterialRequestList
+    // We can set a default purpose or handle it differently
+    setSelectedPurpose("Purchase"); // Default purpose
+    setDraftRequest(null);
+    setActiveTab("create");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
@@ -108,7 +117,7 @@ const MaterialRequest = () => {
           </TabsContent>
 
           <TabsContent value="list">
-            <MaterialRequestList onCreateNew={handleCreateNew} />
+            <MaterialRequestList onCreateNew={handleCreateNewWrapper} />
           </TabsContent>
 
           <TabsContent value="create">

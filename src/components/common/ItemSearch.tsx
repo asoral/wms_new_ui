@@ -18,14 +18,26 @@ interface ItemSearchProps {
   onItemSelect: (item: Item) => void;
   placeholder?: string;
   disabled?: boolean;
+  selectedItem?: {
+    item_code: string;
+    item_name: string;
+    stock_uom: string;
+  } | null;
 }
 
-const ItemSearch = ({ onItemSelect, placeholder = "Search items...", disabled = false }: ItemSearchProps) => {
+const ItemSearch = ({ onItemSelect, placeholder = "Search items...", disabled = false, selectedItem }: ItemSearchProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const { toast } = useToast();
+
+  // Set initial search term from selectedItem
+  useEffect(() => {
+    if (selectedItem) {
+      setSearchTerm(selectedItem.item_name || selectedItem.item_code);
+    }
+  }, [selectedItem]);
 
   const searchItems = async (term: string) => {
     if (!term.trim()) {

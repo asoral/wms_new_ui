@@ -1,4 +1,3 @@
-
 import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextSalesAPI } from './salesApi';
 import { ERPNextStockAPI } from './stockApi';
@@ -108,8 +107,12 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI('Warehouse', 'GET', undefined, filters, limitPageLength);
   }
 
-  async getBinStock(itemCode: string, warehouse: string) {
-    return this.callAPI('Bin', 'GET', undefined, [['item_code', '=', itemCode], ['warehouse', '=', warehouse]]);
+  async getBinStock(itemCode: string, warehouse?: string) {
+    const filters = [['item_code', '=', itemCode]];
+    if (warehouse) {
+      filters.push(['warehouse', '=', warehouse]);
+    }
+    return this.callAPI('Bin', 'GET', undefined, filters);
   }
 
   async getCompanies(filters?: any, limitPageLength?: number) {
