@@ -240,8 +240,8 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
               ))}
             </div>
           </CardContent>
-        )}
-      />
+        </Card>
+      )}
 
       {/* Quick Actions */}
       {shortcuts.length > 0 && (
