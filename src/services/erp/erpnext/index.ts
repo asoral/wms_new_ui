@@ -104,7 +104,6 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   async getStockReconciliations(filters?: any, limitPageLength?: number) {
     const fields = [
       'name',
-      'warehouse',
       'purpose',
       'docstatus', 
       'posting_date',
