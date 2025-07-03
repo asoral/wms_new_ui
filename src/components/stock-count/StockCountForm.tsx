@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/table"
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, CheckCircle, AlertTriangle, Loader2, Package } from "lucide-react";
+import { Plus, CheckCircle, AlertTriangle, Loader2, Package, Search, ScanBarcode } from "lucide-react";
 import ItemScanner from "@/components/item-enquiry/ItemScanner";
 import { StockCountEntry, StockCountItem } from "@/types";
 import { Item } from "@/types";
@@ -24,11 +25,99 @@ interface StockCountFormProps {
 }
 
 const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
+  const [searchParams] = useSearchParams();
+  const warehouse = searchParams.get('warehouse') || '';
   const [stockItems, setStockItems] = useState<StockCountItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [includeZeroQty, setIncludeZeroQty] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showScanner, setShowScanner] = useState<boolean>(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (warehouse) {
+      loadWarehouseStock();
+    }
+  }, [warehouse, includeZeroQty]);
+
+
+  const loadWarehouseStock = async () => {
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const company = await getUserDefaultCompany();
+      if (!company) {
+        toast({
+          title: "No Default Company",
+          description: "Please set a default company in your profile settings.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Get all items in the selected warehouse
+      const filters = [['warehouse', '=', warehouse]];
+      if (!includeZeroQty) {
+        filters.push(['actual_qty', '>', '0']);
+      }
+
+      const response = await erpnextAPI.getBinStock('', warehouse);
+
+      if (response?.data) {
+        const transformedItems: StockCountItem[] = response.data.map((item: any) => ({
+          itemCode: item.item_code,
+          itemName: item.item_name || item.item_code,
+          warehouse: item.warehouse,
+          currentQty: item.actual_qty || 0,
+          actualQty: item.actual_qty || 0,
+          uom: 'Nos',
+          batch: item.batch_no,
+          serial: item.serial_no
+        }));
+
+        let filteredItems = transformedItems;
+        if (!includeZeroQty) {
+          filteredItems = transformedItems.filter(item => item.currentQty > 0);
+        }
+
+        setStockItems(filteredItems);
+
+        if (filteredItems.length === 0) {
+          toast({
+            title: "No Stock Found",
+            description: `No stock found in warehouse: ${warehouse}`,
+            variant: "destructive"
+          });
+        }
+      } else {
+        setStockItems([]);
+        toast({
+          title: "No Data",
+          description: `No stock data available for warehouse: ${warehouse}`,
+          variant: "destructive"
+        });
+      }
+
+    } catch (error) {
+      console.error('Failed to load warehouse stock:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load warehouse stock: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadItemStock = async (itemCode: string) => {
     try {
@@ -165,30 +254,67 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
     await loadItemStock(itemCode);
   };
 
-  return (
-    <div className="space-y-4">
-      <ItemScanner
-        onItemScanned={handleItemScanned}
-        isLoading={loading}
-      />
+  const filteredItems = stockItems.filter(item =>
+    item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.itemName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="includeZeroQty"
-          checked={includeZeroQty}
-          onCheckedChange={(checked) => setIncludeZeroQty(!!checked)}
-        />
-        <Label htmlFor="includeZeroQty" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-          Include Zero Quantity Items
-        </Label>
+  return (
+    <div className="space-y-6">
+      {/* Manual Entry / Scan Barcode Toggle */}
+      <div className="grid grid-cols-2 gap-4">
+        <Button
+          variant={!showScanner ? "default" : "outline"}
+          onClick={() => setShowScanner(false)}
+          className="flex items-center justify-center space-x-2"
+        >
+          <Search className="w-4 h-4" />
+          <span>Manual Entry</span>
+        </Button>
+        <Button
+          variant={showScanner ? "default" : "outline"}
+          onClick={() => setShowScanner(true)}
+          className="flex items-center justify-center space-x-2"
+        >
+          <ScanBarcode className="w-4 h-4" />
+          <span>Scan Barcode</span>
+        </Button>
       </div>
+
+      {/* Scanner or Search Input */}
+      {showScanner ? (
+        <ItemScanner
+          onItemScanned={handleItemScanned}
+          isLoading={loading}
+        />
+      ) : (
+        <div className="space-y-4">
+          <Input
+            placeholder="Search items..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="includeZeroQty"
+              checked={includeZeroQty}
+              onCheckedChange={(checked) => setIncludeZeroQty(!!checked)}
+            />
+            <Label htmlFor="includeZeroQty" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+              Include Zero Quantity Items
+            </Label>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-8">
           <Loader2 className="w-6 h-6 mx-auto animate-spin text-gray-500 mb-2" />
-          <p className="text-gray-500">Loading item stock...</p>
+          <p className="text-gray-500">Loading warehouse stock...</p>
         </div>
-      ) : stockItems.length > 0 ? (
+      ) : filteredItems.length > 0 ? (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -205,18 +331,18 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {stockItems.map((item) => (
-                <TableRow key={item.itemCode + item.warehouse}>
-                  <TableCell>{item.itemCode}</TableCell>
+              {filteredItems.map((item, index) => (
+                <TableRow key={`${item.itemCode}-${item.warehouse}-${index}`}>
+                  <TableCell className="font-medium">{item.itemCode}</TableCell>
                   <TableCell>{item.itemName}</TableCell>
                   <TableCell>{item.warehouse}</TableCell>
-                  <TableCell>{item.currentQty}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">{item.currentQty}</TableCell>
+                  <TableCell className="w-32">
                     <Input
                       type="number"
-                      value={item.actualQty}
+                      value={item.actualQty || 0}
                       onChange={(e) => {
-                        const newQty = parseInt(e.target.value);
+                        const newQty = parseFloat(e.target.value) || 0;
                         setStockItems(prevItems =>
                           prevItems.map(prevItem =>
                             prevItem.itemCode === item.itemCode && prevItem.warehouse === item.warehouse
@@ -225,13 +351,19 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
                           )
                         );
                       }}
+                      className="text-center"
+                      step="0.01"
                     />
                   </TableCell>
                   <TableCell>{item.uom}</TableCell>
-                  <TableCell>{item.batch}</TableCell>
-                  <TableCell>{item.serial}</TableCell>
+                  <TableCell>{item.batch || '-'}</TableCell>
+                  <TableCell>{item.serial || '-'}</TableCell>
                   <TableCell className="text-right">
-                    <Button onClick={() => handleSubmit(item)}>
+                    <Button 
+                      onClick={() => handleSubmit(item)}
+                      size="sm"
+                      className="bg-gray-800 hover:bg-gray-900 text-white"
+                    >
                       Add Entry
                     </Button>
                   </TableCell>
@@ -242,8 +374,17 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
         </div>
       ) : (
         <div className="text-center py-8">
-          <AlertTriangle className="w-6 h-6 mx-auto text-gray-500 mb-2" />
-          <p className="text-gray-500">No stock found for the selected item.</p>
+          {stockItems.length === 0 ? (
+            <>
+              <Package className="w-10 h-10 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-500">Loading warehouse stock...</p>
+            </>
+          ) : (
+            <>
+              <Search className="w-10 h-10 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-500">No items found matching your search.</p>
+            </>
+          )}
         </div>
       )}
     </div>
