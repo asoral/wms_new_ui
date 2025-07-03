@@ -48,15 +48,15 @@ const StockCount = () => {
         const transformedSessions: StockCountSession[] = response.data.map((session: any) => ({
           id: session.name,
           name: session.name,
-          warehouse: session.warehouse,
-          purpose: session.purpose,
-          status: session.status,
-          startedAt: new Date(session.posting_date),
-          completedAt: session.completion_date ? new Date(session.completion_date) : undefined,
-          totalItems: session.total_items || 0,
-          matchedItems: session.matched_items || 0,
-          varianceItems: session.variance_items || 0,
-          entries: session.entries || []
+          warehouse: session.warehouse || 'Unknown',
+          purpose: session.purpose || 'Stock Reconciliation',
+          status: session.docstatus === 0 ? 'Draft' : session.docstatus === 1 ? 'Submitted' : 'Cancelled',
+          startedAt: session.posting_date ? new Date(session.posting_date) : new Date(),
+          completedAt: session.docstatus === 1 ? new Date(session.posting_date) : undefined,
+          totalItems: session.items?.length || 0,
+          matchedItems: 0,
+          varianceItems: session.items?.length || 0,
+          entries: session.items || []
         }));
 
         setSessions(transformedSessions);

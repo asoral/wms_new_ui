@@ -102,7 +102,17 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async getStockReconciliations(filters?: any, limitPageLength?: number) {
-    return this.callAPI('Stock Reconciliation', 'GET', undefined, filters, limitPageLength);
+    const fields = [
+      'name',
+      'warehouse',
+      'purpose',
+      'docstatus', 
+      'posting_date',
+      'posting_time',
+      'company',
+      'difference_amount'
+    ];
+    return this.callAPI('Stock Reconciliation', 'GET', undefined, filters, limitPageLength, fields);
   }
 
   async getWarehouses(filters?: any, company?: string, limitPageLength?: number) {
