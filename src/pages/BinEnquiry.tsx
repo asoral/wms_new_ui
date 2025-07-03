@@ -60,8 +60,9 @@ const BinEnquiry = () => {
         }
       }
 
-      // Fetch bin stock details
-      const response = await erpnextAPI.getBinStock(undefined, binCode);
+      // Fetch bin stock details - need to get bins for warehouse
+      const filters = [['warehouse', '=', binCode]];
+      const response = await erpnextAPI.getStockBalance(filters);
       console.log('Bin stock response:', response);
 
       if (response?.data) {

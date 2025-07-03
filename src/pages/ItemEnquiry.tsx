@@ -235,15 +235,17 @@ const ItemEnquiry = () => {
               onItemScanned={loadItemStock}
               isLoading={loading}
             />
-            <div className="flex justify-end">
-              <Button 
-                type="button" 
-                variant="secondary" 
-                onClick={handleClear}
-              >
-                Clear
-              </Button>
-            </div>
+            {selectedItem && (
+              <div className="flex justify-end">
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  onClick={handleClear}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

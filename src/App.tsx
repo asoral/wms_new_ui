@@ -20,6 +20,8 @@ import StockEntry from "@/pages/StockEntry";
 import Receive from "@/pages/Receive";
 import Deliver from "@/pages/Deliver";
 import StockCount from "@/pages/StockCount";
+import StockCountNew from "@/pages/StockCountNew";
+import StockCountSession from "@/pages/StockCountSession";
 import Packing from "@/pages/Packing";
 import PickList from "@/pages/PickList";
 import PrintLabel from "@/pages/PrintLabel";
@@ -69,6 +71,8 @@ const App = () => {
                             <Route path="/receive" element={<Receive />} />
                             <Route path="/deliver" element={<Deliver />} />
                             <Route path="/stock-count" element={<StockCount />} />
+                            <Route path="/stock-count/new" element={<StockCountNew />} />
+                            <Route path="/stock-count/session" element={<StockCountSession />} />
                             <Route path="/packing" element={<Packing />} />
                             <Route path="/pick-list" element={<PickList />} />
                             <Route path="/print-label" element={<PrintLabel />} />

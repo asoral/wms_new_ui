@@ -171,6 +171,13 @@ const ItemDropdown = ({
     }
   };
 
+  const handleClear = () => {
+    setSearchTerm("");
+    setItems([]);
+    setShowResults(false);
+    setIsOpen(false);
+  };
+
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <div className="relative">
@@ -183,6 +190,15 @@ const ItemDropdown = ({
           className="pl-10 pr-10"
           disabled={disabled || loading}
         />
+        {searchTerm && (
+          <button
+            onClick={handleClear}
+            className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 w-4 h-4"
+            type="button"
+          >
+            ×
+          </button>
+        )}
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
       </div>
 

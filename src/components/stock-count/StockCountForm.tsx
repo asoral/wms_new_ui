@@ -24,23 +24,11 @@ interface StockCountFormProps {
 }
 
 const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
-  const [currentItemCode, setCurrentItemCode] = useState<string>("");
-  const [currentItemName, setCurrentItemName] = useState<string>("");
-  const [warehouse, setWarehouse] = useState<string>("");
-  const [currentQty, setCurrentQty] = useState<number>(0);
-  const [actualQty, setActualQty] = useState<number>(0);
-  const [batch, setBatch] = useState<string>("");
-  const [serial, setSerial] = useState<string>("");
   const [stockItems, setStockItems] = useState<StockCountItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [includeZeroQty, setIncludeZeroQty] = useState<boolean>(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (currentItemCode) {
-      loadItemStock(currentItemCode);
-    }
-  }, [currentItemCode, includeZeroQty]);
 
   const loadItemStock = async (itemCode: string) => {
     try {
@@ -65,8 +53,8 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
         return;
       }
 
-      const filters = [['item_code', '=', itemCode]];
-      const response = await erpnextAPI.getStockBalance(filters);
+      // Get company-filtered bin stock for the item
+      const response = await erpnextAPI.stockAPI.getBinStockForCompany(itemCode, company);
 
       if (response?.data) {
         let transformedItems: StockCountItem[] = response.data.map((item: any) => ({
@@ -75,7 +63,7 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
           warehouse: item.warehouse,
           currentQty: item.actual_qty || 0,
           actualQty: 0,
-          uom: item.stock_uom || 'Nos',
+          uom: 'Nos',
           batch: item.batch_no,
           serial: item.serial_no
         }));
@@ -172,105 +160,92 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
       });
       return;
     }
-
-    setCurrentItemCode(itemCode);
-    setCurrentItemName(item.item_name);
     
     // Load item stock details
     await loadItemStock(itemCode);
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Package className="w-5 h-5" />
-            <span>Add Stock Count Entry</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ItemScanner
-            onItemScanned={handleItemScanned}
-            isLoading={loading}
-          />
+    <div className="space-y-4">
+      <ItemScanner
+        onItemScanned={handleItemScanned}
+        isLoading={loading}
+      />
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="includeZeroQty"
-              checked={includeZeroQty}
-              onCheckedChange={(checked) => setIncludeZeroQty(!!checked)}
-            />
-            <Label htmlFor="includeZeroQty" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-              Include Zero Quantity Items
-            </Label>
-          </div>
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="includeZeroQty"
+          checked={includeZeroQty}
+          onCheckedChange={(checked) => setIncludeZeroQty(!!checked)}
+        />
+        <Label htmlFor="includeZeroQty" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+          Include Zero Quantity Items
+        </Label>
+      </div>
 
-          {loading ? (
-            <div className="text-center py-8">
-              <Loader2 className="w-6 h-6 mx-auto animate-spin text-gray-500 mb-2" />
-              <p className="text-gray-500">Loading item stock...</p>
-            </div>
-          ) : stockItems.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item Code</TableHead>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead>Warehouse</TableHead>
-                    <TableHead>Current Qty</TableHead>
-                    <TableHead>Actual Qty</TableHead>
-                    <TableHead>UOM</TableHead>
-                    <TableHead>Batch</TableHead>
-                    <TableHead>Serial</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stockItems.map((item) => (
-                    <TableRow key={item.itemCode + item.warehouse}>
-                      <TableCell>{item.itemCode}</TableCell>
-                      <TableCell>{item.itemName}</TableCell>
-                      <TableCell>{item.warehouse}</TableCell>
-                      <TableCell>{item.currentQty}</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.actualQty}
-                          onChange={(e) => {
-                            const newQty = parseInt(e.target.value);
-                            setStockItems(prevItems =>
-                              prevItems.map(prevItem =>
-                                prevItem.itemCode === item.itemCode && prevItem.warehouse === item.warehouse
-                                  ? { ...prevItem, actualQty: newQty }
-                                  : prevItem
-                              )
-                            );
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>{item.uom}</TableCell>
-                      <TableCell>{item.batch}</TableCell>
-                      <TableCell>{item.serial}</TableCell>
-                      <TableCell className="text-right">
-                        <Button onClick={() => handleSubmit(item)}>
-                          Add Entry
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <AlertTriangle className="w-6 h-6 mx-auto text-gray-500 mb-2" />
-              <p className="text-gray-500">No stock found for the selected item.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="text-center py-8">
+          <Loader2 className="w-6 h-6 mx-auto animate-spin text-gray-500 mb-2" />
+          <p className="text-gray-500">Loading item stock...</p>
+        </div>
+      ) : stockItems.length > 0 ? (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item Code</TableHead>
+                <TableHead>Item Name</TableHead>
+                <TableHead>Warehouse</TableHead>
+                <TableHead>Current Qty</TableHead>
+                <TableHead>Actual Qty</TableHead>
+                <TableHead>UOM</TableHead>
+                <TableHead>Batch</TableHead>
+                <TableHead>Serial</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stockItems.map((item) => (
+                <TableRow key={item.itemCode + item.warehouse}>
+                  <TableCell>{item.itemCode}</TableCell>
+                  <TableCell>{item.itemName}</TableCell>
+                  <TableCell>{item.warehouse}</TableCell>
+                  <TableCell>{item.currentQty}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.actualQty}
+                      onChange={(e) => {
+                        const newQty = parseInt(e.target.value);
+                        setStockItems(prevItems =>
+                          prevItems.map(prevItem =>
+                            prevItem.itemCode === item.itemCode && prevItem.warehouse === item.warehouse
+                              ? { ...prevItem, actualQty: newQty }
+                              : prevItem
+                          )
+                        );
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>{item.uom}</TableCell>
+                  <TableCell>{item.batch}</TableCell>
+                  <TableCell>{item.serial}</TableCell>
+                  <TableCell className="text-right">
+                    <Button onClick={() => handleSubmit(item)}>
+                      Add Entry
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <AlertTriangle className="w-6 h-6 mx-auto text-gray-500 mb-2" />
+          <p className="text-gray-500">No stock found for the selected item.</p>
+        </div>
+      )}
     </div>
   );
 };
