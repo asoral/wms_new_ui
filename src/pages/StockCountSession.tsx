@@ -176,7 +176,8 @@ const StockCountSession = () => {
                     status: item.actualQty === item.currentQty ? 'matched' : 'variance',
                     uom: item.uom,
                     batch: item.batch,
-                    serial: item.serial
+                    serial: item.serial,
+                    serialBatchBundle: item.serialBatchBundle
                   };
                   handleEntryAdded(entry);
                 }}

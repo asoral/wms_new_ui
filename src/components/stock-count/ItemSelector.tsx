@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, ScanBarcode, Search } from "lucide-react";
+import { Package, ScanBarcode, Search, AlertCircle } from "lucide-react";
 import ItemDropdown from "@/components/common/ItemDropdown";
+import SerialBatchBundleSelector from "@/components/stock-count/SerialBatchBundleSelector";
 import { useToast } from "@/hooks/use-toast";
 import { Item } from "@/types";
 
@@ -21,6 +22,7 @@ interface ItemSelectorProps {
     uom: string;
     batch?: string;
     serial?: string;
+    serialBatchBundle?: string;
   }) => void;
 }
 
@@ -30,10 +32,31 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
   const [batch, setBatch] = useState<string>("");
   const [serial, setSerial] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("manual");
+  const [serialBatchBundle, setSerialBatchBundle] = useState<string>("");
+  const [showBundleSelector, setShowBundleSelector] = useState(false);
   const { toast } = useToast();
 
   const handleItemSelect = (item: Item) => {
     setSelectedItem(item);
+    setShowBundleSelector(false);
+    setSerialBatchBundle("");
+    setBatch("");
+    setSerial("");
+  };
+
+  const isItemTracked = (item: Item | null) => {
+    if (!item) return false;
+    return item.has_serial_no === 1 || item.has_batch_no === 1;
+  };
+
+  const handleBundleCreated = (bundleName: string, totalQty: number) => {
+    setSerialBatchBundle(bundleName);
+    setActualQty(totalQty);
+    setShowBundleSelector(false);
+    toast({
+      title: "Bundle Created",
+      description: `Serial and Batch Bundle ${bundleName} created with ${totalQty} items.`,
+    });
   };
 
   const handleAddItem = () => {
@@ -46,10 +69,20 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
       return;
     }
 
-    if (actualQty < 0) {
+    // Check if item is tracked and requires bundle
+    if (isItemTracked(selectedItem) && !serialBatchBundle) {
+      toast({
+        title: "Serial/Batch Bundle Required",
+        description: "This item requires serial/batch tracking. Please create a bundle first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (actualQty <= 0) {
       toast({
         title: "Invalid Quantity", 
-        description: "Quantity cannot be negative.",
+        description: "Quantity must be greater than zero.",
         variant: "destructive"
       });
       return;
@@ -63,7 +96,8 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
       actualQty: actualQty,
       uom: selectedItem.stock_uom || 'Nos',
       batch: batch || undefined,
-      serial: serial || undefined
+      serial: serial || undefined,
+      serialBatchBundle: serialBatchBundle || undefined
     };
 
     onItemAdded(itemData);
@@ -73,6 +107,8 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
     setActualQty(0);
     setBatch("");
     setSerial("");
+    setSerialBatchBundle("");
+    setShowBundleSelector(false);
 
     toast({
       title: "Item Added",
@@ -113,7 +149,7 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
 
             {selectedItem && (
               <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                   <div>
                     <p className="font-medium text-gray-600">Item Code</p>
                     <p className="text-gray-900">{selectedItem.item_code}</p>
@@ -123,10 +159,68 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
                     <p className="text-gray-900">{selectedItem.stock_uom}</p>
                   </div>
                 </div>
+                
+                {/* Item Tracking Info */}
+                {isItemTracked(selectedItem) && (
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-gray-700">Item Tracking:</span>
+                    {selectedItem.has_serial_no === 1 && (
+                      <Badge variant="outline" className="text-xs">Serial Tracked</Badge>
+                    )}
+                    {selectedItem.has_batch_no === 1 && (
+                      <Badge variant="outline" className="text-xs">Batch Tracked</Badge>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Serial/Batch Bundle for tracked items */}
+            {selectedItem && isItemTracked(selectedItem) && (
+              <div className="space-y-4">
+                {!showBundleSelector ? (
+                  <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <AlertCircle className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-700">
+                          This item requires serial/batch tracking
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowBundleSelector(true)}
+                      >
+                        Create Bundle
+                      </Button>
+                    </div>
+                    {serialBatchBundle && (
+                      <div className="mt-2">
+                        <Badge variant="secondary">Bundle: {serialBatchBundle}</Badge>
+                        <span className="ml-2 text-sm text-gray-600">Qty: {actualQty}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <SerialBatchBundleSelector
+                    itemCode={selectedItem.item_code}
+                    itemName={selectedItem.item_name}
+                    itemGroup={selectedItem.item_group || ''}
+                    hasSerial={selectedItem.has_serial_no === 1}
+                    hasBatch={selectedItem.has_batch_no === 1}
+                    warehouse={warehouse}
+                    transactionType="Inward"
+                    onBundleCreated={handleBundleCreated}
+                    initialQuantity={1}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Simple quantity input for non-tracked items */}
+            {selectedItem && !isItemTracked(selectedItem) && (
               <div className="space-y-2">
                 <Label htmlFor="actual-qty">Actual Quantity *</Label>
                 <Input
@@ -135,36 +229,16 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
                   placeholder="0"
                   value={actualQty || ""}
                   onChange={(e) => setActualQty(Number(e.target.value))}
-                  min="0"
+                  min="1"
                   step="0.01"
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="batch">Batch (Optional)</Label>
-                <Input
-                  id="batch"
-                  placeholder="Enter batch number"
-                  value={batch}
-                  onChange={(e) => setBatch(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="serial">Serial (Optional)</Label>
-                <Input
-                  id="serial"
-                  placeholder="Enter serial number"
-                  value={serial}
-                  onChange={(e) => setSerial(e.target.value)}
-                />
-              </div>
-            </div>
+            )}
 
             <Button 
               onClick={handleAddItem} 
               className="w-full"
-              disabled={!selectedItem}
+              disabled={!selectedItem || actualQty <= 0 || (isItemTracked(selectedItem) && !serialBatchBundle)}
             >
               Add Item to Count
             </Button>

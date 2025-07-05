@@ -103,6 +103,7 @@ export interface StockCountEntry {
   status: 'matched' | 'variance' | 'pending';
   batch?: string;
   serial?: string;
+  serialBatchBundle?: string;
   uom: string;
 }
 

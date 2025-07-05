@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -11,9 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, CheckCircle, AlertTriangle, Loader2, BarChart3, Building2 } from "lucide-react";
 import { format } from 'date-fns';
 import { StockCountSession } from "@/types";
 
@@ -21,10 +23,15 @@ const StockCount = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<StockCountSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
+  const [selectedPurpose, setSelectedPurpose] = useState<string>("Stock Reconciliation");
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [warehouseLoading, setWarehouseLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     loadStockCountSessions();
+    loadWarehouses();
   }, []);
 
   const loadStockCountSessions = async () => {
@@ -74,6 +81,52 @@ const StockCount = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadWarehouses = async () => {
+    try {
+      setWarehouseLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const company = await getUserDefaultCompany();
+      const filters = company ? [['company', '=', company]] : undefined;
+      const response = await erpnextAPI.getWarehouses(filters);
+      
+      if (response?.data) {
+        setWarehouses(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load warehouses:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load warehouses",
+        variant: "destructive"
+      });
+    } finally {
+      setWarehouseLoading(false);
+    }
+  };
+
+  const handleStartSession = () => {
+    if (!selectedWarehouse) {
+      toast({
+        title: "Warehouse Required",
+        description: "Please select a warehouse to start the stock count session.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Navigate to stock count session with parameters
+    navigate(`/stock-count/session?warehouse=${encodeURIComponent(selectedWarehouse)}&purpose=${encodeURIComponent(selectedPurpose)}`);
   };
 
   const formatDate = (date: Date) => {
@@ -144,21 +197,70 @@ const StockCount = () => {
       {/* Start New Session Card */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Quick Actions</span>
+          <CardTitle className="flex items-center space-x-2">
+            <BarChart3 className="w-5 h-5" />
+            <span>Start Stock Count Session</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Button onClick={() => navigate('/stock-count/new')} size="lg" className="w-full">
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="warehouse">Select Warehouse *</Label>
+              <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Search warehouse by code or name..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map((warehouse) => (
+                    <SelectItem key={warehouse.name} value={warehouse.name}>
+                      <div className="flex items-center space-x-2">
+                        <Building2 className="w-4 h-4" />
+                        <span>{warehouse.warehouse_name || warehouse.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="purpose">Select Count Purpose *</Label>
+              <Select value={selectedPurpose} onValueChange={setSelectedPurpose}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select purpose..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Stock Reconciliation">
+                    <div className="flex items-center space-x-2">
+                      <BarChart3 className="w-4 h-4" />
+                      <span>Stock Reconciliation</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="Stock Opening">
+                    <div className="flex items-center space-x-2">
+                      <Building2 className="w-4 h-4" />
+                      <span>Stock Opening</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Button 
+            onClick={handleStartSession}
+            className="w-full py-3"
+            disabled={warehouseLoading || !selectedWarehouse}
+          >
             <Plus className="w-4 h-4 mr-2" />
-            Start New Stock Count Session
+            Start Count Session
           </Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Active Stock Count Sessions</CardTitle>
+          <CardTitle>Draft Stock Reconciliations</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
