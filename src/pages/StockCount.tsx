@@ -223,27 +223,30 @@ const StockCount = () => {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="purpose">Select Count Purpose *</Label>
-              <Select value={selectedPurpose} onValueChange={setSelectedPurpose}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select purpose..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Stock Reconciliation">
-                    <div className="flex items-center space-x-2">
-                      <BarChart3 className="w-4 h-4" />
-                      <span>Stock Reconciliation</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="Stock Opening">
-                    <div className="flex items-center space-x-2">
-                      <Building2 className="w-4 h-4" />
-                      <span>Stock Opening</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="purpose">Select Count Purpose *</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card 
+                className={`cursor-pointer transition-all ${selectedPurpose === 'Stock Reconciliation' ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}
+                onClick={() => setSelectedPurpose('Stock Reconciliation')}
+              >
+                <CardContent className="p-6 text-center">
+                  <BarChart3 className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+                  <h3 className="font-semibold">Stock Reconciliation</h3>
+                </CardContent>
+              </Card>
+
+              <Card 
+                className={`cursor-pointer transition-all ${selectedPurpose === 'Stock Opening' ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}
+                onClick={() => setSelectedPurpose('Stock Opening')}
+              >
+                <CardContent className="p-6 text-center">
+                  <Building2 className="w-8 h-8 mx-auto mb-2 text-green-600" />
+                  <h3 className="font-semibold">Stock Opening</h3>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
