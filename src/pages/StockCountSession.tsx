@@ -26,7 +26,7 @@ const StockCountSession = () => {
 
   const handleEntryAdded = async (entry: StockCountEntry) => {
     // Create draft Stock Reconciliation if this is the first entry
-    if (entries.length === 0) {
+    if (entries.length === 0 && !stockReconciliationId) {
       try {
         const erpnextAPI = await createERPNextAPI();
         if (erpnextAPI) {
@@ -39,24 +39,38 @@ const StockCountSession = () => {
               item_code: entry.itemCode,
               warehouse: entry.warehouse,
               qty: entry.actualQty,
-              valuation_rate: 100, // Default rate, can be enhanced
+              valuation_rate: 100,
               current_qty: entry.currentQty,
               ...(entry.batch && { batch_no: entry.batch }),
-              ...(entry.serial && { serial_no: entry.serial })
+              ...(entry.serial && { serial_no: entry.serial }),
+              ...(entry.serialBatchBundle && { serial_and_batch_bundle: entry.serialBatchBundle })
             }]
           };
 
+          console.log('Creating Stock Reconciliation with data:', stockReconciliationData);
           const response = await erpnextAPI.callAPI('Stock Reconciliation', 'POST', stockReconciliationData);
+          console.log('Stock Reconciliation response:', response);
+          
           if (response?.data?.name) {
             setStockReconciliationId(response.data.name);
             toast({
               title: "Stock Reconciliation Created",
-              description: `Draft Stock Reconciliation ${response.data.name} created.`,
+              description: `Draft Stock Reconciliation ${response.data.name} created successfully.`,
             });
+          } else {
+            throw new Error('No Stock Reconciliation ID returned from API');
           }
+        } else {
+          throw new Error('ERPNext API not available');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to create stock reconciliation:', error);
+        toast({
+          title: "Error Creating Stock Reconciliation",
+          description: error.message || 'Failed to create Stock Reconciliation in ERPNext',
+          variant: "destructive"
+        });
+        return; // Don't add entry if stock reconciliation creation failed
       }
     }
 
