@@ -96,8 +96,8 @@ const StockCountSession = () => {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto py-4 px-4 md:py-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
         <div>
           <h1 className="text-2xl font-bold flex items-center space-x-2">
             <BarChart3 className="w-6 h-6" />
@@ -112,12 +112,12 @@ const StockCountSession = () => {
             )}
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={handleReset}>
+        <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 w-full md:w-auto">
+          <Button variant="outline" onClick={handleReset} className="w-full md:w-auto">
             <RotateCcw className="w-4 h-4 mr-2" />
             Reset
           </Button>
-          <Button onClick={handleSubmitCount}>
+          <Button onClick={handleSubmitCount} className="w-full md:w-auto">
             <Save className="w-4 h-4 mr-2" />
             Submit Count
           </Button>
@@ -133,18 +133,18 @@ const StockCountSession = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-6 text-center">
+          <div className="grid grid-cols-3 gap-4 md:gap-6 text-center">
             <div>
-              <div className="text-3xl font-bold text-gray-600">{totalItems}</div>
-              <div className="text-sm text-gray-500">Total Items</div>
+              <div className="text-2xl md:text-3xl font-bold text-gray-600">{totalItems}</div>
+              <div className="text-xs md:text-sm text-gray-500">Total Items</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-green-600">{matchedItems}</div>
-              <div className="text-sm text-gray-500">Matched</div>
+              <div className="text-2xl md:text-3xl font-bold text-green-600">{matchedItems}</div>
+              <div className="text-xs md:text-sm text-gray-500">Matched</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-red-600">{varianceItems}</div>
-              <div className="text-sm text-gray-500">Variance</div>
+              <div className="text-2xl md:text-3xl font-bold text-red-600">{varianceItems}</div>
+              <div className="text-xs md:text-sm text-gray-500">Variance</div>
             </div>
           </div>
         </CardContent>
@@ -197,40 +197,89 @@ const StockCountSession = () => {
                   <p>No entries added yet. Switch to Item Entry tab to start adding items.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3 font-medium text-gray-700">Item Code</th>
-                        <th className="text-left p-3 font-medium text-gray-700">Item Name</th>
-                        <th className="text-left p-3 font-medium text-gray-700">Warehouse</th>
-                        <th className="text-right p-3 font-medium text-gray-700">Current Qty</th>
-                        <th className="text-right p-3 font-medium text-gray-700">Actual Qty</th>
-                        <th className="text-right p-3 font-medium text-gray-700">Difference</th>
-                        <th className="text-left p-3 font-medium text-gray-700">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {entries.map((entry, index) => (
-                        <tr key={index} className="border-b hover:bg-gray-50">
-                          <td className="p-3 font-medium">{entry.itemCode}</td>
-                          <td className="p-3">{entry.itemName}</td>
-                          <td className="p-3">{entry.warehouse}</td>
-                          <td className="p-3 text-right">{entry.currentQty}</td>
-                          <td className="p-3 text-right">{entry.actualQty}</td>
-                          <td className="p-3 text-right">{entry.difference}</td>
-                          <td className="p-3">
+                <>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-3 font-medium text-gray-700">Item Code</th>
+                          <th className="text-left p-3 font-medium text-gray-700">Item Name</th>
+                          <th className="text-left p-3 font-medium text-gray-700">Warehouse</th>
+                          <th className="text-right p-3 font-medium text-gray-700">Current Qty</th>
+                          <th className="text-right p-3 font-medium text-gray-700">Actual Qty</th>
+                          <th className="text-right p-3 font-medium text-gray-700">Difference</th>
+                          <th className="text-left p-3 font-medium text-gray-700">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries.map((entry, index) => (
+                          <tr key={index} className="border-b hover:bg-gray-50">
+                            <td className="p-3 font-medium">{entry.itemCode}</td>
+                            <td className="p-3">{entry.itemName}</td>
+                            <td className="p-3">{entry.warehouse}</td>
+                            <td className="p-3 text-right">{entry.currentQty}</td>
+                            <td className="p-3 text-right">{entry.actualQty}</td>
+                            <td className="p-3 text-right">{entry.difference}</td>
+                            <td className="p-3">
+                              <Badge 
+                                variant={entry.status === 'matched' ? 'default' : 'destructive'}
+                              >
+                                {entry.status}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3">
+                    {entries.map((entry, index) => (
+                      <Card key={index} className="p-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{entry.itemCode}</p>
+                              <p className="text-sm text-gray-600">{entry.itemName}</p>
+                            </div>
                             <Badge 
                               variant={entry.status === 'matched' ? 'default' : 'destructive'}
+                              className="ml-2"
                             >
                               {entry.status}
                             </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-gray-600">Warehouse:</span>
+                              <span className="ml-1 font-medium">{entry.warehouse}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">UOM:</span>
+                              <span className="ml-1 font-medium">{entry.uom}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Current:</span>
+                              <span className="ml-1 font-medium">{entry.currentQty}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Actual:</span>
+                              <span className="ml-1 font-medium">{entry.actualQty}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-gray-600">Difference:</span>
+                              <span className={`ml-1 font-medium ${entry.difference !== 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {entry.difference > 0 ? '+' : ''}{entry.difference}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

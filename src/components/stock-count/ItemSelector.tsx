@@ -150,7 +150,7 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
 
             {selectedItem && (
               <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-3">
                   <div>
                     <p className="font-medium text-gray-600">Item Code</p>
                     <p className="text-gray-900">{selectedItem.item_code}</p>
@@ -163,7 +163,7 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
                 
                 {/* Item Tracking Info */}
                 {isItemTracked(selectedItem) && (
-                  <div className="flex items-center space-x-2 mb-2">
+                  <div className="flex flex-wrap items-center space-x-2 mb-2">
                     <AlertCircle className="w-4 h-4 text-blue-600" />
                     <span className="text-sm font-medium text-gray-700">Item Tracking:</span>
                     {selectedItem.has_serial_no === 1 && (
@@ -182,7 +182,7 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
               <div className="space-y-4">
                 {!showBundleSelector ? (
                   <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0">
                       <div className="flex items-center space-x-2">
                         <AlertCircle className="w-4 h-4 text-blue-600" />
                         <span className="text-sm font-medium text-blue-700">
@@ -193,14 +193,15 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
                         variant="outline"
                         size="sm"
                         onClick={() => setShowBundleSelector(true)}
+                        className="w-full md:w-auto"
                       >
                         Create Bundle
                       </Button>
                     </div>
                     {serialBatchBundle && (
-                      <div className="mt-2">
+                      <div className="mt-2 flex flex-wrap items-center space-x-2">
                         <Badge variant="secondary">Bundle: {serialBatchBundle}</Badge>
-                        <span className="ml-2 text-sm text-gray-600">Qty: {actualQty}</span>
+                        <span className="text-sm text-gray-600">Qty: {actualQty}</span>
                       </div>
                     )}
                   </div>
@@ -224,15 +225,16 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
             {selectedItem && !isItemTracked(selectedItem) && (
               <div className="space-y-2">
                 <Label htmlFor="actual-qty">Actual Quantity *</Label>
-                <Input
-                  id="actual-qty"
-                  type="number"
-                  placeholder="0"
-                  value={actualQty || ""}
-                  onChange={(e) => setActualQty(Number(e.target.value))}
-                  min="1"
-                  step="0.01"
-                />
+                  <Input
+                    id="actual-qty"
+                    type="number"
+                    placeholder="0"
+                    value={actualQty || ""}
+                    onChange={(e) => setActualQty(Number(e.target.value))}
+                    min="1"
+                    step="0.01"
+                    className="w-full"
+                  />
               </div>
             )}
 

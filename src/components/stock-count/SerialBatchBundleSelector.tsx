@@ -192,6 +192,19 @@ const SerialBatchBundleSelector = ({
     try {
       const company = await getUserDefaultCompany();
       
+      // First, create any new batches
+      const { createBatch } = await import('@/services/serialBatchBundleApi');
+      
+      for (const entry of validEntries) {
+        if (entry.batch_no && newBatches.has(entry.batch_no)) {
+          console.log(`Creating new batch: ${entry.batch_no}`);
+          const batchCreated = await createBatch(entry.batch_no, itemCode);
+          if (!batchCreated) {
+            throw new Error(`Failed to create batch: ${entry.batch_no}`);
+          }
+        }
+      }
+      
       // Convert entries to ERPNext format
       const bundleEntries: SerialBatchBundleEntry[] = validEntries.map(entry => ({
         qty: entry.qty,

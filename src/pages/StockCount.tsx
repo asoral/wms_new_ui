@@ -137,58 +137,58 @@ const StockCount = () => {
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto py-4 px-4 md:py-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Stock Count Management</h1>
         <p className="text-gray-500">Manage stock reconciliation and counting sessions</p>
       </div>
 
       {/* Dashboard Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-600 mb-1">Total Sessions</p>
-                <p className="text-2xl font-bold text-blue-600">{sessions.length}</p>
+                <p className="text-xs md:text-sm text-blue-600 mb-1">Total Sessions</p>
+                <p className="text-xl md:text-2xl font-bold text-blue-600">{sessions.length}</p>
               </div>
-              <CheckCircle className="w-8 h-8 text-blue-600" />
+              <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-green-50 border-green-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-green-600 mb-1">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{sessions.filter(s => s.status === 'Submitted').length}</p>
+                <p className="text-xs md:text-sm text-green-600 mb-1">Completed</p>
+                <p className="text-xl md:text-2xl font-bold text-green-600">{sessions.filter(s => s.status === 'Submitted').length}</p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-600" />
+              <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-yellow-50 border-yellow-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-yellow-600 mb-1">Draft</p>
-                <p className="text-2xl font-bold text-yellow-600">{sessions.filter(s => s.status === 'Draft').length}</p>
+                <p className="text-xs md:text-sm text-yellow-600 mb-1">Draft</p>
+                <p className="text-xl md:text-2xl font-bold text-yellow-600">{sessions.filter(s => s.status === 'Draft').length}</p>
               </div>
-              <AlertTriangle className="w-8 h-8 text-yellow-600" />
+              <AlertTriangle className="w-6 h-6 md:w-8 md:h-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-red-50 border-red-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-red-600 mb-1">Cancelled</p>
-                <p className="text-2xl font-bold text-red-600">{sessions.filter(s => s.status === 'Cancelled').length}</p>
+                <p className="text-xs md:text-sm text-red-600 mb-1">Cancelled</p>
+                <p className="text-xl md:text-2xl font-bold text-red-600">{sessions.filter(s => s.status === 'Cancelled').length}</p>
               </div>
-              <AlertTriangle className="w-8 h-8 text-red-600" />
+              <AlertTriangle className="w-6 h-6 md:w-8 md:h-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
@@ -203,7 +203,7 @@ const StockCount = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="warehouse">Select Warehouse *</Label>
               <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
@@ -272,50 +272,102 @@ const StockCount = () => {
               <p className="text-gray-500">Loading stock count sessions...</p>
             </div>
           ) : sessions.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[100px]">Session ID</TableHead>
-                    <TableHead>Warehouse</TableHead>
-                    <TableHead>Purpose</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Started At</TableHead>
-                    <TableHead className="text-right">Total Items</TableHead>
-                    <TableHead className="text-right">Matched Items</TableHead>
-                    <TableHead className="text-right">Variance Items</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sessions.map((session) => (
-                    <TableRow key={session.id}>
-                      <TableCell className="font-medium">{session.id}</TableCell>
-                      <TableCell>{session.warehouse}</TableCell>
-                      <TableCell>{session.purpose}</TableCell>
-                      <TableCell>
-                        {session.status === 'Open' ? (
-                          <AlertTriangle className="w-4 h-4 mr-1 text-yellow-500 inline" />
-                        ) : session.status === 'Completed' ? (
-                          <div className="flex items-center">
-                            <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
-                            Completed
-                          </div>
-                        ) : (
-                          <div className="flex items-center">
-                            <AlertTriangle className="w-4 h-4 mr-1 text-red-500" />
-                            {session.status}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDate(session.startedAt)}</TableCell>
-                      <TableCell className="text-right">{session.totalItems}</TableCell>
-                      <TableCell className="text-right">{session.matchedItems}</TableCell>
-                      <TableCell className="text-right">{session.varianceItems}</TableCell>
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">Session ID</TableHead>
+                      <TableHead>Warehouse</TableHead>
+                      <TableHead>Purpose</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Started At</TableHead>
+                      <TableHead className="text-right">Total Items</TableHead>
+                      <TableHead className="text-right">Matched Items</TableHead>
+                      <TableHead className="text-right">Variance Items</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {sessions.map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell className="font-medium">{session.id}</TableCell>
+                        <TableCell>{session.warehouse}</TableCell>
+                        <TableCell>{session.purpose}</TableCell>
+                        <TableCell>
+                          {session.status === 'Open' ? (
+                            <AlertTriangle className="w-4 h-4 mr-1 text-yellow-500 inline" />
+                          ) : session.status === 'Completed' ? (
+                            <div className="flex items-center">
+                              <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
+                              Completed
+                            </div>
+                          ) : (
+                            <div className="flex items-center">
+                              <AlertTriangle className="w-4 h-4 mr-1 text-red-500" />
+                              {session.status}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>{formatDate(session.startedAt)}</TableCell>
+                        <TableCell className="text-right">{session.totalItems}</TableCell>
+                        <TableCell className="text-right">{session.matchedItems}</TableCell>
+                        <TableCell className="text-right">{session.varianceItems}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
+                {sessions.map((session) => (
+                  <Card key={session.id} className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium text-gray-900">{session.id}</p>
+                          <p className="text-sm text-gray-600">{session.warehouse}</p>
+                        </div>
+                        <div className="flex items-center">
+                          {session.status === 'Draft' ? (
+                            <AlertTriangle className="w-4 h-4 mr-1 text-yellow-500" />
+                          ) : session.status === 'Submitted' ? (
+                            <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 mr-1 text-red-500" />
+                          )}
+                          <span className="text-sm font-medium">{session.status}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-gray-600">Purpose:</span>
+                          <span className="ml-1 font-medium">{session.purpose}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Started:</span>
+                          <span className="ml-1 font-medium">{formatDate(session.startedAt)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Total Items:</span>
+                          <span className="ml-1 font-medium">{session.totalItems}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Matched:</span>
+                          <span className="ml-1 font-medium text-green-600">{session.matchedItems}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Variance Items:</span>
+                          <span className="ml-1 font-medium text-red-600">{session.varianceItems}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="text-center py-8">
               <AlertTriangle className="w-10 h-10 mx-auto text-gray-400 mb-4" />

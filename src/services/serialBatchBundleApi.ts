@@ -193,6 +193,41 @@ export const checkBatchExists = async (batchNo: string, itemCode: string): Promi
   }
 };
 
+export const createBatch = async (batchNo: string, itemCode: string): Promise<boolean> => {
+  try {
+    const api = await createERPNextAPI();
+    if (!api) return false;
+
+    const batchData = {
+      batch_id: batchNo,
+      item: itemCode,
+      manufacturing_date: new Date().toISOString().split('T')[0]
+    };
+
+    const url = `${api.getBaseURL}/api/resource/Batch`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(batchData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to create batch:', response.status, errorText);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error creating batch:', error);
+    return false;
+  }
+};
+
 export const createSerialBatchBundleFromTraditionalEntry = async (
   itemCode: string,
   itemName: string,
