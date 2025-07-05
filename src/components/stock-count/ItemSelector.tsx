@@ -144,6 +144,7 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
                 onItemSelect={handleItemSelect}
                 selectedItem={selectedItem}
                 placeholder="Search and select item..."
+                key={selectedItem?.item_code || 'empty'}
               />
             </div>
 

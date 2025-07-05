@@ -130,8 +130,12 @@ export const fetchAvailableSerials = async (itemCode: string, warehouse: string)
 export const createSerialBatchBundle = async (bundleData: any): Promise<{data: {name: string}} | null> => {
   try {
     const api = await createERPNextAPI();
-    if (!api) return null;
+    if (!api) {
+      console.error('ERPNext API not available');
+      return null;
+    }
 
+    console.log('Creating serial batch bundle with data:', bundleData);
     const url = `${api.getBaseURL}/api/resource/Serial and Batch Bundle`;
 
     const response = await fetch(url, {
@@ -143,22 +147,26 @@ export const createSerialBatchBundle = async (bundleData: any): Promise<{data: {
       body: JSON.stringify(bundleData)
     });
 
+    const responseText = await response.text();
+    console.log('Serial batch bundle response:', response.status, responseText);
+
     if (!response.ok) {
-      console.error('Failed to create serial and batch bundle:', response.status, response.statusText);
-      return null;
+      console.error('Failed to create serial and batch bundle:', response.status, responseText);
+      throw new Error(`HTTP ${response.status}: ${responseText}`);
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
 
     if (data && data.data && data.data.name) {
+      console.log('Successfully created bundle:', data.data.name);
       return {data: {name: data.data.name}};
     } else {
-      console.warn('Failed to create serial and batch bundle or invalid response');
-      return null;
+      console.warn('Invalid response structure:', data);
+      throw new Error('Invalid response structure from ERPNext API');
     }
   } catch (error) {
     console.error('Error creating serial and batch bundle:', error);
-    return null;
+    throw error;
   }
 };
 

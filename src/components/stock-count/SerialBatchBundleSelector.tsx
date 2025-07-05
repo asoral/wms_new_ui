@@ -45,6 +45,7 @@ const SerialBatchBundleSelector = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newBatches, setNewBatches] = useState<Set<string>>(new Set());
+  const [batchCheckTimeouts, setBatchCheckTimeouts] = useState<Map<number, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
     if (itemCode && warehouse && (hasSerial || hasBatch)) {
@@ -59,6 +60,13 @@ const SerialBatchBundleSelector = ({
     if (hasBatch) defaultEntry.batch_no = '';
     setEntries([defaultEntry]);
   }, [hasSerial, hasBatch, initialQuantity]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      batchCheckTimeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }, []);
 
   const loadAvailableSerialBatch = async () => {
     setIsLoading(true);
@@ -79,7 +87,7 @@ const SerialBatchBundleSelector = ({
   };
 
   const checkAndMarkNewBatches = async (batchNo: string) => {
-    if (!batchNo) return;
+    if (!batchNo || batchNo.length < 3) return; // Only check after minimum length
     
     const exists = await checkBatchExists(batchNo, itemCode);
     if (!exists) {
@@ -109,6 +117,18 @@ const SerialBatchBundleSelector = ({
         return newSet;
       });
     }
+    
+    // Clear timeout for this entry
+    const timeout = batchCheckTimeouts.get(index);
+    if (timeout) {
+      clearTimeout(timeout);
+      setBatchCheckTimeouts(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(index);
+        return newMap;
+      });
+    }
+    
     setEntries(entries.filter((_, i) => i !== index));
   };
 
@@ -118,16 +138,37 @@ const SerialBatchBundleSelector = ({
     updatedEntries[index] = { ...updatedEntries[index], [field]: value };
     setEntries(updatedEntries);
 
-    // Check if batch is new when batch_no is updated
+    // Check if batch is new when batch_no is updated and user stops typing
     if (field === 'batch_no' && typeof value === 'string') {
-      if (oldBatch) {
+      if (oldBatch && oldBatch !== value) {
         setNewBatches(prev => {
           const newSet = new Set(prev);
           newSet.delete(oldBatch);
           return newSet;
         });
       }
-      checkAndMarkNewBatches(value);
+      
+      // Clear existing timeout for this field
+      const existingTimeout = batchCheckTimeouts.get(index);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+      
+      // Debounce the batch check
+      const timeoutId = setTimeout(() => {
+        checkAndMarkNewBatches(value);
+        setBatchCheckTimeouts(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(index);
+          return newMap;
+        });
+      }, 800);
+      
+      setBatchCheckTimeouts(prev => {
+        const newMap = new Map(prev);
+        newMap.set(index, timeoutId);
+        return newMap;
+      });
     }
   };
 
@@ -178,20 +219,22 @@ const SerialBatchBundleSelector = ({
         total_amount: 0,
         posting_date: new Date().toISOString().split('T')[0],
         posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
-        voucher_type: 'Stock Reconciliation', // Add the missing voucher_type field
+        voucher_type: 'Stock Reconciliation',
         entries: bundleEntries
       };
 
       const result = await createSerialBatchBundle(bundleData);
       if (result?.data?.name) {
-        toast.success('Serial and Batch Bundle created successfully');
+        toast.success(`Serial and Batch Bundle ${result.data.name} created successfully`);
         onBundleCreated(result.data.name, totalQty);
         // Clear new batches set after successful creation
         setNewBatches(new Set());
+      } else {
+        throw new Error('No bundle name returned from ERPNext API');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create bundle:', error);
-      toast.error('Failed to create Serial and Batch Bundle');
+      toast.error(`Failed to create Serial and Batch Bundle: ${error.message || 'Unknown error'}`);
     } finally {
       setIsCreating(false);
     }
