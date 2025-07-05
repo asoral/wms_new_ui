@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, RotateCcw, Save } from "lucide-react";
-import StockCountForm from "@/components/stock-count/StockCountForm";
+import ItemSelector from "@/components/stock-count/ItemSelector";
 import { StockCountEntry } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { createERPNextAPI } from "@/services/erpnextApi";
 
 const StockCountSession = () => {
   const [searchParams] = useSearchParams();
@@ -16,13 +17,49 @@ const StockCountSession = () => {
   const purpose = searchParams.get('purpose') || 'Stock Reconciliation';
   const [entries, setEntries] = useState<StockCountEntry[]>([]);
   const [activeTab, setActiveTab] = useState("entry");
+  const [stockReconciliationId, setStockReconciliationId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const totalItems = entries.length;
   const matchedItems = entries.filter(entry => entry.status === 'matched').length;
   const varianceItems = entries.filter(entry => entry.status === 'variance').length;
 
-  const handleEntryAdded = (entry: StockCountEntry) => {
+  const handleEntryAdded = async (entry: StockCountEntry) => {
+    // Create draft Stock Reconciliation if this is the first entry
+    if (entries.length === 0) {
+      try {
+        const erpnextAPI = await createERPNextAPI();
+        if (erpnextAPI) {
+          const stockReconciliationData = {
+            purpose: purpose,
+            posting_date: new Date().toISOString().split('T')[0],
+            posting_time: new Date().toTimeString().split(' ')[0],
+            set_posting_time: 1,
+            items: [{
+              item_code: entry.itemCode,
+              warehouse: entry.warehouse,
+              qty: entry.actualQty,
+              valuation_rate: 100, // Default rate, can be enhanced
+              current_qty: entry.currentQty,
+              ...(entry.batch && { batch_no: entry.batch }),
+              ...(entry.serial && { serial_no: entry.serial })
+            }]
+          };
+
+          const response = await erpnextAPI.callAPI('Stock Reconciliation', 'POST', stockReconciliationData);
+          if (response?.data?.name) {
+            setStockReconciliationId(response.data.name);
+            toast({
+              title: "Stock Reconciliation Created",
+              description: `Draft Stock Reconciliation ${response.data.name} created.`,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to create stock reconciliation:', error);
+      }
+    }
+
     setEntries(prev => [...prev, entry]);
     toast({
       title: "Entry Added",
@@ -66,7 +103,14 @@ const StockCountSession = () => {
             <BarChart3 className="w-6 h-6" />
             <span>Stock Count</span>
           </h1>
-          <p className="text-gray-500">Warehouse: {warehouse}</p>
+          <p className="text-gray-500">
+            Warehouse: {warehouse}
+            {stockReconciliationId && (
+              <span className="ml-4 text-blue-600">
+                Draft SR: {stockReconciliationId}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={handleReset}>
@@ -119,7 +163,24 @@ const StockCountSession = () => {
               <CardTitle>Scan Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <StockCountForm onEntryAdded={handleEntryAdded} />
+              <ItemSelector 
+                warehouse={warehouse}
+                onItemAdded={(item) => {
+                  const entry: StockCountEntry = {
+                    itemCode: item.itemCode,
+                    itemName: item.itemName,
+                    warehouse: item.warehouse,
+                    currentQty: item.currentQty,
+                    actualQty: item.actualQty,
+                    difference: item.actualQty - item.currentQty,
+                    status: item.actualQty === item.currentQty ? 'matched' : 'variance',
+                    uom: item.uom,
+                    batch: item.batch,
+                    serial: item.serial
+                  };
+                  handleEntryAdded(entry);
+                }}
+              />
             </CardContent>
           </Card>
         </TabsContent>

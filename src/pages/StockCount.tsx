@@ -85,13 +85,76 @@ const StockCount = () => {
 
   return (
     <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Stock Count Sessions</h1>
-        <Button onClick={() => navigate('/stock-count/new')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Start New Session
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Stock Count Management</h1>
+        <p className="text-gray-500">Manage stock reconciliation and counting sessions</p>
       </div>
+
+      {/* Dashboard Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-600 mb-1">Total Sessions</p>
+                <p className="text-2xl font-bold text-blue-600">{sessions.length}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-green-50 border-green-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-green-600 mb-1">Completed</p>
+                <p className="text-2xl font-bold text-green-600">{sessions.filter(s => s.status === 'Submitted').length}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-yellow-600 mb-1">Draft</p>
+                <p className="text-2xl font-bold text-yellow-600">{sessions.filter(s => s.status === 'Draft').length}</p>
+              </div>
+              <AlertTriangle className="w-8 h-8 text-yellow-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-red-600 mb-1">Cancelled</p>
+                <p className="text-2xl font-bold text-red-600">{sessions.filter(s => s.status === 'Cancelled').length}</p>
+              </div>
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Start New Session Card */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Quick Actions</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => navigate('/stock-count/new')} size="lg" className="w-full">
+            <Plus className="w-4 h-4 mr-2" />
+            Start New Stock Count Session
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

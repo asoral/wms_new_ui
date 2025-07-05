@@ -165,6 +165,11 @@ const ItemDropdown = ({
     setSearchTerm(value);
     setIsOpen(true);
     
+    // Clear selected item when user starts typing
+    if (selectedItem && value !== selectedItem.item_name && value !== selectedItem.item_code) {
+      // User is editing, allow it
+    }
+    
     if (!value.trim() || value.length < 2) {
       setItems([]);
       setShowResults(false);
@@ -189,6 +194,7 @@ const ItemDropdown = ({
           placeholder={placeholder}
           className="pl-10 pr-10"
           disabled={disabled || loading}
+          autoComplete="off"
         />
         {searchTerm && (
           <button

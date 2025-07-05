@@ -60,9 +60,19 @@ const BinEnquiry = () => {
         }
       }
 
-      // Fetch bin stock details - need to get bins for warehouse
-      const filters = [['warehouse', '=', binCode]];
-      const response = await erpnextAPI.getStockBalance(filters);
+      // Fetch bin stock details from Bin doctype
+      const filters = [['warehouse', '=', binCode], ['actual_qty', '>', 0]];
+      const fields = [
+        'name',
+        'item_code', 
+        'warehouse',
+        'actual_qty',
+        'reserved_qty',
+        'planned_qty',
+        'valuation_rate',
+        'stock_value'
+      ];
+      const response = await erpnextAPI.callAPI('Bin', 'GET', undefined, filters, undefined, fields);
       console.log('Bin stock response:', response);
 
       if (response?.data) {

@@ -34,7 +34,13 @@ const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorPr
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      const response = await erpnextAPI.searchSalesOrders(searchTerm);
+      // Search with proper status filters for delivery
+      const filters = [
+        ['name', 'like', `%${searchTerm}%`],
+        ['docstatus', '=', 1],
+        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+      ];
+      const response = await erpnextAPI.getSalesOrders(filters);
       
       if (response?.data && Array.isArray(response.data)) {
         // Transform the data to match our SalesOrder interface
