@@ -2,16 +2,15 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Plus, Package, FileText, CheckCircle, AlertTriangle, Search } from "lucide-react";
+import { Plus, Package, FileText, CheckCircle, AlertTriangle } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import StatusBadge from "@/components/ui/status-badge";
+import PurchaseOrderSelector from "./PurchaseOrderSelector";
 
 interface ReceiveDashboardProps {
-  onSelectPO: (poNumber: string) => void;
+  onSelectPO: (purchaseOrder: any) => void;
   onSelectDraftReceipt: (receiptId: string) => void;
   shortcuts?: Array<{
     label: string;
@@ -37,7 +36,6 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
     draftReceipts: 0
   });
   const [loading, setLoading] = useState(false);
-  const [poSearchTerm, setPOSearchTerm] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -107,17 +105,6 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
     }
   };
 
-  const handlePOSearch = () => {
-    if (poSearchTerm.trim()) {
-      onSelectPO(poSearchTerm.trim());
-    }
-  };
-
-  const handlePOKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handlePOSearch();
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -145,32 +132,11 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
         />
       </div>
 
-      {/* PO Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick PO Search</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex space-x-2">
-            <div className="flex-1">
-              <Label htmlFor="po-search">Purchase Order Number</Label>
-              <Input
-                id="po-search"
-                value={poSearchTerm}
-                onChange={(e) => setPOSearchTerm(e.target.value)}
-                onKeyPress={handlePOKeyPress}
-                placeholder="Enter PO number (e.g., PUR-ORD-2024-00001)"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handlePOSearch} disabled={!poSearchTerm.trim()}>
-                <Search className="w-4 h-4 mr-2" />
-                Search
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* PO Selector */}
+      <PurchaseOrderSelector 
+        onSelectPO={onSelectPO}
+        shortcuts={[]}
+      />
 
       {/* Recent Purchase Orders */}
       <Card>
@@ -195,7 +161,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                   </div>
                   <div className="flex items-center space-x-2">
                     <StatusBadge status={po.status} />
-                    <Button size="sm" onClick={() => onSelectPO(po.name)}>
+                    <Button size="sm" onClick={() => onSelectPO(po)}>
                       Receive
                     </Button>
                   </div>

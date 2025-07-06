@@ -58,51 +58,18 @@ const Receive = () => {
   const [loading, setLoading] = useState(false);
   const [currentPurchaseReceipt, setCurrentPurchaseReceipt] = useState<string | null>(null);
 
-  const selectPO = async (poNumber: string) => {
+  const selectPO = async (purchaseOrder: any) => {
     setLoading(true);
     try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Fetch PO data from ERPNext
-      const poResult = await erpnextAPI.getPurchaseOrder(poNumber);
-      if (!poResult.data) {
-        toast({
-          title: "Purchase Order Not Found",
-          description: `PO ${poNumber} could not be found in ERPNext.`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const po = poResult.data;
-      
-      // Transform ERPNext PO data to our interface
+      // Transform the PO data received from the selector
       const transformedPO: PurchaseOrder = {
-        poNumber: po.name,
-        supplier: po.supplier, // Use the supplier field directly from ERPNext
-        date: po.schedule_date || po.transaction_date,
-        totalAmount: po.grand_total || 0,
-        status: po.status === 'To Receive' ? 'pending' : 
-                po.status === 'Partially Received' ? 'partial' : 'completed',
-        items: po.items ? po.items.map((item: any) => ({
-          itemCode: item.item_code,
-          itemName: item.item_name,
-          orderedQty: item.qty || 0,
-          receivedQty: item.received_qty || 0,
-          pendingQty: (item.qty || 0) - (item.received_qty || 0),
-          uom: item.stock_uom || item.uom,
-          rate: item.rate || 0,
-          warehouse: item.warehouse || 'Main Store',
-          name: item.name // Store the PO item ID for linking
-        })) : []
+        poNumber: purchaseOrder.number,
+        supplier: purchaseOrder.supplier,
+        date: purchaseOrder.scheduleDate,
+        totalAmount: purchaseOrder.totalValue,
+        status: purchaseOrder.status === 'To Receive' ? 'pending' : 
+                purchaseOrder.status === 'Partially Received' ? 'partial' : 'completed',
+        items: purchaseOrder.items || []
       };
 
       setSelectedPO(transformedPO);
@@ -110,14 +77,14 @@ const Receive = () => {
       
       toast({
         title: "Purchase Order Loaded",
-        description: `PO ${poNumber} loaded successfully with ${transformedPO.items.length} items`,
+        description: `PO ${purchaseOrder.number} loaded successfully with ${transformedPO.items.length} items`,
       });
       
     } catch (error) {
-      console.error('Error fetching PO:', error);
+      console.error('Error processing PO:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch Purchase Order from ERPNext",
+        description: "Failed to process Purchase Order",
         variant: "destructive"
       });
     } finally {
