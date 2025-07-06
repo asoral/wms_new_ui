@@ -126,10 +126,10 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (searchValue !== undefined) {
+      if (searchValue !== undefined && searchValue.trim()) {
         fetchItems(searchValue);
       }
-    }, 300);
+    }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [searchValue]);

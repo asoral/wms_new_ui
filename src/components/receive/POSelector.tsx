@@ -52,14 +52,11 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
 
       const company = await getUserDefaultCompany();
       
-      // Get purchase orders ready for receiving
-      const filters = [
+      const result = await erpnextAPI.getPurchaseOrders([
         ['docstatus', '=', 1],
         ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']],
         ['company', '=', company]
-      ];
-      
-      const result = await erpnextAPI.getPurchaseOrders(filters, company, 50);
+      ]);
       
       if (result.data && Array.isArray(result.data)) {
         const transformedResults: PurchaseOrder[] = result.data.map((po: any) => ({
