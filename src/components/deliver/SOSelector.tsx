@@ -74,8 +74,15 @@ const SOSelector = ({ onOrderSelected, isLoading }: SOSelectorProps) => {
         filters.push(['name', 'like', `%${search}%`]);
       }
       
-      // Use the resource API directly
-      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Sales Order?filters=${JSON.stringify(filters)}&limit_page_length=50`, {
+      // Use the correct Frappe Resource API format
+      const url = `${erpnextAPI.baseURL}/api/resource/Sales Order`;
+      const params = new URLSearchParams({
+        filters: JSON.stringify(filters),
+        fields: JSON.stringify(['name', 'customer', 'delivery_date', 'grand_total', 'status', 'per_delivered']),
+        limit_page_length: '50'
+      });
+      
+      const response = await fetch(`${url}?${params}`, {
         headers: {
           'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
           'Content-Type': 'application/json',
@@ -137,7 +144,7 @@ const SOSelector = ({ onOrderSelected, isLoading }: SOSelectorProps) => {
       if (searchValue !== undefined) {
         fetchSalesOrders(searchValue);
       }
-    }, 500);
+    }, 800);
 
     return () => clearTimeout(timeoutId);
   }, [searchValue]);
@@ -226,7 +233,7 @@ const SOSelector = ({ onOrderSelected, isLoading }: SOSelectorProps) => {
   return (
     <div className="space-y-4">
       <div>
-        <Label>Sales Order</Label>
+        <Label>Search Sales Order</Label>
         <div className="flex-1 min-w-0 mt-1">
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>

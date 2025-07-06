@@ -83,8 +83,15 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
         filters.push(['name', 'like', `%${search}%`]);
       }
       
-      // Use the resource API directly
-      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Order?filters=${JSON.stringify(filters)}&limit_page_length=50`, {
+      // Use the correct Frappe Resource API format
+      const url = `${erpnextAPI.baseURL}/api/resource/Purchase Order`;
+      const params = new URLSearchParams({
+        filters: JSON.stringify(filters),
+        fields: JSON.stringify(['name', 'supplier', 'supplier_name', 'schedule_date', 'transaction_date', 'grand_total', 'status', 'per_received']),
+        limit_page_length: '50'
+      });
+      
+      const response = await fetch(`${url}?${params}`, {
         headers: {
           'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
           'Content-Type': 'application/json',
@@ -142,7 +149,7 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
       if (searchValue !== undefined) {
         fetchPurchaseOrders(searchValue);
       }
-    }, 500);
+    }, 800);
 
     return () => clearTimeout(timeoutId);
   }, [searchValue]);
@@ -227,7 +234,7 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
   return (
     <div className="space-y-4">
       <div>
-        <Label>Purchase Order</Label>
+        <Label>Search Purchase Order</Label>
         <div className="flex-1 min-w-0 mt-1">
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>

@@ -1,12 +1,6 @@
-import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Search, Package, Calendar, User, DollarSign, Loader2 } from "lucide-react";
-import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
-import { useToast } from "@/hooks/use-toast";
+import { Package } from "lucide-react";
 import { SalesOrder } from "@/types";
 import SOSelector from "./SOSelector";
 
@@ -20,132 +14,6 @@ interface SalesOrderSelectorProps {
 }
 
 const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorProps) => {
-  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    if (searchTerm.trim()) {
-      searchSalesOrders(searchTerm);
-    } else {
-      loadDefaultSalesOrders();
-    }
-  }, [searchTerm]);
-
-  const loadDefaultSalesOrders = async () => {
-    try {
-      setLoading(true);
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const company = await getUserDefaultCompany();
-      
-      // Get sales orders ready for delivery
-      const filters = [
-        ['docstatus', '=', 1],
-        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']],
-        ['company', '=', company]
-      ];
-      
-      const response = await erpnextAPI.getSalesOrders(filters);
-      
-      if (response?.data && Array.isArray(response.data)) {
-        const transformedOrders: SalesOrder[] = response.data.map((order: any) => ({
-          id: order.name,
-          name: order.name,
-          number: order.name,
-          customer: order.customer,
-          status: order.status,
-          delivery_date: order.delivery_date,
-          grand_total: order.grand_total,
-          totalValue: order.grand_total,
-          totalItems: order.items?.length || 0,
-          percentDelivered: order.per_delivered || 0,
-          items: order.items || []
-        }));
-        
-        setSalesOrders(transformedOrders);
-      } else {
-        setSalesOrders([]);
-      }
-    } catch (error) {
-      console.error('Error loading sales orders:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load sales orders",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const searchSalesOrders = async (searchTerm: string) => {
-    try {
-      setLoading(true);
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const company = await getUserDefaultCompany();
-      
-      // Search with proper status filters for delivery
-      const filters = [
-        ['name', 'like', `%${searchTerm}%`],
-        ['docstatus', '=', 1],
-        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']],
-        ['company', '=', company]
-      ];
-      
-      const response = await erpnextAPI.getSalesOrders(filters);
-      
-      if (response?.data && Array.isArray(response.data)) {
-        const transformedOrders: SalesOrder[] = response.data.map((order: any) => ({
-          id: order.name,
-          name: order.name,
-          number: order.name,
-          customer: order.customer,
-          status: order.status,
-          delivery_date: order.delivery_date,
-          grand_total: order.grand_total,
-          totalValue: order.grand_total,
-          totalItems: order.items?.length || 0,
-          percentDelivered: order.per_delivered || 0,
-          items: order.items || []
-        }));
-        
-        setSalesOrders(transformedOrders);
-      } else {
-        setSalesOrders([]);
-      }
-    } catch (error) {
-      console.error('Error searching sales orders:', error);
-      toast({
-        title: "Error",
-        description: "Failed to search sales orders",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "To Deliver": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "To Deliver and Bill": return "bg-blue-100 text-blue-800 border-blue-200";
-      case "Partially Delivered": return "bg-orange-100 text-orange-800 border-orange-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
   const handleSOSelect = (salesOrder: SalesOrder) => {
     onSelectSO(salesOrder);
   };
@@ -159,7 +27,7 @@ const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorPr
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <SOSelector onOrderSelected={handleSOSelect} isLoading={loading} />
+        <SOSelector onOrderSelected={handleSOSelect} isLoading={false} />
 
         {/* Quick Actions */}
         {shortcuts.length > 0 && (
