@@ -146,6 +146,10 @@ const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorPr
     }
   };
 
+  const handleSOSelect = (salesOrder: SalesOrder) => {
+    onSelectSO(salesOrder);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -155,22 +159,7 @@ const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorPr
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="so-search">Search Sales Order</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              id="so-search"
-              placeholder="SAL"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
         <SOSelector onOrderSelected={handleSOSelect} isLoading={loading} />
-        </div>
 
         {/* Quick Actions */}
         {shortcuts.length > 0 && (
