@@ -62,7 +62,7 @@ const App = () => {
                         <Layout>
                           <Routes>
                             <Route path="/" element={<Home />} />
-                            <Route path="/index" element={<Index />} />
+                            <Route path="/home" element={<Home />} />
                             <Route path="/profile" element={<Profile />} />
                             <Route path="/item-enquiry" element={<ItemEnquiry />} />
                             <Route path="/bin-enquiry" element={<BinEnquiry />} />

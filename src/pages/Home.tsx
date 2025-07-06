@@ -33,9 +33,6 @@ import {
 } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useEnhancedDashboard } from '@/hooks/useEnhancedDashboard';
-import WMSNavigation from '@/components/WMSNavigation';
-import TopBar from '@/components/TopBar';
-import BottomNavigation from '@/components/BottomNavigation';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -122,38 +119,27 @@ const Home = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Desktop Sidebar */}
-      <WMSNavigation />
-      
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <TopBar />
-        
-        {/* Dashboard Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="container mx-auto py-6 px-4 md:px-6 space-y-8 pb-20 md:pb-6">
-            <div className="flex items-center justify-between">
-              <h1 className="text-3xl font-bold">Dashboard</h1>
-              <div className="flex items-center space-x-3">
-                <Select value={timeRange} onValueChange={setTimeRange}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Today</SelectItem>
-                    <SelectItem value="week">This Week</SelectItem>
-                    <SelectItem value="month">This Month</SelectItem>
-                    <SelectItem value="quarter">This Quarter</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleRefresh} variant="outline" disabled={refreshing}>
-                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refresh Data
-                </Button>
-              </div>
-            </div>
+    <div className="container mx-auto py-6 px-4 md:px-6 space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <div className="flex items-center space-x-3">
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="day">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="quarter">This Quarter</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={handleRefresh} variant="outline" disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </Button>
+        </div>
+      </div>
 
             {/* Main Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -480,23 +466,17 @@ const Home = () => {
               </CardContent>
             </Card>
 
-            {/* Error State */}
-            {error && (
-              <Card className="border-red-200 bg-red-50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center text-red-800">
-                    <AlertTriangle className="w-5 h-5 mr-2" />
-                    <p>Error loading dashboard data: {error}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-        
-        {/* Mobile Bottom Navigation */}
-        <BottomNavigation />
-      </div>
+      {/* Error State */}
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center text-red-800">
+              <AlertTriangle className="w-5 h-5 mr-2" />
+              <p>Error loading dashboard data: {error}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
