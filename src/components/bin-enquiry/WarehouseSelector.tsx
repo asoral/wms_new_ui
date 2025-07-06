@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -41,11 +40,8 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   const loadInitialWarehouses = async () => {
     setIsLoadingWarehouses(true);
     try {
-      console.log('Loading initial warehouses...');
-      
       const cached = await offlineStorage.getCachedData('warehouses_page_1');
       if (cached && Array.isArray(cached) && cached.length > 0) {
-        console.log('Loading warehouses from cache:', cached.length);
         setWarehouses(cached);
         setIsLoadingWarehouses(false);
         return;
@@ -59,14 +55,11 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   };
 
   const fetchWarehouses = async (search: string = "") => {
-    console.log('fetchWarehouses called with search:', search);
     setIsLoadingWarehouses(true);
     
     try {
-      console.log('Fetching warehouses from API, search:', search);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
-        console.error('ERPNext API not configured');
         const cached = await offlineStorage.getCachedData('warehouses_page_1');
         if (cached && Array.isArray(cached)) {
           setWarehouses(cached);
@@ -86,10 +79,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         filters.push(['company', "=", defaultCompany])
       }
       
-      console.log('API filters:', filters);
-      
       const result = await erpnextAPI.getWarehouses(filters);
-      console.log('Warehouse API result:', result);
       
       if (result && result.data) {
         const warehouseData: WarehouseInfo[] = result.data.map(warehouse => ({
@@ -99,14 +89,12 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
           company: (warehouse as any).company
         }));
         
-        console.log('Setting warehouses:', warehouseData.length);
         setWarehouses(warehouseData);
         
         if (!search.trim()) {
           await offlineStorage.cacheData('warehouses_page_1', warehouseData, 300000);
         }
       } else {
-        console.log('No warehouses found in API response');
         setWarehouses([]);
       }
     } catch (error) {
@@ -116,7 +104,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         const cacheKey = search.trim() ? `warehouses_search_${search}` : 'warehouses_page_1';
         const cached = await offlineStorage.getCachedData(cacheKey);
         if (cached && Array.isArray(cached)) {
-          console.log('Loading warehouses from cache after error');
           setWarehouses(cached);
         }
       } catch (cacheError) {
@@ -132,41 +119,33 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
       if (searchValue !== undefined) {
         fetchWarehouses(searchValue);
       }
-    }, 300);
+    }, 800); // Increased to 800ms to reduce API calls
 
     return () => clearTimeout(timeoutId);
   }, [searchValue]);
 
   const handleWarehouseSelect = (warehouse: WarehouseInfo) => {
-    console.log('Warehouse selected:', warehouse);
     setSelectedWarehouse(warehouse);
     setOpen(false);
     onWarehouseSelected(warehouse.name);
   };
 
   const filteredWarehouses = useMemo(() => {
-    console.log('Filtering warehouses. Total warehouses:', warehouses.length, 'Search value:', searchValue);
     if (!searchValue) return warehouses;
     const lowercaseSearch = searchValue.toLowerCase();
     const filtered = warehouses.filter(warehouse => 
       warehouse.name.toLowerCase().includes(lowercaseSearch) ||
       warehouse.warehouse_name.toLowerCase().includes(lowercaseSearch)
     );
-    console.log('Filtered warehouses count:', filtered.length);
     return filtered;
   }, [warehouses, searchValue]);
-
-  console.log('Rendering WarehouseSelector. Warehouses count:', warehouses.length, 'Filtered count:', filteredWarehouses.length, 'Loading:', isLoadingWarehouses);
 
   return (
     <div className="space-y-4">
       <div>
         <Label htmlFor="warehouse-search">Warehouse Code / Name</Label>
         <div className="flex-1 min-w-0 mt-1">
-          <Popover open={open} onOpenChange={(newOpen) => {
-            console.log('Warehouse Popover open state changing:', newOpen);
-            setOpen(newOpen);
-          }}>
+          <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -174,9 +153,6 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 aria-expanded={open}
                 className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
                 disabled={isLoading}
-                onClick={() => {
-                  console.log('Warehouse Popover trigger clicked. Current open state:', open);
-                }}
               >
                 <div className="flex-1 min-w-0 text-left">
                   <div className="truncate">
@@ -199,10 +175,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 <CommandInput 
                   placeholder="Search warehouses..." 
                   value={searchValue}
-                  onValueChange={(value) => {
-                    console.log('Warehouse Search value changing to:', value);
-                    setSearchValue(value);
-                  }}
+                  onValueChange={setSearchValue}
                 />
                 <CommandList>
                   <CommandEmpty>
@@ -218,39 +191,35 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                   )}
                   {!isLoadingWarehouses && filteredWarehouses.length > 0 && (
                     <CommandGroup>
-                      {filteredWarehouses.map((warehouse) => {
-                        console.log('Rendering warehouse:', warehouse.name, warehouse.warehouse_name);
-                        return (
-                          <CommandItem
-                            key={warehouse.name}
-                            value={warehouse.name}
-                            onSelect={(currentValue) => {
-                              console.log('Warehouse CommandItem onSelect called with:', currentValue);
-                              const selectedWarehouseData = filteredWarehouses.find(w => w.name === currentValue);
-                              if (selectedWarehouseData) {
-                                handleWarehouseSelect(selectedWarehouseData);
-                              }
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedWarehouse?.name === warehouse.name ? "opacity-100" : "opacity-0"
+                      {filteredWarehouses.map((warehouse) => (
+                        <CommandItem
+                          key={warehouse.name}
+                          value={warehouse.name}
+                          onSelect={(currentValue) => {
+                            const selectedWarehouseData = filteredWarehouses.find(w => w.name === currentValue);
+                            if (selectedWarehouseData) {
+                              handleWarehouseSelect(selectedWarehouseData);
+                            }
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedWarehouse?.name === warehouse.name ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            <Warehouse className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{warehouse.warehouse_name || warehouse.name}</div>
+                              <div className="text-sm text-muted-foreground truncate">{warehouse.name}</div>
+                              {warehouse.is_group === 1 && (
+                                <span className="text-xs px-1 py-0.5 bg-blue-100 text-blue-600 rounded mt-1 inline-block">Group</span>
                               )}
-                            />
-                            <div className="flex items-center space-x-3 flex-1 min-w-0">
-                              <Warehouse className="w-4 h-4 text-muted-foreground shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{warehouse.warehouse_name || warehouse.name}</div>
-                                <div className="text-sm text-muted-foreground truncate">{warehouse.name}</div>
-                                {warehouse.is_group === 1 && (
-                                  <span className="text-xs px-1 py-0.5 bg-blue-100 text-blue-600 rounded mt-1 inline-block">Group</span>
-                                )}
-                              </div>
                             </div>
-                          </CommandItem>
-                        );
-                      })}
+                          </div>
+                        </CommandItem>
+                      ))}
                     </CommandGroup>
                   )}
                 </CommandList>

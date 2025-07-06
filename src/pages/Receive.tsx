@@ -196,11 +196,12 @@ const Receive = () => {
 
       // Find the corresponding PO item to get the PO item ID
       const poItem = selectedPO.items.find(item => item.itemCode === entry.itemCode);
-      if (!poItem || !poItem.name) {
-        console.error('PO item not found or missing ID:', entry.itemCode);
+      if (!poItem) {
+        console.error('PO item not found for item code:', entry.itemCode);
+        console.log('Available PO items:', selectedPO.items.map(i => ({ itemCode: i.itemCode, name: i.name })));
         toast({
           title: "Error",
-          description: "Purchase Order item reference not found",
+          description: `Item ${entry.itemCode} not found in this Purchase Order`,
           variant: "destructive"
         });
         return;
@@ -210,7 +211,7 @@ const Receive = () => {
       const entryWithWarehouse = {
         ...entry,
         warehouse: selectedWarehouse || entry.warehouse,
-        purchaseOrderItem: poItem.name // Add PO item reference
+        purchaseOrderItem: poItem.name || poItem.itemCode // Use name if available, fallback to itemCode
       };
 
       console.log('Processing entry with warehouse and PO item reference:', entryWithWarehouse);
