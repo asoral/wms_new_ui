@@ -27,6 +27,8 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
   const [scannedCode, setScannedCode] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("manual");
   const [warehouses, setWarehouses] = useState<string[]>([]);
+  const [batchEntryMethod, setBatchEntryMethod] = useState<string>("traditional");
+  const [batchEntries, setBatchEntries] = useState<Array<{batchNumber: string, quantity: number}>>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -67,61 +69,141 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
       return;
     }
 
-    if (!receivedQty || receivedQty <= 0) {
+    if (batchEntryMethod === "traditional") {
+      if (!receivedQty || receivedQty <= 0) {
+        toast({
+          title: "Invalid Quantity",
+          description: "Please enter a valid received quantity.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (receivedQty > selectedItem.pendingQty) {
+        toast({
+          title: "Quantity Exceeded",
+          description: `Cannot receive more than pending quantity (${selectedItem.pendingQty}).`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!batch) {
+        toast({
+          title: "Batch Number Required",
+          description: "Please enter a batch number.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const entry: ReceiveEntry = {
+        itemCode: selectedItem.itemCode,
+        itemName: selectedItem.itemName,
+        receivedQty: receivedQty,
+        warehouse: warehouse || selectedItem.warehouse,
+        batch: batch,
+        serial: serial || undefined,
+        uom: selectedItem.uom,
+        rate: selectedItem.rate,
+        purchaseOrderItem: selectedItem.name
+      };
+
+      try {
+        await onAddEntry(entry);
+        
+        // Reset form
+        setReceivedQty(0);
+        setBatch("");
+        setSerial("");
+        setScannedCode("");
+        
+        toast({
+          title: "Item Added",
+          description: `${selectedItem.itemName} added to receipt successfully.`,
+        });
+      } catch (error) {
+        // Error handling is done in the parent component
+      }
+    }
+  };
+
+  const addBatchRow = () => {
+    setBatchEntries(prev => [...prev, { batchNumber: "", quantity: 0 }]);
+  };
+
+  const removeBatchRow = (index: number) => {
+    setBatchEntries(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateBatchEntry = (index: number, field: 'batchNumber' | 'quantity', value: string | number) => {
+    setBatchEntries(prev => prev.map((entry, i) => 
+      i === index ? { ...entry, [field]: value } : entry
+    ));
+  };
+
+  const getTotalBatchQuantity = () => {
+    return batchEntries.reduce((total, entry) => total + (entry.quantity || 0), 0);
+  };
+
+  const handleBundleSubmit = async () => {
+    if (!selectedItem) {
       toast({
-        title: "Invalid Quantity",
-        description: "Please enter a valid received quantity.",
+        title: "No Item Selected",
+        description: "Please select an item to receive.",
         variant: "destructive"
       });
       return;
     }
 
-    if (receivedQty > selectedItem.pendingQty) {
+    if (batchEntries.length === 0) {
+      toast({
+        title: "No Batch Entries",
+        description: "Please add at least one batch entry.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const totalQty = getTotalBatchQuantity();
+    if (totalQty > selectedItem.pendingQty) {
       toast({
         title: "Quantity Exceeded",
-        description: `Cannot receive more than pending quantity (${selectedItem.pendingQty}).`,
+        description: `Total quantity (${totalQty}) exceeds pending quantity (${selectedItem.pendingQty}).`,
         variant: "destructive"
       });
       return;
     }
 
-    if (!warehouse) {
-      toast({
-        title: "No Warehouse Selected",
-        description: "Please select a warehouse for receiving.",
-        variant: "destructive"
-      });
-      return;
+    // Submit each batch as a separate entry
+    for (const batchEntry of batchEntries) {
+      if (batchEntry.batchNumber && batchEntry.quantity > 0) {
+        const entry: ReceiveEntry = {
+          itemCode: selectedItem.itemCode,
+          itemName: selectedItem.itemName,
+          receivedQty: batchEntry.quantity,
+          warehouse: warehouse || selectedItem.warehouse,
+          batch: batchEntry.batchNumber,
+          uom: selectedItem.uom,
+          rate: selectedItem.rate,
+          purchaseOrderItem: selectedItem.name
+        };
+
+        try {
+          await onAddEntry(entry);
+        } catch (error) {
+          console.error('Error adding batch entry:', error);
+          return;
+        }
+      }
     }
 
-    const entry: ReceiveEntry = {
-      itemCode: selectedItem.itemCode,
-      itemName: selectedItem.itemName,
-      receivedQty: receivedQty,
-      warehouse: warehouse,
-      batch: batch || undefined,
-      serial: serial || undefined,
-      uom: selectedItem.uom,
-      rate: selectedItem.rate,
-      purchaseOrderItem: selectedItem.name
-    };
-
-    try {
-      await onAddEntry(entry);
-      
-      // Reset form
-      setReceivedQty(0);
-      setBatch("");
-      setSerial("");
-      setScannedCode("");
-      
-      toast({
-        title: "Item Added",
-        description: `${selectedItem.itemName} added to receipt successfully.`,
-      });
-    } catch (error) {
-      // Error handling is done in the parent component
-    }
+    // Reset bundle entries
+    setBatchEntries([]);
+    toast({
+      title: "Bundle Added",
+      description: `${batchEntries.length} batch entries added to receipt successfully.`,
+    });
   };
 
   const handleScanProcess = () => {
@@ -236,11 +318,12 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
               <div className="space-y-4">
                 <div>
                   <Label className="text-base font-medium">Serial/Batch Input Method</Label>
-                  <Tabs value="traditional" className="w-full mt-2">
+                  <Tabs value={batchEntryMethod} onValueChange={setBatchEntryMethod} className="w-full mt-2">
                     <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="traditional">Traditional Entry</TabsTrigger>
                       <TabsTrigger value="bundle">Bundle Entry</TabsTrigger>
                     </TabsList>
+                    
                     <TabsContent value="traditional" className="space-y-4 mt-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -265,18 +348,82 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                           />
                         </div>
                       </div>
+                      <Button 
+                        onClick={handleAddEntry} 
+                        className="w-full bg-gray-600 hover:bg-gray-700" 
+                        disabled={!selectedItem || !receivedQty || !batch}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add to Count
+                      </Button>
+                    </TabsContent>
+
+                    <TabsContent value="bundle" className="space-y-4 mt-4">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <Label className="text-base font-medium">Batch Entries</Label>
+                          <div className="text-sm text-gray-600">
+                            Total: {getTotalBatchQuantity()} / {selectedItem.pendingQty} {selectedItem.uom}
+                          </div>
+                        </div>
+                        
+                        {batchEntries.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-3 gap-4 text-sm font-medium text-gray-600 pb-2 border-b">
+                              <div>Batch Number</div>
+                              <div>Quantity</div>
+                              <div>Action</div>
+                            </div>
+                            {batchEntries.map((entry, index) => (
+                              <div key={index} className="grid grid-cols-3 gap-4 items-center">
+                                <Input
+                                  placeholder="Enter batch number"
+                                  value={entry.batchNumber}
+                                  onChange={(e) => updateBatchEntry(index, 'batchNumber', e.target.value)}
+                                />
+                                <Input
+                                  type="number"
+                                  placeholder="Quantity"
+                                  value={entry.quantity || ""}
+                                  onChange={(e) => updateBatchEntry(index, 'quantity', Number(e.target.value))}
+                                  min="1"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeBatchRow(index)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <Button
+                          variant="outline"
+                          onClick={addBatchRow}
+                          className="w-full"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Batch Row
+                        </Button>
+                        
+                        {batchEntries.length > 0 && (
+                          <Button 
+                            onClick={handleBundleSubmit}
+                            className="w-full bg-slate-800 hover:bg-slate-900" 
+                            disabled={batchEntries.some(entry => !entry.batchNumber || entry.quantity <= 0)}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Bundle to Count ({batchEntries.length} batches)
+                          </Button>
+                        )}
+                      </div>
                     </TabsContent>
                   </Tabs>
                 </div>
-
-                <Button 
-                  onClick={handleAddEntry} 
-                  className="w-full bg-gray-600 hover:bg-gray-700" 
-                  disabled={!selectedItem || !receivedQty || !batch}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add to Count
-                </Button>
               </div>
             )}
           </TabsContent>
