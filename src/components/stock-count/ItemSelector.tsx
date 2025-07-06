@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, ScanBarcode, Search, AlertCircle } from "lucide-react";
-import ItemDropdown from "@/components/common/ItemDropdown";
+import StockCountItemSelector from "@/components/common/ItemSelector";
 import SerialBatchBundleSelector from "@/components/stock-count/SerialBatchBundleSelector";
 import { useToast } from "@/hooks/use-toast";
 import { Item } from "@/types";
@@ -140,11 +140,10 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
           <TabsContent value="manual" className="space-y-4 mt-6">
             <div className="space-y-2">
               <Label>Select Item</Label>
-              <ItemDropdown
+              <StockCountItemSelector
                 onItemSelect={handleItemSelect}
                 selectedItem={selectedItem}
                 placeholder="Search and select item..."
-                key={selectedItem?.item_code || 'empty'}
               />
             </div>
 

@@ -41,6 +41,46 @@ const StockCountSession = () => {
           throw new Error('No default company found. Please set your default company in Profile settings.');
         }
 
+        // Get current stock valuation for the item
+        let currentQty = 0;
+        let valuationRate = 0;
+        
+        try {
+          const stockResponse = await erpnextAPI.stockAPI.getBinStockForCompany(entry.itemCode, company);
+          if (stockResponse?.data) {
+            const warehouseStock = stockResponse.data.find((stock: any) => stock.warehouse === entry.warehouse);
+            if (warehouseStock) {
+              currentQty = warehouseStock.actual_qty || 0;
+            }
+          }
+          
+          // Get valuation rate from stock ledger
+          const stockLedgerResponse = await erpnextAPI.stockAPI.getStockLedgerEntries(entry.itemCode, [entry.warehouse]);
+          if (stockLedgerResponse?.data && stockLedgerResponse.data.length > 0) {
+            const latestEntry = stockLedgerResponse.data
+              .filter((ledger: any) => ledger.warehouse === entry.warehouse)
+              .sort((a: any, b: any) => {
+                const dateA = new Date(a.posting_date + ' ' + (a.posting_time || '00:00:00'));
+                const dateB = new Date(b.posting_date + ' ' + (b.posting_time || '00:00:00'));
+                return dateB.getTime() - dateA.getTime();
+              })[0];
+            
+            if (latestEntry) {
+              valuationRate = latestEntry.valuation_rate || 0;
+            }
+          }
+          
+          // Fallback: get item details for standard rate
+          if (!valuationRate) {
+            const itemDetails = await erpnextAPI.getItemDetails(entry.itemCode);
+            if (itemDetails?.data) {
+              valuationRate = (itemDetails.data as any).standard_rate || (itemDetails.data as any).valuation_rate || 0;
+            }
+          }
+        } catch (error) {
+          console.warn('Could not fetch stock details for valuation:', error);
+        }
+
         const stockReconciliationData = {
           doctype: 'Stock Reconciliation',
           company: company,
@@ -54,9 +94,9 @@ const StockCountSession = () => {
             item_code: entry.itemCode,
             warehouse: entry.warehouse,
             qty: entry.actualQty,
-            valuation_rate: 100,
-            current_qty: entry.currentQty,
-            current_valuation_rate: 100,
+            valuation_rate: valuationRate || 0,
+            current_qty: currentQty,
+            current_valuation_rate: valuationRate || 0,
             ...(entry.batch && { batch_no: entry.batch }),
             ...(entry.serial && { serial_no: entry.serial }),
             ...(entry.serialBatchBundle && { serial_and_batch_bundle: entry.serialBatchBundle })
@@ -78,9 +118,24 @@ const StockCountSession = () => {
         }
       } catch (error: any) {
         console.error('Failed to create stock reconciliation:', error);
+        
+        let errorMessage = 'Failed to create Stock Reconciliation in ERPNext.';
+        
+        if (error.message) {
+          if (error.message.includes('ValidationError')) {
+            errorMessage = 'Validation failed: Please check that all required fields are filled correctly.';
+          } else if (error.message.includes('PermissionError')) {
+            errorMessage = 'Permission denied: You may not have rights to create Stock Reconciliation.';
+          } else if (error.message.includes('DuplicateEntryError')) {
+            errorMessage = 'Duplicate entry: A similar stock reconciliation may already exist.';
+          } else {
+            errorMessage = error.message;
+          }
+        }
+        
         toast({
           title: "Error Creating Stock Reconciliation",
-          description: error.message || 'Failed to create Stock Reconciliation in ERPNext. Check console for details.',
+          description: errorMessage,
           variant: "destructive"
         });
         return; // Don't add entry if stock reconciliation creation failed
@@ -126,10 +181,19 @@ const StockCountSession = () => {
     <div className="container mx-auto py-4 px-4 md:py-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold flex items-center space-x-2">
-            <BarChart3 className="w-6 h-6" />
-            <span>Stock Count</span>
-          </h1>
+          <div className="flex items-center space-x-4">
+            <h1 className="text-2xl font-bold flex items-center space-x-2">
+              <BarChart3 className="w-6 h-6" />
+              <span>Stock Count</span>
+            </h1>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/stock-count')}
+            >
+              ← Back to Dashboard
+            </Button>
+          </div>
           <p className="text-gray-500">
             Warehouse: {warehouse}
             {stockReconciliationId && (
@@ -181,7 +245,12 @@ const StockCountSession = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="entry">Item Entry</TabsTrigger>
-          <TabsTrigger value="review">Review & Submit</TabsTrigger>
+          <TabsTrigger value="review" className="relative">
+            Review & Submit
+            {entries.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="entry" className="space-y-6">

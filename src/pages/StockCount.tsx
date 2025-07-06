@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
 import {
   Table,
   TableBody,
@@ -25,13 +25,10 @@ const StockCount = () => {
   const [loading, setLoading] = useState(true);
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [selectedPurpose, setSelectedPurpose] = useState<string>("Stock Reconciliation");
-  const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [warehouseLoading, setWarehouseLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     loadStockCountSessions();
-    loadWarehouses();
   }, []);
 
   const loadStockCountSessions = async () => {
@@ -80,38 +77,6 @@ const StockCount = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadWarehouses = async () => {
-    try {
-      setWarehouseLoading(true);
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) {
-        toast({
-          title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const company = await getUserDefaultCompany();
-      const filters = company ? [['company', '=', company]] : undefined;
-      const response = await erpnextAPI.getWarehouses(filters);
-      
-      if (response?.data) {
-        setWarehouses(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to load warehouses:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load warehouses",
-        variant: "destructive"
-      });
-    } finally {
-      setWarehouseLoading(false);
     }
   };
 
@@ -204,24 +169,10 @@ const StockCount = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="warehouse">Select Warehouse *</Label>
-              <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Search warehouse by code or name..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {warehouses.map((warehouse) => (
-                    <SelectItem key={warehouse.name} value={warehouse.name}>
-                      <div className="flex items-center space-x-2">
-                        <Building2 className="w-4 h-4" />
-                        <span>{warehouse.warehouse_name || warehouse.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <WarehouseSelector
+              onWarehouseSelected={setSelectedWarehouse}
+              isLoading={loading}
+            />
 
           </div>
 
@@ -239,12 +190,12 @@ const StockCount = () => {
               </Card>
 
               <Card 
-                className={`cursor-pointer transition-all ${selectedPurpose === 'Stock Opening' ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}
-                onClick={() => setSelectedPurpose('Stock Opening')}
+                className={`cursor-pointer transition-all ${selectedPurpose === 'Opening Stock' ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}
+                onClick={() => setSelectedPurpose('Opening Stock')}
               >
                 <CardContent className="p-6 text-center">
                   <Building2 className="w-8 h-8 mx-auto mb-2 text-green-600" />
-                  <h3 className="font-semibold">Stock Opening</h3>
+                  <h3 className="font-semibold">Opening Stock</h3>
                 </CardContent>
               </Card>
             </div>
@@ -253,7 +204,7 @@ const StockCount = () => {
           <Button 
             onClick={handleStartSession}
             className="w-full py-3"
-            disabled={warehouseLoading || !selectedWarehouse}
+            disabled={!selectedWarehouse}
           >
             <Plus className="w-4 h-4 mr-2" />
             Start Count Session

@@ -144,6 +144,15 @@ const ItemEnquiry = () => {
 
             console.log(`Item: ${code}, Warehouse: ${item.warehouse}, Qty: ${actualQty}, Rate: ${valuationRate}, Total: ${totalValuation}`);
 
+            // Calculate age from bin last updated date
+            let age = 0;
+            if (item.modified) {
+              const lastUpdated = new Date(item.modified);
+              const today = new Date();
+              const diffTime = Math.abs(today.getTime() - lastUpdated.getTime());
+              age = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            }
+
             return {
               itemCode: item.item_code,
               itemName: itemDetails?.item_name || item.item_code,
@@ -151,7 +160,7 @@ const ItemEnquiry = () => {
               qty: actualQty,
               uom: itemDetails?.stock_uom || 'Nos',
               valuation: totalValuation,
-              age: Math.floor(Math.random() * 120), // Mock age data
+              age: age,
               binLocation: item.warehouse
             };
           });
