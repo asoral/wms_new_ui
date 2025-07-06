@@ -3,11 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Search, Plus } from "lucide-react";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { Badge } from "@/components/ui/badge";
+import { Search, Package, Calendar, User, DollarSign, Loader2 } from "lucide-react";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import SalesOrderList from "./SalesOrderList";
-import { SalesOrder, SalesOrderOption } from "@/types";
+import { SalesOrder } from "@/types";
 
 interface SalesOrderSelectorProps {
   onSelectSO: (salesOrder: SalesOrder) => void;
@@ -20,30 +20,92 @@ interface SalesOrderSelectorProps {
 
 const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorProps) => {
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const searchSalesOrders = async (searchTerm: string) => {
-    if (!searchTerm.trim()) {
-      setSalesOrders([]);
-      return;
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      searchSalesOrders(searchTerm);
+    } else {
+      loadDefaultSalesOrders();
     }
+  }, [searchTerm]);
 
+  const loadDefaultSalesOrders = async () => {
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const company = await getUserDefaultCompany();
+      
+      // Get sales orders ready for delivery
+      const filters = [
+        ['docstatus', '=', 1],
+        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']],
+        ['company', '=', company]
+      ];
+      
+      const response = await erpnextAPI.getSalesOrders(filters);
+      
+      if (response?.data && Array.isArray(response.data)) {
+        const transformedOrders: SalesOrder[] = response.data.map((order: any) => ({
+          id: order.name,
+          name: order.name,
+          number: order.name,
+          customer: order.customer,
+          status: order.status,
+          delivery_date: order.delivery_date,
+          grand_total: order.grand_total,
+          totalValue: order.grand_total,
+          totalItems: order.items?.length || 0,
+          percentDelivered: order.per_delivered || 0,
+          items: order.items || []
+        }));
+        
+        setSalesOrders(transformedOrders);
+      } else {
+        setSalesOrders([]);
+      }
+    } catch (error) {
+      console.error('Error loading sales orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load sales orders",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const searchSalesOrders = async (searchTerm: string) => {
     try {
       setLoading(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
+      const company = await getUserDefaultCompany();
+      
       // Search with proper status filters for delivery
       const filters = [
         ['name', 'like', `%${searchTerm}%`],
         ['docstatus', '=', 1],
-        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']],
+        ['company', '=', company]
       ];
+      
       const response = await erpnextAPI.getSalesOrders(filters);
       
       if (response?.data && Array.isArray(response.data)) {
-        // Transform the data to match our SalesOrder interface
         const transformedOrders: SalesOrder[] = response.data.map((order: any) => ({
           id: order.name,
           name: order.name,
@@ -74,33 +136,94 @@ const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorPr
     }
   };
 
-  const handleSOSelect = (salesOrder: SalesOrder) => {
-    onSelectSO(salesOrder);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "To Deliver": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "To Deliver and Bill": return "bg-blue-100 text-blue-800 border-blue-200";
+      case "Partially Delivered": return "bg-orange-100 text-orange-800 border-orange-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Select Sales Order</CardTitle>
+        <CardTitle className="flex items-center space-x-2">
+          <Package className="w-5 h-5" />
+          <span>Select Sales Order for Delivery</span>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex space-x-2">
-          <div className="flex-1">
-            <Label htmlFor="so-search">Search Sales Order</Label>
+        <div className="space-y-2">
+          <Label htmlFor="so-search">Search Sales Order</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
               id="so-search"
-              placeholder="Enter SO number (e.g., SO-2024-00001)"
-              onChange={(e) => searchSalesOrders(e.target.value)}
+              placeholder="SAL"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
             />
           </div>
         </div>
 
-        <SalesOrderList onSelectSO={handleSOSelect} />
+        {/* Sales Orders List */}
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              Loading sales orders...
+            </div>
+          ) : salesOrders.length > 0 ? (
+            salesOrders.map((order) => (
+              <div
+                key={order.id}
+                onClick={() => onSelectSO(order)}
+                className="p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-blue-300 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <div className="font-semibold text-lg">{order.number}</div>
+                      <Badge className={getStatusColor(order.status)} variant="outline">
+                        {order.status}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">{order.customer}</div>
+                    <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        Due: {order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                      <div>
+                        Delivered: {order.percentDelivered}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-green-600 text-lg">
+                      ₹{order.totalValue?.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Package className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p>No sales orders found</p>
+              <p className="text-sm mt-1">
+                {searchTerm ? 'Try a different search term' : 'No sales orders available for delivery'}
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Quick Actions */}
         {shortcuts.length > 0 && (
-          <div className="mt-4">
-            <CardTitle>Quick Actions</CardTitle>
+          <div className="mt-6 pt-4 border-t">
+            <CardTitle className="mb-3">Quick Actions</CardTitle>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {shortcuts.map((shortcut, index) => (
                 <Button
