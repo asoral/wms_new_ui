@@ -1,12 +1,14 @@
-
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package, Calendar, User, DollarSign, Loader2 } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Package, Calendar, User, DollarSign, Loader2, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { offlineStorage } from "@/services/offlineStorage";
 
 interface PurchaseOrder {
   name: string;
@@ -20,26 +22,46 @@ interface PurchaseOrder {
 
 interface POSelectorProps {
   onOrderSelected: (order: any) => void;
-  loading: boolean;
+  isLoading: boolean;
 }
 
-const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
+const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPOs, setIsLoadingPOs] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [searchValue, setSearchValue] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
-    if (searchTerm.trim()) {
-      searchPurchaseOrders(searchTerm);
-    } else {
-      loadDefaultPurchaseOrders();
-    }
-  }, [searchTerm]);
+    return () => {
+      setOpen(false);
+    };
+  }, []);
 
-  const loadDefaultPurchaseOrders = async () => {
+  useEffect(() => {
+    loadInitialPurchaseOrders();
+  }, []);
+
+  const loadInitialPurchaseOrders = async () => {
+    setIsLoadingPOs(true);
     try {
-      setIsLoading(true);
+      const cached = await offlineStorage.getCachedData('purchase_orders_receive');
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        setPurchaseOrders(cached);
+        setIsLoadingPOs(false);
+        return;
+      }
+      await fetchPurchaseOrders("");
+    } catch (error) {
+      console.error('Failed to load initial purchase orders:', error);
+      setIsLoadingPOs(false);
+    }
+  };
+
+  const fetchPurchaseOrders = async (search: string = "") => {
+    setIsLoadingPOs(true);
+    try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -51,12 +73,29 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
       }
 
       const company = await getUserDefaultCompany();
-      
-      const result = await erpnextAPI.getPurchaseOrders([
+      let filters: any[] = [
         ['docstatus', '=', 1],
         ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']],
         ['company', '=', company]
-      ]);
+      ];
+      
+      if (search.trim()) {
+        filters.push(['name', 'like', `%${search}%`]);
+      }
+      
+      // Use the resource API directly
+      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Order?filters=${JSON.stringify(filters)}&limit_page_length=50`, {
+        headers: {
+          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
       
       if (result.data && Array.isArray(result.data)) {
         const transformedResults: PurchaseOrder[] = result.data.map((po: any) => ({
@@ -70,6 +109,10 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
         }));
         
         setPurchaseOrders(transformedResults);
+        
+        if (!search.trim()) {
+          await offlineStorage.cacheData('purchase_orders_receive', transformedResults, 300000);
+        }
       } else {
         setPurchaseOrders([]);
       }
@@ -80,64 +123,50 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
         description: "Failed to load purchase orders from ERPNext",
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const searchPurchaseOrders = async (searchTerm: string) => {
-    try {
-      setIsLoading(true);
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const company = await getUserDefaultCompany();
       
-      // Search with proper status filters for receiving
-      const filters = [
-        ['name', 'like', `%${searchTerm}%`],
-        ['docstatus', '=', 1],
-        ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']],
-        ['company', '=', company]
-      ];
-      
-      const result = await erpnextAPI.getPurchaseOrders(filters, company, 50);
-      
-      if (result.data && Array.isArray(result.data)) {
-        const transformedResults: PurchaseOrder[] = result.data.map((po: any) => ({
-          name: po.name,
-          supplier: po.supplier,
-          supplier_name: po.supplier_name || po.supplier,
-          schedule_date: po.schedule_date || po.transaction_date,
-          grand_total: po.grand_total || 0,
-          status: po.status,
-          per_received: po.per_received || 0
-        }));
-        
-        setPurchaseOrders(transformedResults);
-      } else {
-        setPurchaseOrders([]);
+      try {
+        const cached = await offlineStorage.getCachedData('purchase_orders_receive');
+        if (cached && Array.isArray(cached)) {
+          setPurchaseOrders(cached);
+        }
+      } catch (cacheError) {
+        console.error('Failed to load cached purchase orders:', cacheError);
       }
-    } catch (error) {
-      console.error('Error searching purchase orders:', error);
-      toast({
-        title: "Error",
-        description: "Failed to search purchase orders",
-        variant: "destructive"
-      });
     } finally {
-      setIsLoading(false);
+      setIsLoadingPOs(false);
     }
   };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchValue !== undefined) {
+        fetchPurchaseOrders(searchValue);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchValue]);
 
   const selectPurchaseOrder = async (po: PurchaseOrder) => {
     try {
-      setIsLoading(true);
+      setIsLoadingPOs(true);
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
       // Get full PO details
-      const fullPOResult = await erpnextAPI.getPurchaseOrder(po.name);
+      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Order/${po.name}`, {
+        headers: {
+          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const fullPOResult = await response.json();
+      
       if (fullPOResult.data) {
         const fullPO = fullPOResult.data;
         
@@ -161,7 +190,8 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
           })) : []
         };
 
-        // Call the parent handler to proceed to receiving
+        setSelectedPO(po);
+        setOpen(false);
         onOrderSelected(transformedPO);
       }
     } catch (error) {
@@ -172,7 +202,7 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setIsLoadingPOs(false);
     }
   };
 
@@ -185,82 +215,119 @@ const POSelector = ({ onOrderSelected, loading }: POSelectorProps) => {
     }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Package className="w-5 h-5" />
-          <span>Select Purchase Order to Receive</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="po-search">Search Purchase Order</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              id="po-search"
-              placeholder="PUR"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
+  const filteredOrders = useMemo(() => {
+    if (!searchValue) return purchaseOrders;
+    const lowercaseSearch = searchValue.toLowerCase();
+    return purchaseOrders.filter(po => 
+      po.name.toLowerCase().includes(lowercaseSearch) ||
+      po.supplier_name.toLowerCase().includes(lowercaseSearch)
+    );
+  }, [purchaseOrders, searchValue]);
 
-        {/* Purchase Orders List */}
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Loading purchase orders...
-            </div>
-          ) : purchaseOrders.length > 0 ? (
-            purchaseOrders.map((po) => (
-              <div
-                key={po.name}
-                onClick={() => selectPurchaseOrder(po)}
-                className="p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-blue-300 transition-colors"
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label>Purchase Order</Label>
+        <div className="flex-1 min-w-0 mt-1">
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
+                disabled={isLoading}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <div className="font-semibold text-lg">{po.name}</div>
-                      <Badge className={getStatusColor(po.status)} variant="outline">
-                        {po.status}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">{po.supplier_name}</div>
-                    <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        Due: {po.schedule_date ? new Date(po.schedule_date).toLocaleDateString() : 'N/A'}
-                      </div>
-                      <div>
-                        Received: {po.per_received}%
-                      </div>
-                    </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="truncate">
+                    {selectedPO 
+                      ? selectedPO.name
+                      : "Select Purchase Order..."
+                    }
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-green-600 text-lg">
-                      ₹{po.grand_total.toLocaleString()}
+                  {selectedPO && (
+                    <div className="text-sm text-muted-foreground truncate">
+                      {selectedPO.supplier_name} - ₹{selectedPO.grand_total.toLocaleString()}
                     </div>
-                  </div>
+                  )}
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Package className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-              <p>No purchase orders found</p>
-              <p className="text-sm mt-1">
-                {searchTerm ? 'Try a different search term' : 'No purchase orders available for receiving'}
-              </p>
-            </div>
-          )}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[10000]" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput 
+                  placeholder="Search purchase orders..." 
+                  value={searchValue}
+                  onValueChange={setSearchValue}
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    {isLoadingPOs ? "Loading purchase orders..." : "No purchase orders found."}
+                  </CommandEmpty>
+                  {isLoadingPOs && (
+                    <CommandGroup>
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        <span className="text-sm text-muted-foreground">Loading purchase orders...</span>
+                      </div>
+                    </CommandGroup>
+                  )}
+                  {!isLoadingPOs && filteredOrders.length > 0 && (
+                    <CommandGroup>
+                      {filteredOrders.map((po) => (
+                        <CommandItem
+                          key={po.name}
+                          value={po.name}
+                          onSelect={() => selectPurchaseOrder(po)}
+                          className="flex flex-col items-start p-3"
+                        >
+                          <div className="flex w-full items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Check
+                                className={cn(
+                                  "h-4 w-4",
+                                  selectedPO?.name === po.name ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <div>
+                                <div className="font-semibold text-sm">{po.name}</div>
+                                <div className="text-xs text-gray-600 flex items-center">
+                                  <User className="w-3 h-3 mr-1" />
+                                  {po.supplier_name}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold text-green-600 text-sm">
+                                ₹{po.grand_total.toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2 mt-2 w-full">
+                            <Badge className={getStatusColor(po.status)} variant="outline">
+                              {po.status}
+                            </Badge>
+                            <div className="text-xs text-gray-500 flex items-center">
+                              <Calendar className="w-3 h-3 mr-1" />
+                              Due: {po.schedule_date ? new Date(po.schedule_date).toLocaleDateString() : 'N/A'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Received: {po.per_received}%
+                            </div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

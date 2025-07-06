@@ -8,6 +8,7 @@ import { Search, Package, Calendar, User, DollarSign, Loader2 } from "lucide-rea
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { SalesOrder } from "@/types";
+import SOSelector from "./SOSelector";
 
 interface SalesOrderSelectorProps {
   onSelectSO: (salesOrder: SalesOrder) => void;
@@ -168,56 +169,7 @@ const SalesOrderSelector = ({ onSelectSO, shortcuts = [] }: SalesOrderSelectorPr
           </div>
         </div>
 
-        {/* Sales Orders List */}
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Loading sales orders...
-            </div>
-          ) : salesOrders.length > 0 ? (
-            salesOrders.map((order) => (
-              <div
-                key={order.id}
-                onClick={() => onSelectSO(order)}
-                className="p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-blue-300 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <div className="font-semibold text-lg">{order.number}</div>
-                      <Badge className={getStatusColor(order.status)} variant="outline">
-                        {order.status}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">{order.customer}</div>
-                    <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        Due: {order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : 'N/A'}
-                      </div>
-                      <div>
-                        Delivered: {order.percentDelivered}%
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-green-600 text-lg">
-                      ₹{order.totalValue?.toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Package className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-              <p>No sales orders found</p>
-              <p className="text-sm mt-1">
-                {searchTerm ? 'Try a different search term' : 'No sales orders available for delivery'}
-              </p>
-            </div>
-          )}
+        <SOSelector onOrderSelected={handleSOSelect} isLoading={loading} />
         </div>
 
         {/* Quick Actions */}
