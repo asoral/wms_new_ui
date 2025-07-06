@@ -16,7 +16,8 @@ import WarehouseSelector from "../components/bin-enquiry/WarehouseSelector";
 
 export interface PurchaseOrder {
   poNumber: string;
-  supplier: string;
+  supplier: string; // Supplier ID
+  supplierName?: string; // Supplier display name
   date: string;
   totalAmount: number;
   status: 'pending' | 'partial' | 'completed';
@@ -65,6 +66,7 @@ const Receive = () => {
       const transformedPO: PurchaseOrder = {
         poNumber: purchaseOrder.number,
         supplier: purchaseOrder.supplier,
+        supplierName: purchaseOrder.supplierName, // Add supplier display name
         date: purchaseOrder.scheduleDate,
         totalAmount: purchaseOrder.totalValue,
         status: purchaseOrder.status === 'To Receive' ? 'pending' : 
@@ -216,9 +218,10 @@ const Receive = () => {
 
       console.log('Processing entry with warehouse and PO item reference:', entryWithWarehouse);
 
-      // Get the company from the PO
-      const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
-      const company = poDetails.data.company;
+        // Get the company from the PO details we fetch
+        const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
+        const company = poDetails.data.company;
+        const supplierFromPO = poDetails.data.supplier; // Get correct supplier ID
 
       // Always add to the same Purchase Receipt instead of creating multiple ones
       if (!currentPurchaseReceipt) {
@@ -237,7 +240,7 @@ const Receive = () => {
         };
 
         const receiptData = {
-          supplier: selectedPO.supplier,
+          supplier: supplierFromPO, // Use supplier ID from PO details
           company: company,
           posting_date: new Date().toISOString().split('T')[0],
           purchase_order: selectedPO.poNumber,
@@ -435,7 +438,7 @@ const Receive = () => {
                       </div>
                       <div>
                         <p className="text-gray-600">Supplier</p>
-                        <p className="font-medium">{selectedPO.supplier}</p>
+                        <p className="font-medium">{selectedPO.supplierName || selectedPO.supplier}</p>
                       </div>
                       <div>
                         <p className="text-gray-600">Date</p>

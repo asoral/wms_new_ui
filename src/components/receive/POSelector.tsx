@@ -179,7 +179,8 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
         
         const transformedPO = {
           number: fullPO.name,
-          supplier: fullPO.supplier_name || fullPO.supplier,
+          supplier: fullPO.supplier, // Use supplier ID, not display name
+          supplierName: fullPO.supplier_name || fullPO.supplier, // Keep display name separate
           status: fullPO.status,
           scheduleDate: fullPO.schedule_date || fullPO.transaction_date,
           totalItems: fullPO.items ? fullPO.items.length : 0,
