@@ -185,6 +185,7 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
           totalItems: fullPO.items ? fullPO.items.length : 0,
           totalValue: fullPO.grand_total || 0,
           items: fullPO.items ? fullPO.items.map((item: any) => ({
+            name: item.name, // Purchase Order Item record ID - crucial for linking
             itemCode: item.item_code,
             itemName: item.item_name,
             orderedQty: item.qty || 0,
