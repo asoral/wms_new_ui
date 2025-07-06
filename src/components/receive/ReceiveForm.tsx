@@ -175,9 +175,9 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
           </TabsList>
 
           <TabsContent value="manual" className="space-y-4 mt-6">
-            {/* Item Selection */}
+            {/* Item Code/Name Input */}
             <div className="space-y-2">
-              <Label htmlFor="item-select">Select Item</Label>
+              <Label htmlFor="item-input">Item Code / Name</Label>
               <Select
                 value={selectedItem?.itemCode || ""}
                 onValueChange={(value) => {
@@ -186,16 +186,16 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an item to receive" />
+                  <SelectValue placeholder="Search item by code, name or barcode..." />
                 </SelectTrigger>
                 <SelectContent>
                   {pendingItems.map((item) => (
                     <SelectItem key={item.itemCode} value={item.itemCode}>
-                      <div className="flex items-center justify-between w-full">
-                        <span>{item.itemName}</span>
-                        <Badge variant="outline" className="ml-2">
-                          Pending: {item.pendingQty}
-                        </Badge>
+                      <div className="w-full">
+                        <div className="flex justify-between">
+                          <span className="font-medium">{item.itemName}</span>
+                        </div>
+                        <div className="text-xs text-gray-500">{item.itemCode}</div>
                       </div>
                     </SelectItem>
                   ))}
@@ -205,88 +205,80 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
 
             {/* Selected Item Details */}
             {selectedItem && (
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <p className="font-medium text-gray-600">Item Code</p>
-                    <p className="text-gray-900">{selectedItem.itemCode}</p>
+                    <p className="text-gray-600">Item Name</p>
+                    <p className="font-medium">{selectedItem.itemName}</p>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-600">Ordered Qty</p>
-                    <p className="text-gray-900">{selectedItem.orderedQty}</p>
+                    <p className="text-gray-600">Pending Qty</p>
+                    <p className="font-medium text-orange-600">{selectedItem.pendingQty} {selectedItem.uom}</p>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-600">Received Qty</p>
-                    <p className="text-gray-900">{selectedItem.receivedQty}</p>
+                    <p className="text-gray-600">Rate</p>
+                    <p className="font-medium">₹{selectedItem.rate}</p>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-600">Pending Qty</p>
-                    <p className="text-gray-900 font-semibold text-orange-600">{selectedItem.pendingQty}</p>
+                    <p className="text-gray-600">Warehouse</p>
+                    <p className="font-medium">{selectedItem.warehouse}</p>
                   </div>
+                </div>
+                {/* Batch Tracked indicator */}
+                <div className="mt-2">
+                  <Badge variant="outline">Batch Tracked</Badge>
                 </div>
               </div>
             )}
 
-            {/* Receiving Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="received-qty">Received Quantity</Label>
-                <Input
-                  id="received-qty"
-                  type="number"
-                  placeholder="Enter received quantity"
-                  value={receivedQty || ""}
-                  onChange={(e) => setReceivedQty(Number(e.target.value))}
-                  max={selectedItem?.pendingQty || 0}
-                  min="1"
-                />
-              </div>
+            {/* Serial/Batch Input Method - only show when item selected */}
+            {selectedItem && (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-medium">Serial/Batch Input Method</Label>
+                  <Tabs value="traditional" className="w-full mt-2">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="traditional">Traditional Entry</TabsTrigger>
+                      <TabsTrigger value="bundle">Bundle Entry</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="traditional" className="space-y-4 mt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="batch">Batch Number *</Label>
+                          <Input
+                            id="batch"
+                            placeholder="Enter batch number..."
+                            value={batch}
+                            onChange={(e) => setBatch(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="received-qty">Actual Quantity *</Label>
+                          <Input
+                            id="received-qty"
+                            type="number"
+                            placeholder="0"
+                            value={receivedQty || ""}
+                            onChange={(e) => setReceivedQty(Number(e.target.value))}
+                            max={selectedItem?.pendingQty || 0}
+                            min="1"
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="warehouse-select">Warehouse</Label>
-                <Select value={warehouse} onValueChange={setWarehouse}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select warehouse" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses.map((wh) => (
-                      <SelectItem key={wh} value={wh}>
-                        {wh}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Button 
+                  onClick={handleAddEntry} 
+                  className="w-full bg-gray-600 hover:bg-gray-700" 
+                  disabled={!selectedItem || !receivedQty || !batch}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add to Count
+                </Button>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="batch">Batch Number (Optional)</Label>
-                <Input
-                  id="batch"
-                  placeholder="Enter batch number"
-                  value={batch}
-                  onChange={(e) => setBatch(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="serial">Serial Number (Optional)</Label>
-                <Input
-                  id="serial"
-                  placeholder="Enter serial number"
-                  value={serial}
-                  onChange={(e) => setSerial(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleAddEntry} 
-              className="w-full" 
-              disabled={!selectedItem || !receivedQty || !warehouse}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add to Receipt
-            </Button>
+            )}
           </TabsContent>
 
           <TabsContent value="scan" className="space-y-4 mt-6">

@@ -477,6 +477,16 @@ const Receive = () => {
                   onAddEntry={addReceiveEntry}
                   defaultWarehouse={selectedWarehouse}
                 />
+
+                {/* Purchase Order Items Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Purchase Order Items</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <POItemsDisplay items={selectedPO.items} />
+                  </CardContent>
+                </Card>
               </div>
             )}
           </TabsContent>
