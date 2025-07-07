@@ -235,7 +235,7 @@ const Receive = () => {
           uom: entryWithWarehouse.uom,
           purchase_order: selectedPO.poNumber,
           purchase_order_item: entryWithWarehouse.purchaseOrderItem,
-          ...(entryWithWarehouse.batch && { batch_no: entryWithWarehouse.batch }),
+          // Let ERPNext auto-create batch numbers for batch-tracked items
           ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
         };
 
@@ -282,7 +282,7 @@ const Receive = () => {
           uom: entryWithWarehouse.uom,
           purchase_order: selectedPO.poNumber,
           purchase_order_item: entryWithWarehouse.purchaseOrderItem,
-          ...(entryWithWarehouse.batch && { batch_no: entryWithWarehouse.batch }),
+          // Let ERPNext auto-create batch numbers for batch-tracked items
           ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
         };
         
