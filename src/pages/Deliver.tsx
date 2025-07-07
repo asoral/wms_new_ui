@@ -171,15 +171,21 @@ const Deliver = () => {
       const deliveryNoteData = {
         company: defaultCompany || selectedSalesOrder.customer, // Use default company or fallback
         customer: selectedSalesOrder.customer,
-        items: deliveryEntries.map(entry => ({
-          item_code: entry.itemCode,
-          qty: entry.deliveredQty,
-          rate: entry.rate,
-          warehouse: entry.warehouse,
-          against_sales_order: selectedSalesOrder.name,
-          ...(entry.batch && { batch_no: entry.batch }),
-          ...(entry.serial && { serial_no: entry.serial })
-        }))
+        items: deliveryEntries.map(entry => {
+          // Find the corresponding sales order item
+          const soItem = selectedSalesOrder.items.find(item => item.itemCode === entry.itemCode);
+          
+          return {
+            item_code: entry.itemCode,
+            qty: entry.deliveredQty,
+            rate: entry.rate,
+            warehouse: entry.warehouse,
+            against_sales_order: selectedSalesOrder.name,
+            against_sales_order_item: soItem?.itemCode || entry.itemCode, // Required field
+            ...(entry.batch && { batch_no: entry.batch }),
+            ...(entry.serial && { serial_no: entry.serial })
+          };
+        })
       };
 
       const response = await erpnextAPI.createDeliveryNote(deliveryNoteData);
