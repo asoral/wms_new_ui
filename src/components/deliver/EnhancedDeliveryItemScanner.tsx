@@ -9,8 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Package, Scan, Search } from "lucide-react";
 import { DeliveryEntry, SOItem } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import ItemDropdown from "@/components/common/ItemDropdown";
+import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
 import { createERPNextAPI } from "@/services/erpnextApi";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface EnhancedDeliveryItemScannerProps {
   soItems: SOItem[];
@@ -55,13 +56,12 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
     wh.warehouse_name?.toLowerCase().includes(warehouseSearch.toLowerCase())
   );
 
-  const handleItemSelect = (item: any) => {
-    setSelectedItemCode(item.item_code);
+  const handleItemSelect = (itemCode: string) => {
+    setSelectedItemCode(itemCode);
   };
 
-  const handleWarehouseSelect = (warehouseCode: string) => {
-    setWarehouse(warehouseCode);
-    setWarehouseSearch("");
+  const handleWarehouseSelect = (warehouse: string) => {
+    setWarehouse(warehouse);
   };
 
   const handlePickBatchSerial = async () => {
@@ -249,10 +249,24 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
               {/* Item Code / Name */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Item Code / Name</label>
-                <ItemDropdown
-                  onItemSelect={handleItemSelect}
-                  placeholder="Select an item to deliver..."
-                />
+                <Select value={selectedItemCode} onValueChange={handleItemSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an item to deliver..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {soItems.map((item) => (
+                      <SelectItem key={item.itemCode} value={item.itemCode}>
+                        <div className="flex items-center space-x-2">
+                          <Package className="w-4 h-4" />
+                          <div>
+                            <div className="font-medium">{item.itemCode}</div>
+                            <div className="text-sm text-gray-500">{item.itemName}</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {selectedItem && (
                   <div className="mt-2 text-sm text-gray-600">
                     {selectedItem.itemCode} - {selectedItem.itemName}
@@ -260,36 +274,13 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
                 )}
               </div>
 
-              {/* Warehouse Code / Name */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Warehouse Code / Name</label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Search warehouse by code or name..."
-                      value={warehouse || warehouseSearch}
-                      onChange={(e) => {
-                        setWarehouseSearch(e.target.value);
-                        if (!e.target.value) setWarehouse("");
-                      }}
-                    />
-                    <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-                    
-                    {warehouseSearch && !warehouse && filteredWarehouses.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        {filteredWarehouses.slice(0, 10).map((wh) => (
-                          <div
-                            key={wh.name}
-                            onClick={() => handleWarehouseSelect(wh.name)}
-                            className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                          >
-                            <div className="font-medium text-sm">{wh.name}</div>
-                            <div className="text-xs text-gray-500">{wh.warehouse_name}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <WarehouseSelector 
+                    onWarehouseSelected={handleWarehouseSelect}
+                    isLoading={false}
+                  />
                 </div>
 
                 <div>
