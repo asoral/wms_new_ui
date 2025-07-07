@@ -229,7 +229,7 @@ const Receive = () => {
       if (entryWithWarehouse.batch) {
         console.log('Creating Serial and Batch Bundle for batch:', entryWithWarehouse.batch);
         
-        // Check if batch exists, create if it doesn't
+        // Step 1: Check if batch exists, create if it doesn't (same as Stock Reconciliation)
         const batchExists = await checkBatchExists(entryWithWarehouse.batch, entryWithWarehouse.itemCode);
         if (!batchExists) {
           console.log('Creating new batch:', entryWithWarehouse.batch);
@@ -242,25 +242,28 @@ const Receive = () => {
             });
             return;
           }
+          console.log('New batch created successfully:', entryWithWarehouse.batch);
         }
 
-        // Create Serial and Batch Bundle
+        // Step 2: Create Serial and Batch Bundle entries (same format as Stock Reconciliation)
         const bundleEntries = [{
           batch_no: entryWithWarehouse.batch,
           qty: entryWithWarehouse.receivedQty,
           warehouse: entryWithWarehouse.warehouse,
+          delivered_qty: 0,
           incoming_rate: entryWithWarehouse.rate,
           outgoing_rate: 0,
           stock_value_difference: entryWithWarehouse.rate * entryWithWarehouse.receivedQty,
-          is_outward: 0,
-          delivered_qty: 0,
+          is_outward: 0, // Inward transaction for Purchase Receipt
           ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
         }];
 
+        // Step 3: Create bundle data (same format as Stock Reconciliation)
         const bundleData = {
+          company: company,
           item_code: entryWithWarehouse.itemCode,
           item_name: entryWithWarehouse.itemName,
-          item_group: "Raw Material", // Default item group
+          item_group: "Raw Material", // Default item group for Purchase Receipt
           has_serial_no: entryWithWarehouse.serial ? 1 : 0,
           has_batch_no: 1,
           warehouse: entryWithWarehouse.warehouse,
@@ -279,13 +282,13 @@ const Receive = () => {
         
         if (bundleResult?.data?.name) {
           serialBatchBundle = bundleResult.data.name;
-          console.log('Serial and Batch Bundle created:', serialBatchBundle);
+          console.log('Serial and Batch Bundle created successfully:', serialBatchBundle);
           toast({
             title: "Bundle Created",
             description: `Serial and Batch Bundle ${serialBatchBundle} created for batch ${entryWithWarehouse.batch}`,
           });
         } else {
-          throw new Error('Failed to create Serial and Batch Bundle');
+          throw new Error('Failed to create Serial and Batch Bundle - no bundle name returned');
         }
       }
 
