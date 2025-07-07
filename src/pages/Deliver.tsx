@@ -1,37 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, CheckCircle, AlertTriangle, Loader2, Truck } from "lucide-react";
-import { format } from 'date-fns';
-import DeliveryForm from "@/components/deliver/DeliveryForm";
-import SalesOrderSearch from "@/components/deliver/SalesOrderSearch";
-import { SalesOrder, SalesOrderItem, SOItem, DeliveryEntry, SalesOrderOption, DashboardData } from "@/types";
+import { Truck } from "lucide-react";
+import DeliverDashboard from "@/components/deliver/DeliverDashboard";
+import DeliveryProcess from "@/components/deliver/DeliveryProcess";
+import { SalesOrder, SalesOrderOption, DashboardData, DeliveryEntry } from "@/types";
 
 const Deliver = () => {
   const navigate = useNavigate();
-  const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
+  const [currentStep, setCurrentStep] = useState<'dashboard' | 'process' | 'review'>('dashboard');
+  const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrder | null>(null);
   const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
 
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     pendingOrders: 0,
@@ -39,6 +21,10 @@ const Deliver = () => {
     overdue: 0,
     deliveredToday: 0,
   });
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
   const loadDashboardData = async () => {
     try {
@@ -53,27 +39,13 @@ const Deliver = () => {
         return;
       }
 
-      // Fetch dashboard data
-      const response = await erpnextAPI.callAPI('frappe.desk.desk_page.get_counts');
-
-      if (response?.data) {
-        // Transform the data to match our DashboardData interface
-        const transformedData: DashboardData = {
-          pendingOrders: response.data.open_sales_orders || 0,
-          readyToShip: response.data.items_to_deliver || 0,
-          overdue: response.data.overdue_sales_orders || 0,
-          deliveredToday: response.data.delivered_today || 0,
-        };
-
-        setDashboardData(transformedData);
-      } else {
-        setDashboardData({
-          pendingOrders: 0,
-          readyToShip: 0,
-          overdue: 0,
-          deliveredToday: 0,
-        });
-      }
+      // Set default dashboard data since the get_counts API doesn't exist
+      setDashboardData({
+        pendingOrders: 0,
+        readyToShip: 0,
+        overdue: 0,
+        deliveredToday: 0,
+      });
 
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -87,36 +59,88 @@ const Deliver = () => {
     }
   };
 
-  const handleSelectSO = (salesOrder: SalesOrder) => {
-    setSalesOrder(salesOrder);
-  };
+  const handleSelectSalesOrder = async (salesOrderOption: SalesOrderOption) => {
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-  const handleAddEntry = (entry: DeliveryEntry) => {
-    setDeliveryEntries([...deliveryEntries, entry]);
-  };
+      // Fetch full sales order details
+      const response = await erpnextAPI.getSalesOrder(salesOrderOption.number);
+      
+      if (response?.data) {
+        const salesOrder: SalesOrder = {
+          id: response.data.name,
+          name: response.data.name,
+          number: response.data.name,
+          customer: response.data.customer,
+          status: response.data.status,
+          totalValue: response.data.grand_total || 0,
+          grand_total: response.data.grand_total || 0,
+          totalItems: response.data.items?.length || 0,
+          percentDelivered: response.data.per_delivered || 0,
+          items: response.data.items?.map((item: any) => ({
+            itemCode: item.item_code,
+            itemName: item.item_name,
+            orderedQty: item.qty,
+            deliveredQty: item.delivered_qty || 0,
+            pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
+            rate: item.rate,
+            uom: item.uom,
+            warehouse: item.warehouse
+          })) || []
+        };
 
-  const calculateTotalDelivered = () => {
-    return deliveryEntries.reduce((acc, entry) => acc + entry.actualQty, 0);
-  };
+        setSelectedSalesOrder(salesOrder);
+        setCurrentStep('process');
+      }
 
-  const calculateTotalValue = () => {
-    return deliveryEntries.reduce((acc, entry) => acc + (entry.actualQty * entry.rate), 0);
-  };
-
-  const handleSubmitDelivery = async () => {
-    if (!salesOrder) {
+    } catch (error) {
+      console.error('Error fetching sales order:', error);
       toast({
-        title: "Sales Order Required",
-        description: "Please select a sales order before submitting delivery.",
+        title: "Error",
+        description: "Failed to fetch sales order details",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddDeliveryEntry = (entry: DeliveryEntry) => {
+    setDeliveryEntries(prev => [...prev, entry]);
+  };
+
+  const handleBackToDashboard = () => {
+    setCurrentStep('dashboard');
+    setSelectedSalesOrder(null);
+    setDeliveryEntries([]);
+  };
+
+  const handleProceedToReview = () => {
+    if (deliveryEntries.length === 0) {
+      toast({
+        title: "No Items Added",
+        description: "Please add items to the delivery before proceeding.",
         variant: "destructive"
       });
       return;
     }
+    setCurrentStep('review');
+  };
 
-    if (deliveryEntries.length === 0) {
+  const handleSubmitDelivery = async () => {
+    if (!selectedSalesOrder || deliveryEntries.length === 0) {
       toast({
-        title: "No Items to Deliver",
-        description: "Please add items to the delivery before submitting.",
+        title: "Invalid Delivery",
+        description: "Please ensure a sales order is selected and items are added.",
         variant: "destructive"
       });
       return;
@@ -128,29 +152,26 @@ const Deliver = () => {
       if (!erpnextAPI) {
         toast({
           title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings in the Profile page.",
+          description: "Please configure your ERPNext settings.",
           variant: "destructive"
         });
         return;
       }
 
-      // Prepare the data for creating the Delivery Note
+      // Prepare delivery note data
       const deliveryNoteData = {
-        sales_order: salesOrder.name,
-        customer: salesOrder.customer,
-        company: 'GrandLiners', // Replace with the actual company name
+        customer: selectedSalesOrder.customer,
         items: deliveryEntries.map(entry => ({
           item_code: entry.itemCode,
-          qty: entry.actualQty,
+          qty: entry.deliveredQty,
           rate: entry.rate,
           warehouse: entry.warehouse,
-          batch_no: entry.batch,
-          serial_no: entry.serial,
-          uom: entry.uom
+          against_sales_order: selectedSalesOrder.name,
+          ...(entry.batch && { batch_no: entry.batch }),
+          ...(entry.serial && { serial_no: entry.serial })
         }))
       };
 
-      // Create the Delivery Note
       const response = await erpnextAPI.createDeliveryNote(deliveryNoteData);
 
       if (response?.data) {
@@ -158,16 +179,12 @@ const Deliver = () => {
           title: "Delivery Note Created",
           description: `Delivery Note ${response.data.name} created successfully.`,
         });
-        // Reset state after successful submission
-        setSalesOrder(null);
-        setDeliveryEntries([]);
-        navigate('/deliveries');
-      } else {
-        toast({
-          title: "Delivery Note Creation Failed",
-          description: "Failed to create delivery note. Please try again.",
-          variant: "destructive"
-        });
+        
+        // Reset to dashboard
+        handleBackToDashboard();
+        
+        // Optionally navigate to delivery note or stay on dashboard
+        // navigate(`/delivery-note/${response.data.name}`);
       }
 
     } catch (error) {
@@ -182,16 +199,10 @@ const Deliver = () => {
     }
   };
 
-  const shortcuts = [
-    {
-      label: "New Customer",
-      icon: Plus,
-      action: () => {
-        // Implement the action to navigate to the new customer page
-        navigate("/customers/new");
-      },
-    },
-  ];
+  const handleViewAllSalesOrders = () => {
+    // Navigate to sales orders list
+    navigate('/sales-orders');
+  };
 
   return (
     <div className="container mx-auto py-6">
@@ -203,131 +214,47 @@ const Deliver = () => {
         <p className="text-gray-500">Create a new delivery for a sales order.</p>
       </div>
 
-      {/* Dashboard Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600 mb-1">Pending Orders</p>
-                <p className="text-2xl font-bold text-blue-600">{dashboardData.pendingOrders}</p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-green-50 border-green-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-600 mb-1">Ready to Ship</p>
-                <p className="text-2xl font-bold text-green-600">{dashboardData.readyToShip}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-red-50 border-red-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-red-600 mb-1">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">{dashboardData.overdue}</p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-yellow-600 mb-1">Delivered Today</p>
-                <p className="text-2xl font-bold text-yellow-600">{dashboardData.deliveredToday}</p>
-              </div>
-              <Truck className="w-8 h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Order Selection */}
-        <SalesOrderSearch onSelectSO={handleSelectSO} shortcuts={shortcuts} />
-
-        {/* Delivery Form */}
-        {salesOrder && (
-          <DeliveryForm soItems={salesOrder.items} onAddEntry={handleAddEntry} />
-        )}
-      </div>
-
-      {/* Delivery Summary */}
-      {deliveryEntries.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Delivery Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Warehouse</TableHead>
-                    <TableHead>Batch</TableHead>
-                    <TableHead>Serial</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead className="text-right">Rate</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {deliveryEntries.map((entry, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{entry.itemName}</TableCell>
-                      <TableCell>{entry.warehouse}</TableCell>
-                      <TableCell>{entry.batch || '-'}</TableCell>
-                      <TableCell>{entry.serial || '-'}</TableCell>
-                      <TableCell className="text-right">{entry.actualQty} {entry.uom}</TableCell>
-                      <TableCell className="text-right">₹{entry.rate.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">₹{(entry.actualQty * entry.rate).toLocaleString()}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={4}>Total</TableCell>
-                    <TableCell className="text-right">{calculateTotalDelivered()} Items</TableCell>
-                    <TableCell></TableCell>
-                    <TableCell className="text-right">₹{calculateTotalValue().toLocaleString()}</TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+      {currentStep === 'dashboard' && (
+        <DeliverDashboard
+          onSelectSalesOrder={handleSelectSalesOrder}
+          onViewSalesOrders={handleViewAllSalesOrders}
+          dashboardData={dashboardData}
+          isLoading={loading}
+        />
       )}
 
-      {/* Submit Button */}
-      {salesOrder && (
-        <div className="mt-6">
-          <Button
-            onClick={handleSubmitDelivery}
-            className="w-full"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting Delivery...
-              </>
-            ) : (
-              "Submit Delivery"
-            )}
-          </Button>
+      {currentStep === 'process' && selectedSalesOrder && (
+        <DeliveryProcess
+          salesOrder={selectedSalesOrder}
+          onBack={handleBackToDashboard}
+          onNext={handleProceedToReview}
+          onAddEntry={handleAddDeliveryEntry}
+        />
+      )}
+
+      {currentStep === 'review' && selectedSalesOrder && (
+        <div className="space-y-6">
+          {/* Review and Submit functionality would go here */}
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">Review Delivery</h2>
+            <p className="text-gray-600 mb-6">Review the items and submit the delivery note.</p>
+            
+            <div className="flex space-x-4 justify-center">
+              <button
+                onClick={() => setCurrentStep('process')}
+                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Back to Edit
+              </button>
+              <button
+                onClick={handleSubmitDelivery}
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Submitting...' : 'Submit Delivery'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
