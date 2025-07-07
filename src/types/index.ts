@@ -76,6 +76,10 @@ export interface DeliveryEntry {
   rate: number;
   salesOrderItem?: string;
   serial_batch_bundle?: string;
+  batches?: Array<{
+    batch_no: string;
+    qty: number;
+  }>;
 }
 
 // Stock Count Types

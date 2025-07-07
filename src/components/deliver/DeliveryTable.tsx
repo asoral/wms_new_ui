@@ -7,7 +7,7 @@ import { DeliveryEntry } from "@/types";
 
 interface DeliveryTableProps {
   entries: DeliveryEntry[];
-  onRemoveEntry: (index: number) => Promise<void>;
+  onRemoveEntry: (index: number) => void;
 }
 
 const DeliveryTable = ({ entries, onRemoveEntry }: DeliveryTableProps) => {

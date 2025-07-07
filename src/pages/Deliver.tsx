@@ -2,14 +2,19 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { Truck } from "lucide-react";
+import { Truck, ArrowLeft } from "lucide-react";
 import DeliverDashboard from "@/components/deliver/DeliverDashboard";
-import DeliveryProcess from "@/components/deliver/DeliveryProcess";
+import EnhancedDeliveryItemScanner from "@/components/deliver/EnhancedDeliveryItemScanner";
+import DeliveryTable from "@/components/deliver/DeliveryTable";
 import { SalesOrder, SalesOrderOption, DashboardData, DeliveryEntry } from "@/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Deliver = () => {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<'dashboard' | 'process' | 'review'>('dashboard');
+  const [currentStep, setCurrentStep] = useState<'dashboard' | 'deliver' | 'review'>('dashboard');
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrder | null>(null);
   const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -99,7 +104,7 @@ const Deliver = () => {
         };
 
         setSelectedSalesOrder(salesOrder);
-        setCurrentStep('process');
+        setCurrentStep('deliver');
       }
 
     } catch (error) {
@@ -204,58 +209,184 @@ const Deliver = () => {
     navigate('/sales-orders');
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
   return (
     <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold flex items-center space-x-2">
-          <Truck className="w-6 h-6" />
-          <span>Deliver</span>
-        </h1>
-        <p className="text-gray-500">Create a new delivery for a sales order.</p>
-      </div>
-
-      {currentStep === 'dashboard' && (
-        <DeliverDashboard
-          onSelectSalesOrder={handleSelectSalesOrder}
-          onViewSalesOrders={handleViewAllSalesOrders}
-          dashboardData={dashboardData}
-          isLoading={loading}
-        />
-      )}
-
-      {currentStep === 'process' && selectedSalesOrder && (
-        <DeliveryProcess
-          salesOrder={selectedSalesOrder}
-          onBack={handleBackToDashboard}
-          onNext={handleProceedToReview}
-          onAddEntry={handleAddDeliveryEntry}
-        />
-      )}
-
-      {currentStep === 'review' && selectedSalesOrder && (
-        <div className="space-y-6">
-          {/* Review and Submit functionality would go here */}
-          <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">Review Delivery</h2>
-            <p className="text-gray-600 mb-6">Review the items and submit the delivery note.</p>
-            
-            <div className="flex space-x-4 justify-center">
-              <button
-                onClick={() => setCurrentStep('process')}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Back to Edit
-              </button>
-              <button
-                onClick={handleSubmitDelivery}
-                disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? 'Submitting...' : 'Submit Delivery'}
-              </button>
-            </div>
+      {currentStep === 'dashboard' ? (
+        <>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold flex items-center space-x-2">
+              <Truck className="w-6 h-6" />
+              <span>Deliver</span>
+            </h1>
+            <p className="text-gray-500">Create a new delivery for a sales order.</p>
           </div>
-        </div>
+          <DeliverDashboard
+            onSelectSalesOrder={handleSelectSalesOrder}
+            onViewSalesOrders={handleViewAllSalesOrders}
+            dashboardData={dashboardData}
+            isLoading={loading}
+          />
+        </>
+      ) : (
+        <>
+          {/* Header with back button and sales order info */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  onClick={handleBackToDashboard}
+                  className="flex items-center space-x-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Dashboard</span>
+                </Button>
+                <div className="h-6 w-px bg-gray-300" />
+                <div className="flex items-center space-x-2">
+                  <Truck className="w-5 h-5 text-blue-600" />
+                  <span className="font-semibold">Deliver</span>
+                </div>
+              </div>
+            </div>
+            {selectedSalesOrder && (
+              <div className="mt-4 text-sm text-gray-600">
+                Selected: {selectedSalesOrder.number} - {selectedSalesOrder.customer}
+              </div>
+            )}
+          </div>
+
+          {/* Main Content with Tabs */}
+          <Tabs value={currentStep} onValueChange={(value) => setCurrentStep(value as any)}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="dashboard" disabled>Dashboard</TabsTrigger>
+              <TabsTrigger value="deliver">Deliver Items</TabsTrigger>
+              <TabsTrigger value="review">Review & Submit</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="deliver" className="mt-6">
+              {selectedSalesOrder && (
+                <div className="space-y-6">
+                  {/* Selected Sales Order Summary */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Selected Sales Order</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-4 gap-4 text-center">
+                        <div>
+                          <div className="text-sm text-gray-600">Order:</div>
+                          <div className="font-semibold text-blue-600">{selectedSalesOrder.number}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Customer:</div>
+                          <div className="font-semibold">{selectedSalesOrder.customer}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Amount:</div>
+                          <div className="font-semibold">{formatCurrency(selectedSalesOrder.totalValue)}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Draft DN:</div>
+                          <div className="text-green-600 text-sm">Will create after first item</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Delivery Item Scanner */}
+                  <EnhancedDeliveryItemScanner
+                    soItems={selectedSalesOrder.items}
+                    onAddEntry={handleAddDeliveryEntry}
+                  />
+
+                  {/* Items in Sales Order Table */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Items in {selectedSalesOrder.number}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50">
+                              <th className="text-left p-3 border text-sm">Item Code</th>
+                              <th className="text-left p-3 border text-sm">Item Name</th>
+                              <th className="text-left p-3 border text-sm">Ordered</th>
+                              <th className="text-left p-3 border text-sm">Delivered</th>
+                              <th className="text-left p-3 border text-sm">Pending</th>
+                              <th className="text-left p-3 border text-sm">Rate</th>
+                              <th className="text-left p-3 border text-sm">Warehouse</th>
+                              <th className="text-left p-3 border text-sm">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedSalesOrder.items.map((item, index) => (
+                              <tr key={index} className="border-b">
+                                <td className="p-3 border text-sm">{item.itemCode}</td>
+                                <td className="p-3 border text-sm">{item.itemName}</td>
+                                <td className="p-3 border text-sm">{item.orderedQty} {item.uom}</td>
+                                <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td>
+                                <td className="p-3 border text-sm text-orange-600 font-medium">{item.pendingQty} {item.uom}</td>
+                                <td className="p-3 border text-sm">₹{item.rate}</td>
+                                <td className="p-3 border text-sm">{item.warehouse}</td>
+                                <td className="p-3 border text-sm">
+                                  <Badge variant="secondary">Pending</Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="review" className="mt-6">
+              <div className="space-y-6">
+                {/* Review Summary */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Review Delivery</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 mb-6">Review the items and submit the delivery note.</p>
+                    
+                    {deliveryEntries.length > 0 && (
+                      <DeliveryTable entries={deliveryEntries} onRemoveEntry={(index) => {
+                        setDeliveryEntries(prev => prev.filter((_, i) => i !== index));
+                      }} />
+                    )}
+                    
+                    <div className="flex justify-between items-center mt-6">
+                      <Button
+                        variant="outline"
+                        onClick={() => setCurrentStep('deliver')}
+                      >
+                        Back to Edit
+                      </Button>
+                      <Button
+                        onClick={handleSubmitDelivery}
+                        disabled={loading || deliveryEntries.length === 0}
+                      >
+                        {loading ? 'Submitting...' : `Submit Delivery (${deliveryEntries.length} items)`}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </>
       )}
     </div>
   );
