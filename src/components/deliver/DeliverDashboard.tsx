@@ -285,6 +285,7 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
                   </div>
                   <div className="flex items-center space-x-2">
                     <Badge variant="outline">{so.status}</Badge>
+                    <Badge variant="secondary">{so.percentDelivered}% delivered</Badge>
                   </div>
                 </div>
               ))}
