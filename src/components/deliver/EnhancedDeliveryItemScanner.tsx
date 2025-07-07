@@ -267,11 +267,6 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedItem && (
-                  <div className="mt-2 text-sm text-gray-600">
-                    {selectedItem.itemCode} - {selectedItem.itemName}
-                  </div>
-                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

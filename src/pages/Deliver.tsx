@@ -163,8 +163,13 @@ const Deliver = () => {
         return;
       }
 
+      // Get user's default company
+      const { getUserDefaultCompany } = await import('@/services/erpnextApi');
+      const defaultCompany = await getUserDefaultCompany();
+      
       // Prepare delivery note data
       const deliveryNoteData = {
+        company: defaultCompany || selectedSalesOrder.customer, // Use default company or fallback
         customer: selectedSalesOrder.customer,
         items: deliveryEntries.map(entry => ({
           item_code: entry.itemCode,
