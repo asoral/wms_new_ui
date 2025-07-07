@@ -8,6 +8,7 @@ import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight } from "luci
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { createSerialBatchBundle, checkBatchExists, createBatch } from "@/services/serialBatchBundleApi";
 import ReceiveDashboard from "../components/receive/ReceiveDashboard";
 import ReceiveForm from "../components/receive/ReceiveForm";
 import ReceiveTable from "../components/receive/ReceiveTable";
@@ -218,10 +219,75 @@ const Receive = () => {
 
       console.log('Processing entry with warehouse and PO item reference:', entryWithWarehouse);
 
-        // Get the company from the PO details we fetch
-        const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
-        const company = poDetails.data.company;
-        const supplierFromPO = poDetails.data.supplier; // Get correct supplier ID
+      // Get the company from the PO details we fetch
+      const poDetails = await erpnextAPI.getPurchaseOrder(selectedPO.poNumber);
+      const company = poDetails.data.company;
+      const supplierFromPO = poDetails.data.supplier; // Get correct supplier ID
+
+      // Create Serial and Batch Bundle if item has batch tracking
+      let serialBatchBundle = null;
+      if (entryWithWarehouse.batch) {
+        console.log('Creating Serial and Batch Bundle for batch:', entryWithWarehouse.batch);
+        
+        // Check if batch exists, create if it doesn't
+        const batchExists = await checkBatchExists(entryWithWarehouse.batch, entryWithWarehouse.itemCode);
+        if (!batchExists) {
+          console.log('Creating new batch:', entryWithWarehouse.batch);
+          const batchCreated = await createBatch(entryWithWarehouse.batch, entryWithWarehouse.itemCode);
+          if (!batchCreated) {
+            toast({
+              title: "Error",
+              description: `Failed to create batch ${entryWithWarehouse.batch}`,
+              variant: "destructive"
+            });
+            return;
+          }
+        }
+
+        // Create Serial and Batch Bundle
+        const bundleEntries = [{
+          batch_no: entryWithWarehouse.batch,
+          qty: entryWithWarehouse.receivedQty,
+          warehouse: entryWithWarehouse.warehouse,
+          incoming_rate: entryWithWarehouse.rate,
+          outgoing_rate: 0,
+          stock_value_difference: entryWithWarehouse.rate * entryWithWarehouse.receivedQty,
+          is_outward: 0,
+          delivered_qty: 0,
+          ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
+        }];
+
+        const bundleData = {
+          item_code: entryWithWarehouse.itemCode,
+          item_name: entryWithWarehouse.itemName,
+          item_group: "Raw Material", // Default item group
+          has_serial_no: entryWithWarehouse.serial ? 1 : 0,
+          has_batch_no: 1,
+          warehouse: entryWithWarehouse.warehouse,
+          type_of_transaction: 'Inward',
+          total_qty: entryWithWarehouse.receivedQty,
+          avg_rate: entryWithWarehouse.rate,
+          total_amount: entryWithWarehouse.rate * entryWithWarehouse.receivedQty,
+          posting_date: new Date().toISOString().split('T')[0],
+          posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+          voucher_type: 'Purchase Receipt',
+          entries: bundleEntries
+        };
+
+        console.log('Creating Serial and Batch Bundle with data:', bundleData);
+        const bundleResult = await createSerialBatchBundle(bundleData);
+        
+        if (bundleResult?.data?.name) {
+          serialBatchBundle = bundleResult.data.name;
+          console.log('Serial and Batch Bundle created:', serialBatchBundle);
+          toast({
+            title: "Bundle Created",
+            description: `Serial and Batch Bundle ${serialBatchBundle} created for batch ${entryWithWarehouse.batch}`,
+          });
+        } else {
+          throw new Error('Failed to create Serial and Batch Bundle');
+        }
+      }
 
       // Always add to the same Purchase Receipt instead of creating multiple ones
       if (!currentPurchaseReceipt) {
@@ -235,8 +301,8 @@ const Receive = () => {
           uom: entryWithWarehouse.uom,
           purchase_order: selectedPO.poNumber,
           purchase_order_item: entryWithWarehouse.purchaseOrderItem,
-          // Let ERPNext auto-create batch numbers for batch-tracked items
-          ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
+          ...(serialBatchBundle && { serial_and_batch_bundle: serialBatchBundle }),
+          ...(entryWithWarehouse.serial && !serialBatchBundle && { serial_no: entryWithWarehouse.serial })
         };
 
         const receiptData = {
@@ -282,8 +348,8 @@ const Receive = () => {
           uom: entryWithWarehouse.uom,
           purchase_order: selectedPO.poNumber,
           purchase_order_item: entryWithWarehouse.purchaseOrderItem,
-          // Let ERPNext auto-create batch numbers for batch-tracked items
-          ...(entryWithWarehouse.serial && { serial_no: entryWithWarehouse.serial })
+          ...(serialBatchBundle && { serial_and_batch_bundle: serialBatchBundle }),
+          ...(entryWithWarehouse.serial && !serialBatchBundle && { serial_no: entryWithWarehouse.serial })
         };
         
         const updatedItems = [...(currentReceiptData.items || []), newItem];
