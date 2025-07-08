@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { CalendarIcon, Package, Trash2, Plus, ArrowLeft, Save } from "lucide-react"
+import { CalendarIcon, Package, Trash2, Plus, ArrowLeft, Save, ArrowRight } from "lucide-react"
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemSearch from '@/components/common/ItemSearch';
@@ -36,12 +36,13 @@ interface MaterialRequestFormProps {
 const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" }: MaterialRequestFormProps) => {
   const [formData, setFormData] = useState({
     material_request_type: purpose,
-    company: '',
-    remarks: ''
+    company: ''
   });
   const [items, setItems] = useState<MaterialRequestItem[]>([]);
   const [warehouses, setWarehouses] = useState<string[]>([]);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -109,7 +110,7 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
       uom: item.stock_uom || 'Nos',
       rate: 0,
       amount: 0,
-      warehouse: '',
+      warehouse: selectedWarehouse, // Use header warehouse
       schedule_date: new Date().toISOString().split('T')[0],
       description: item.description || ''
     };
@@ -154,7 +155,7 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
     setItems([...items, newItem]);
   };
 
-  const handleSubmit = async () => {
+  const handleSaveDraft = async () => {
     if (items.length === 0) {
       toast({
         title: "No Items",
@@ -198,8 +199,8 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
 
       if (response?.data) {
         toast({
-          title: "Success",
-          description: `Material request ${response.data.name} created successfully.`,
+          title: "Draft Saved",
+          description: `Material request ${response.data.name} saved as draft.`,
         });
         
         if (onSubmit) {
@@ -216,6 +217,13 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReviewAndSubmit = async () => {
+    // First save as draft
+    await handleSaveDraft();
+    // Then show review - in the future we can make this a separate component
+    setShowReview(true);
   };
 
   return (
@@ -235,21 +243,33 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
         </div>
       </div>
 
-      {/* Request Details */}
+      {/* Warehouse Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Request Details</CardTitle>
+          <CardTitle>Default Warehouse</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div>
-            <Label htmlFor="remarks">Remarks</Label>
-            <Textarea
-              id="remarks"
-              placeholder="Enter request remarks..."
-              value={formData.remarks}
-              onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
-              rows={3}
-            />
+            <Label>Select Default Warehouse</Label>
+            <Select
+              value={selectedWarehouse}
+              onValueChange={(value) => {
+                setSelectedWarehouse(value);
+                // Update all items with the new warehouse
+                setItems(items.map(item => ({ ...item, warehouse: value })));
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select warehouse for all items..." />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((warehouse) => (
+                  <SelectItem key={warehouse} value={warehouse}>
+                    {warehouse}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -358,22 +378,13 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
                     </div>
 
                     <div>
-                      <Label>Warehouse Code / Name</Label>
-                      <Select
+                      <Label>Warehouse</Label>
+                      <Input
                         value={item.warehouse}
-                        onValueChange={(value) => handleItemUpdate(item.item_code, 'warehouse', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Search warehouse by code or name..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {warehouses.map((warehouse) => (
-                            <SelectItem key={warehouse} value={warehouse}>
-                              {warehouse}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        readOnly
+                        className="bg-gray-50"
+                        placeholder="Select warehouse above"
+                      />
                     </div>
                   </div>
 
@@ -420,20 +431,22 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
         <div className="flex space-x-2">
           <Button 
             type="button" 
-            onClick={handleSubmit} 
+            variant="outline"
+            onClick={handleSaveDraft} 
             disabled={loading || items.length === 0}
             className="flex-1 sm:flex-none"
           >
             <Save className="w-4 h-4 mr-2" />
-            {loading ? 'Creating...' : 'Save Draft'}
+            {loading ? 'Saving...' : 'Save Draft'}
           </Button>
           <Button 
             type="button" 
-            onClick={handleSubmit} 
+            onClick={handleReviewAndSubmit} 
             disabled={loading || items.length === 0}
             className="flex-1 sm:flex-none"
           >
-            {loading ? 'Submitting...' : 'Review & Submit'}
+            <ArrowRight className="w-4 h-4 mr-2" />
+            Review & Submit
           </Button>
         </div>
       </div>

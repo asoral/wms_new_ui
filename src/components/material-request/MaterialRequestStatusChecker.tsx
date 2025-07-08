@@ -20,7 +20,11 @@ interface MaterialRequestStatus {
   docstatus: number;
 }
 
-const MaterialRequestStatusChecker = () => {
+interface MaterialRequestStatusCheckerProps {
+  onEdit?: (request: MaterialRequestStatus) => void;
+}
+
+const MaterialRequestStatusChecker = ({ onEdit }: MaterialRequestStatusCheckerProps = {}) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [requestStatus, setRequestStatus] = useState<MaterialRequestStatus | null>(null);
@@ -165,6 +169,19 @@ const MaterialRequestStatusChecker = () => {
                 </p>
               </div>
             </div>
+            
+            {requestStatus.status === 'Draft' && onEdit && (
+              <div className="pt-3 border-t">
+                <Button 
+                  onClick={() => onEdit(requestStatus)}
+                  size="sm"
+                  className="w-full"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Edit Draft Request
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

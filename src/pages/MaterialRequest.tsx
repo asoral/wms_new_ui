@@ -7,7 +7,7 @@ import { Database, FileText, Package, CheckCircle, AlertTriangle, Calendar, User
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import MaterialRequestStatusChecker from "@/components/material-request/MaterialRequestStatusChecker";
-import MaterialRequestForm from "@/components/material-request/MaterialRequestForm";
+import MaterialRequestFormImproved from "@/components/material-request/MaterialRequestFormImproved";
 import MaterialRequestReview from "@/components/material-request/MaterialRequestReview";
 import MaterialRequestList from "@/components/material-request/MaterialRequestList";
 
@@ -91,7 +91,7 @@ const MaterialRequest = () => {
 
   const handleDraftCreated = (draftData: any) => {
     setCurrentDraft(draftData);
-    // Don't go back to dashboard yet - stay for review
+    setCurrentView('review'); // Go to review after saving draft
     toast({
       title: "Draft Saved",
       description: `Material request draft ${draftData.name} has been saved.`,
@@ -178,12 +178,10 @@ const MaterialRequest = () => {
   if (currentView === 'create') {
     return (
       <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-        <MaterialRequestForm
+        <MaterialRequestFormImproved
           purpose={selectedPurpose as any}
-          draftRequest={editingRequest || currentDraft}
-          onDraftCreated={handleDraftCreated}
-          onReviewAndSubmit={handleReviewAndSubmit}
-          onBack={handleBackToDashboard}
+          onSubmit={handleDraftCreated}
+          onCancel={handleBackToDashboard}
         />
       </div>
     );
@@ -231,7 +229,7 @@ const MaterialRequest = () => {
 
         <div className="space-y-6">
           {/* Status Checker */}
-          <MaterialRequestStatusChecker />
+          <MaterialRequestStatusChecker onEdit={handleEditFromList} />
 
           {/* Quick Actions */}
           <Card>
