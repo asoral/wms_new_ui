@@ -150,16 +150,28 @@ const Deliver = () => {
         customer: selectedSalesOrder.customer,
         items: entries.map(entry => {
           const soItem = selectedSalesOrder.items.find(item => item.itemCode === entry.itemCode);
-          return {
+          const itemData: any = {
             item_code: entry.itemCode,
             qty: entry.deliveredQty,
             rate: entry.rate,
             warehouse: entry.warehouse,
             against_sales_order: selectedSalesOrder.name,
             so_detail: soItem?.name || '', // Correct field name for Sales Order Item
-            ...(entry.batch && { batch_no: entry.batch }),
-            ...(entry.serial && { serial_no: entry.serial })
           };
+          
+          // Handle batches for ERPNext v15+ Serial and Batch Bundle
+          if (entry.batches && entry.batches.length > 0) {
+            itemData.use_serial_batch_fields = 1;
+            itemData.batch_no = entry.batches.map(b => `${b.batch_no}:${b.qty}`).join('\n');
+          } else if (entry.batch) {
+            itemData.batch_no = entry.batch;
+          }
+          
+          if (entry.serial) {
+            itemData.serial_no = entry.serial;
+          }
+          
+          return itemData;
         })
       };
 
