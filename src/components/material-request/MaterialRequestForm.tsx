@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Save, ArrowRight, ArrowLeft } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { MaterialRequestPurpose } from "@/pages/MaterialRequest";
+type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture";
 import ItemSearch from "@/components/common/ItemSearch";
 
 interface MaterialRequestFormProps {
