@@ -59,11 +59,12 @@ const MaterialRequestList = ({ onBack, onEdit, onView }: MaterialRequestListProp
   };
 
   const filteredRequests = requests.filter(request => {
-    const matchesSearch = request.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         request.material_request_type.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (request.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (request.material_request_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (request.title || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     if (filterStatus === "all") return matchesSearch;
-    return matchesSearch && request.status.toLowerCase() === filterStatus.toLowerCase();
+    return matchesSearch && (request.status || '').toLowerCase() === filterStatus.toLowerCase();
   });
 
   const getStatusBadge = (status: string) => {
@@ -184,11 +185,18 @@ const MaterialRequestList = ({ onBack, onEdit, onView }: MaterialRequestListProp
                         <td className="p-3 border">{request.owner}</td>
                         <td className="p-3 border">
                           <div className="flex space-x-2">
-                            <Button size="sm" variant="outline">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => onView(request)}
+                            >
                               View
                             </Button>
                             {request.status === 'Draft' && (
-                              <Button size="sm">
+                              <Button 
+                                size="sm"
+                                onClick={() => onEdit(request)}
+                              >
                                 Edit
                               </Button>
                             )}
