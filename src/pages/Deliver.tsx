@@ -92,6 +92,7 @@ const Deliver = () => {
           totalItems: response.data.items?.length || 0,
           percentDelivered: response.data.per_delivered || 0,
           items: response.data.items?.map((item: any) => ({
+            name: item.name, // ERPNext Sales Order Item unique identifier
             itemCode: item.item_code,
             itemName: item.item_name,
             orderedQty: item.qty,
@@ -181,7 +182,7 @@ const Deliver = () => {
             rate: entry.rate,
             warehouse: entry.warehouse,
             against_sales_order: selectedSalesOrder.name,
-            against_sales_order_item: soItem?.itemCode || entry.itemCode, // Required field
+            against_sales_order_item: soItem?.name || '', // Use the Sales Order Item name (unique identifier)
             ...(entry.batch && { batch_no: entry.batch }),
             ...(entry.serial && { serial_no: entry.serial })
           };
