@@ -10,8 +10,9 @@ import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import ItemDropdown from "@/components/common/ItemDropdown";
+import ItemSelector from "@/components/common/ItemSelector";
 import UOMSelector from "@/components/material-request/UOMSelector";
+import WarehouseSelector from "@/components/material-request/WarehouseSelector";
 
 type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture" | "Customer Provided";
 
@@ -384,42 +385,22 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <Label htmlFor="sourceWarehouse">Source Warehouse *</Label>
-                <Select
+                <WarehouseSelector
                   value={sourceWarehouse}
                   onValueChange={(value) => handleWarehouseSelect(value, true)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select source warehouse" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses.map((warehouse) => (
-                      <SelectItem key={warehouse.name} value={warehouse.name}>
-                        {warehouse.warehouse_name || warehouse.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select source warehouse"
+                />
                 <p className="text-sm text-muted-foreground mt-1">
                   Warehouse from which items will be transferred
                 </p>
               </div>
               <div>
                 <Label htmlFor="targetWarehouse">Target Warehouse *</Label>
-                <Select
+                <WarehouseSelector
                   value={targetWarehouse}
                   onValueChange={setTargetWarehouse}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select target warehouse" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses.map((warehouse) => (
-                      <SelectItem key={warehouse.name} value={warehouse.name}>
-                        {warehouse.warehouse_name || warehouse.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select target warehouse"
+                />
                 <p className="text-sm text-muted-foreground mt-1">
                   Warehouse to which items will be transferred
                 </p>
@@ -475,7 +456,7 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="lg:col-span-2">
                     <Label>Item *</Label>
-                    <ItemDropdown
+                    <ItemSelector
                       onItemSelect={(selectedItem) => handleItemSelect(index, selectedItem)}
                       placeholder="Search and select item..."
                       selectedItem={item.itemCode ? {
@@ -510,21 +491,11 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
 
                   <div>
                     <Label htmlFor={`warehouse-${index}`}>Warehouse</Label>
-                    <Select
+                    <WarehouseSelector
                       value={item.warehouse}
                       onValueChange={(value) => updateItem(index, 'warehouse', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select warehouse" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map((warehouse) => (
-                          <SelectItem key={warehouse.name} value={warehouse.name}>
-                            {warehouse.warehouse_name || warehouse.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Select warehouse"
+                    />
                   </div>
 
                   <div>
