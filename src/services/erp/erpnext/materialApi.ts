@@ -117,4 +117,25 @@ export class ERPNextMaterialAPI extends ERPNextBaseAPI {
 
     return response.json();
   }
+
+  async submitMaterialRequest(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Material Request/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        docstatus: 1
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Submit Material Request API Error:', response.status, errorText);
+      throw new Error(`Failed to submit material request: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
 }

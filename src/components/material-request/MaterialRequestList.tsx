@@ -10,10 +10,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import MobileMaterialRequestCard from "./MobileMaterialRequestCard";
 
 interface MaterialRequestListProps {
-  onCreateNew: () => void;
+  onBack: () => void;
+  onEdit: (request: any) => void;
+  onView: (request: any) => void;
 }
 
-const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
+const MaterialRequestList = ({ onBack, onEdit, onView }: MaterialRequestListProps) => {
   const [requests, setRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -136,9 +138,8 @@ const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Material Requests ({filteredRequests.length})</span>
-              <Button onClick={onCreateNew} size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                New Request
+              <Button onClick={onBack} variant="outline" size="sm">
+                Back to Dashboard
               </Button>
             </CardTitle>
           </CardHeader>
@@ -205,9 +206,8 @@ const MaterialRequestList = ({ onCreateNew }: MaterialRequestListProps) => {
         <Card>
           <CardContent className="p-8 text-center">
             <p className="text-gray-500 mb-4">No material requests found</p>
-            <Button onClick={onCreateNew}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create First Material Request
+            <Button onClick={onBack} variant="outline">
+              Back to Dashboard
             </Button>
           </CardContent>
         </Card>

@@ -2,15 +2,20 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Database, FileText, Package, CheckCircle, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Database, FileText, Package, CheckCircle, AlertTriangle, Calendar, User, Eye, Edit3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import MaterialRequestStatusChecker from "@/components/material-request/MaterialRequestStatusChecker";
 import MaterialRequestForm from "@/components/material-request/MaterialRequestForm";
+import MaterialRequestReview from "@/components/material-request/MaterialRequestReview";
+import MaterialRequestList from "@/components/material-request/MaterialRequestList";
 
 const MaterialRequest = () => {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'create' | 'list'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'create' | 'review' | 'list' | 'edit'>('dashboard');
   const [selectedPurpose, setSelectedPurpose] = useState<string>('');
+  const [currentDraft, setCurrentDraft] = useState<any>(null);
+  const [editingRequest, setEditingRequest] = useState<any>(null);
   const [materialRequests, setMaterialRequests] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState({
     total: 0,
@@ -71,21 +76,60 @@ const MaterialRequest = () => {
 
   const handleCreateNew = (purpose: string) => {
     setSelectedPurpose(purpose);
+    setCurrentDraft(null);
+    setEditingRequest(null);
     setCurrentView('create');
   };
 
   const handleBackToDashboard = () => {
     setCurrentView('dashboard');
     setSelectedPurpose('');
+    setCurrentDraft(null);
+    setEditingRequest(null);
+    fetchMaterialRequests(); // Refresh data when returning to dashboard
   };
 
-  const handleFormSubmit = (data: any) => {
+  const handleDraftCreated = (draftData: any) => {
+    setCurrentDraft(draftData);
+    // Don't go back to dashboard yet - stay for review
     toast({
-      title: "Material Request Created",
-      description: `Material request ${data.name} created successfully!`,
+      title: "Draft Saved",
+      description: `Material request draft ${draftData.name} has been saved.`,
+    });
+  };
+
+  const handleReviewAndSubmit = () => {
+    if (currentDraft) {
+      setCurrentView('review');
+    }
+  };
+
+  const handleEditRequest = () => {
+    setCurrentView('create');
+  };
+
+  const handleRequestSubmitted = (submittedData: any) => {
+    toast({
+      title: "Request Submitted",
+      description: `Material request ${submittedData.name} has been submitted successfully.`,
     });
     handleBackToDashboard();
-    fetchMaterialRequests(); // Refresh the list
+  };
+
+  const handleViewAll = () => {
+    setCurrentView('list');
+  };
+
+  const handleEditFromList = (request: any) => {
+    setEditingRequest(request);
+    setCurrentDraft(request);
+    setSelectedPurpose(request.material_request_type);
+    setCurrentView('create');
+  };
+
+  const handleViewFromList = (request: any) => {
+    setCurrentDraft(request);
+    setCurrentView('review');
   };
 
   const getStatusBadge = (status: string) => {
@@ -106,25 +150,71 @@ const MaterialRequest = () => {
     return <Badge variant={statusInfo.variant}>{status}</Badge>;
   };
 
-  if (currentView === 'create' && selectedPurpose) {
+  const getTypeBadge = (type: string) => {
+    const typeMap: Record<string, string> = {
+      'Purchase': 'bg-blue-100 text-blue-800',
+      'Material Transfer': 'bg-green-100 text-green-800',
+      'Material Issue': 'bg-red-100 text-red-800',
+      'Manufacture': 'bg-purple-100 text-purple-800',
+      'Customer Provided': 'bg-orange-100 text-orange-800'
+    };
+
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeMap[type] || 'bg-gray-100 text-gray-800'}`}>
+        {type}
+      </span>
+    );
+  };
+
+  const getTotalItems = (request: any) => {
+    return request.items?.length || 0;
+  };
+
+  const getTotalQty = (request: any) => {
+    return request.items?.reduce((total: number, item: any) => total + (item.qty || 0), 0) || 0;
+  };
+
+  // Render different views based on currentView state
+  if (currentView === 'create') {
     return (
       <div className="min-h-screen bg-gray-50 p-4 md:p-6">
         <MaterialRequestForm
           purpose={selectedPurpose as any}
-          onDraftCreated={handleFormSubmit}
-          onReviewAndSubmit={() => {
-            // Handle review and submit logic
-            toast({
-              title: "Ready for Review",
-              description: "Material request is ready for review and submission.",
-            });
-          }}
+          draftRequest={editingRequest || currentDraft}
+          onDraftCreated={handleDraftCreated}
+          onReviewAndSubmit={handleReviewAndSubmit}
           onBack={handleBackToDashboard}
         />
       </div>
     );
   }
 
+  if (currentView === 'review' && currentDraft) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+        <MaterialRequestReview
+          draftData={currentDraft}
+          onBack={() => setCurrentView('create')}
+          onEdit={handleEditRequest}
+          onSubmitted={handleRequestSubmitted}
+        />
+      </div>
+    );
+  }
+
+  if (currentView === 'list') {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+        <MaterialRequestList
+          onBack={handleBackToDashboard}
+          onEdit={handleEditFromList}
+          onView={handleViewFromList}
+        />
+      </div>
+    );
+  }
+
+  // Dashboard view
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
@@ -134,6 +224,7 @@ const MaterialRequest = () => {
             <Database className="w-6 h-6 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Material Request</h1>
+              <p className="text-muted-foreground">Create and manage material requests</p>
             </div>
           </div>
         </div>
@@ -238,7 +329,7 @@ const MaterialRequest = () => {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Recent Material Requests</span>
-                <Button variant="ghost" size="sm" onClick={fetchMaterialRequests}>
+                <Button variant="outline" size="sm" onClick={handleViewAll}>
                   View All
                 </Button>
               </CardTitle>
@@ -247,26 +338,97 @@ const MaterialRequest = () => {
               {loading ? (
                 <div className="text-center py-4">Loading material requests...</div>
               ) : (
-                <div className="space-y-4">
-                  {materialRequests.slice(0, 5).map((request) => (
-                    <div key={request.name} className="border rounded-lg p-4 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold">{request.name}</h3>
-                        <p className="text-sm text-gray-600">
-                          {request.material_request_type} • {request.creation}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {getStatusBadge(request.status)}
-                        <Button size="sm" variant="outline">
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Request ID</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead># Items</TableHead>
+                        <TableHead>Total Qty</TableHead>
+                        <TableHead>Required By</TableHead>
+                        <TableHead>Requested By</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {materialRequests.slice(0, 5).map((request) => (
+                        <TableRow key={request.name} className="hover:bg-muted/50">
+                          <TableCell className="font-medium">
+                            <div>
+                              <div className="font-semibold">{request.name}</div>
+                              {request.title && (
+                                <div className="text-sm text-muted-foreground">{request.title}</div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {getTypeBadge(request.material_request_type)}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(request.status)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              <Package className="w-4 h-4 text-muted-foreground" />
+                              <span>{getTotalItems(request)}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium">{getTotalQty(request)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="w-4 h-4 text-muted-foreground" />
+                              <span>
+                                {request.schedule_date 
+                                  ? new Date(request.schedule_date).toLocaleDateString()
+                                  : 'Not set'
+                                }
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              <User className="w-4 h-4 text-muted-foreground" />
+                              <span>{request.requested_by || 'Not specified'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(request.creation).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex space-x-1">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleViewFromList(request)}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              {request.status === 'Draft' && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleEditFromList(request)}
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  
                   {materialRequests.length === 0 && (
-                    <div className="text-center py-4 text-gray-500">
-                      No material requests found
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No material requests found</p>
+                      <p className="text-sm mt-2">Create your first material request to get started</p>
                     </div>
                   )}
                 </div>

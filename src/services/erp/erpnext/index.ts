@@ -205,6 +205,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.materialAPI.searchMaterialRequests(searchTerm, company, limitPageLength);
   }
 
+  async submitMaterialRequest(name: string) {
+    return this.materialAPI.submitMaterialRequest(name);
+  }
+
   async searchMaterialRequestsForStockEntry(searchTerm: string, company?: string, limitPageLength?: number) {
     return this.materialAPI.searchMaterialRequests(searchTerm, company, limitPageLength);
   }
