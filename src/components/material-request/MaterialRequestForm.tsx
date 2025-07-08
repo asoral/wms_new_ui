@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,11 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Save, ArrowRight, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, Save, ArrowRight, ArrowLeft, Package, Calendar, DollarSign } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture";
-import ItemSearch from "@/components/common/ItemSearch";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import ItemDropdown from "@/components/common/ItemDropdown";
+import UOMSelector from "@/components/material-request/UOMSelector";
+
+type MaterialRequestPurpose = "Purchase" | "Material Transfer" | "Material Issue" | "Manufacture" | "Customer Provided";
 
 interface MaterialRequestFormProps {
   purpose: MaterialRequestPurpose;
@@ -28,12 +31,20 @@ interface FormItem {
   warehouse?: string;
   requiredBy?: string;
   description?: string;
+  rate?: number;
+  amount?: number;
+  project?: string;
+  costCenter?: string;
 }
 
 const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAndSubmit, onBack }: MaterialRequestFormProps) => {
   const [items, setItems] = useState<FormItem[]>([]);
   const [remarks, setRemarks] = useState("");
   const [company, setCompany] = useState("");
+  const [requiredBy, setRequiredBy] = useState("");
+  const [requestedBy, setRequestedBy] = useState("");
+  const [costCenter, setCostCenter] = useState("");
+  const [project, setProject] = useState("");
   const [loading, setLoading] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [sourceWarehouse, setSourceWarehouse] = useState("");
@@ -57,6 +68,10 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
         setCompany(defaultCompany);
       }
 
+      // Set default required by date to today
+      const today = new Date().toISOString().split('T')[0];
+      setRequiredBy(today);
+
       // Load warehouses
       const erpnextAPI = await createERPNextAPI();
       if (erpnextAPI) {
@@ -74,6 +89,10 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
     if (draftRequest) {
       setRemarks(draftRequest.remarks || "");
       setCompany(draftRequest.company || company);
+      setRequiredBy(draftRequest.schedule_date || "");
+      setRequestedBy(draftRequest.requested_by || "");
+      setCostCenter(draftRequest.cost_center || "");
+      setProject(draftRequest.project || "");
       setSourceWarehouse(draftRequest.set_from_warehouse || "");
       setTargetWarehouse(draftRequest.set_warehouse || "");
       
@@ -85,7 +104,11 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
           uom: item.uom || item.stock_uom || "Nos",
           warehouse: item.warehouse || "",
           requiredBy: item.schedule_date || item.requiredBy || "",
-          description: item.description || ""
+          description: item.description || "",
+          rate: item.rate || 0,
+          amount: item.amount || 0,
+          project: item.project || "",
+          costCenter: item.cost_center || ""
         }));
         setItems(formItems);
       }
@@ -93,14 +116,19 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
   };
 
   const addItem = () => {
+    const defaultRequiredBy = requiredBy || new Date().toISOString().split('T')[0];
     setItems([...items, {
       itemCode: "",
       itemName: "",
       qty: 1,
       uom: "Nos",
-      warehouse: "",
-      requiredBy: "",
-      description: ""
+      warehouse: purpose === "Material Transfer" ? sourceWarehouse : "",
+      requiredBy: defaultRequiredBy,
+      description: "",
+      rate: 0,
+      amount: 0,
+      project: project,
+      costCenter: costCenter
     }]);
   };
 
@@ -111,6 +139,14 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
   const updateItem = (index: number, field: keyof FormItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
+    
+    // Auto-calculate amount when qty or rate changes
+    if (field === 'qty' || field === 'rate') {
+      const qty = field === 'qty' ? value : updatedItems[index].qty;
+      const rate = field === 'rate' ? value : updatedItems[index].rate;
+      updatedItems[index].amount = qty * rate;
+    }
+    
     setItems(updatedItems);
   };
 
@@ -118,13 +154,39 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
     updateItem(index, 'itemCode', item.item_code);
     updateItem(index, 'itemName', item.item_name);
     updateItem(index, 'uom', item.stock_uom || 'Nos');
+    updateItem(index, 'description', item.description || '');
+  };
+
+  const handleWarehouseSelect = (warehouseCode: string, isSource = false) => {
+    if (isSource) {
+      setSourceWarehouse(warehouseCode);
+      // Update all items with source warehouse
+      const updatedItems = items.map(item => ({
+        ...item,
+        warehouse: warehouseCode
+      }));
+      setItems(updatedItems);
+    } else {
+      setTargetWarehouse(warehouseCode);
+    }
   };
 
   const saveDraft = async () => {
+    // Validation
     if (items.length === 0) {
       toast({
         title: "No Items",
         description: "Please add at least one item to the material request.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const incompleteItems = items.filter(item => !item.itemCode || !item.itemName || item.qty <= 0);
+    if (incompleteItems.length > 0) {
+      toast({
+        title: "Incomplete Items",
+        description: "Please complete all item details and ensure quantities are greater than 0.",
         variant: "destructive"
       });
       return;
@@ -167,6 +229,10 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
       const requestData = {
         material_request_type: purpose,
         company: company,
+        schedule_date: requiredBy,
+        requested_by: requestedBy,
+        cost_center: costCenter,
+        project: project,
         remarks: remarks,
         ...(purpose === "Material Transfer" && sourceWarehouse && { set_from_warehouse: sourceWarehouse }),
         ...(targetWarehouse && { set_warehouse: targetWarehouse }),
@@ -175,8 +241,11 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
           qty: item.qty,
           uom: item.uom,
           warehouse: item.warehouse,
-          schedule_date: item.requiredBy || new Date().toISOString().split('T')[0],
-          description: item.description
+          schedule_date: item.requiredBy || requiredBy,
+          description: item.description,
+          rate: item.rate || 0,
+          project: item.project,
+          cost_center: item.costCenter
         }))
       };
 
@@ -209,8 +278,12 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
     }
   };
 
+  const getTotalAmount = () => {
+    return items.reduce((total, item) => total + (item.amount || 0), 0).toFixed(2);
+  };
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -218,35 +291,69 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h2 className="text-xl font-semibold">Create Material Request</h2>
-            <p className="text-sm text-gray-600">{purpose}</p>
+            <h2 className="text-2xl font-bold">Material Request</h2>
+            <Badge variant="outline" className="mt-1">
+              {purpose}
+            </Badge>
           </div>
         </div>
       </div>
 
-      {/* Form */}
+      {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Request Details</CardTitle>
+          <CardTitle className="flex items-center space-x-2">
+            <Package className="w-5 h-5" />
+            <span>Basic Information</span>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <Label htmlFor="company">Company</Label>
+              <Label htmlFor="company">Company *</Label>
               <Input
                 id="company"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="Company name"
+                required
               />
             </div>
             <div>
-              <Label htmlFor="purpose">Purpose</Label>
+              <Label htmlFor="requiredBy">Required By *</Label>
               <Input
-                id="purpose"
-                value={purpose}
-                readOnly
-                className="bg-gray-50"
+                id="requiredBy"
+                type="date"
+                value={requiredBy}
+                onChange={(e) => setRequiredBy(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="requestedBy">Requested By</Label>
+              <Input
+                id="requestedBy"
+                value={requestedBy}
+                onChange={(e) => setRequestedBy(e.target.value)}
+                placeholder="Person making request"
+              />
+            </div>
+            <div>
+              <Label htmlFor="costCenter">Cost Center</Label>
+              <Input
+                id="costCenter"
+                value={costCenter}
+                onChange={(e) => setCostCenter(e.target.value)}
+                placeholder="Cost center code"
+              />
+            </div>
+            <div>
+              <Label htmlFor="project">Project</Label>
+              <Input
+                id="project"
+                value={project}
+                onChange={(e) => setProject(e.target.value)}
+                placeholder="Project code"
               />
             </div>
           </div>
@@ -257,7 +364,7 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
               id="remarks"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              placeholder="Additional remarks or notes"
+              placeholder="Additional remarks or notes about this material request"
               rows={3}
             />
           </div>
@@ -268,15 +375,18 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
       {purpose === "Material Transfer" && (
         <Card>
           <CardHeader>
-            <CardTitle>Transfer Warehouses</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <Package className="w-5 h-5" />
+              <span>Transfer Details</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <Label htmlFor="sourceWarehouse">Source Warehouse *</Label>
                 <Select
                   value={sourceWarehouse}
-                  onValueChange={setSourceWarehouse}
+                  onValueChange={(value) => handleWarehouseSelect(value, true)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select source warehouse" />
@@ -289,6 +399,9 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Warehouse from which items will be transferred
+                </p>
               </div>
               <div>
                 <Label htmlFor="targetWarehouse">Target Warehouse *</Label>
@@ -307,6 +420,9 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Warehouse to which items will be transferred
+                </p>
               </div>
             </div>
           </CardContent>
@@ -317,7 +433,11 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Items</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <Package className="w-5 h-5" />
+              <span>Items</span>
+              <Badge variant="secondary">{items.length} items</Badge>
+            </CardTitle>
             <Button onClick={addItem} size="sm">
               <Plus className="w-4 h-4 mr-2" />
               Add Item
@@ -325,12 +445,22 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {items.map((item, index) => (
-              <div key={index} className="border rounded-lg p-4">
+              <div key={index} className="border rounded-lg p-4 bg-muted/30">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-medium">Item {index + 1}</h4>
-                  {items.length > 1 && (
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="outline">#{index + 1}</Badge>
+                    <h4 className="font-medium">
+                      {item.itemName || "New Item"}
+                    </h4>
+                    {item.itemCode && (
+                      <Badge variant="secondary" className="text-xs">
+                        {item.itemCode}
+                      </Badge>
+                    )}
+                  </div>
+                  {items.length > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -344,11 +474,12 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="lg:col-span-2">
-                    <Label>Item</Label>
-                    <ItemSearch
+                    <Label>Item *</Label>
+                    <ItemDropdown
                       onItemSelect={(selectedItem) => handleItemSelect(index, selectedItem)}
-                      placeholder="Search for items..."
+                      placeholder="Search and select item..."
                       selectedItem={item.itemCode ? {
+                        name: item.itemCode,
                         item_code: item.itemCode,
                         item_name: item.itemName,
                         stock_uom: item.uom
@@ -357,7 +488,7 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
                   </div>
 
                   <div>
-                    <Label htmlFor={`qty-${index}`}>Quantity</Label>
+                    <Label htmlFor={`qty-${index}`}>Quantity *</Label>
                     <Input
                       id={`qty-${index}`}
                       type="number"
@@ -365,16 +496,15 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
                       onChange={(e) => updateItem(index, 'qty', parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
+                      placeholder="0.00"
                     />
                   </div>
 
                   <div>
                     <Label htmlFor={`uom-${index}`}>UOM</Label>
-                    <Input
-                      id={`uom-${index}`}
+                    <UOMSelector
                       value={item.uom}
-                      onChange={(e) => updateItem(index, 'uom', e.target.value)}
-                      placeholder="Unit"
+                      onValueChange={(value) => updateItem(index, 'uom', value)}
                     />
                   </div>
 
@@ -406,31 +536,74 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
                       onChange={(e) => updateItem(index, 'requiredBy', e.target.value)}
                     />
                   </div>
-                </div>
 
-                <div className="mt-4">
-                  <Label htmlFor={`description-${index}`}>Description</Label>
-                  <Textarea
-                    id={`description-${index}`}
-                    value={item.description}
-                    onChange={(e) => updateItem(index, 'description', e.target.value)}
-                    placeholder="Item description or notes"
-                    rows={2}
-                  />
+                  {purpose === "Purchase" && (
+                    <div>
+                      <Label htmlFor={`rate-${index}`}>Expected Rate</Label>
+                      <Input
+                        id={`rate-${index}`}
+                        type="number"
+                        value={item.rate}
+                        onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+
+                  <div className="lg:col-span-2">
+                    <Label htmlFor={`description-${index}`}>Description</Label>
+                    <Textarea
+                      id={`description-${index}`}
+                      value={item.description}
+                      onChange={(e) => updateItem(index, 'description', e.target.value)}
+                      placeholder="Item description or notes"
+                      rows={2}
+                    />
+                  </div>
+
+                  {purpose === "Purchase" && item.rate > 0 && item.qty > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Amount:</span>
+                      <Badge variant="outline">${item.amount?.toFixed(2) || '0.00'}</Badge>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
 
             {items.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                <p>No items added yet.</p>
-                <Button onClick={addItem} className="mt-2">
+              <div className="text-center py-12 text-muted-foreground">
+                <Package className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg mb-2">No items added yet</p>
+                <p className="text-sm mb-4">Add items to get started with your material request</p>
+                <Button onClick={addItem}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add First Item
                 </Button>
               </div>
             )}
           </div>
+
+          {/* Summary */}
+          {items.length > 0 && purpose === "Purchase" && (
+            <>
+              <Separator className="my-6" />
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-muted-foreground">
+                  Total Items: {items.length}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium">Total Estimated Amount:</span>
+                  <Badge variant="default" className="text-base">
+                    ${getTotalAmount()}
+                  </Badge>
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

@@ -6,7 +6,7 @@ import { Database, FileText, Package, CheckCircle, AlertTriangle, ArrowLeft } fr
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import MaterialRequestStatusChecker from "@/components/material-request/MaterialRequestStatusChecker";
-import MaterialRequestFormImproved from "@/components/material-request/MaterialRequestFormImproved";
+import MaterialRequestForm from "@/components/material-request/MaterialRequestForm";
 
 const MaterialRequest = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'create' | 'list'>('dashboard');
@@ -109,10 +109,17 @@ const MaterialRequest = () => {
   if (currentView === 'create' && selectedPurpose) {
     return (
       <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-        <MaterialRequestFormImproved
-          purpose={selectedPurpose}
-          onSubmit={handleFormSubmit}
-          onCancel={handleBackToDashboard}
+        <MaterialRequestForm
+          purpose={selectedPurpose as any}
+          onDraftCreated={handleFormSubmit}
+          onReviewAndSubmit={() => {
+            // Handle review and submit logic
+            toast({
+              title: "Ready for Review",
+              description: "Material request is ready for review and submission.",
+            });
+          }}
+          onBack={handleBackToDashboard}
         />
       </div>
     );
@@ -141,7 +148,7 @@ const MaterialRequest = () => {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <Button
                   onClick={() => handleCreateNew("Purchase")}
                   variant="outline"
@@ -173,6 +180,14 @@ const MaterialRequest = () => {
                 >
                   <CheckCircle className="w-5 h-5 text-purple-600" />
                   <span className="text-sm font-medium">Manufacture Request</span>
+                </Button>
+                <Button
+                  onClick={() => handleCreateNew("Customer Provided")}
+                  variant="outline"
+                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-orange-50 hover:border-orange-200"
+                >
+                  <Database className="w-5 h-5 text-orange-600" />
+                  <span className="text-sm font-medium">Customer Provided</span>
                 </Button>
               </div>
             </CardContent>
