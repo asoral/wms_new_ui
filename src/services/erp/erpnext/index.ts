@@ -72,6 +72,14 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI(`Delivery Note/${name}`, 'GET');
   }
 
+  async updateDeliveryNote(name: string, deliveryData: any) {
+    return this.salesAPI.updateDeliveryNote(name, deliveryData);
+  }
+
+  async submitDeliveryNote(name: string) {
+    return this.salesAPI.submitDeliveryNote(name);
+  }
+
   // Stock methods - fixed parameter delegation
   async getStockBalance(filters?: any) {
     return this.stockAPI.getStockBalance(filters);

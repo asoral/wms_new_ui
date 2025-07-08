@@ -17,6 +17,7 @@ const Deliver = () => {
   const [currentStep, setCurrentStep] = useState<'dashboard' | 'deliver' | 'review'>('dashboard');
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<SalesOrder | null>(null);
   const [deliveryEntries, setDeliveryEntries] = useState<DeliveryEntry[]>([]);
+  const [draftDeliveryNote, setDraftDeliveryNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -120,14 +121,121 @@ const Deliver = () => {
     }
   };
 
-  const handleAddDeliveryEntry = (entry: DeliveryEntry) => {
-    setDeliveryEntries(prev => [...prev, entry]);
+  const handleAddDeliveryEntry = async (entry: DeliveryEntry) => {
+    const newEntries = [...deliveryEntries, entry];
+    setDeliveryEntries(newEntries);
+    
+    // Create draft delivery note on first item if not already created
+    if (!draftDeliveryNote && newEntries.length === 1) {
+      await createDraftDeliveryNote(newEntries);
+    } else if (draftDeliveryNote) {
+      // Update existing draft with new item
+      await updateDraftDeliveryNote(newEntries);
+    }
+  };
+
+  const createDraftDeliveryNote = async (entries: DeliveryEntry[]) => {
+    if (!selectedSalesOrder) return;
+    
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const { getUserDefaultCompany } = await import('@/services/erpnextApi');
+      const defaultCompany = await getUserDefaultCompany();
+      
+      const deliveryNoteData = {
+        company: defaultCompany || selectedSalesOrder.customer,
+        customer: selectedSalesOrder.customer,
+        items: entries.map(entry => {
+          const soItem = selectedSalesOrder.items.find(item => item.itemCode === entry.itemCode);
+          return {
+            item_code: entry.itemCode,
+            qty: entry.deliveredQty,
+            rate: entry.rate,
+            warehouse: entry.warehouse,
+            against_sales_order: selectedSalesOrder.name,
+            so_detail: soItem?.name || '', // Correct field name for Sales Order Item
+            ...(entry.batch && { batch_no: entry.batch }),
+            ...(entry.serial && { serial_no: entry.serial })
+          };
+        })
+      };
+
+      const response = await erpnextAPI.createDeliveryNote(deliveryNoteData);
+      
+      if (response?.data) {
+        setDraftDeliveryNote(response.data.name);
+        toast({
+          title: "Draft Delivery Note Created",
+          description: `Draft ${response.data.name} created successfully.`,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to create draft delivery note:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create draft delivery note",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateDraftDeliveryNote = async (entries: DeliveryEntry[]) => {
+    if (!selectedSalesOrder || !draftDeliveryNote) return;
+    
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const { getUserDefaultCompany } = await import('@/services/erpnextApi');
+      const defaultCompany = await getUserDefaultCompany();
+      
+      const deliveryNoteData = {
+        company: defaultCompany || selectedSalesOrder.customer,
+        customer: selectedSalesOrder.customer,
+        items: entries.map(entry => {
+          const soItem = selectedSalesOrder.items.find(item => item.itemCode === entry.itemCode);
+          return {
+            item_code: entry.itemCode,
+            qty: entry.deliveredQty,
+            rate: entry.rate,
+            warehouse: entry.warehouse,
+            against_sales_order: selectedSalesOrder.name,
+            so_detail: soItem?.name || '', // Correct field name for Sales Order Item
+            ...(entry.batch && { batch_no: entry.batch }),
+            ...(entry.serial && { serial_no: entry.serial })
+          };
+        })
+      };
+
+      await erpnextAPI.updateDeliveryNote(draftDeliveryNote, deliveryNoteData);
+      
+      toast({
+        title: "Draft Updated",
+        description: `Draft ${draftDeliveryNote} updated with new item.`,
+      });
+    } catch (error) {
+      console.error('Failed to update draft delivery note:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to update draft delivery note",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBackToDashboard = () => {
     setCurrentStep('dashboard');
     setSelectedSalesOrder(null);
     setDeliveryEntries([]);
+    setDraftDeliveryNote(null);
   };
 
   const handleProceedToReview = () => {
@@ -164,51 +272,62 @@ const Deliver = () => {
         return;
       }
 
-      // Get user's default company
-      const { getUserDefaultCompany } = await import('@/services/erpnextApi');
-      const defaultCompany = await getUserDefaultCompany();
-      
-      // Prepare delivery note data
-      const deliveryNoteData = {
-        company: defaultCompany || selectedSalesOrder.customer, // Use default company or fallback
-        customer: selectedSalesOrder.customer,
-        items: deliveryEntries.map(entry => {
-          // Find the corresponding sales order item
-          const soItem = selectedSalesOrder.items.find(item => item.itemCode === entry.itemCode);
+      if (draftDeliveryNote) {
+        // Submit the existing draft delivery note
+        const response = await erpnextAPI.submitDeliveryNote(draftDeliveryNote);
+        
+        if (response?.data) {
+          toast({
+            title: "Delivery Note Submitted",
+            description: `Delivery Note ${draftDeliveryNote} submitted successfully.`,
+          });
           
-          return {
-            item_code: entry.itemCode,
-            qty: entry.deliveredQty,
-            rate: entry.rate,
-            warehouse: entry.warehouse,
-            against_sales_order: selectedSalesOrder.name,
-            against_sales_order_item: soItem?.name || '', // Use the Sales Order Item name (unique identifier)
-            ...(entry.batch && { batch_no: entry.batch }),
-            ...(entry.serial && { serial_no: entry.serial })
-          };
-        })
-      };
-
-      const response = await erpnextAPI.createDeliveryNote(deliveryNoteData);
-
-      if (response?.data) {
-        toast({
-          title: "Delivery Note Created",
-          description: `Delivery Note ${response.data.name} created successfully.`,
-        });
+          // Reset to dashboard
+          handleBackToDashboard();
+        }
+      } else {
+        // Create and submit new delivery note
+        const { getUserDefaultCompany } = await import('@/services/erpnextApi');
+        const defaultCompany = await getUserDefaultCompany();
         
-        // Reset to dashboard
-        handleBackToDashboard();
-        
-        // Optionally navigate to delivery note or stay on dashboard
-        // navigate(`/delivery-note/${response.data.name}`);
+        const deliveryNoteData = {
+          company: defaultCompany || selectedSalesOrder.customer,
+          customer: selectedSalesOrder.customer,
+          items: deliveryEntries.map(entry => {
+            const soItem = selectedSalesOrder.items.find(item => item.itemCode === entry.itemCode);
+            return {
+              item_code: entry.itemCode,
+              qty: entry.deliveredQty,
+              rate: entry.rate,
+              warehouse: entry.warehouse,
+              against_sales_order: selectedSalesOrder.name,
+              so_detail: soItem?.name || '', // Correct field name for Sales Order Item
+              ...(entry.batch && { batch_no: entry.batch }),
+              ...(entry.serial && { serial_no: entry.serial })
+            };
+          })
+        };
+
+        const response = await erpnextAPI.createDeliveryNote(deliveryNoteData);
+
+        if (response?.data) {
+          // Submit the newly created delivery note
+          await erpnextAPI.submitDeliveryNote(response.data.name);
+          
+          toast({
+            title: "Delivery Note Created & Submitted",
+            description: `Delivery Note ${response.data.name} created and submitted successfully.`,
+          });
+          
+          // Reset to dashboard
+          handleBackToDashboard();
+        }
       }
-
     } catch (error) {
-      console.error('Failed to create delivery note:', error);
+      console.error('Failed to submit delivery note:', error);
       toast({
         title: "Error",
-        description: `Failed to create delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: `Failed to submit delivery note: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
@@ -307,7 +426,9 @@ const Deliver = () => {
                         </div>
                         <div>
                           <div className="text-sm text-gray-600">Draft DN:</div>
-                          <div className="text-green-600 text-sm">Will create after first item</div>
+                          <div className={`text-sm ${draftDeliveryNote ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
+                            {draftDeliveryNote || 'Will create after first item'}
+                          </div>
                         </div>
                       </div>
                     </CardContent>

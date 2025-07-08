@@ -151,6 +151,24 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
     return response.json();
   }
 
+  async submitDeliveryNote(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Delivery Note/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ docstatus: 1 })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to submit delivery note: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
+
   /**
    * Get delivery notes for dashboard metrics
    */
