@@ -36,6 +36,8 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
   const [company, setCompany] = useState("");
   const [loading, setLoading] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [sourceWarehouse, setSourceWarehouse] = useState("");
+  const [targetWarehouse, setTargetWarehouse] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -72,6 +74,8 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
     if (draftRequest) {
       setRemarks(draftRequest.remarks || "");
       setCompany(draftRequest.company || company);
+      setSourceWarehouse(draftRequest.set_from_warehouse || "");
+      setTargetWarehouse(draftRequest.set_warehouse || "");
       
       if (draftRequest.items && Array.isArray(draftRequest.items)) {
         const formItems: FormItem[] = draftRequest.items.map((item: any) => ({
@@ -126,6 +130,33 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
       return;
     }
 
+    if (purpose === "Material Transfer") {
+      if (!sourceWarehouse) {
+        toast({
+          title: "Source Warehouse Required",
+          description: "Please select a source warehouse for material transfer.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (!targetWarehouse) {
+        toast({
+          title: "Target Warehouse Required",
+          description: "Please select a target warehouse for material transfer.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (sourceWarehouse === targetWarehouse) {
+        toast({
+          title: "Invalid Warehouse Selection",
+          description: "Source and target warehouses cannot be the same.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
@@ -137,6 +168,8 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
         material_request_type: purpose,
         company: company,
         remarks: remarks,
+        ...(purpose === "Material Transfer" && sourceWarehouse && { set_from_warehouse: sourceWarehouse }),
+        ...(targetWarehouse && { set_warehouse: targetWarehouse }),
         items: items.map(item => ({
           item_code: item.itemCode,
           qty: item.qty,
@@ -230,6 +263,55 @@ const MaterialRequestForm = ({ purpose, draftRequest, onDraftCreated, onReviewAn
           </div>
         </CardContent>
       </Card>
+
+      {/* Warehouse Selection for Material Transfer */}
+      {purpose === "Material Transfer" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Transfer Warehouses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="sourceWarehouse">Source Warehouse *</Label>
+                <Select
+                  value={sourceWarehouse}
+                  onValueChange={setSourceWarehouse}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select source warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.name} value={warehouse.name}>
+                        {warehouse.warehouse_name || warehouse.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="targetWarehouse">Target Warehouse *</Label>
+                <Select
+                  value={targetWarehouse}
+                  onValueChange={setTargetWarehouse}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select target warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.name} value={warehouse.name}>
+                        {warehouse.warehouse_name || warehouse.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Items */}
       <Card>
