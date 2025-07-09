@@ -12,7 +12,7 @@ import { format } from "date-fns"
 import { CalendarIcon, Package, Trash2, Plus, ArrowLeft, Save, ArrowRight } from "lucide-react"
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import ItemSearch from '@/components/common/ItemSearch';
+import ItemSelector from '@/components/common/ItemSelector';
 import WarehouseSelector from '@/components/material-request/WarehouseSelector';
 import { Item } from "@/types";
 
@@ -184,7 +184,7 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
         throw new Error('ERPNext API not configured');
       }
 
-      const requestData = {
+      let requestData: any = {
         ...formData,
         items: items.map(item => ({
           item_code: item.item_code,
@@ -196,6 +196,12 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
           description: item.description
         }))
       };
+
+      // For Material Transfer, set the correct warehouse fields
+      if (purpose === "Material Transfer") {
+        requestData.set_from_warehouse = selectedWarehouse; // Source warehouse
+        requestData.set_warehouse = formData.set_warehouse; // Target warehouse
+      }
 
       const response = await erpnextAPI.createMaterialRequest(requestData);
 
@@ -319,7 +325,7 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
           {/* Item Search */}
           <div>
             <Label>Search and Add Items</Label>
-            <ItemSearch onItemSelect={handleItemSelect} />
+            <ItemSelector onItemSelect={handleItemSelect} placeholder="Search and select items to add..." />
           </div>
 
           {/* Items List */}
