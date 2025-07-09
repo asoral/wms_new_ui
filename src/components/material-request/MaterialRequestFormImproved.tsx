@@ -13,6 +13,7 @@ import { CalendarIcon, Package, Trash2, Plus, ArrowLeft, Save, ArrowRight } from
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemSearch from '@/components/common/ItemSearch';
+import WarehouseSelector from '@/components/material-request/WarehouseSelector';
 import { Item } from "@/types";
 
 interface MaterialRequestItem {
@@ -36,7 +37,8 @@ interface MaterialRequestFormProps {
 const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" }: MaterialRequestFormProps) => {
   const [formData, setFormData] = useState({
     material_request_type: purpose,
-    company: ''
+    company: '',
+    set_warehouse: ''
   });
   const [items, setItems] = useState<MaterialRequestItem[]>([]);
   const [warehouses, setWarehouses] = useState<string[]>([]);
@@ -243,36 +245,64 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
         </div>
       </div>
 
-      {/* Warehouse Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Default Warehouse</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div>
-            <Label>Select Default Warehouse</Label>
-            <Select
-              value={selectedWarehouse}
-              onValueChange={(value) => {
-                setSelectedWarehouse(value);
-                // Update all items with the new warehouse
-                setItems(items.map(item => ({ ...item, warehouse: value })));
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select warehouse for all items..." />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses.map((warehouse) => (
-                  <SelectItem key={warehouse} value={warehouse}>
-                    {warehouse}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Warehouse Selection for Material Transfer */}
+      {purpose === "Material Transfer" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Transfer Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label>From Warehouse *</Label>
+                <WarehouseSelector
+                  value={selectedWarehouse}
+                  onValueChange={(value) => {
+                    setSelectedWarehouse(value);
+                    // Update all items with the source warehouse
+                    setItems(items.map(item => ({ ...item, warehouse: value })));
+                  }}
+                  placeholder="Select source warehouse"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Warehouse from which items will be transferred
+                </p>
+              </div>
+              <div>
+                <Label>To Warehouse *</Label>
+                <WarehouseSelector
+                  value={formData.set_warehouse || ''}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, set_warehouse: value }))}
+                  placeholder="Select target warehouse"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Warehouse to which items will be transferred
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Default Warehouse</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div>
+              <Label>Select Default Warehouse</Label>
+              <WarehouseSelector
+                value={selectedWarehouse}
+                onValueChange={(value) => {
+                  setSelectedWarehouse(value);
+                  // Update all items with the new warehouse
+                  setItems(items.map(item => ({ ...item, warehouse: value })));
+                }}
+                placeholder="Select warehouse for all items..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Items Section */}
       <Card>
