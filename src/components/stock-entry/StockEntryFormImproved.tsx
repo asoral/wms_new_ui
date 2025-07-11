@@ -426,7 +426,7 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
                   <SelectValue placeholder="Select source document type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Manual Entry</SelectItem>
+                  <SelectItem value="manual">Manual Entry</SelectItem>
                   <SelectItem value="Material Request">Material Request</SelectItem>
                   <SelectItem value="Purchase Order">Purchase Order</SelectItem>
                   <SelectItem value="Sales Order">Sales Order</SelectItem>
