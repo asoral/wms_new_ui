@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Save, ArrowRight, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, Save, ArrowRight, ArrowLeft, FileText } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import ItemSearch from "@/components/common/ItemSearch";
+import ItemSelector from "@/components/common/ItemSelector";
+import WarehouseSelector from "@/components/material-request/WarehouseSelector";
 
 // Define StockEntryType to match the page
 export type StockEntryType = 
@@ -50,7 +51,12 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
   const [purpose, setPurpose] = useState("");
   const [company, setCompany] = useState("");
   const [loading, setLoading] = useState(false);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [fromWarehouse, setFromWarehouse] = useState("");
+  const [toWarehouse, setToWarehouse] = useState("");
+  const [getItemsFrom, setGetItemsFrom] = useState("");
+  const [selectedDocument, setSelectedDocument] = useState("");
+  const [sourceDocuments, setSourceDocuments] = useState<any[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -69,15 +75,6 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
       if (defaultCompany) {
         setCompany(defaultCompany);
       }
-
-      // Load warehouses
-      const erpnextAPI = await createERPNextAPI();
-      if (erpnextAPI) {
-        const warehouseResponse = await erpnextAPI.getWarehouses();
-        if (warehouseResponse?.data) {
-          setWarehouses(warehouseResponse.data);
-        }
-      }
     } catch (error) {
       console.error('Error loading initial data:', error);
     }
@@ -87,6 +84,10 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
     if (draftEntry) {
       setPurpose(draftEntry.purpose || "");
       setCompany(draftEntry.company || company);
+      setFromWarehouse(draftEntry.from_warehouse || "");
+      setToWarehouse(draftEntry.to_warehouse || "");
+      setGetItemsFrom(draftEntry.get_items_from || "");
+      setSelectedDocument(draftEntry.material_request || draftEntry.purchase_order || draftEntry.sales_order || "");
       
       if (draftEntry.items && Array.isArray(draftEntry.items)) {
         const formItems: FormItem[] = draftEntry.items.map((item: any) => ({
@@ -135,6 +136,129 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
     updateItem(index, 'itemCode', item.item_code);
     updateItem(index, 'itemName', item.item_name);
     updateItem(index, 'uom', item.stock_uom || 'Nos');
+    
+    // Auto-set warehouses if defined at header level
+    if (isTransferType) {
+      if (fromWarehouse) updateItem(index, 'fromWarehouse', fromWarehouse);
+      if (toWarehouse) updateItem(index, 'toWarehouse', toWarehouse);
+    } else {
+      if (type === 'Material Receipt' && toWarehouse) {
+        updateItem(index, 'warehouse', toWarehouse);
+      } else if (type === 'Material Issue' && fromWarehouse) {
+        updateItem(index, 'warehouse', fromWarehouse);
+      }
+    }
+  };
+
+  const loadSourceDocuments = async (sourceType: string) => {
+    if (!sourceType) {
+      setSourceDocuments([]);
+      return;
+    }
+
+    setLoadingDocuments(true);
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      let documents: any[] = [];
+      
+      switch (sourceType) {
+        case 'Material Request':
+          const mrResult = await erpnextAPI.getMaterialRequests(undefined, company);
+          documents = mrResult.data || [];
+          break;
+        case 'Purchase Order':
+          const poResult = await erpnextAPI.getPurchaseOrders(undefined, company);
+          documents = poResult.data || [];
+          break;
+        case 'Sales Order':
+          const soResult = await erpnextAPI.getSalesOrders(undefined, company);
+          documents = soResult.data || [];
+          break;
+        case 'BOM':
+          const bomResult = await erpnextAPI.searchBOMs("");
+          documents = bomResult.data || [];
+          break;
+      }
+      
+      setSourceDocuments(documents);
+    } catch (error) {
+      console.error('Error loading source documents:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load ${sourceType} documents`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const handleGetItemsFromChange = (value: string) => {
+    setGetItemsFrom(value);
+    setSelectedDocument("");
+    setSourceDocuments([]);
+    loadSourceDocuments(value);
+  };
+
+  const handleDocumentSelect = async (documentName: string) => {
+    setSelectedDocument(documentName);
+    
+    if (!documentName || !getItemsFrom) return;
+
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      setLoading(true);
+      
+      let fetchedItems: any[] = [];
+      
+      if (getItemsFrom === 'Material Request') {
+        // Use direct API call to fetch Material Request items
+        const result = await erpnextAPI.getMaterialRequest(documentName);
+        fetchedItems = result.data?.items || [];
+      } else if (getItemsFrom === 'Purchase Order') {
+        const result = await erpnextAPI.getPurchaseOrder(documentName);
+        fetchedItems = result.data?.items || [];
+      } else if (getItemsFrom === 'Sales Order') {
+        const result = await erpnextAPI.getSalesOrder(documentName);
+        fetchedItems = result.data?.items || [];
+      }
+      
+      if (fetchedItems.length > 0) {
+        const formItems: FormItem[] = fetchedItems.map((item: any) => ({
+          itemCode: item.item_code || "",
+          itemName: item.item_name || "",
+          qty: item.qty || item.stock_qty || 1,
+          uom: item.uom || item.stock_uom || "Nos",
+          rate: item.rate || 0,
+          warehouse: item.warehouse || "",
+          fromWarehouse: item.s_warehouse || fromWarehouse || "",
+          toWarehouse: item.t_warehouse || toWarehouse || "",
+          batch: item.batch_no || "",
+          serial: item.serial_no || ""
+        }));
+        
+        setItems(formItems);
+        
+        toast({
+          title: "Items Loaded",
+          description: `${formItems.length} items loaded from ${getItemsFrom}`,
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error fetching items from document:', error);
+      toast({
+        title: "Error",
+        description: `Failed to fetch items from ${getItemsFrom}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const saveDraft = async () => {
@@ -158,13 +282,20 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
         stock_entry_type: type,
         company: company,
         purpose: purpose,
+        from_warehouse: fromWarehouse || undefined,
+        to_warehouse: toWarehouse || undefined,
+        get_items_from: getItemsFrom || undefined,
+        material_request: getItemsFrom === 'Material Request' ? selectedDocument : undefined,
+        purchase_order: getItemsFrom === 'Purchase Order' ? selectedDocument : undefined,
+        sales_order: getItemsFrom === 'Sales Order' ? selectedDocument : undefined,
+        bom_no: getItemsFrom === 'BOM' ? selectedDocument : undefined,
         items: items.map(item => ({
           item_code: item.itemCode,
           qty: item.qty,
           uom: item.uom,
           basic_rate: item.rate || 0,
-          s_warehouse: item.fromWarehouse,
-          t_warehouse: item.toWarehouse,
+          s_warehouse: item.fromWarehouse || fromWarehouse,
+          t_warehouse: item.toWarehouse || toWarehouse,
           batch_no: item.batch,
           serial_no: item.serial
         }))
@@ -243,6 +374,94 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
             </div>
           </div>
 
+          {/* Source and Target Warehouses for Transfer Types */}
+          {isTransferType && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+              <Label>From Warehouse</Label>
+              <WarehouseSelector 
+                value={fromWarehouse}
+                onValueChange={setFromWarehouse}
+                placeholder="Select source warehouse"
+              />
+              </div>
+              <div>
+              <Label>To Warehouse</Label>
+              <WarehouseSelector 
+                value={toWarehouse}
+                onValueChange={setToWarehouse}
+                placeholder="Select target warehouse"
+              />
+              </div>
+            </div>
+          )}
+
+          {/* Single Warehouse for Issue/Receipt Types */}
+          {!isTransferType && (
+            <div>
+              <Label>
+                {type === 'Material Issue' ? 'Source Warehouse' : 
+                 type === 'Material Receipt' ? 'Target Warehouse' : 'Warehouse'}
+              </Label>
+            <WarehouseSelector 
+              value={type === 'Material Issue' ? fromWarehouse : toWarehouse}
+              onValueChange={(warehouse) => {
+                if (type === 'Material Issue') {
+                  setFromWarehouse(warehouse);
+                } else {
+                  setToWarehouse(warehouse);
+                }
+              }}
+              placeholder={`Select ${type === 'Material Issue' ? 'source' : 'target'} warehouse`}
+            />
+            </div>
+          )}
+
+          {/* Get Items From Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Get Items From</Label>
+              <Select value={getItemsFrom} onValueChange={handleGetItemsFromChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Manual Entry</SelectItem>
+                  <SelectItem value="Material Request">Material Request</SelectItem>
+                  <SelectItem value="Purchase Order">Purchase Order</SelectItem>
+                  <SelectItem value="Sales Order">Sales Order</SelectItem>
+                  <SelectItem value="BOM">Bill of Materials</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {getItemsFrom && (
+              <div>
+                <Label>{getItemsFrom} Document</Label>
+                <Select 
+                  value={selectedDocument} 
+                  onValueChange={handleDocumentSelect}
+                  disabled={loadingDocuments}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Select ${getItemsFrom}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sourceDocuments.map((doc) => (
+                      <SelectItem key={doc.name} value={doc.name}>
+                        <div className="flex items-center space-x-2">
+                          <FileText className="w-4 h-4" />
+                          <span>{doc.name}</span>
+                          {doc.title && <span className="text-gray-500">- {doc.title}</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
           <div>
             <Label htmlFor="purpose">Purpose</Label>
             <Textarea
@@ -288,14 +507,16 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="lg:col-span-2">
                     <Label>Item</Label>
-                    <ItemSearch
+                    <ItemSelector
                       onItemSelect={(selectedItem) => handleItemSelect(index, selectedItem)}
                       placeholder="Search for items..."
                       selectedItem={item.itemCode ? {
                         item_code: item.itemCode,
                         item_name: item.itemName,
-                        stock_uom: item.uom
+                        stock_uom: item.uom,
+                        name: item.itemCode
                       } : null}
+                      isLoading={loading}
                     />
                   </div>
 
@@ -337,60 +558,33 @@ const StockEntryFormImproved = ({ type, draftEntry, onDraftCreated, onReviewAndS
                     <>
                       <div>
                         <Label htmlFor={`from-warehouse-${index}`}>From Warehouse</Label>
-                        <Select
+                        <WarehouseSelector
                           value={item.fromWarehouse}
-                          onValueChange={(value) => updateItem(index, 'fromWarehouse', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select from warehouse" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {warehouses.map((warehouse) => (
-                              <SelectItem key={warehouse.name} value={warehouse.name}>
-                                {warehouse.warehouse_name || warehouse.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onValueChange={(warehouse) => updateItem(index, 'fromWarehouse', warehouse)}
+                          placeholder="Select from warehouse"
+                        />
                       </div>
 
                       <div>
                         <Label htmlFor={`to-warehouse-${index}`}>To Warehouse</Label>
-                        <Select
+                        <WarehouseSelector
                           value={item.toWarehouse}
-                          onValueChange={(value) => updateItem(index, 'toWarehouse', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select to warehouse" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {warehouses.map((warehouse) => (
-                              <SelectItem key={warehouse.name} value={warehouse.name}>
-                                {warehouse.warehouse_name || warehouse.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onValueChange={(warehouse) => updateItem(index, 'toWarehouse', warehouse)}
+                          placeholder="Select to warehouse"
+                        />
                       </div>
                     </>
                   ) : (
                     <div>
-                      <Label htmlFor={`warehouse-${index}`}>Warehouse</Label>
-                      <Select
+                      <Label htmlFor={`warehouse-${index}`}>
+                        {type === 'Material Issue' ? 'Source Warehouse' : 
+                         type === 'Material Receipt' ? 'Target Warehouse' : 'Warehouse'}
+                      </Label>
+                      <WarehouseSelector
                         value={item.warehouse}
-                        onValueChange={(value) => updateItem(index, 'warehouse', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select warehouse" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {warehouses.map((warehouse) => (
-                            <SelectItem key={warehouse.name} value={warehouse.name}>
-                              {warehouse.warehouse_name || warehouse.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onValueChange={(warehouse) => updateItem(index, 'warehouse', warehouse)}
+                        placeholder={`Select ${type === 'Material Issue' ? 'source' : 'target'} warehouse`}
+                      />
                     </div>
                   )}
 
