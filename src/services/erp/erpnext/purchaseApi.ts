@@ -21,7 +21,11 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
     // Build URL parameters
     const params = new URLSearchParams();
     params.append('filters', JSON.stringify(conditions));
-    // No custom fields → let Frappe return default fields
+    // Request specific fields needed for dashboard
+    params.append('fields', JSON.stringify([
+      'name', 'supplier', 'supplier_name', 'schedule_date', 'transaction_date', 
+      'grand_total', 'status', 'items', 'total_qty'
+    ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String(offset));
 
@@ -67,6 +71,11 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
 
     const params = new URLSearchParams();
     params.append('filters', JSON.stringify(conditions));
+    // Request specific fields needed for dashboard
+    params.append('fields', JSON.stringify([
+      'name', 'supplier', 'supplier_name', 'posting_date', 'creation', 
+      'grand_total', 'status', 'items', 'total_qty'
+    ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String(offset));
 
