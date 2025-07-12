@@ -646,7 +646,7 @@ const Receive = () => {
                       </div>
                       <div>
                         <p className="text-gray-600">Total Amount</p>
-                        <p className="font-medium">₹{selectedPO.totalAmount.toLocaleString()}</p>
+                        <p className="font-medium">₹{((selectedPO.totalAmount && typeof selectedPO.totalAmount === 'number') ? selectedPO.totalAmount : 0).toLocaleString()}</p>
                       </div>
                     </div>
                   </CardContent>
