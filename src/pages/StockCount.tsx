@@ -4,25 +4,21 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { StockRecoCard } from "@/components/stock-count/StockRecoCard";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, CheckCircle, AlertTriangle, Loader2, BarChart3, Building2 } from "lucide-react";
+import { Plus, CheckCircle, AlertTriangle, Loader2, BarChart3, Building2, Search } from "lucide-react";
 import { format } from 'date-fns';
 import { StockCountSession } from "@/types";
 
 const StockCount = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<StockCountSession[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<StockCountSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [selectedPurpose, setSelectedPurpose] = useState<string>("Stock Reconciliation");
   const { toast } = useToast();
@@ -30,6 +26,22 @@ const StockCount = () => {
   useEffect(() => {
     loadStockCountSessions();
   }, []);
+
+  useEffect(() => {
+    // Filter sessions based on search term
+    let filtered = sessions;
+    if (searchTerm) {
+      filtered = sessions.filter(session => 
+        session.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        session.purpose.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    // Show only last 5 sessions unless searching
+    if (!searchTerm) {
+      filtered = filtered.slice(0, 5);
+    }
+    setFilteredSessions(filtered);
+  }, [sessions, searchTerm]);
 
   const loadStockCountSessions = async () => {
     try {
@@ -44,24 +56,32 @@ const StockCount = () => {
         return;
       }
 
-      const response = await erpnextAPI.getStockReconciliations();
+      // Add filters to get recent records and order by creation date
+      const filters = [
+        ['docstatus', 'in', [0, 1]] // Only Draft and Submitted
+      ];
+      const response = await erpnextAPI.getStockReconciliations(filters, 20); // Get last 20 records
       console.log('Stock count sessions response:', response);
 
       if (response?.data) {
         // Transform the data to match our StockCountSession interface
-        const transformedSessions: StockCountSession[] = response.data.map((session: any) => ({
-          id: session.name,
-          name: session.name,
-          warehouse: session.warehouse || 'Unknown',
-          purpose: session.purpose || 'Stock Reconciliation',
-          status: session.docstatus === 0 ? 'Draft' : session.docstatus === 1 ? 'Submitted' : 'Cancelled',
-          startedAt: session.posting_date ? new Date(session.posting_date) : new Date(),
-          completedAt: session.docstatus === 1 ? new Date(session.posting_date) : undefined,
-          totalItems: session.items?.length || 0,
-          matchedItems: 0,
-          varianceItems: session.items?.length || 0,
-          entries: session.items || []
-        }));
+        const transformedSessions: StockCountSession[] = response.data
+          .sort((a: any, b: any) => new Date(b.posting_date).getTime() - new Date(a.posting_date).getTime()) // Sort by newest first
+          .map((session: any) => ({
+            id: session.name,
+            name: session.name,
+            warehouse: session.warehouse || 'Multiple', // Remove Unknown, show Multiple if no specific warehouse
+            purpose: session.purpose || 'Stock Reconciliation',
+            status: session.docstatus === 0 ? 'Draft' : session.docstatus === 1 ? 'Submitted' : 'Cancelled',
+            startedAt: session.posting_date ? new Date(session.posting_date) : new Date(),
+            postingTime: session.posting_time || '',
+            completedAt: session.docstatus === 1 ? new Date(session.posting_date) : undefined,
+            totalItems: session.items?.length || 0,
+            matchedItems: 0,
+            varianceItems: session.items?.length || 0,
+            differenceAmount: session.difference_amount || 0,
+            entries: session.items || []
+          }));
 
         setSessions(transformedSessions);
       } else {
@@ -94,11 +114,28 @@ const StockCount = () => {
     navigate(`/stock-count/session?warehouse=${encodeURIComponent(selectedWarehouse)}&purpose=${encodeURIComponent(selectedPurpose)}`);
   };
 
-  const formatDate = (date: Date) => {
-    if (!date || isNaN(date.getTime())) {
-      return 'Invalid Date';
+  const handleEditSession = async (sessionId: string) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+      
+      const sessionDetails = await erpnextAPI.getStockReconciliation(sessionId);
+      if (sessionDetails?.data) {
+        // Navigate to edit session with the session data
+        navigate(`/stock-count/session?sessionId=${sessionId}&mode=edit`);
+      }
+    } catch (error) {
+      console.error('Failed to load session details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load session details",
+        variant: "destructive"
+      });
     }
-    return format(date, 'dd MMM yyyy, HH:mm');
+  };
+
+  const handleViewSession = (sessionId: string) => {
+    navigate(`/stock-count/session?sessionId=${sessionId}&mode=view`);
   };
 
   return (
@@ -214,115 +251,47 @@ const StockCount = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Draft Stock Reconciliations</CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
+            <CardTitle>Stock Reco List</CardTitle>
+            <div className="flex items-center space-x-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Search sessions..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-64"
+                />
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mt-2">
+            {searchTerm ? `Showing search results for "${searchTerm}"` : "Showing last 5 stock reconciliations"}
+          </p>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">
               <Loader2 className="w-6 h-6 mx-auto animate-spin text-gray-500 mb-2" />
-              <p className="text-gray-500">Loading stock count sessions...</p>
+              <p className="text-gray-500">Loading stock reconciliations...</p>
             </div>
-          ) : sessions.length > 0 ? (
-            <>
-              {/* Desktop Table View */}
-              <div className="hidden md:block overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[100px]">Session ID</TableHead>
-                      <TableHead>Warehouse</TableHead>
-                      <TableHead>Purpose</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Started At</TableHead>
-                      <TableHead className="text-right">Total Items</TableHead>
-                      <TableHead className="text-right">Matched Items</TableHead>
-                      <TableHead className="text-right">Variance Items</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sessions.map((session) => (
-                      <TableRow key={session.id}>
-                        <TableCell className="font-medium">{session.id}</TableCell>
-                        <TableCell>{session.warehouse}</TableCell>
-                        <TableCell>{session.purpose}</TableCell>
-                        <TableCell>
-                          {session.status === 'Open' ? (
-                            <AlertTriangle className="w-4 h-4 mr-1 text-yellow-500 inline" />
-                          ) : session.status === 'Completed' ? (
-                            <div className="flex items-center">
-                              <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
-                              Completed
-                            </div>
-                          ) : (
-                            <div className="flex items-center">
-                              <AlertTriangle className="w-4 h-4 mr-1 text-red-500" />
-                              {session.status}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>{formatDate(session.startedAt)}</TableCell>
-                        <TableCell className="text-right">{session.totalItems}</TableCell>
-                        <TableCell className="text-right">{session.matchedItems}</TableCell>
-                        <TableCell className="text-right">{session.varianceItems}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Mobile Card View */}
-              <div className="md:hidden space-y-3">
-                {sessions.map((session) => (
-                  <Card key={session.id} className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium text-gray-900">{session.id}</p>
-                          <p className="text-sm text-gray-600">{session.warehouse}</p>
-                        </div>
-                        <div className="flex items-center">
-                          {session.status === 'Draft' ? (
-                            <AlertTriangle className="w-4 h-4 mr-1 text-yellow-500" />
-                          ) : session.status === 'Submitted' ? (
-                            <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
-                          ) : (
-                            <AlertTriangle className="w-4 h-4 mr-1 text-red-500" />
-                          )}
-                          <span className="text-sm font-medium">{session.status}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-gray-600">Purpose:</span>
-                          <span className="ml-1 font-medium">{session.purpose}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Started:</span>
-                          <span className="ml-1 font-medium">{formatDate(session.startedAt)}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Total Items:</span>
-                          <span className="ml-1 font-medium">{session.totalItems}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Matched:</span>
-                          <span className="ml-1 font-medium text-green-600">{session.matchedItems}</span>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-gray-600">Variance Items:</span>
-                          <span className="ml-1 font-medium text-red-600">{session.varianceItems}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </>
+          ) : filteredSessions.length > 0 ? (
+            <div className="grid gap-4">
+              {filteredSessions.map((session) => (
+                <StockRecoCard
+                  key={session.id}
+                  session={session}
+                  onEdit={session.status === 'Draft' ? handleEditSession : undefined}
+                  onView={handleViewSession}
+                />
+              ))}
+            </div>
           ) : (
             <div className="text-center py-8">
               <AlertTriangle className="w-10 h-10 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">No active stock count sessions found.</p>
+              <p className="text-gray-500">
+                {searchTerm ? "No stock reconciliations found matching your search." : "No stock reconciliations found."}
+              </p>
             </div>
           )}
         </CardContent>

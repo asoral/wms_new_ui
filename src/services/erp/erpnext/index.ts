@@ -117,9 +117,14 @@ export class ERPNextAPI extends ERPNextBaseAPI {
       'posting_date',
       'posting_time',
       'company',
-      'difference_amount'
+      'difference_amount',
+      'items'
     ];
     return this.callAPI('Stock Reconciliation', 'GET', undefined, filters, limitPageLength, fields);
+  }
+
+  async getStockReconciliation(name: string) {
+    return this.callAPI(`Stock Reconciliation/${name}`, 'GET');
   }
 
   async getWarehouses(filters?: any, company?: string, limitPageLength?: number) {

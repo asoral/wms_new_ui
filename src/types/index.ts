@@ -88,12 +88,14 @@ export interface StockCountSession {
   name: string;
   warehouse: string;
   purpose: string;
-  status: string;
+  status: 'Draft' | 'In Progress' | 'Completed' | 'Submitted' | 'Cancelled';
   startedAt: Date;
+  postingTime?: string;
   completedAt?: Date;
   totalItems: number;
   matchedItems: number;
   varianceItems: number;
+  differenceAmount?: number;
   entries: StockCountEntry[];
 }
 
