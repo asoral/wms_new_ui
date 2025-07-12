@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight } from "lucide-react";
+import { Truck, Package, CheckCircle, FileText, Printer, ArrowRight, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -642,6 +642,20 @@ const Receive = () => {
     }
   };
 
+  const resetToDashboard = () => {
+    // Clear all state and go back to dashboard
+    setSelectedPO(null);
+    setSelectedWarehouse("");
+    setReceiveEntries([]);
+    setCurrentPurchaseReceipt(null);
+    setActiveTab("dashboard");
+    
+    toast({
+      title: "Reset Complete",
+      description: "Cleared all data and returned to dashboard",
+    });
+  };
+
   const shortcuts = [
     { label: 'Print Label', icon: Printer, action: () => navigate('/print-label') },
     { label: 'Request QC', icon: CheckCircle, action: () => navigate('/quality-check') },
@@ -657,16 +671,28 @@ const Receive = () => {
             <Truck className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Receive</h1>
           </div>
-          {selectedPO && (
+          {(selectedPO || currentPurchaseReceipt) && (
             <div className="flex items-center space-x-2">
-              <Badge variant="outline">{selectedPO.poNumber}</Badge>
-              {currentPurchaseReceipt && (
-                <Badge variant="secondary">PR: {currentPurchaseReceipt}</Badge>
-              )}
-              <Button onClick={submitReceipt} disabled={!currentPurchaseReceipt || loading}>
-                <Package className="w-4 h-4 mr-2" />
-                Submit Receipt
+              <Button 
+                variant="outline" 
+                onClick={resetToDashboard}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset
               </Button>
+              {selectedPO && (
+                <>
+                  <Badge variant="outline">{selectedPO.poNumber}</Badge>
+                  {currentPurchaseReceipt && (
+                    <Badge variant="secondary">PR: {currentPurchaseReceipt}</Badge>
+                  )}
+                  <Button onClick={submitReceipt} disabled={!currentPurchaseReceipt || loading}>
+                    <Package className="w-4 h-4 mr-2" />
+                    Submit Receipt
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
