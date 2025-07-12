@@ -55,10 +55,17 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
     }
   };
 
-  // Helper function to count items safely (from items array)
-  const getItemCount = (items: any[] | undefined): string => {
-    if (!items || !Array.isArray(items)) return '0';
-    return items.length.toString();
+  // Helper function to count items safely (from items array or total_qty)
+  const getItemCount = (obj: any): string => {
+    // Try to get items array length first
+    if (obj.items && Array.isArray(obj.items)) {
+      return obj.items.length.toString();
+    }
+    // Fallback to total_qty if items array not available
+    if (obj.total_qty && typeof obj.total_qty === 'number') {
+      return obj.total_qty.toString();
+    }
+    return '0';
   };
 
   // Helper function to get supplier name (from ERPNext supplier_name field)
@@ -260,7 +267,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-                        <p className="text-sm">{getItemCount(po.items)} items</p>
+                        <p className="text-sm">{getItemCount(po)} items</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Required By</p>
@@ -324,7 +331,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-                        <p className="text-sm">{getItemCount(receipt.items)} items</p>
+                        <p className="text-sm">{getItemCount(receipt)} items</p>
                       </div>
                        <div>
                          <p className="text-sm font-medium text-muted-foreground">Created On</p>
