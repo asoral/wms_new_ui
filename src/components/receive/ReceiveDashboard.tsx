@@ -273,7 +273,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredDrafts.map((receipt) => (
+              {filteredDrafts.slice(0, 5).map((receipt) => (
                 <div key={receipt.name} className="border rounded-lg p-4 flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">{receipt.name}</h3>

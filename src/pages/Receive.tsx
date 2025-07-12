@@ -65,24 +65,28 @@ const Receive = () => {
   const selectPO = async (purchaseOrder: any) => {
     setLoading(true);
     try {
-      // Transform the PO data received from the selector
+      console.log('selectPO called with:', purchaseOrder);
+      
+      // Handle both cases: when called from dashboard (direct PO object) and from selector (transformed object)
       const transformedPO: PurchaseOrder = {
-        poNumber: purchaseOrder.number,
+        poNumber: purchaseOrder.number || purchaseOrder.name,
         supplier: purchaseOrder.supplier,
-        supplierName: purchaseOrder.supplierName, // Add supplier display name
-        date: purchaseOrder.scheduleDate,
-        totalAmount: purchaseOrder.totalValue,
+        supplierName: purchaseOrder.supplierName || purchaseOrder.supplier_name || purchaseOrder.supplier,
+        date: purchaseOrder.scheduleDate || purchaseOrder.schedule_date || purchaseOrder.transaction_date,
+        totalAmount: purchaseOrder.totalValue || purchaseOrder.grand_total || 0,
         status: purchaseOrder.status === 'To Receive' ? 'pending' : 
                 purchaseOrder.status === 'Partially Received' ? 'partial' : 'completed',
         items: purchaseOrder.items || []
       };
 
+      console.log('Transformed PO:', transformedPO);
+      
       setSelectedPO(transformedPO);
       setActiveTab("receive");
       
       toast({
         title: "Purchase Order Loaded",
-        description: `PO ${purchaseOrder.number} loaded successfully with ${transformedPO.items.length} items`,
+        description: `PO ${transformedPO.poNumber} loaded successfully with ${transformedPO.items.length} items`,
       });
       
     } catch (error) {
@@ -128,17 +132,10 @@ const Receive = () => {
         try {
           const poResult = await erpnextAPI.getPurchaseOrder(receipt.purchase_order);
           if (poResult?.data) {
-            // Transform the PO data to match expected format
-            const poData = {
-              number: poResult.data.name,
-              supplier: poResult.data.supplier,
-              supplierName: poResult.data.supplier_name,
-              scheduleDate: poResult.data.schedule_date,
-              totalValue: poResult.data.grand_total,
-              status: poResult.data.status,
-              items: poResult.data.items || []
-            };
-            await selectPO(poData);
+            console.log('Fetched PO for draft receipt:', poResult.data);
+            
+            // Use the direct PO data from ERPNext (same format as dashboard)
+            await selectPO(poResult.data);
           }
         } catch (poError) {
           console.error('Error fetching PO for draft receipt:', poError);
