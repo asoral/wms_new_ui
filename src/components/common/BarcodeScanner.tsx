@@ -26,18 +26,32 @@ const BarcodeScanner = ({
   const [flashSupported, setFlashSupported] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
   const codeReader = useRef<BrowserMultiFormatReader | null>(null);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
 
   useEffect(() => {
-    startCamera();
+    let mounted = true;
+    
+    const initializeCamera = async () => {
+      if (mounted && !isCleaningUp) {
+        await startCamera();
+      }
+    };
+    
+    initializeCamera();
     
     return () => {
-      stopCamera();
+      mounted = false;
+      cleanup();
     };
   }, []);
 
   const startCamera = async () => {
+    if (isCleaningUp) return;
+    
     try {
       setError(null);
+      console.log('Starting camera...');
+      
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
@@ -46,11 +60,24 @@ const BarcodeScanner = ({
         }
       });
 
+      if (isCleaningUp) {
+        // If cleanup started while we were getting camera access, stop immediately
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       streamRef.current = mediaStream;
       
-      if (videoRef.current) {
+      if (videoRef.current && !isCleaningUp) {
         videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
+        // Wait for video to be ready before starting barcode scanning
+        videoRef.current.onloadedmetadata = () => {
+          if (!isCleaningUp && videoRef.current) {
+            videoRef.current.play().catch(err => {
+              console.error('Error playing video:', err);
+            });
+          }
+        };
       }
 
       const track = mediaStream.getVideoTracks()[0];
@@ -59,23 +86,29 @@ const BarcodeScanner = ({
 
       setIsScanning(true);
       
-      codeReader.current = new BrowserMultiFormatReader();
-      startBarcodeScanning();
+      if (!isCleaningUp) {
+        codeReader.current = new BrowserMultiFormatReader();
+        startBarcodeScanning();
+      }
 
     } catch (err) {
-      console.error('Error accessing camera:', err);
-      setError('Failed to access camera. Please ensure camera permissions are granted.');
+      if (!isCleaningUp) {
+        console.error('Error accessing camera:', err);
+        setError('Failed to access camera. Please ensure camera permissions are granted.');
+      }
     }
   };
 
   const startBarcodeScanning = async () => {
-    if (!codeReader.current || !videoRef.current) return;
+    if (!codeReader.current || !videoRef.current || isCleaningUp) return;
 
     try {
       await codeReader.current.decodeFromVideoDevice(
         undefined,
         videoRef.current,
         (result, err) => {
+          if (isCleaningUp) return;
+          
           if (result) {
             console.log('Barcode detected:', result.getText());
             handleBarcodeFound(result.getText());
@@ -86,18 +119,23 @@ const BarcodeScanner = ({
         }
       );
     } catch (err) {
-      console.error('Error starting barcode scanning:', err);
+      if (!isCleaningUp) {
+        console.error('Error starting barcode scanning:', err);
+      }
     }
   };
 
-  const stopCamera = () => {
-    console.log('Stopping camera and cleaning up resources...');
+  const cleanup = () => {
+    if (isCleaningUp) return;
+    setIsCleaningUp(true);
+    
+    console.log('Starting comprehensive camera cleanup...');
     
     // Stop the barcode reader first
     if (codeReader.current) {
       try {
         codeReader.current.reset();
-        console.log('Barcode reader reset');
+        console.log('Barcode reader reset successfully');
       } catch (err) {
         console.error('Error resetting barcode reader:', err);
       }
@@ -107,25 +145,35 @@ const BarcodeScanner = ({
     // Stop all media stream tracks
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
-        track.stop();
-        console.log('Camera track stopped:', track.kind, track.readyState);
+        try {
+          track.stop();
+          console.log('Camera track stopped:', track.kind, track.readyState);
+        } catch (err) {
+          console.error('Error stopping track:', err);
+        }
       });
       streamRef.current = null;
     }
 
-    // Clear video element
+    // Clear and stop video element
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current.pause();
+      try {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+        videoRef.current.load(); // Reset the video element
+        console.log('Video element cleared and reset');
+      } catch (err) {
+        console.error('Error clearing video element:', err);
+      }
     }
 
     setIsScanning(false);
     setFlashOn(false);
-    console.log('Camera cleanup completed');
+    console.log('Camera cleanup completed successfully');
   };
 
   const toggleFlash = async () => {
-    if (!streamRef.current || !flashSupported) return;
+    if (!streamRef.current || !flashSupported || isCleaningUp) return;
 
     try {
       const track = streamRef.current.getVideoTracks()[0];
@@ -139,22 +187,24 @@ const BarcodeScanner = ({
   };
 
   const handleBarcodeFound = (code: string) => {
+    if (isCleaningUp) return;
+    
     console.log('Barcode detected:', code);
+    cleanup();
     onBarcodeScanned(code);
-    stopCamera();
     onClose();
   };
 
   const handleClose = () => {
-    stopCamera();
+    cleanup();
     onClose();
   };
 
   const handleManualInput = () => {
     const barcode = prompt('Enter barcode manually:');
     if (barcode && barcode.trim()) {
+      cleanup();
       onBarcodeScanned(barcode.trim());
-      stopCamera();
       onClose();
     }
   };
