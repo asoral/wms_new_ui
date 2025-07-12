@@ -397,29 +397,37 @@ const Receive = () => {
         return;
       }
 
-      // Update local state
-      const updatedEntries = [...receiveEntries];
-      updatedEntries[index] = updatedEntry;
-      setReceiveEntries(updatedEntries);
-
-      // Update in ERPNext
+      // Get current receipt data first
       const currentReceiptResponse = await erpnextAPI.getPurchaseReceipt(currentPurchaseReceipt);
       const currentReceiptData = currentReceiptResponse.data;
       
-      // Update the corresponding item in ERPNext
+      // Update the corresponding item in ERPNext with all necessary fields
       const updatedItems = [...(currentReceiptData.items || [])];
       if (updatedItems[index]) {
+        const item = updatedItems[index] as any; // Use 'any' to access ERPNext-specific fields
+        
+        // Preserve all existing fields and only update what's needed
         updatedItems[index] = {
-          ...updatedItems[index],
+          ...item,
           qty: updatedEntry.receivedQty,
-          batch_no: updatedEntry.batch,
-          serial_no: updatedEntry.serial
+          batch_no: updatedEntry.batch || item.batch_no,
+          serial_no: updatedEntry.serial || item.serial_no,
+          // Include additional fields that ERPNext might need for validation
+          ...(item.received_qty !== undefined && { received_qty: updatedEntry.receivedQty }),
+          ...(item.accepted_qty !== undefined && { accepted_qty: updatedEntry.receivedQty }),
+          ...(item.rejected_qty !== undefined && { rejected_qty: 0 }),
         };
       }
 
+      // Update the receipt in ERPNext
       await erpnextAPI.updatePurchaseReceipt(currentPurchaseReceipt, {
         items: updatedItems
       });
+
+      // Only update local state after successful ERPNext update
+      const updatedEntries = [...receiveEntries];
+      updatedEntries[index] = updatedEntry;
+      setReceiveEntries(updatedEntries);
 
       toast({
         title: "Entry Updated",
@@ -427,9 +435,19 @@ const Receive = () => {
       });
     } catch (error) {
       console.error('Error updating entry:', error);
+      
+      let errorMessage = "Failed to update entry. Please try again.";
+      
+      // Parse ERPNext specific error messages
+      if (error instanceof Error && error.message.includes('QtyMismatchError')) {
+        errorMessage = "Quantity validation failed. Please check the received quantity against ERPNext rules.";
+      } else if (error instanceof Error && error.message.includes('417')) {
+        errorMessage = "ERPNext validation failed. The quantity may not meet business rule requirements.";
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to update entry",
+        title: "Update Failed", 
+        description: errorMessage,
         variant: "destructive"
       });
     }
