@@ -43,6 +43,35 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
   const [draftSearchTerm, setDraftSearchTerm] = useState("");
   const { toast } = useToast();
 
+  // Helper function to safely format dates
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString();
+    } catch (error) {
+      return 'N/A';
+    }
+  };
+
+  // Helper function to count items safely
+  const getItemCount = (items: any[] | undefined): string => {
+    if (!items || !Array.isArray(items)) return '0';
+    return items.length.toString();
+  };
+
+  // Helper function to get supplier name
+  const getSupplierName = (obj: any): string => {
+    return obj.supplier_name || obj.supplier || 'Unknown Supplier';
+  };
+
+  // Helper function to get total value
+  const getTotalValue = (obj: any): number => {
+    const total = obj.grand_total || obj.total || obj.total_amount || 0;
+    return (typeof total === 'number') ? total : 0;
+  };
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -211,30 +240,25 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Supplier</p>
-                        <p className="text-sm">{po.supplier}</p>
+                        <p className="text-sm">{getSupplierName(po)}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-                        <p className="text-sm">{po.total_qty || 'N/A'} items</p>
+                        <p className="text-sm">{getItemCount(po.items)} items</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Required By</p>
-                        <p className="text-sm">
-                          {po.schedule_date ? 
-                            new Date(po.schedule_date).toLocaleDateString() : 
-                            new Date(po.transaction_date).toLocaleDateString()
-                          }
-                        </p>
+                        <p className="text-sm">{formatDate(po.schedule_date || po.transaction_date)}</p>
                       </div>
                     </div>
                     <div className="mt-2">
                       <p className="text-sm text-muted-foreground">
-                        Total Value: <span className="font-medium">₹{((po.grand_total && typeof po.grand_total === 'number') ? po.grand_total : 0).toLocaleString()}</span>
+                        Total Value: <span className="font-medium">₹{getTotalValue(po).toLocaleString()}</span>
                       </p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end space-y-2 ml-4">
-                    <StatusBadge status={po.status} />
+                    <StatusBadge status={po.status || 'Unknown'} />
                     <Button size="sm" onClick={() => onSelectPO(po)}>
                       Receive
                     </Button>
@@ -280,30 +304,25 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Supplier</p>
-                        <p className="text-sm">{receipt.supplier}</p>
+                        <p className="text-sm">{getSupplierName(receipt)}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-                        <p className="text-sm">{receipt.total_qty || receipt.items?.length || 'N/A'} items</p>
+                        <p className="text-sm">{getItemCount(receipt.items)} items</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Created On</p>
-                        <p className="text-sm">
-                          {receipt.posting_date ? 
-                            new Date(receipt.posting_date).toLocaleDateString() : 
-                            receipt.creation ? new Date(receipt.creation).toLocaleDateString() : 'N/A'
-                          }
-                        </p>
+                        <p className="text-sm">{formatDate(receipt.posting_date || receipt.creation)}</p>
                       </div>
                     </div>
                     <div className="mt-2">
                       <p className="text-sm text-muted-foreground">
-                        Total Value: <span className="font-medium">₹{((receipt.grand_total && typeof receipt.grand_total === 'number') ? receipt.grand_total : 0).toLocaleString()}</span>
+                        Total Value: <span className="font-medium">₹{getTotalValue(receipt).toLocaleString()}</span>
                       </p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end space-y-2 ml-4">
-                    <StatusBadge status="Draft" />
+                    <StatusBadge status={receipt.status || 'Draft'} />
                     <Button size="sm" onClick={() => onSelectDraftReceipt(receipt.name)}>
                       Continue
                     </Button>
