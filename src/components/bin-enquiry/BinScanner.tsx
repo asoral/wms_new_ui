@@ -81,7 +81,6 @@ const BinScanner = ({ onBinScanned, isLoading }: BinScannerProps) => {
               onClose={stopScanning}
               title="Scan Bin/Warehouse Barcode"
               description="Point your camera at a bin or warehouse barcode"
-              isModal={false}
             />
           )}
         </TabsContent>
