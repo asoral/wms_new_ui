@@ -35,6 +35,8 @@ export interface POItem {
   rate: number;
   warehouse: string;
   name?: string; // PO Item ID for linking
+  has_batch_no?: boolean;
+  has_serial_no?: boolean;
 }
 
 export interface ReceiveEntry {
@@ -224,9 +226,9 @@ const Receive = () => {
       const company = poDetails.data.company;
       const supplierFromPO = poDetails.data.supplier; // Get correct supplier ID
 
-      // Create Serial and Batch Bundle if item has batch tracking
+      // Create Serial and Batch Bundle if item has batch or serial tracking
       let serialBatchBundle = null;
-      if (entryWithWarehouse.batch) {
+      if (entryWithWarehouse.batch || entryWithWarehouse.serial) {
         console.log('Creating Serial and Batch Bundle for batch:', entryWithWarehouse.batch);
         
         // Step 1: Check if batch exists, create if it doesn't (same as Stock Reconciliation)

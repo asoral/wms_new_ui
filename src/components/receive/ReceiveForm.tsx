@@ -88,10 +88,11 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
         return;
       }
 
-      if (!batch) {
+      // Only require batch if item is batch tracked
+      if (selectedItem.has_batch_no && !batch) {
         toast({
           title: "Batch Number Required",
-          description: "Please enter a batch number.",
+          description: "Please enter a batch number for this batch-tracked item.",
           variant: "destructive"
         });
         return;
@@ -306,15 +307,49 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                     <p className="font-medium">{selectedItem.warehouse}</p>
                   </div>
                 </div>
-                {/* Batch Tracked indicator */}
-                <div className="mt-2">
-                  <Badge variant="outline">Batch Tracked</Badge>
+                {/* Item Tracking indicators */}
+                <div className="mt-2 flex gap-2">
+                  {selectedItem.has_batch_no && (
+                    <Badge variant="outline">Batch Tracked</Badge>
+                  )}
+                  {selectedItem.has_serial_no && (
+                    <Badge variant="outline">Serial Tracked</Badge>
+                  )}
+                  {!selectedItem.has_batch_no && !selectedItem.has_serial_no && (
+                    <Badge variant="secondary">No Tracking</Badge>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Serial/Batch Input Method - only show when item selected */}
-            {selectedItem && (
+            {/* For non-tracked items, show simple quantity input */}
+            {selectedItem && !selectedItem.has_batch_no && !selectedItem.has_serial_no && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="received-qty-simple">Received Quantity *</Label>
+                  <Input
+                    id="received-qty-simple"
+                    type="number"
+                    placeholder="0"
+                    value={receivedQty || ""}
+                    onChange={(e) => setReceivedQty(Number(e.target.value))}
+                    max={selectedItem?.pendingQty || 0}
+                    min="1"
+                  />
+                </div>
+                <Button 
+                  onClick={handleAddEntry} 
+                  className="w-full bg-gray-600 hover:bg-gray-700" 
+                  disabled={!selectedItem || !receivedQty}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add to Receipt
+                </Button>
+              </div>
+            )}
+
+            {/* Serial/Batch Input Method - only show when item selected and is tracked */}
+            {selectedItem && (selectedItem.has_batch_no || selectedItem.has_serial_no) && (
               <div className="space-y-4">
                 <div>
                   <Label className="text-base font-medium">Serial/Batch Input Method</Label>
@@ -326,15 +361,30 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                     
                     <TabsContent value="traditional" className="space-y-4 mt-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="batch">Batch Number *</Label>
-                          <Input
-                            id="batch"
-                            placeholder="Enter batch number..."
-                            value={batch}
-                            onChange={(e) => setBatch(e.target.value)}
-                          />
-                        </div>
+                        {/* Only show batch input if item is batch tracked */}
+                        {selectedItem.has_batch_no && (
+                          <div className="space-y-2">
+                            <Label htmlFor="batch">Batch Number *</Label>
+                            <Input
+                              id="batch"
+                              placeholder="Enter batch number..."
+                              value={batch}
+                              onChange={(e) => setBatch(e.target.value)}
+                            />
+                          </div>
+                        )}
+                        {/* Only show serial input if item is serial tracked */}
+                        {selectedItem.has_serial_no && (
+                          <div className="space-y-2">
+                            <Label htmlFor="serial">Serial Number</Label>
+                            <Input
+                              id="serial"
+                              placeholder="Enter serial number..."
+                              value={serial}
+                              onChange={(e) => setSerial(e.target.value)}
+                            />
+                          </div>
+                        )}
                         <div className="space-y-2">
                           <Label htmlFor="received-qty">Actual Quantity *</Label>
                           <Input
@@ -351,7 +401,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                       <Button 
                         onClick={handleAddEntry} 
                         className="w-full bg-gray-600 hover:bg-gray-700" 
-                        disabled={!selectedItem || !receivedQty || !batch}
+                        disabled={!selectedItem || !receivedQty || (selectedItem.has_batch_no && !batch)}
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add to Count

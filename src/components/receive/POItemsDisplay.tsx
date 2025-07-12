@@ -41,6 +41,17 @@ const POItemsDisplay = ({ items }: POItemsDisplayProps) => {
               <div className="text-xs text-gray-500">
                 Rate: ₹{item.rate.toLocaleString()} | Warehouse: {item.warehouse}
               </div>
+              <div className="flex gap-1 mt-1">
+                {item.has_batch_no && (
+                  <Badge variant="outline" className="text-xs">Batch</Badge>
+                )}
+                {item.has_serial_no && (
+                  <Badge variant="outline" className="text-xs">Serial</Badge>
+                )}
+                {!item.has_batch_no && !item.has_serial_no && (
+                  <Badge variant="secondary" className="text-xs">No Tracking</Badge>
+                )}
+              </div>
             </div>
           </Card>
         ))}
@@ -59,6 +70,7 @@ const POItemsDisplay = ({ items }: POItemsDisplayProps) => {
             <th className="text-left p-2">Received</th>
             <th className="text-left p-2">Pending</th>
             <th className="text-left p-2">UOM</th>
+            <th className="text-left p-2">Tracking</th>
           </tr>
         </thead>
         <tbody>
@@ -70,6 +82,19 @@ const POItemsDisplay = ({ items }: POItemsDisplayProps) => {
               <td className="p-2">{item.receivedQty}</td>
               <td className="p-2">{item.pendingQty}</td>
               <td className="p-2">{item.uom}</td>
+              <td className="p-2">
+                <div className="flex gap-1">
+                  {item.has_batch_no && (
+                    <Badge variant="outline" className="text-xs">Batch</Badge>
+                  )}
+                  {item.has_serial_no && (
+                    <Badge variant="outline" className="text-xs">Serial</Badge>
+                  )}
+                  {!item.has_batch_no && !item.has_serial_no && (
+                    <Badge variant="secondary" className="text-xs">None</Badge>
+                  )}
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>

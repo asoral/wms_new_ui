@@ -177,26 +177,74 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
       if (fullPOResult.data) {
         const fullPO = fullPOResult.data;
         
+        // Fetch item details to get tracking information
+        const itemsWithTracking = await Promise.all(
+          (fullPO.items || []).map(async (item: any) => {
+            try {
+              // Fetch item details to get has_batch_no and has_serial_no
+              const itemResponse = await fetch(
+                `${erpnextAPI.baseURL}/api/resource/Item/${encodeURIComponent(item.item_code)}?fields=["has_batch_no","has_serial_no"]`,
+                {
+                  headers: {
+                    'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+                    'Content-Type': 'application/json',
+                  }
+                }
+              );
+              
+              let hasBatch = false;
+              let hasSerial = false;
+              
+              if (itemResponse.ok) {
+                const itemData = await itemResponse.json();
+                hasBatch = itemData.data?.has_batch_no === 1;
+                hasSerial = itemData.data?.has_serial_no === 1;
+              }
+              
+              return {
+                name: item.name, // Purchase Order Item record ID - crucial for linking
+                itemCode: item.item_code,
+                itemName: item.item_name,
+                orderedQty: item.qty || 0,
+                receivedQty: item.received_qty || 0,
+                pendingQty: (item.qty || 0) - (item.received_qty || 0),
+                rate: item.rate || 0,
+                uom: item.stock_uom || item.uom,
+                warehouse: item.warehouse || 'Main Store',
+                qtyToReceive: (item.qty || 0) - (item.received_qty || 0),
+                has_batch_no: hasBatch,
+                has_serial_no: hasSerial
+              };
+            } catch (error) {
+              console.error(`Error fetching item details for ${item.item_code}:`, error);
+              // Return item without tracking info if fetch fails
+              return {
+                name: item.name,
+                itemCode: item.item_code,
+                itemName: item.item_name,
+                orderedQty: item.qty || 0,
+                receivedQty: item.received_qty || 0,
+                pendingQty: (item.qty || 0) - (item.received_qty || 0),
+                rate: item.rate || 0,
+                uom: item.stock_uom || item.uom,
+                warehouse: item.warehouse || 'Main Store',
+                qtyToReceive: (item.qty || 0) - (item.received_qty || 0),
+                has_batch_no: false,
+                has_serial_no: false
+              };
+            }
+          })
+        );
+
         const transformedPO = {
           number: fullPO.name,
           supplier: fullPO.supplier, // Use supplier ID, not display name
           supplierName: fullPO.supplier_name || fullPO.supplier, // Keep display name separate
           status: fullPO.status,
           scheduleDate: fullPO.schedule_date || fullPO.transaction_date,
-          totalItems: fullPO.items ? fullPO.items.length : 0,
+          totalItems: itemsWithTracking.length,
           totalValue: fullPO.grand_total || 0,
-          items: fullPO.items ? fullPO.items.map((item: any) => ({
-            name: item.name, // Purchase Order Item record ID - crucial for linking
-            itemCode: item.item_code,
-            itemName: item.item_name,
-            orderedQty: item.qty || 0,
-            receivedQty: item.received_qty || 0,
-            pendingQty: (item.qty || 0) - (item.received_qty || 0),
-            rate: item.rate || 0,
-            uom: item.stock_uom || item.uom,
-            warehouse: item.warehouse || 'Main Store',
-            qtyToReceive: (item.qty || 0) - (item.received_qty || 0)
-          })) : []
+          items: itemsWithTracking
         };
 
         setSelectedPO(po);
