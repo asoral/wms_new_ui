@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, FileText, CheckCircle, AlertTriangle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Package, FileText, CheckCircle, AlertTriangle, Search } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +29,9 @@ interface DashboardAnalytics {
 
 const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: ReceiveDashboardProps) => {
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [filteredPOs, setFilteredPOs] = useState<any[]>([]);
   const [draftReceipts, setDraftReceipts] = useState<any[]>([]);
+  const [filteredDrafts, setFilteredDrafts] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<DashboardAnalytics>({
     totalPOs: 0,
     pendingPOs: 0,
@@ -36,11 +39,31 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
     draftReceipts: 0
   });
   const [loading, setLoading] = useState(false);
+  const [poSearchTerm, setPOSearchTerm] = useState("");
+  const [draftSearchTerm, setDraftSearchTerm] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  // Filter POs based on search term
+  useEffect(() => {
+    const filtered = purchaseOrders.filter(po =>
+      po.name.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
+      (po.supplier || '').toLowerCase().includes(poSearchTerm.toLowerCase())
+    );
+    setFilteredPOs(filtered);
+  }, [purchaseOrders, poSearchTerm]);
+
+  // Filter draft receipts based on search term
+  useEffect(() => {
+    const filtered = draftReceipts.filter(draft =>
+      draft.name.toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
+      (draft.supplier || '').toLowerCase().includes(draftSearchTerm.toLowerCase())
+    );
+    setFilteredDrafts(filtered);
+  }, [draftReceipts, draftSearchTerm]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -138,78 +161,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
         shortcuts={[]}
       />
 
-      {/* Recent Purchase Orders */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Purchase Orders to Receive</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-4">Loading purchase orders...</div>
-          ) : (
-            <div className="space-y-4">
-              {purchaseOrders.slice(0, 5).map((po) => (
-                <div key={po.name} className="border rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold">{po.name}</h3>
-                    <p className="text-sm text-gray-600">
-                      {po.supplier} - ₹{(po.grand_total || 0).toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Due: {new Date(po.schedule_date || po.transaction_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <StatusBadge status={po.status} />
-                    <Button size="sm" onClick={() => onSelectPO(po)}>
-                      Receive
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {purchaseOrders.length === 0 && (
-                <div className="text-center py-4 text-gray-500">
-                  No purchase orders to receive
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Draft Purchase Receipts */}
-      {draftReceipts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Draft Purchase Receipts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {draftReceipts.map((receipt) => (
-                <div key={receipt.name} className="border rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold">{receipt.name}</h3>
-                    <p className="text-sm text-gray-600">
-                      {receipt.supplier} - ₹{(receipt.grand_total || 0).toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Created: {new Date(receipt.posting_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <StatusBadge status="Draft" />
-                    <Button size="sm" onClick={() => onSelectDraftReceipt(receipt.name)}>
-                      Continue
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Quick Actions */}
+      {/* Quick Actions - Moved to top */}
       {shortcuts.length > 0 && (
         <Card>
           <CardHeader>
@@ -228,6 +180,141 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                   <span className="text-sm font-medium">{shortcut.label}</span>
                 </Button>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Purchase Orders */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle>Recent Purchase Orders to Receive</CardTitle>
+          <div className="relative w-72">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search purchase orders..."
+              value={poSearchTerm}
+              onChange={(e) => setPOSearchTerm(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-4">Loading purchase orders...</div>
+          ) : (
+            <div className="space-y-4">
+              {filteredPOs.slice(0, 5).map((po) => (
+                <div key={po.name} className="border rounded-lg p-4 flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg">{po.name}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Supplier</p>
+                        <p className="text-sm">{po.supplier}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                        <p className="text-sm">{po.total_qty || 'N/A'} items</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Required By</p>
+                        <p className="text-sm">
+                          {po.schedule_date ? 
+                            new Date(po.schedule_date).toLocaleDateString() : 
+                            new Date(po.transaction_date).toLocaleDateString()
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-sm text-muted-foreground">
+                        Total Value: <span className="font-medium">₹{(po.grand_total || 0).toLocaleString()}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end space-y-2 ml-4">
+                    <StatusBadge status={po.status} />
+                    <Button size="sm" onClick={() => onSelectPO(po)}>
+                      Receive
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {filteredPOs.length === 0 && poSearchTerm && (
+                <div className="text-center py-4 text-gray-500">
+                  No purchase orders found matching "{poSearchTerm}"
+                </div>
+              )}
+              {purchaseOrders.length === 0 && !poSearchTerm && (
+                <div className="text-center py-4 text-gray-500">
+                  No purchase orders to receive
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Draft Purchase Receipts */}
+      {draftReceipts.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle>Draft Purchase Receipts</CardTitle>
+            <div className="relative w-72">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search draft receipts..."
+                value={draftSearchTerm}
+                onChange={(e) => setDraftSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {filteredDrafts.map((receipt) => (
+                <div key={receipt.name} className="border rounded-lg p-4 flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg">{receipt.name}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Supplier</p>
+                        <p className="text-sm">{receipt.supplier}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                        <p className="text-sm">{receipt.total_qty || receipt.items?.length || 'N/A'} items</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Created On</p>
+                        <p className="text-sm">
+                          {receipt.posting_date ? 
+                            new Date(receipt.posting_date).toLocaleDateString() : 
+                            receipt.creation ? new Date(receipt.creation).toLocaleDateString() : 'N/A'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-sm text-muted-foreground">
+                        Total Value: <span className="font-medium">₹{(receipt.grand_total || 0).toLocaleString()}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end space-y-2 ml-4">
+                    <StatusBadge status="Draft" />
+                    <Button size="sm" onClick={() => onSelectDraftReceipt(receipt.name)}>
+                      Continue
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {filteredDrafts.length === 0 && draftSearchTerm && (
+                <div className="text-center py-4 text-gray-500">
+                  No draft receipts found matching "{draftSearchTerm}"
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

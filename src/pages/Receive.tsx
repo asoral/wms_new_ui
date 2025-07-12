@@ -123,9 +123,27 @@ const Receive = () => {
 
       const receipt = receiptResult.data;
       
-      // If receipt has a purchase order, load it first
+      // If receipt has a purchase order, fetch and load it first
       if (receipt.purchase_order) {
-        await selectPO(receipt.purchase_order);
+        try {
+          const poResult = await erpnextAPI.getPurchaseOrder(receipt.purchase_order);
+          if (poResult?.data) {
+            // Transform the PO data to match expected format
+            const poData = {
+              number: poResult.data.name,
+              supplier: poResult.data.supplier,
+              supplierName: poResult.data.supplier_name,
+              scheduleDate: poResult.data.schedule_date,
+              totalValue: poResult.data.grand_total,
+              status: poResult.data.status,
+              items: poResult.data.items || []
+            };
+            await selectPO(poData);
+          }
+        } catch (poError) {
+          console.error('Error fetching PO for draft receipt:', poError);
+          // Continue without PO if it fails
+        }
       }
 
       // Set current receipt and populate entries
