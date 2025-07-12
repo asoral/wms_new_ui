@@ -234,7 +234,7 @@ const ItemEnquiry = () => {
         <p className="text-gray-500">Check the stock levels of a specific item.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="mb-6">
         <Card>
           <CardHeader>
             <CardTitle>Select Item</CardTitle>

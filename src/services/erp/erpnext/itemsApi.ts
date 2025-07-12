@@ -187,11 +187,40 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Lookup an item by barcode through direct item fetch
+   * Lookup an item by barcode through Item Barcode child table
    */
   async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item | undefined>> {
     console.log('Fetching item by barcode:', barcode);
     try {
+      // First try to search in Item Barcode child table
+      const barcodeParams = new URLSearchParams();
+      barcodeParams.append('filters', JSON.stringify([
+        ['barcode', '=', barcode]
+      ]));
+      barcodeParams.append('fields', JSON.stringify(['parent']));
+      
+      console.log('Searching Item Barcode table with URL:', `${this.baseURL}/api/resource/Item Barcode?${barcodeParams.toString()}`);
+      
+      const barcodeResponse = await fetch(
+        `${this.baseURL}/api/resource/Item Barcode?${barcodeParams.toString()}`,
+        { headers: this.getHeaders() }
+      );
+      
+      if (barcodeResponse.ok) {
+        const barcodeResult = await barcodeResponse.json();
+        console.log('Barcode table response:', barcodeResult);
+        
+        if (barcodeResult.data && barcodeResult.data.length > 0) {
+          // Found barcode, get the parent item
+          const itemCode = barcodeResult.data[0].parent;
+          console.log('Found item code from barcode:', itemCode);
+          
+          return this.getItemDetails(itemCode);
+        }
+      }
+      
+      // Fallback: try direct item lookup (in case barcode matches item code)
+      console.log('Barcode not found in child table, trying direct item lookup');
       const params = new URLSearchParams({
         fields: JSON.stringify([
           'name',
@@ -208,7 +237,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
         `${this.baseURL}/api/resource/Item/${encodeURIComponent(barcode)}?${params.toString()}`,
         { headers: this.getHeaders() }
       );
-      console.log('API response status:', response.status);
+      console.log('Direct item lookup response status:', response.status);
   
       if (!response.ok) {
         if (response.status === 404) {
@@ -219,7 +248,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       }
   
       const result = await response.json();
-      console.log('API response data:', result);
+      console.log('Direct item lookup response data:', result);
       
       // Transform the data to ensure proper structure
       const transformedItem = {
