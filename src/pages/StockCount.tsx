@@ -64,24 +64,52 @@ const StockCount = () => {
       console.log('Stock count sessions response:', response);
 
       if (response?.data) {
-        // Transform the data to match our StockCountSession interface
-        const transformedSessions: StockCountSession[] = response.data
-          .sort((a: any, b: any) => new Date(b.posting_date).getTime() - new Date(a.posting_date).getTime()) // Sort by newest first
-          .map((session: any) => ({
-            id: session.name,
-            name: session.name,
-            warehouse: session.warehouse || 'Multiple', // Remove Unknown, show Multiple if no specific warehouse
-            purpose: session.purpose || 'Stock Reconciliation',
-            status: session.docstatus === 0 ? 'Draft' : session.docstatus === 1 ? 'Submitted' : 'Cancelled',
-            startedAt: session.posting_date ? new Date(session.posting_date) : new Date(),
-            postingTime: session.posting_time || '',
-            completedAt: session.docstatus === 1 ? new Date(session.posting_date) : undefined,
-            totalItems: session.items?.length || 0,
-            matchedItems: 0,
-            varianceItems: session.items?.length || 0,
-            differenceAmount: session.difference_amount || 0,
-            entries: session.items || []
-          }));
+        // For each stock reconciliation, fetch detailed data including items
+        const detailedSessions = await Promise.all(
+          response.data.map(async (session: any) => {
+            try {
+              const detailResponse = await erpnextAPI.getStockReconciliation(session.name);
+              const detailData = detailResponse?.data || session;
+              
+              return {
+                id: session.name,
+                name: session.name,
+                warehouse: detailData.warehouse || 'Multiple',
+                purpose: session.purpose || 'Stock Reconciliation',
+                status: session.docstatus === 0 ? 'Draft' : session.docstatus === 1 ? 'Submitted' : 'Cancelled',
+                startedAt: session.posting_date ? new Date(session.posting_date) : new Date(),
+                postingTime: session.posting_time || '',
+                completedAt: session.docstatus === 1 ? new Date(session.posting_date) : undefined,
+                totalItems: detailData.items?.length || 0,
+                matchedItems: 0,
+                varianceItems: detailData.items?.length || 0,
+                differenceAmount: session.difference_amount || 0,
+                entries: detailData.items || []
+              };
+            } catch (error) {
+              console.error(`Failed to fetch details for ${session.name}:`, error);
+              // Return basic data if detailed fetch fails
+              return {
+                id: session.name,
+                name: session.name,
+                warehouse: 'Multiple',
+                purpose: session.purpose || 'Stock Reconciliation',
+                status: session.docstatus === 0 ? 'Draft' : session.docstatus === 1 ? 'Submitted' : 'Cancelled',
+                startedAt: session.posting_date ? new Date(session.posting_date) : new Date(),
+                postingTime: session.posting_time || '',
+                completedAt: session.docstatus === 1 ? new Date(session.posting_date) : undefined,
+                totalItems: 0,
+                matchedItems: 0,
+                varianceItems: 0,
+                differenceAmount: session.difference_amount || 0,
+                entries: []
+              };
+            }
+          })
+        );
+
+        const transformedSessions: StockCountSession[] = detailedSessions
+          .sort((a: any, b: any) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()); // Sort by newest first
 
         setSessions(transformedSessions);
       } else {

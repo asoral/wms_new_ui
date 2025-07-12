@@ -15,14 +15,80 @@ const StockCountSession = () => {
   const navigate = useNavigate();
   const warehouse = searchParams.get('warehouse') || '';
   const purpose = searchParams.get('purpose') || 'Stock Reconciliation';
+  const sessionId = searchParams.get('sessionId');
+  const mode = searchParams.get('mode') || 'create'; // create, edit, view
   const [entries, setEntries] = useState<StockCountEntry[]>([]);
   const [activeTab, setActiveTab] = useState("entry");
-  const [stockReconciliationId, setStockReconciliationId] = useState<string | null>(null);
+  const [stockReconciliationId, setStockReconciliationId] = useState<string | null>(sessionId);
+  const [loading, setLoading] = useState(false);
+  const [sessionData, setSessionData] = useState<any>(null);
   const { toast } = useToast();
+
+  // Load existing session data if in edit/view mode
+  useEffect(() => {
+    if (sessionId && (mode === 'edit' || mode === 'view')) {
+      loadSessionData();
+    }
+  }, [sessionId, mode]);
 
   const totalItems = entries.length;
   const matchedItems = entries.filter(entry => entry.status === 'matched').length;
   const varianceItems = entries.filter(entry => entry.status === 'variance').length;
+
+  const loadSessionData = async () => {
+    if (!sessionId) return;
+    
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const response = await erpnextAPI.getStockReconciliation(sessionId);
+      if (response?.data) {
+        setSessionData(response.data);
+        setStockReconciliationId(response.data.name);
+        
+        // Transform ERPNext items to StockCountEntry format
+        if (response.data.items) {
+          const transformedEntries: StockCountEntry[] = response.data.items.map((item: any) => ({
+            itemCode: item.item_code,
+            itemName: item.item_name || item.item_code,
+            warehouse: item.warehouse,
+            currentQty: item.current_qty || 0,
+            actualQty: item.qty || 0,
+            difference: (item.qty || 0) - (item.current_qty || 0),
+            status: ((item.qty || 0) === (item.current_qty || 0)) ? 'matched' : 'variance',
+            uom: item.uom || '',
+            batch: item.batch_no || '',
+            serial: item.serial_no || '',
+            serialBatchBundle: item.serial_and_batch_bundle || ''
+          }));
+          setEntries(transformedEntries);
+        }
+        
+        // Switch to review tab if items exist
+        if (response.data.items && response.data.items.length > 0) {
+          setActiveTab("review");
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load session data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load stock reconciliation data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEntryAdded = async (entry: StockCountEntry) => {
     // Create draft Stock Reconciliation if this is the first entry
@@ -184,7 +250,9 @@ const StockCountSession = () => {
           <div className="flex items-center space-x-4">
             <h1 className="text-2xl font-bold flex items-center space-x-2">
               <BarChart3 className="w-6 h-6" />
-              <span>Stock Count</span>
+              <span>
+                {mode === 'edit' ? 'Edit Stock Count' : mode === 'view' ? 'View Stock Count' : 'Stock Count'}
+              </span>
             </h1>
             <Button 
               variant="outline" 
@@ -195,34 +263,51 @@ const StockCountSession = () => {
             </Button>
           </div>
           <p className="text-gray-500">
-            Warehouse: {warehouse}
             {stockReconciliationId && (
-              <span className="ml-4 text-blue-600">
-                Draft SR: {stockReconciliationId}
+              <span className="text-blue-600 font-medium text-lg">
+                {sessionData?.purpose || 'Stock Reconciliation'}: {stockReconciliationId}
+              </span>
+            )}
+            {warehouse && !stockReconciliationId && (
+              <span>Warehouse: {warehouse}</span>
+            )}
+            {sessionData?.company && (
+              <span className="ml-4 text-gray-600">
+                Company: {sessionData.company}
               </span>
             )}
           </p>
         </div>
         <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 w-full md:w-auto">
-          <Button variant="outline" onClick={handleReset} className="w-full md:w-auto">
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Reset
-          </Button>
-          <Button onClick={handleSubmitCount} className="w-full md:w-auto">
-            <Save className="w-4 h-4 mr-2" />
-            Submit Count
-          </Button>
+          {mode !== 'view' && (
+            <>
+              <Button variant="outline" onClick={handleReset} className="w-full md:w-auto">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset
+              </Button>
+              <Button onClick={handleSubmitCount} className="w-full md:w-auto">
+                <Save className="w-4 h-4 mr-2" />
+                {mode === 'edit' ? 'Update Count' : 'Submit Count'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Stock Count Session Summary */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Stock Count Session</span>
-            <Badge variant="outline">{purpose}</Badge>
-          </CardTitle>
-        </CardHeader>
+      {loading ? (
+        <Card className="mb-6">
+          <CardContent className="p-8 text-center">
+            <div className="text-gray-500">Loading session data...</div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Stock Count Session</span>
+              <Badge variant="outline">{sessionData?.purpose || purpose}</Badge>
+            </CardTitle>
+          </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-4 md:gap-6 text-center">
             <div>
@@ -239,7 +324,8 @@ const StockCountSession = () => {
             </div>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       {/* Tabs for Entry and Review */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -254,6 +340,16 @@ const StockCountSession = () => {
         </TabsList>
 
         <TabsContent value="entry" className="space-y-6">
+          {mode === 'view' ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Session Items (View Only)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-500">This session is in view-only mode. You cannot add new items.</p>
+              </CardContent>
+            </Card>
+          ) : (
           <Card>
             <CardHeader>
               <CardTitle>Scan Items</CardTitle>
@@ -279,7 +375,8 @@ const StockCountSession = () => {
                 }}
               />
             </CardContent>
-          </Card>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="review" className="space-y-6">
