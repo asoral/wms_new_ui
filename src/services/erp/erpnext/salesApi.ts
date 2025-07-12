@@ -10,7 +10,14 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(finalFilters));
+    // Request specific fields needed for dashboard
+    params.append('fields', JSON.stringify([
+      'name', 'customer', 'customer_name', 'delivery_date', 'transaction_date', 
+      'grand_total', 'status', 'items', 'total_qty', 'per_delivered'
+    ]));
+    params.append('limit_page_length', String(limitPageLength || 20));
 
     const response = await fetch(`${this.baseURL}/api/resource/Sales Order?${params}`, {
       headers: this.getHeaders(),
@@ -90,7 +97,14 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(finalFilters));
+    // Request specific fields needed for dashboard
+    params.append('fields', JSON.stringify([
+      'name', 'customer', 'customer_name', 'posting_date', 'creation', 
+      'grand_total', 'status', 'items', 'total_qty'
+    ]));
+    params.append('limit_page_length', String(limitPageLength || 20));
 
     const response = await fetch(`${this.baseURL}/api/resource/Delivery Note?${params}`, {
       headers: this.getHeaders(),

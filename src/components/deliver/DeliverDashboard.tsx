@@ -2,89 +2,124 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Truck, Package, FileText, Search, Printer, Shield, Loader2 } from "lucide-react";
+import { Plus, Truck, FileText, CheckCircle, AlertTriangle, Search } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { SalesOrderOption, DashboardData } from "@/types";
+import StatusBadge from "@/components/ui/status-badge";
+// import SalesOrderSelector from "./SalesOrderSelector";
 
 interface DeliverDashboardProps {
-  onSelectSalesOrder: (salesOrder: SalesOrderOption) => void;
-  onViewSalesOrders: () => void;
-  dashboardData: DashboardData;
-  isLoading: boolean;
+  onSelectSalesOrder: (salesOrder: any) => void;
+  onSelectDraftDelivery?: (deliveryId: string) => void;
+  shortcuts?: Array<{
+    label: string;
+    icon: any;
+    action: () => void;
+  }>;
 }
 
-interface DraftDeliveryNote {
-  name: string;
-  customer: string;
-  status: string;
-  totalItems: number;
-  totalValue: number;
-  salesOrder: string;
+interface DashboardAnalytics {
+  totalSOs: number;
+  pendingSOs: number;
+  completedSOs: number;
+  draftDeliveries: number;
 }
 
-const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData, isLoading }: DeliverDashboardProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<SalesOrderOption[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [draftDeliveryNotes, setDraftDeliveryNotes] = useState<DraftDeliveryNote[]>([]);
-  const [draftsLoading, setDraftsLoading] = useState(false);
+const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts = [] }: DeliverDashboardProps) => {
+  const [salesOrders, setSalesOrders] = useState<any[]>([]);
+  const [filteredSOs, setFilteredSOs] = useState<any[]>([]);
+  const [draftDeliveries, setDraftDeliveries] = useState<any[]>([]);
+  const [filteredDrafts, setFilteredDrafts] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<DashboardAnalytics>({
+    totalSOs: 0,
+    pendingSOs: 0,
+    completedSOs: 0,
+    draftDeliveries: 0
+  });
+  const [loading, setLoading] = useState(false);
+  const [soSearchTerm, setSOSearchTerm] = useState("");
+  const [draftSearchTerm, setDraftSearchTerm] = useState("");
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchDraftDeliveryNotes();
-  }, []);
-
-  const fetchDraftDeliveryNotes = async () => {
-    setDraftsLoading(true);
+  // Helper function to safely format dates
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'N/A';
     try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      const company = await getUserDefaultCompany();
-      
-      // Fetch draft delivery notes
-      const response = await erpnextAPI.getDeliveryNotes([
-        ['docstatus', '=', 0] // Draft status
-      ], company || undefined, 10);
-
-      const drafts: DraftDeliveryNote[] = response.data?.map((dn: any) => ({
-        name: dn.name,
-        customer: dn.customer,
-        status: dn.status || 'Draft',
-        totalItems: dn.items?.length || 0,
-        totalValue: dn.grand_total || 0,
-        salesOrder: dn.items?.[0]?.against_sales_order || ''
-      })) || [];
-
-      setDraftDeliveryNotes(drafts);
-
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString();
     } catch (error) {
-      console.error('Error fetching draft delivery notes:', error);
-    } finally {
-      setDraftsLoading(false);
+      return 'N/A';
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) {
-      toast({
-        title: "Search Term Required",
-        description: "Please enter a sales order number or customer name to search.",
-        variant: "destructive"
-      });
-      return;
+  // Helper function to count items safely (from items array or total_qty)
+  const getItemCount = (obj: any): string => {
+    // Try to get items array length first
+    if (obj.items && Array.isArray(obj.items)) {
+      return obj.items.length.toString();
     }
+    // Fallback to total_qty if items array not available
+    if (obj.total_qty && typeof obj.total_qty === 'number') {
+      return obj.total_qty.toString();
+    }
+    return '0';
+  };
 
-    setSearchLoading(true);
+  // Helper function to get customer name (from ERPNext customer_name field)
+  const getCustomerName = (obj: any): string => {
+    return obj.customer_name || obj.customer || 'Unknown Customer';
+  };
+
+  // Helper function to get total value (from ERPNext grand_total field)
+  const getTotalValue = (obj: any): number => {
+    const total = obj.grand_total || 0;
+    return (typeof total === 'number') ? total : 0;
+  };
+
+  // Helper function to get SO delivery date (from delivery_date)
+  const getSODeliveryDate = (so: any): string => {
+    return formatDate(so.delivery_date);
+  };
+
+  // Helper function to get delivery created date (from posting_date)
+  const getDeliveryCreatedDate = (delivery: any): string => {
+    return formatDate(delivery.posting_date);
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  // Filter SOs based on search term
+  useEffect(() => {
+    const filtered = salesOrders.filter(so =>
+      so.name.toLowerCase().includes(soSearchTerm.toLowerCase()) ||
+      (so.customer || '').toLowerCase().includes(soSearchTerm.toLowerCase()) ||
+      (so.customer_name || '').toLowerCase().includes(soSearchTerm.toLowerCase())
+    );
+    setFilteredSOs(filtered);
+  }, [salesOrders, soSearchTerm]);
+
+  // Filter draft deliveries based on search term
+  useEffect(() => {
+    const filtered = draftDeliveries.filter(draft =>
+      draft.name.toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
+      (draft.customer || '').toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
+      (draft.customer_name || '').toLowerCase().includes(draftSearchTerm.toLowerCase())
+    );
+    setFilteredDrafts(filtered);
+  }, [draftDeliveries, draftSearchTerm]);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
     try {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
           title: "ERPNext Not Configured",
-          description: "Please configure your ERPNext settings.",
+          description: "Please configure your ERPNext settings in the Profile page.",
           variant: "destructive"
         });
         return;
@@ -92,327 +127,238 @@ const DeliverDashboard = ({ onSelectSalesOrder, onViewSalesOrders, dashboardData
 
       const company = await getUserDefaultCompany();
       
-      // Search sales orders
-      const response = await erpnextAPI.searchSalesOrders(searchTerm, company || undefined, 20);
+      // Fetch sales orders
+      const soFilters = [
+        ['docstatus', '=', 1], // Submitted orders only
+        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+      ];
 
-      const results: SalesOrderOption[] = response.data?.map((so: any) => ({
-        id: so.name,
-        number: so.name,
-        customer: so.customer,
-        status: so.status,
-        delivery_date: so.delivery_date,
-        totalValue: so.grand_total || 0,
-        totalItems: 0, // Will be populated when selected
-        expectedDelivery: so.delivery_date,
-        percentDelivered: so.per_delivered || 0
-      })) || [];
-
-      setSearchResults(results);
-
-      if (results.length === 0) {
-        toast({
-          title: "No Results",
-          description: "No sales orders found matching your search criteria.",
-          variant: "destructive"
-        });
+      const soResponse = await erpnextAPI.getSalesOrders(soFilters, company || undefined);
+      
+      if (soResponse?.data && Array.isArray(soResponse.data)) {
+        setSalesOrders(soResponse.data);
+      } else {
+        setSalesOrders([]);
       }
 
+      // Fetch draft delivery notes
+      const deliveryFilters = [
+        ['docstatus', '=', 0] // Draft deliveries only
+      ];
+
+      const deliveryResponse = await erpnextAPI.getDeliveryNotes(deliveryFilters, company || undefined);
+      
+      if (deliveryResponse?.data && Array.isArray(deliveryResponse.data)) {
+        setDraftDeliveries(deliveryResponse.data);
+      } else {
+        setDraftDeliveries([]);
+      }
+
+      // Calculate analytics
+      const totalSOs = soResponse?.data?.length || 0;
+      const pendingSOs = soResponse?.data?.filter((so: any) => so.status === 'To Deliver').length || 0;
+      const completedSOs = soResponse?.data?.filter((so: any) => so.status === 'Completed').length || 0;
+      const draftDeliveriesCount = deliveryResponse?.data?.length || 0;
+
+      setAnalytics({
+        totalSOs,
+        pendingSOs,
+        completedSOs,
+        draftDeliveries: draftDeliveriesCount
+      });
+
     } catch (error) {
-      console.error('Error searching sales orders:', error);
+      console.error('Error fetching dashboard data:', error);
       toast({
-        title: "Search Failed",
-        description: "Failed to search sales orders. Please try again.",
+        title: "Error",
+        description: "Failed to fetch dashboard data",
         variant: "destructive"
       });
     } finally {
-      setSearchLoading(false);
+      setLoading(false);
     }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
   };
 
   return (
     <div className="space-y-6">
-      {/* Delivery Summary */}
+      {/* Dashboard Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Total Sales Orders"
+          value={analytics.totalSOs.toString()}
+          icon={FileText}
+        />
+        <MetricCard
+          title="Pending to Deliver"
+          value={analytics.pendingSOs.toString()}
+          icon={Truck}
+        />
+        <MetricCard
+          title="Completed"
+          value={analytics.completedSOs.toString()}
+          icon={CheckCircle}
+        />
+        <MetricCard
+          title="Draft Deliveries"
+          value={analytics.draftDeliveries.toString()}
+          icon={AlertTriangle}
+        />
+      </div>
+
+      {/* SO Selector - Commented out since we're handling selection in the dashboard */}
+      {/* <SalesOrderSelector 
+        onSelectSalesOrder={onSelectSalesOrder}
+        shortcuts={[]}
+      /> */}
+
+      {/* Quick Actions */}
+      {shortcuts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {shortcuts.map((shortcut, index) => (
+                <Button
+                  key={index}
+                  onClick={shortcut.action}
+                  variant="outline"
+                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
+                >
+                  <shortcut.icon className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium">{shortcut.label}</span>
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Sales Orders */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Package className="w-5 h-5" />
-            <span>Delivery Summary</span>
-          </CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle>Recent Sales Orders to Deliver</CardTitle>
+          <div className="relative w-72">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search sales orders..."
+              value={soSearchTerm}
+              onChange={(e) => setSOSearchTerm(e.target.value)}
+              className="pl-8"
+            />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-20 bg-gray-100 rounded-lg"></div>
-                </div>
-              ))
-            ) : (
-              <>
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="flex items-center p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <Truck className="w-6 h-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-blue-600">Today's Deliveries</p>
-                        <h3 className="text-2xl font-bold text-blue-600">{dashboardData.deliveredToday}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-green-50 border-green-200">
-                  <CardContent className="flex items-center p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <Package className="w-6 h-6 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-green-600">Total Deliveries</p>
-                        <h3 className="text-2xl font-bold text-green-600">2</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-yellow-50 border-yellow-200">
-                  <CardContent className="flex items-center p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-yellow-100 rounded-lg">
-                        <FileText className="w-6 h-6 text-yellow-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-yellow-600">Pending Orders</p>
-                        <h3 className="text-2xl font-bold text-yellow-600">{dashboardData.pendingOrders}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-purple-50 border-purple-200">
-                  <CardContent className="flex items-center p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        <Truck className="w-6 h-6 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-purple-600">Ready to Ship</p>
-                        <h3 className="text-2xl font-bold text-purple-600">{dashboardData.readyToShip}</h3>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Select Sales Order for Delivery */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="w-5 h-5" />
-            <span>Select Sales Order for Delivery</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Search Sales Order</label>
-            <div className="flex space-x-2">
-              <Input
-                placeholder="Search by SO number, customer name..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="flex-1"
-              />
-              <Button 
-                onClick={handleSearch} 
-                disabled={searchLoading}
-                className="min-w-[100px]"
-              >
-                {searchLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  "Search"
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Search Results */}
-          {searchResults.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-gray-700">Search Results:</h4>
-              {searchResults.slice(0, 5).map((so) => (
-                <div 
-                  key={so.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                  onClick={() => onSelectSalesOrder(so)}
-                >
+          {loading ? (
+            <div className="text-center py-4">Loading sales orders...</div>
+          ) : (
+            <div className="space-y-4">
+              {filteredSOs.slice(0, 5).map((so) => (
+                <div key={so.name} className="border rounded-lg p-4 flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-blue-600">{so.number}</div>
-                    <div className="text-sm text-gray-600">{so.customer}</div>
-                    <div className="text-xs text-gray-500">
-                      Delivery: {formatDate(so.delivery_date)} • {formatCurrency(so.totalValue)}
+                    <h3 className="font-semibold text-lg">{so.name}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Customer</p>
+                        <p className="text-sm">{getCustomerName(so)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                        <p className="text-sm">{getItemCount(so)} items</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Delivery Date</p>
+                        <p className="text-sm">{getSODeliveryDate(so)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-sm text-muted-foreground">
+                        Total Value: <span className="font-medium">₹{getTotalValue(so).toLocaleString()}</span>
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="outline">{so.status}</Badge>
-                    <Badge variant="secondary">{so.percentDelivered}% delivered</Badge>
+                  <div className="flex flex-col items-end space-y-2 ml-4">
+                    <StatusBadge status={so.status || 'Unknown'} />
+                    <Button size="sm" onClick={() => onSelectSalesOrder(so)}>
+                      Deliver
+                    </Button>
                   </div>
                 </div>
               ))}
-              {searchResults.length > 5 && (
-                <div className="text-center text-sm text-gray-500">
-                  Showing 5 of {searchResults.length} results
+              {filteredSOs.length === 0 && soSearchTerm && (
+                <div className="text-center py-4 text-gray-500">
+                  No sales orders found matching "{soSearchTerm}"
+                </div>
+              )}
+              {salesOrders.length === 0 && !soSearchTerm && (
+                <div className="text-center py-4 text-gray-500">
+                  No sales orders to deliver
                 </div>
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button 
-              onClick={onViewSalesOrders} 
-              variant="outline"
-              className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
-            >
-              <FileText className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-medium">View All SOs</span>
-            </Button>
-            
-            <Button 
-              variant="outline"
-              className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-green-50 hover:border-green-200"
-              onClick={() => {
-                // Navigate to print label
-                window.location.href = '/print-label';
-              }}
-            >
-              <Printer className="w-5 h-5 text-green-600" />
-              <span className="text-sm font-medium">Print Label</span>
-            </Button>
-            
-            <Button 
-              variant="outline"
-              className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-purple-50 hover:border-purple-200"
-              onClick={() => {
-                // Navigate to quality check
-                window.location.href = '/quality-check';
-              }}
-            >
-              <Shield className="w-5 h-5 text-purple-600" />
-              <span className="text-sm font-medium">Quality Check</span>
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
       {/* Draft Delivery Notes */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5" />
-              <span>Draft Delivery Notes</span>
+      {draftDeliveries.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle>Draft Delivery Notes</CardTitle>
+            <div className="relative w-72">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search draft deliveries..."
+                value={draftSearchTerm}
+                onChange={(e) => setDraftSearchTerm(e.target.value)}
+                className="pl-8"
+              />
             </div>
-            <Button 
-              onClick={fetchDraftDeliveryNotes} 
-              variant="outline" 
-              size="sm"
-              disabled={draftsLoading}
-            >
-              {draftsLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Refresh"
-              )}
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {draftsLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-16 bg-gray-100 rounded-lg"></div>
-                </div>
-              ))}
-            </div>
-          ) : draftDeliveryNotes.length > 0 ? (
-            <div className="space-y-3">
-              {draftDeliveryNotes.map((draft) => (
-                <div 
-                  key={draft.name}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {filteredDrafts.slice(0, 5).map((delivery) => (
+                <div key={delivery.name} className="border rounded-lg p-4 flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium">{draft.name}</span>
-                      <Badge variant="secondary">{draft.status}</Badge>
-                      <span className="text-sm text-gray-500">SO: {draft.salesOrder}</span>
+                    <h3 className="font-semibold text-lg">{delivery.name}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Customer</p>
+                        <p className="text-sm">{getCustomerName(delivery)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                        <p className="text-sm">{getItemCount(delivery)} items</p>
+                      </div>
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground">Created On</p>
+                         <p className="text-sm">{getDeliveryCreatedDate(delivery)}</p>
+                       </div>
                     </div>
-                    <div className="text-sm text-gray-600">
-                      <span className="inline-flex items-center mr-4">
-                        <Package className="w-3 h-3 mr-1" />
-                        {draft.totalItems} items
-                      </span>
-                      <span className="text-gray-500">₀</span> {/* As shown in screenshot */}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Invalid Date {/* As shown in screenshot */}
+                    <div className="mt-2">
+                      <p className="text-sm text-muted-foreground">
+                        Total Value: <span className="font-medium">₹{getTotalValue(delivery).toLocaleString()}</span>
+                      </p>
                     </div>
                   </div>
-                  <Button 
-                    size="sm"
-                    className="bg-gray-900 hover:bg-gray-800 text-white"
-                  >
-                    Continue
-                  </Button>
+                  <div className="flex flex-col items-end space-y-2 ml-4">
+                    <StatusBadge status={delivery.status || 'Draft'} />
+                    <Button size="sm" onClick={() => onSelectDraftDelivery?.(delivery.name)}>
+                      Continue
+                    </Button>
+                  </div>
                 </div>
               ))}
+              {filteredDrafts.length === 0 && draftSearchTerm && (
+                <div className="text-center py-4 text-gray-500">
+                  No draft deliveries found matching "{draftSearchTerm}"
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              No draft delivery notes found
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

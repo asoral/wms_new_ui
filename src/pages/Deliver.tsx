@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, ArrowLeft } from "lucide-react";
+import { Truck, ArrowLeft, Plus } from "lucide-react";
 import DeliverDashboard from "@/components/deliver/DeliverDashboard";
 import EnhancedDeliveryItemScanner from "@/components/deliver/EnhancedDeliveryItemScanner";
 import DeliveryTable from "@/components/deliver/DeliveryTable";
@@ -65,7 +65,7 @@ const Deliver = () => {
     }
   };
 
-  const handleSelectSalesOrder = async (salesOrderOption: SalesOrderOption) => {
+  const handleSelectSalesOrder = async (salesOrder: any) => {
     try {
       setLoading(true);
       const erpnextAPI = await createERPNextAPI();
@@ -78,8 +78,8 @@ const Deliver = () => {
         return;
       }
 
-      // Fetch full sales order details
-      const response = await erpnextAPI.getSalesOrder(salesOrderOption.number);
+      // Use the sales order data directly from the dashboard
+      const response = { data: salesOrder };
       
       if (response?.data) {
         const salesOrder: SalesOrder = {
@@ -373,9 +373,27 @@ const Deliver = () => {
           </div>
           <DeliverDashboard
             onSelectSalesOrder={handleSelectSalesOrder}
-            onViewSalesOrders={handleViewAllSalesOrders}
-            dashboardData={dashboardData}
-            isLoading={loading}
+            onSelectDraftDelivery={(draftId) => {
+              // Handle selecting draft delivery note for continuation
+              setDraftDeliveryNote(draftId);
+              toast({
+                title: "Draft Selected",
+                description: `Draft delivery note ${draftId} selected for continuation.`,
+              });
+            }}
+            shortcuts={[
+              {
+                label: "Create New Delivery",
+                icon: Plus,
+                action: () => {
+                  // Handle creating new delivery without selecting SO first
+                  toast({
+                    title: "Feature Coming Soon",
+                    description: "Direct delivery creation will be available soon.",
+                  });
+                }
+              }
+            ]}
           />
         </>
       ) : (
