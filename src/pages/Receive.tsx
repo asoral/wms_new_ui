@@ -127,15 +127,94 @@ const Receive = () => {
 
       const receipt = receiptResult.data;
       
-      // If receipt has a purchase order, fetch and load it first
+      // If receipt has a purchase order, fetch and load it properly with items
       if (receipt.purchase_order) {
         try {
-          const poResult = await erpnextAPI.getPurchaseOrder(receipt.purchase_order);
-          if (poResult?.data) {
-            console.log('Fetched PO for draft receipt:', poResult.data);
-            
-            // Use the direct PO data from ERPNext (same format as dashboard)
-            await selectPO(poResult.data);
+          console.log('Fetching PO for draft receipt:', receipt.purchase_order);
+          
+          // Fetch complete PO data with items (same approach as POSelector)
+          const poResponse = await fetch(
+            `${erpnextAPI.baseURL}/api/resource/Purchase Order/${encodeURIComponent(receipt.purchase_order)}`,
+            {
+              headers: {
+                'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+                'Content-Type': 'application/json',
+              }
+            }
+          );
+
+          if (poResponse.ok) {
+            const poResult = await poResponse.json();
+            if (poResult?.data) {
+              const fullPO = poResult.data;
+              console.log('Fetched complete PO data:', fullPO);
+              
+              // Fetch item tracking information for each item
+              const itemsWithTracking = await Promise.all(
+                (fullPO.items || []).map(async (item: any) => {
+                  try {
+                    const itemResponse = await fetch(
+                      `${erpnextAPI.baseURL}/api/resource/Item/${encodeURIComponent(item.item_code)}?fields=["has_batch_no","has_serial_no"]`,
+                      {
+                        headers: {
+                          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
+                          'Content-Type': 'application/json',
+                        }
+                      }
+                    );
+                    
+                    let hasBatch = false;
+                    let hasSerial = false;
+                    
+                    if (itemResponse.ok) {
+                      const itemData = await itemResponse.json();
+                      hasBatch = itemData.data?.has_batch_no === 1;
+                      hasSerial = itemData.data?.has_serial_no === 1;
+                    }
+
+                    return {
+                      itemCode: item.item_code,
+                      itemName: item.item_name || item.item_code,
+                      orderedQty: item.qty || 0,
+                      receivedQty: item.received_qty || 0,
+                      pendingQty: (item.qty || 0) - (item.received_qty || 0),
+                      uom: item.uom || 'Nos',
+                      rate: item.rate || 0,
+                      warehouse: item.warehouse || 'Main Store',
+                      name: item.name,
+                      has_batch_no: hasBatch,
+                      has_serial_no: hasSerial
+                    };
+                  } catch (error) {
+                    console.error('Error fetching item tracking:', error);
+                    return {
+                      itemCode: item.item_code,
+                      itemName: item.item_name || item.item_code,
+                      orderedQty: item.qty || 0,
+                      receivedQty: item.received_qty || 0,
+                      pendingQty: (item.qty || 0) - (item.received_qty || 0),
+                      uom: item.uom || 'Nos',
+                      rate: item.rate || 0,
+                      warehouse: item.warehouse || 'Main Store',
+                      name: item.name,
+                      has_batch_no: false,
+                      has_serial_no: false
+                    };
+                  }
+                })
+              );
+
+              // Create the complete PO object with items
+              const completePO = {
+                ...fullPO,
+                items: itemsWithTracking
+              };
+              
+              console.log('Complete PO with tracking:', completePO);
+              
+              // Now call selectPO with the complete data
+              await selectPO(completePO);
+            }
           }
         } catch (poError) {
           console.error('Error fetching PO for draft receipt:', poError);
