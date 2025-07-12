@@ -96,7 +96,9 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         'reserved_qty',
         'planned_qty',
         'ordered_qty',
-        'projected_qty'
+        'projected_qty',
+        'creation',
+        'modified'
       ];
 
       const binParams = this.buildQueryParams(binFilters, binFields);

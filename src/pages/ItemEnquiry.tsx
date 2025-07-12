@@ -144,12 +144,12 @@ const ItemEnquiry = () => {
 
             console.log(`Item: ${code}, Warehouse: ${item.warehouse}, Qty: ${actualQty}, Rate: ${valuationRate}, Total: ${totalValuation}`);
 
-            // Calculate age from bin last updated date
+            // Calculate age from bin creation date
             let age = 1; // Default to at least 1 day
-            if (item.modified) {
-              const lastUpdated = new Date(item.modified);
+            if (item.creation) {
+              const creationDate = new Date(item.creation);
               const today = new Date();
-              const diffTime = Math.abs(today.getTime() - lastUpdated.getTime());
+              const diffTime = Math.abs(today.getTime() - creationDate.getTime());
               age = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
             }
 
