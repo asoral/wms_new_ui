@@ -3,8 +3,9 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, RotateCcw, Save } from "lucide-react";
+import { BarChart3, RotateCcw, Save, Trash2, Edit, Check, X } from "lucide-react";
 import ItemSelector from "@/components/stock-count/ItemSelector";
 import { StockCountEntry } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,8 @@ const StockCountSession = () => {
   const [stockReconciliationId, setStockReconciliationId] = useState<string | null>(sessionId);
   const [loading, setLoading] = useState(false);
   const [sessionData, setSessionData] = useState<any>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingEntry, setEditingEntry] = useState<StockCountEntry | null>(null);
   const { toast } = useToast();
 
   // Load existing session data if in edit/view mode
@@ -224,6 +227,47 @@ const StockCountSession = () => {
     });
   };
 
+  const handleDeleteEntry = (index: number) => {
+    const deletedEntry = entries[index];
+    setEntries(prev => prev.filter((_, i) => i !== index));
+    toast({
+      title: "Entry Deleted",
+      description: `Stock count entry for ${deletedEntry.itemName} has been removed.`,
+    });
+  };
+
+  const handleEditEntry = (index: number) => {
+    setEditingIndex(index);
+    setEditingEntry({ ...entries[index] });
+  };
+
+  const handleSaveEdit = () => {
+    if (editingIndex !== null && editingEntry) {
+      const updatedEntry: StockCountEntry = {
+        ...editingEntry,
+        difference: editingEntry.actualQty - editingEntry.currentQty,
+        status: (editingEntry.actualQty === editingEntry.currentQty ? 'matched' : 'variance') as 'matched' | 'variance' | 'pending'
+      };
+      
+      setEntries(prev => prev.map((entry, i) => 
+        i === editingIndex ? updatedEntry : entry
+      ));
+      
+      setEditingIndex(null);
+      setEditingEntry(null);
+      
+      toast({
+        title: "Entry Updated",
+        description: `Stock count entry for ${updatedEntry.itemName} has been updated.`,
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditingEntry(null);
+  };
+
   const handleSubmitCount = () => {
     if (entries.length === 0) {
       toast({
@@ -403,6 +447,7 @@ const StockCountSession = () => {
                           <th className="text-right p-3 font-medium text-gray-700">Actual Qty</th>
                           <th className="text-right p-3 font-medium text-gray-700">Difference</th>
                           <th className="text-left p-3 font-medium text-gray-700">Status</th>
+                          {mode !== 'view' && <th className="text-center p-3 font-medium text-gray-700">Actions</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -412,15 +457,85 @@ const StockCountSession = () => {
                             <td className="p-3">{entry.itemName}</td>
                             <td className="p-3">{entry.warehouse}</td>
                             <td className="p-3 text-right">{entry.currentQty}</td>
-                            <td className="p-3 text-right">{entry.actualQty}</td>
-                            <td className="p-3 text-right">{entry.difference}</td>
+                            <td className="p-3 text-right">
+                              {editingIndex === index ? (
+                                <Input
+                                  type="number"
+                                  value={editingEntry?.actualQty || 0}
+                                  onChange={(e) => setEditingEntry(prev => prev ? {
+                                    ...prev,
+                                    actualQty: parseFloat(e.target.value) || 0
+                                  } : null)}
+                                  className="w-20 text-right"
+                                />
+                              ) : (
+                                entry.actualQty
+                              )}
+                            </td>
+                            <td className="p-3 text-right">
+                              {editingIndex === index && editingEntry
+                                ? editingEntry.actualQty - editingEntry.currentQty
+                                : entry.difference
+                              }
+                            </td>
                             <td className="p-3">
                               <Badge 
-                                variant={entry.status === 'matched' ? 'default' : 'destructive'}
+                                variant={editingIndex === index && editingEntry
+                                  ? (editingEntry.actualQty === editingEntry.currentQty ? 'default' : 'destructive')
+                                  : (entry.status === 'matched' ? 'default' : 'destructive')
+                                }
                               >
-                                {entry.status}
+                                {editingIndex === index && editingEntry
+                                  ? (editingEntry.actualQty === editingEntry.currentQty ? 'matched' : 'variance')
+                                  : entry.status
+                                }
                               </Badge>
                             </td>
+                            {mode !== 'view' && (
+                              <td className="p-3">
+                                <div className="flex items-center justify-center space-x-1">
+                                  {editingIndex === index ? (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleSaveEdit}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleCancelEdit}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleEditEntry(index)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => handleDeleteEntry(index)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -437,12 +552,20 @@ const StockCountSession = () => {
                               <p className="font-medium text-gray-900">{entry.itemCode}</p>
                               <p className="text-sm text-gray-600">{entry.itemName}</p>
                             </div>
-                            <Badge 
-                              variant={entry.status === 'matched' ? 'default' : 'destructive'}
-                              className="ml-2"
-                            >
-                              {entry.status}
-                            </Badge>
+                            <div className="flex items-center space-x-2">
+                              <Badge 
+                                variant={editingIndex === index && editingEntry
+                                  ? (editingEntry.actualQty === editingEntry.currentQty ? 'default' : 'destructive')
+                                  : (entry.status === 'matched' ? 'default' : 'destructive')
+                                }
+                                className="ml-2"
+                              >
+                                {editingIndex === index && editingEntry
+                                  ? (editingEntry.actualQty === editingEntry.currentQty ? 'matched' : 'variance')
+                                  : entry.status
+                                }
+                              </Badge>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
@@ -459,15 +582,77 @@ const StockCountSession = () => {
                             </div>
                             <div>
                               <span className="text-gray-600">Actual:</span>
-                              <span className="ml-1 font-medium">{entry.actualQty}</span>
+                              {editingIndex === index ? (
+                                <Input
+                                  type="number"
+                                  value={editingEntry?.actualQty || 0}
+                                  onChange={(e) => setEditingEntry(prev => prev ? {
+                                    ...prev,
+                                    actualQty: parseFloat(e.target.value) || 0
+                                  } : null)}
+                                  className="w-20 ml-1 inline-block text-sm"
+                                />
+                              ) : (
+                                <span className="ml-1 font-medium">{entry.actualQty}</span>
+                              )}
                             </div>
                             <div className="col-span-2">
                               <span className="text-gray-600">Difference:</span>
-                              <span className={`ml-1 font-medium ${entry.difference !== 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                {entry.difference > 0 ? '+' : ''}{entry.difference}
+                              <span className={`ml-1 font-medium ${
+                                editingIndex === index && editingEntry
+                                  ? (editingEntry.actualQty - editingEntry.currentQty !== 0 ? 'text-red-600' : 'text-green-600')
+                                  : (entry.difference !== 0 ? 'text-red-600' : 'text-green-600')
+                              }`}>
+                                {editingIndex === index && editingEntry
+                                  ? (editingEntry.actualQty - editingEntry.currentQty > 0 ? '+' : '') + (editingEntry.actualQty - editingEntry.currentQty)
+                                  : (entry.difference > 0 ? '+' : '') + entry.difference
+                                }
                               </span>
                             </div>
                           </div>
+                          {mode !== 'view' && (
+                            <div className="flex justify-end space-x-2 pt-2 border-t">
+                              {editingIndex === index ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleSaveEdit}
+                                  >
+                                    <Check className="w-4 h-4 mr-1" />
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleCancelEdit}
+                                  >
+                                    <X className="w-4 h-4 mr-1" />
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditEntry(index)}
+                                  >
+                                    <Edit className="w-4 h-4 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleDeleteEntry(index)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Delete
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </Card>
                     ))}
