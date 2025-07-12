@@ -500,6 +500,11 @@ const StockCountSession = () => {
                 Company: {sessionData.company}
               </span>
             )}
+            {(sessionData?.warehouse || warehouse || (entries.length > 0 ? entries[0].warehouse : '')) && (
+              <span className="ml-4 text-gray-600">
+                Warehouse: {sessionData?.warehouse || warehouse || (entries.length > 0 ? entries[0].warehouse : '')}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 w-full md:w-auto">
@@ -580,12 +585,12 @@ const StockCountSession = () => {
             </CardHeader>
             <CardContent>
               <ItemSelector 
-                warehouse={warehouse}
+                warehouse={warehouse || sessionData?.warehouse || (entries.length > 0 ? entries[0].warehouse : '')}
                 onItemAdded={(item) => {
                   const entry: StockCountEntry = {
                     itemCode: item.itemCode,
                     itemName: item.itemName,
-                    warehouse: item.warehouse,
+                    warehouse: item.warehouse || warehouse || sessionData?.warehouse || (entries.length > 0 ? entries[0].warehouse : ''),
                     currentQty: item.currentQty,
                     actualQty: item.actualQty,
                     difference: item.actualQty - item.currentQty,
