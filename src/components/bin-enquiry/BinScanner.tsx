@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Camera, Search } from "lucide-react";
 import WarehouseSelector from "./WarehouseSelector";
-import CameraScanner from "./CameraScanner";
+import BarcodeScanner from "../common/BarcodeScanner";
 
 interface BinScannerProps {
   onBinScanned: (binCode: string) => void;
@@ -76,10 +76,12 @@ const BinScanner = ({ onBinScanned, isLoading }: BinScannerProps) => {
               </div>
             </div>
           ) : (
-            <CameraScanner
-              onBarcodeDetected={handleBarcodeDetected}
+            <BarcodeScanner
+              onBarcodeScanned={handleBarcodeDetected}
               onClose={stopScanning}
-              isActive={true}
+              title="Scan Bin/Warehouse Barcode"
+              description="Point your camera at a bin or warehouse barcode"
+              isModal={false}
             />
           )}
         </TabsContent>

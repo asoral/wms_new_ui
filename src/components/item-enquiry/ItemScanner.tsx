@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Camera, Search } from "lucide-react";
 import { Item, ItemSelectCallback } from "@/types";
 import ItemSelector from "../common/ItemSelector";
-import CameraScanner from "./CameraScanner";
+import BarcodeScanner from "../common/BarcodeScanner";
 
 interface ItemScannerProps {
   onItemScanned: ItemSelectCallback;
@@ -88,9 +88,11 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
               </div>
             </div>
           ) : (
-            <CameraScanner
+            <BarcodeScanner
               onBarcodeScanned={handleBarcodeScanned}
               onClose={stopScanning}
+              title="Scan Item Barcode"
+              description="Point your camera at an item barcode to scan automatically"
             />
           )}
         </TabsContent>

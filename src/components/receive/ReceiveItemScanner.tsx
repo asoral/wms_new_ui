@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Search, ScanBarcode } from "lucide-react";
 import { POItem } from "@/types";
 import { Item, ItemSelectCallback } from "@/types";
-import CameraScanner from "../item-enquiry/CameraScanner";
+import BarcodeScanner from "../common/BarcodeScanner";
 import ItemSelector from "../item-enquiry/ItemSelector";
 
 interface ReceiveItemScannerProps {
@@ -100,9 +100,11 @@ const ReceiveItemScanner = ({ poItems, onItemScanned, isLoading }: ReceiveItemSc
               </div>
             </div>
           ) : (
-            <CameraScanner
+            <BarcodeScanner
               onBarcodeScanned={handleBarcodeScanned}
               onClose={stopScanning}
+              title="Scan Item Barcode"
+              description="Point your camera at an item barcode for receiving"
             />
           )}
         </TabsContent>
