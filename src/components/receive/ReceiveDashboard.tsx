@@ -55,21 +55,31 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
     }
   };
 
-  // Helper function to count items safely
+  // Helper function to count items safely (from items array)
   const getItemCount = (items: any[] | undefined): string => {
     if (!items || !Array.isArray(items)) return '0';
     return items.length.toString();
   };
 
-  // Helper function to get supplier name
+  // Helper function to get supplier name (from ERPNext supplier_name field)
   const getSupplierName = (obj: any): string => {
     return obj.supplier_name || obj.supplier || 'Unknown Supplier';
   };
 
-  // Helper function to get total value
+  // Helper function to get total value (from ERPNext grand_total field)
   const getTotalValue = (obj: any): number => {
-    const total = obj.grand_total || obj.total || obj.total_amount || 0;
+    const total = obj.grand_total || 0;
     return (typeof total === 'number') ? total : 0;
+  };
+
+  // Helper function to get PO required date (from schedule_date)
+  const getPORequiredDate = (po: any): string => {
+    return formatDate(po.schedule_date);
+  };
+
+  // Helper function to get receipt created date (from posting_date)
+  const getReceiptCreatedDate = (receipt: any): string => {
+    return formatDate(receipt.posting_date);
   };
 
   useEffect(() => {
@@ -80,7 +90,8 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
   useEffect(() => {
     const filtered = purchaseOrders.filter(po =>
       po.name.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
-      (po.supplier || '').toLowerCase().includes(poSearchTerm.toLowerCase())
+      (po.supplier || '').toLowerCase().includes(poSearchTerm.toLowerCase()) ||
+      (po.supplier_name || '').toLowerCase().includes(poSearchTerm.toLowerCase())
     );
     setFilteredPOs(filtered);
   }, [purchaseOrders, poSearchTerm]);
@@ -89,7 +100,8 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
   useEffect(() => {
     const filtered = draftReceipts.filter(draft =>
       draft.name.toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
-      (draft.supplier || '').toLowerCase().includes(draftSearchTerm.toLowerCase())
+      (draft.supplier || '').toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
+      (draft.supplier_name || '').toLowerCase().includes(draftSearchTerm.toLowerCase())
     );
     setFilteredDrafts(filtered);
   }, [draftReceipts, draftSearchTerm]);
@@ -248,7 +260,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Required By</p>
-                        <p className="text-sm">{formatDate(po.schedule_date || po.transaction_date)}</p>
+                        <p className="text-sm">{getPORequiredDate(po)}</p>
                       </div>
                     </div>
                     <div className="mt-2">
@@ -310,10 +322,10 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                         <p className="text-sm font-medium text-muted-foreground">Total Items</p>
                         <p className="text-sm">{getItemCount(receipt.items)} items</p>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Created On</p>
-                        <p className="text-sm">{formatDate(receipt.posting_date || receipt.creation)}</p>
-                      </div>
+                       <div>
+                         <p className="text-sm font-medium text-muted-foreground">Created On</p>
+                         <p className="text-sm">{getReceiptCreatedDate(receipt)}</p>
+                       </div>
                     </div>
                     <div className="mt-2">
                       <p className="text-sm text-muted-foreground">
