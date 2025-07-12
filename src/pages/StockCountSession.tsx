@@ -94,14 +94,81 @@ const StockCountSession = () => {
   };
 
   const handleEntryAdded = async (entry: StockCountEntry) => {
-    // Create draft Stock Reconciliation if this is the first entry
-    if (entries.length === 0 && !stockReconciliationId) {
-      try {
-        const erpnextAPI = await createERPNextAPI();
-        if (!erpnextAPI) {
-          throw new Error('ERPNext API not available');
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not available');
+      }
+
+      if (stockReconciliationId) {
+        // We're editing an existing stock reconciliation - add the new item
+        console.log('Adding item to existing Stock Reconciliation:', stockReconciliationId);
+        
+        // Get current stock reconciliation data
+        const currentSR = await erpnextAPI.getStockReconciliation(stockReconciliationId);
+        if (!currentSR?.data) {
+          throw new Error('Failed to fetch current stock reconciliation');
         }
 
+        // Get valuation rate for the new item
+        let valuationRate = 0;
+        try {
+          const stockLedgerResponse = await erpnextAPI.stockAPI.getStockLedgerEntries(entry.itemCode, [entry.warehouse]);
+          if (stockLedgerResponse?.data && stockLedgerResponse.data.length > 0) {
+            const latestEntry = stockLedgerResponse.data
+              .filter((ledger: any) => ledger.warehouse === entry.warehouse)
+              .sort((a: any, b: any) => {
+                const dateA = new Date(a.posting_date + ' ' + (a.posting_time || '00:00:00'));
+                const dateB = new Date(b.posting_date + ' ' + (b.posting_time || '00:00:00'));
+                return dateB.getTime() - dateA.getTime();
+              })[0];
+            
+            if (latestEntry) {
+              valuationRate = latestEntry.valuation_rate || 0;
+            }
+          }
+          
+          // Fallback: get item details for standard rate
+          if (!valuationRate) {
+            const itemDetails = await erpnextAPI.getItemDetails(entry.itemCode);
+            if (itemDetails?.data) {
+              valuationRate = (itemDetails.data as any).standard_rate || (itemDetails.data as any).valuation_rate || 0;
+            }
+          }
+        } catch (error) {
+          console.warn('Could not fetch valuation rate for new item:', error);
+        }
+
+        // Add the new item to the existing items array
+        const newItem = {
+          item_code: entry.itemCode,
+          warehouse: entry.warehouse,
+          qty: entry.actualQty,
+          valuation_rate: valuationRate || 0,
+          current_qty: entry.currentQty,
+          current_valuation_rate: valuationRate || 0,
+          ...(entry.batch && { batch_no: entry.batch }),
+          ...(entry.serial && { serial_no: entry.serial }),
+          ...(entry.serialBatchBundle && { serial_and_batch_bundle: entry.serialBatchBundle })
+        };
+
+        const updatedItems = [...currentSR.data.items, newItem];
+
+        // Update the stock reconciliation in ERPNext
+        const updateData = {
+          items: updatedItems
+        };
+
+        console.log('Adding new item to Stock Reconciliation:', updateData);
+        await erpnextAPI.callAPI(`Stock Reconciliation/${stockReconciliationId}`, 'PUT', updateData);
+
+        toast({
+          title: "Item Added",
+          description: `Stock count entry for ${entry.itemName} has been added to ERPNext.`,
+        });
+      } else {
+        // Create new stock reconciliation if this is the first entry
+        console.log('Creating new Stock Reconciliation...');
         // Get company from user profile
         const { getUserDefaultCompany } = await import('@/services/erpnextApi');
         const company = await getUserDefaultCompany();
@@ -153,7 +220,7 @@ const StockCountSession = () => {
         const stockReconciliationData = {
           doctype: 'Stock Reconciliation',
           company: company,
-          purpose: purpose,
+          purpose: sessionData?.purpose || purpose,
           posting_date: new Date().toISOString().split('T')[0],
           posting_time: new Date().toTimeString().split(' ')[0],
           set_posting_time: 1,
@@ -185,37 +252,34 @@ const StockCountSession = () => {
         } else {
           throw new Error('No Stock Reconciliation ID returned from API');
         }
-      } catch (error: any) {
-        console.error('Failed to create stock reconciliation:', error);
-        
-        let errorMessage = 'Failed to create Stock Reconciliation in ERPNext.';
-        
-        if (error.message) {
-          if (error.message.includes('ValidationError')) {
-            errorMessage = 'Validation failed: Please check that all required fields are filled correctly.';
-          } else if (error.message.includes('PermissionError')) {
-            errorMessage = 'Permission denied: You may not have rights to create Stock Reconciliation.';
-          } else if (error.message.includes('DuplicateEntryError')) {
-            errorMessage = 'Duplicate entry: A similar stock reconciliation may already exist.';
-          } else {
-            errorMessage = error.message;
-          }
-        }
-        
-        toast({
-          title: "Error Creating Stock Reconciliation",
-          description: errorMessage,
-          variant: "destructive"
-        });
-        return; // Don't add entry if stock reconciliation creation failed
       }
-    }
 
-    setEntries(prev => [...prev, entry]);
-    toast({
-      title: "Entry Added",
-      description: `Stock count entry for ${entry.itemName} has been added.`,
-    });
+      // Update local state
+      setEntries(prev => [...prev, entry]);
+    } catch (error: any) {
+      console.error('Failed to add entry to stock reconciliation:', error);
+      
+      let errorMessage = 'Failed to add entry to Stock Reconciliation in ERPNext.';
+      
+      if (error.message) {
+        if (error.message.includes('ValidationError')) {
+          errorMessage = 'Validation failed: Please check that all required fields are filled correctly.';
+        } else if (error.message.includes('PermissionError')) {
+          errorMessage = 'Permission denied: You may not have rights to modify Stock Reconciliation.';
+        } else if (error.message.includes('DuplicateEntryError')) {
+          errorMessage = 'Duplicate entry: A similar item entry may already exist.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast({
+        title: "Error Adding Entry",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      return; // Don't add entry to local state if ERPNext update failed
+    }
   };
 
   const handleReset = () => {
@@ -227,13 +291,58 @@ const StockCountSession = () => {
     });
   };
 
-  const handleDeleteEntry = (index: number) => {
-    const deletedEntry = entries[index];
-    setEntries(prev => prev.filter((_, i) => i !== index));
-    toast({
-      title: "Entry Deleted",
-      description: `Stock count entry for ${deletedEntry.itemName} has been removed.`,
-    });
+  const handleDeleteEntry = async (index: number) => {
+    if (!stockReconciliationId) {
+      // If no stock reconciliation ID, just remove from local state
+      const deletedEntry = entries[index];
+      setEntries(prev => prev.filter((_, i) => i !== index));
+      toast({
+        title: "Entry Deleted",
+        description: `Stock count entry for ${deletedEntry.itemName} has been removed.`,
+      });
+      return;
+    }
+
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not available');
+      }
+
+      const deletedEntry = entries[index];
+
+      // Get current stock reconciliation data
+      const currentSR = await erpnextAPI.getStockReconciliation(stockReconciliationId);
+      if (!currentSR?.data) {
+        throw new Error('Failed to fetch current stock reconciliation');
+      }
+
+      // Remove the item from the items array
+      const updatedItems = currentSR.data.items.filter((_: any, i: number) => i !== index);
+
+      // Update the stock reconciliation in ERPNext
+      const updateData = {
+        items: updatedItems
+      };
+
+      console.log('Updating Stock Reconciliation after delete:', updateData);
+      await erpnextAPI.callAPI(`Stock Reconciliation/${stockReconciliationId}`, 'PUT', updateData);
+
+      // Update local state
+      setEntries(prev => prev.filter((_, i) => i !== index));
+      
+      toast({
+        title: "Entry Deleted",
+        description: `Stock count entry for ${deletedEntry.itemName} has been removed from ERPNext.`,
+      });
+    } catch (error: any) {
+      console.error('Failed to delete entry from stock reconciliation:', error);
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete entry from ERPNext",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleEditEntry = (index: number) => {
@@ -241,25 +350,64 @@ const StockCountSession = () => {
     setEditingEntry({ ...entries[index] });
   };
 
-  const handleSaveEdit = () => {
-    if (editingIndex !== null && editingEntry) {
-      const updatedEntry: StockCountEntry = {
-        ...editingEntry,
-        difference: editingEntry.actualQty - editingEntry.currentQty,
-        status: (editingEntry.actualQty === editingEntry.currentQty ? 'matched' : 'variance') as 'matched' | 'variance' | 'pending'
-      };
-      
-      setEntries(prev => prev.map((entry, i) => 
-        i === editingIndex ? updatedEntry : entry
-      ));
-      
-      setEditingIndex(null);
-      setEditingEntry(null);
-      
-      toast({
-        title: "Entry Updated",
-        description: `Stock count entry for ${updatedEntry.itemName} has been updated.`,
-      });
+  const handleSaveEdit = async () => {
+    if (editingIndex !== null && editingEntry && stockReconciliationId) {
+      try {
+        const erpnextAPI = await createERPNextAPI();
+        if (!erpnextAPI) {
+          throw new Error('ERPNext API not available');
+        }
+
+        // Update the stock reconciliation in ERPNext
+        const updatedEntry: StockCountEntry = {
+          ...editingEntry,
+          difference: editingEntry.actualQty - editingEntry.currentQty,
+          status: (editingEntry.actualQty === editingEntry.currentQty ? 'matched' : 'variance') as 'matched' | 'variance' | 'pending'
+        };
+
+        // Get current stock reconciliation data
+        const currentSR = await erpnextAPI.getStockReconciliation(stockReconciliationId);
+        if (!currentSR?.data) {
+          throw new Error('Failed to fetch current stock reconciliation');
+        }
+
+        // Update the specific item in the items array
+        const updatedItems = currentSR.data.items.map((item: any, index: number) => 
+          index === editingIndex ? {
+            ...item,
+            qty: updatedEntry.actualQty,
+            valuation_rate: item.valuation_rate || 0
+          } : item
+        );
+
+        // Update the stock reconciliation in ERPNext
+        const updateData = {
+          items: updatedItems
+        };
+
+        console.log('Updating Stock Reconciliation with:', updateData);
+        await erpnextAPI.callAPI(`Stock Reconciliation/${stockReconciliationId}`, 'PUT', updateData);
+        
+        // Update local state
+        setEntries(prev => prev.map((entry, i) => 
+          i === editingIndex ? updatedEntry : entry
+        ));
+        
+        setEditingIndex(null);
+        setEditingEntry(null);
+        
+        toast({
+          title: "Entry Updated",
+          description: `Stock count entry for ${updatedEntry.itemName} has been updated in ERPNext.`,
+        });
+      } catch (error: any) {
+        console.error('Failed to update stock reconciliation:', error);
+        toast({
+          title: "Update Failed",
+          description: error.message || "Failed to update entry in ERPNext",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -268,7 +416,7 @@ const StockCountSession = () => {
     setEditingEntry(null);
   };
 
-  const handleSubmitCount = () => {
+  const handleSubmitCount = async () => {
     if (entries.length === 0) {
       toast({
         title: "No Entries",
@@ -278,13 +426,45 @@ const StockCountSession = () => {
       return;
     }
 
-    toast({
-      title: "Count Submitted",
-      description: `Stock count with ${entries.length} entries has been submitted.`,
-    });
-    
-    // Navigate back to stock count list
-    navigate('/stock-count');
+    if (!stockReconciliationId) {
+      toast({
+        title: "No Stock Reconciliation",
+        description: "No stock reconciliation found to submit.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not available');
+      }
+
+      console.log('Submitting Stock Reconciliation:', stockReconciliationId);
+      
+      // Submit the stock reconciliation in ERPNext
+      const submitResponse = await erpnextAPI.callAPI(`Stock Reconciliation/${stockReconciliationId}`, 'PUT', {
+        docstatus: 1
+      });
+
+      console.log('Submit response:', submitResponse);
+
+      toast({
+        title: "Stock Reconciliation Submitted",
+        description: `Stock Reconciliation ${stockReconciliationId} has been successfully submitted in ERPNext.`,
+      });
+      
+      // Navigate back to stock count list
+      navigate('/stock-count');
+    } catch (error: any) {
+      console.error('Failed to submit stock reconciliation:', error);
+      toast({
+        title: "Submit Failed",
+        description: error.message || "Failed to submit stock reconciliation in ERPNext",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
