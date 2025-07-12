@@ -229,7 +229,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                     </div>
                     <div className="mt-2">
                       <p className="text-sm text-muted-foreground">
-                        Total Value: <span className="font-medium">₹{(po.grand_total || 0).toLocaleString()}</span>
+                        Total Value: <span className="font-medium">₹{((po.grand_total && typeof po.grand_total === 'number') ? po.grand_total : 0).toLocaleString()}</span>
                       </p>
                     </div>
                   </div>
@@ -298,7 +298,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                     </div>
                     <div className="mt-2">
                       <p className="text-sm text-muted-foreground">
-                        Total Value: <span className="font-medium">₹{(receipt.grand_total || 0).toLocaleString()}</span>
+                        Total Value: <span className="font-medium">₹{((receipt.grand_total && typeof receipt.grand_total === 'number') ? receipt.grand_total : 0).toLocaleString()}</span>
                       </p>
                     </div>
                   </div>
