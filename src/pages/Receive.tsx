@@ -385,6 +385,99 @@ const Receive = () => {
     }
   };
 
+  const updateReceiveEntry = async (index: number, updatedEntry: ReceiveEntry) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI || !currentPurchaseReceipt) {
+        toast({
+          title: "Error",
+          description: "ERPNext not configured or no active receipt",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update local state
+      const updatedEntries = [...receiveEntries];
+      updatedEntries[index] = updatedEntry;
+      setReceiveEntries(updatedEntries);
+
+      // Update in ERPNext
+      const currentReceiptResponse = await erpnextAPI.getPurchaseReceipt(currentPurchaseReceipt);
+      const currentReceiptData = currentReceiptResponse.data;
+      
+      // Update the corresponding item in ERPNext
+      const updatedItems = [...(currentReceiptData.items || [])];
+      if (updatedItems[index]) {
+        updatedItems[index] = {
+          ...updatedItems[index],
+          qty: updatedEntry.receivedQty,
+          batch_no: updatedEntry.batch,
+          serial_no: updatedEntry.serial
+        };
+      }
+
+      await erpnextAPI.updatePurchaseReceipt(currentPurchaseReceipt, {
+        items: updatedItems
+      });
+
+      toast({
+        title: "Entry Updated",
+        description: `${updatedEntry.itemCode} updated successfully`,
+      });
+    } catch (error) {
+      console.error('Error updating entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update entry",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteReceiveEntry = async (index: number) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI || !currentPurchaseReceipt) {
+        toast({
+          title: "Error",
+          description: "ERPNext not configured or no active receipt",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const entryToDelete = receiveEntries[index];
+
+      // Update local state
+      const updatedEntries = receiveEntries.filter((_, i) => i !== index);
+      setReceiveEntries(updatedEntries);
+
+      // Update in ERPNext
+      const currentReceiptResponse = await erpnextAPI.getPurchaseReceipt(currentPurchaseReceipt);
+      const currentReceiptData = currentReceiptResponse.data;
+      
+      // Remove the corresponding item from ERPNext
+      const updatedItems = (currentReceiptData.items || []).filter((_, i) => i !== index);
+
+      await erpnextAPI.updatePurchaseReceipt(currentPurchaseReceipt, {
+        items: updatedItems
+      });
+
+      toast({
+        title: "Entry Deleted",
+        description: `${entryToDelete.itemCode} removed from receipt`,
+      });
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete entry",
+        variant: "destructive"
+      });
+    }
+  };
+
   const submitReceipt = async () => {
     if (!currentPurchaseReceipt) {
       toast({
@@ -572,7 +665,12 @@ const Receive = () => {
                 <CardTitle>Review Receipt</CardTitle>
               </CardHeader>
               <CardContent>
-                <ReceiveTable entries={receiveEntries} />
+                <ReceiveTable 
+                  entries={receiveEntries} 
+                  onUpdateEntry={updateReceiveEntry}
+                  onDeleteEntry={deleteReceiveEntry}
+                  mode="edit"
+                />
               </CardContent>
             </Card>
           </TabsContent>

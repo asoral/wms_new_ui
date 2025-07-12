@@ -1,16 +1,24 @@
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Edit, Trash2, Check, X } from "lucide-react";
 import { ReceiveEntry } from "../../pages/Receive";
 
 interface ReceiveTableProps {
   entries: ReceiveEntry[];
+  onUpdateEntry?: (index: number, updatedEntry: ReceiveEntry) => void;
+  onDeleteEntry?: (index: number) => void;
+  mode?: 'edit' | 'view';
 }
 
-const ReceiveTable = ({ entries }: ReceiveTableProps) => {
+const ReceiveTable = ({ entries, onUpdateEntry, onDeleteEntry, mode = 'edit' }: ReceiveTableProps) => {
   const isMobile = useIsMobile();
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingEntry, setEditingEntry] = useState<ReceiveEntry | null>(null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -24,137 +32,195 @@ const ReceiveTable = ({ entries }: ReceiveTableProps) => {
     return entries.reduce((total, entry) => total + (entry.receivedQty * entry.rate), 0);
   };
 
-  if (isMobile) {
-    return (
-      <div className="space-y-4">
-        {entries.map((entry, index) => (
-          <Card key={index} className="border-l-4 border-l-green-500">
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-lg">{entry.itemCode}</h3>
-                    <p className="text-gray-600 text-sm">{entry.itemName}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg">{formatCurrency(entry.receivedQty * entry.rate)}</p>
-                    <p className="text-sm text-gray-600">{formatCurrency(entry.rate)}/unit</p>
-                  </div>
-                </div>
+  const handleEditEntry = (index: number) => {
+    setEditingIndex(index);
+    setEditingEntry({ ...entries[index] });
+  };
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Received Qty:</span>
-                    <p className="font-medium">{entry.receivedQty} {entry.uom}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Warehouse:</span>
-                    <p className="font-medium">{entry.warehouse}</p>
-                  </div>
-                </div>
+  const handleSaveEdit = async () => {
+    if (editingIndex !== null && editingEntry && onUpdateEntry) {
+      onUpdateEntry(editingIndex, editingEntry);
+      setEditingIndex(null);
+      setEditingEntry(null);
+    }
+  };
 
-                {(entry.batch || entry.serial) && (
-                  <div className="flex flex-wrap gap-2">
-                    {entry.batch && (
-                      <Badge variant="outline">Batch: {entry.batch}</Badge>
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditingEntry(null);
+  };
+
+  const handleDeleteEntry = (index: number) => {
+    if (onDeleteEntry) {
+      onDeleteEntry(index);
+    }
+  };
+
+  // Use card view for all screens (mobile and desktop)
+  return (
+    <div className="space-y-4">
+      {entries.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-gray-500">No items added yet. Scan or select items to add them to the receipt.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Card View for all devices */}
+          <div className="space-y-3">
+            {entries.map((entry, index) => (
+              <Card key={index} className="border-l-4 border-l-green-500">
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    {/* Header with Item Info and Total */}
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg text-gray-900">{entry.itemCode}</h3>
+                        <p className="text-gray-600 text-sm">{entry.itemName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-lg text-green-600">{formatCurrency(entry.receivedQty * entry.rate)}</p>
+                        <p className="text-sm text-gray-600">{formatCurrency(entry.rate)}/unit</p>
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Received Qty:</span>
+                        {editingIndex === index ? (
+                          <Input
+                            type="number"
+                            value={editingEntry?.receivedQty || 0}
+                            onChange={(e) => setEditingEntry(prev => prev ? {
+                              ...prev,
+                              receivedQty: parseFloat(e.target.value) || 0
+                            } : null)}
+                            className="mt-1 text-sm"
+                            min="0"
+                            step="0.01"
+                          />
+                        ) : (
+                          <p className="font-medium">{entry.receivedQty} {entry.uom}</p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Warehouse:</span>
+                        <p className="font-medium">{entry.warehouse}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">UOM:</span>
+                        <p className="font-medium">{entry.uom}</p>
+                      </div>
+                    </div>
+
+                    {/* Batch/Serial Info */}
+                    {(entry.batch || entry.serial) && (
+                      <div className="flex flex-wrap gap-2">
+                        {entry.batch && (
+                          <div>
+                            <span className="text-gray-600 text-sm">Batch:</span>
+                            {editingIndex === index ? (
+                              <Input
+                                value={editingEntry?.batch || ''}
+                                onChange={(e) => setEditingEntry(prev => prev ? {
+                                  ...prev,
+                                  batch: e.target.value
+                                } : null)}
+                                className="mt-1 text-sm"
+                                placeholder="Enter batch number"
+                              />
+                            ) : (
+                              <Badge variant="outline" className="ml-1">Batch: {entry.batch}</Badge>
+                            )}
+                          </div>
+                        )}
+                        {entry.serial && (
+                          <div>
+                            <span className="text-gray-600 text-sm">Serial:</span>
+                            {editingIndex === index ? (
+                              <Input
+                                value={editingEntry?.serial || ''}
+                                onChange={(e) => setEditingEntry(prev => prev ? {
+                                  ...prev,
+                                  serial: e.target.value
+                                } : null)}
+                                className="mt-1 text-sm"
+                                placeholder="Enter serial number"
+                              />
+                            ) : (
+                              <Badge variant="outline" className="ml-1">Serial: {entry.serial}</Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
-                    {entry.serial && (
-                      <Badge variant="outline">Serial: {entry.serial}</Badge>
+
+                    {/* Action Buttons */}
+                    {mode !== 'view' && (
+                      <div className="flex justify-end space-x-2 pt-2 border-t">
+                        {editingIndex === index ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleSaveEdit}
+                              className="h-8 px-3"
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleCancelEdit}
+                              className="h-8 px-3"
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditEntry(index)}
+                              className="h-8 px-3"
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteEntry(index)}
+                              className="h-8 px-3"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-        {entries.length === 0 && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-gray-500">No items added yet. Scan or select items to add them to the receipt.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {entries.length > 0 && (
-          <Card className="bg-gray-50">
+          {/* Summary Card */}
+          <Card className="bg-gray-50 border-2 border-dashed border-gray-300">
             <CardContent className="p-4">
               <div className="text-center space-y-2">
                 <p className="text-sm text-gray-600">Total Items: {entries.length}</p>
-                <p className="text-xl font-bold">Total Value: {formatCurrency(getTotalValue())}</p>
+                <p className="text-xl font-bold text-gray-900">Total Value: {formatCurrency(getTotalValue())}</p>
               </div>
             </CardContent>
           </Card>
-        )}
-      </div>
-    );
-  }
-
-  // Desktop table view
-  return (
-    <div className="space-y-4">
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Item Code</TableHead>
-              <TableHead>Item Name</TableHead>
-              <TableHead className="text-right">Received Qty</TableHead>
-              <TableHead>UOM</TableHead>
-              <TableHead>Warehouse</TableHead>
-              <TableHead>Batch/Serial</TableHead>
-              <TableHead className="text-right">Rate</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {entries.map((entry, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-medium">{entry.itemCode}</TableCell>
-                <TableCell>{entry.itemName}</TableCell>
-                <TableCell className="text-right font-semibold">{entry.receivedQty}</TableCell>
-                <TableCell>{entry.uom}</TableCell>
-                <TableCell>{entry.warehouse}</TableCell>
-                <TableCell>
-                  {entry.batch && (
-                    <Badge variant="outline" className="mr-1">
-                      Batch: {entry.batch}
-                    </Badge>
-                  )}
-                  {entry.serial && (
-                    <Badge variant="outline">
-                      Serial: {entry.serial}
-                    </Badge>
-                  )}
-                  {!entry.batch && !entry.serial && (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">{formatCurrency(entry.rate)}</TableCell>
-                <TableCell className="text-right font-semibold">
-                  {formatCurrency(entry.receivedQty * entry.rate)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {entries.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No items added yet. Scan or select items to add them to the receipt.
-        </div>
-      )}
-
-      {entries.length > 0 && (
-        <div className="flex justify-end">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Total Items: {entries.length}</p>
-              <p className="text-lg font-bold">Total Value: {formatCurrency(getTotalValue())}</p>
-            </div>
-          </div>
-        </div>
+        </>
       )}
     </div>
   );
