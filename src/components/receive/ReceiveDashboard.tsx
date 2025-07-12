@@ -129,8 +129,14 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
 
       const poResponse = await erpnextAPI.getPurchaseOrders(poFilters, company || undefined);
       
+      console.log('=== RAW PO RESPONSE ===', poResponse);
+      
       if (poResponse?.data && Array.isArray(poResponse.data)) {
+        console.log('=== FIRST PO ITEM ===', poResponse.data[0]);
         setPurchaseOrders(poResponse.data);
+      } else {
+        console.log('=== NO PO DATA FOUND ===');
+        setPurchaseOrders([]);
       }
 
       // Fetch draft purchase receipts
@@ -140,8 +146,14 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
 
       const receiptResponse = await erpnextAPI.getPurchaseReceipts(receiptFilters, company || undefined);
       
+      console.log('=== RAW RECEIPT RESPONSE ===', receiptResponse);
+      
       if (receiptResponse?.data && Array.isArray(receiptResponse.data)) {
+        console.log('=== FIRST RECEIPT ITEM ===', receiptResponse.data[0]);
         setDraftReceipts(receiptResponse.data);
+      } else {
+        console.log('=== NO RECEIPT DATA FOUND ===');
+        setDraftReceipts([]);
       }
 
       // Calculate analytics
