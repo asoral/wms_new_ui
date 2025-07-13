@@ -34,6 +34,7 @@ import NotFound from "@/pages/NotFound";
 import DraftReceipts from "@/pages/DraftReceipts";
 import ReceiptDetail from "@/pages/ReceiptDetail";
 import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
+import SalesOrderList from "@/pages/SalesOrderList";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +82,7 @@ const App = () => {
                             <Route path="/reports" element={<Reports />} />
                             <Route path="/notifications" element={<Notifications />} />
                             <Route path="/sync" element={<Sync />} />
+                            <Route path="/sales-orders" element={<SalesOrderList />} />
                             <Route path="/draft-receipts" element={<DraftReceipts />} />
                             <Route path="/receipt/:id" element={<ReceiptDetail />} />
                             <Route path="*" element={<NotFound />} />

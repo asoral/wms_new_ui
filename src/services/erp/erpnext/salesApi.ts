@@ -43,9 +43,11 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
   }
 
   async searchSalesOrders(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<SalesOrder[]>> {
-    // More inclusive filters - let's see all submitted sales orders first  
+    // Enhanced filters for sales orders ready for delivery - based on the JSON structure
     const filters = [
-      ['docstatus', '=', 1] // Only submitted orders
+      ['docstatus', '=', 1], // Only submitted orders
+      ['status', '!=', 'Closed'], // Exclude closed orders  
+      ['per_delivered', '<', 100] // Orders with pending delivery
     ];
 
     if (company) {
