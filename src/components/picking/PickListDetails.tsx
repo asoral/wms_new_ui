@@ -243,9 +243,24 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
             const createdPickList = await api.createPickList(pickListData);
             console.log('Pick List created in ERPNext:', createdPickList);
 
-            // Fetch the created Pick List with all details
+            // Important: Call get_items method to populate the Pick List items after creation
             const pickListName = createdPickList.data?.name;
             if (pickListName) {
+              try {
+                // First, set the material_request field and save to trigger change
+                await api.updatePickList(pickListName, {
+                  material_request: relatedDocument
+                });
+                console.log('Updated Pick List with material request');
+                
+                // Call the get_items method to fetch items from the material request
+                await api.callMethod('Pick List', pickListName, 'get_items', {});
+                console.log('Called get_items method to populate Pick List');
+              } catch (methodError) {
+                console.warn('get_items method call failed, trying alternative approach:', methodError);
+              }
+              
+              // Now fetch the Pick List with populated items
               const pickListDetails = await api.getPickList(pickListName);
               console.log('Pick List details from ERPNext:', pickListDetails);
               

@@ -293,6 +293,11 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI('Pick List', 'POST', data);
   }
 
+  // Call ERPNext server method
+  async callMethod(doctype: string, docname: string, method: string, args: any = {}) {
+    return this.stockAPI.callMethod(doctype, docname, method, args);
+  }
+
   // Quality Inspections
   async getQualityInspections(filters?: any, limitPageLength?: number) {
     return this.callAPI('Quality Inspection', 'GET', undefined, filters, limitPageLength);
