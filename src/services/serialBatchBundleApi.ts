@@ -59,6 +59,7 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
 
     console.log(`🔥 DEBUGGING: Fetching batches for item: ${itemCode}, warehouse: ${warehouse}`);
     console.log(`🔥 DEBUGGING: Using NEW Stock Ledger Entry approach`);
+    console.log(`🔥 DEBUGGING: About to call Stock Ledger Entry API`);
 
     // Query Stock Ledger Entry to get batch quantities in the specific warehouse
     // This mimics the SQL: SELECT batch_no, SUM(actual_qty) as qty FROM `tabStock Ledger Entry` WHERE warehouse=X AND item_code=Y GROUP BY batch_no
@@ -73,7 +74,8 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
       limit_page_length: '0' // Get all records
     });
 
-    console.log('Fetching stock ledger entries:', stockLedgerUrl + '?' + stockLedgerParams.toString());
+    console.log('🔥 DEBUGGING: Stock Ledger API URL:', stockLedgerUrl + '?' + stockLedgerParams.toString());
+    console.log('🔥 DEBUGGING: Filters being sent:', JSON.parse(stockLedgerParams.get('filters') || '[]'));
 
     const stockResponse = await fetch(`${stockLedgerUrl}?${stockLedgerParams.toString()}`, {
       headers: {
@@ -88,7 +90,8 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
     }
 
     const stockData = await stockResponse.json();
-    console.log('Stock ledger response:', stockData);
+    console.log('🔥 DEBUGGING: Stock ledger response status:', stockResponse.status);
+    console.log('🔥 DEBUGGING: Stock ledger response data:', stockData);
 
     if (!stockData?.data || !Array.isArray(stockData.data)) {
       console.warn('No stock ledger data found');
