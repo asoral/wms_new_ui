@@ -49,9 +49,10 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
       ['status', 'in', ['To Deliver and Bill', 'To Deliver', 'Partially Delivered']] // Include all delivery-relevant statuses
     ];
 
-    if (company) {
-      filters.push(['company', '=', company]);
-    }
+    // Don't filter by company during search to show all available sales orders
+    // if (company) {
+    //   filters.push(['company', '=', company]);
+    // }
 
     console.log('Searching for sales orders with term:', searchTerm);
     console.log('Using filters:', filters);
