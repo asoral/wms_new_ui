@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Package, Play, ChevronDown } from "lucide-react";
+import { ArrowLeft, Package, Play } from "lucide-react";
 import { PickList, PickListPurpose } from "../../pages/PickList";
 
 interface PickListDetailsProps {
@@ -97,16 +96,68 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       };
       onStartPicking(newPickList);
     } else if (pickList) {
-      onStartPicking(pickList);
+      // Map existing pick list to proper format
+      const formattedPickList: PickList = {
+        ...pickList,
+        items: pickList.locations?.map((item, index) => ({
+          ...item,
+          id: (index + 1).toString(),
+          code: item.item_code,
+          name: item.item_name,
+          requiredQty: item.qty,
+          pickedQty: item.picked_qty || 0,
+          bin: item.warehouse,
+          batch: item.batch_no,
+          serial: item.serial_no,
+          status: (item.picked_qty || 0) === 0 ? "pending" : 
+                  (item.picked_qty || 0) < item.qty ? "partial" : "completed"
+        })) || []
+      };
+      onStartPicking(formattedPickList);
     }
   };
 
-  const canStartPicking = purpose && relatedDocument;
+  const canStartPicking = purpose && (isCreatingNew ? relatedDocument : true);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
+      {/* Header with stepper */}
+      <div className="flex items-center space-x-2 mb-6">
+        <Package className="w-6 h-6 text-blue-600" />
+        <h1 className="text-2xl font-bold">Pick List</h1>
+      </div>
+
+      {/* Progress Steps */}
+      <div className="flex items-center space-x-4 mb-6">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+            1
+          </div>
+          <span className="text-gray-400">Select</span>
+        </div>
+        <div className="w-8 h-px bg-gray-200"></div>
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
+            2
+          </div>
+          <span className="text-blue-600 font-medium">Details</span>
+        </div>
+        <div className="w-8 h-px bg-gray-200"></div>
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+            3
+          </div>
+          <span className="text-gray-400">Pick</span>
+        </div>
+      </div>
+
       {/* Back Button */}
-      <Button variant="outline" onClick={onBack} className="flex items-center space-x-2">
+      <Button variant="ghost" onClick={onBack} className="flex items-center space-x-2">
         <ArrowLeft className="w-4 h-4" />
         <span>Back to Selection</span>
       </Button>
@@ -128,7 +179,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
                 </div>
                 <div>
                   <span className="font-medium text-gray-600">Created Date:</span>
-                  <p className="text-gray-900">{new Date(pickList.createdDate || pickList.creation).toLocaleString()}</p>
+                  <p className="text-gray-900">{formatDate(pickList.createdDate || pickList.creation)}</p>
                 </div>
               </div>
             </div>
@@ -159,7 +210,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
           <div className="space-y-2">
             <Label htmlFor="relatedDocument">{getRelatedDocumentLabel(purpose)}</Label>
             <Select 
-              value={relatedDocument} 
+              value={relatedDocument || (pickList?.relatedDocument || getRelatedDocumentOptions(purpose)[0] || "")} 
               onValueChange={setRelatedDocument}
               disabled={!isCreatingNew}
             >
@@ -167,32 +218,36 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
                 <SelectValue placeholder={`Select ${getRelatedDocumentLabel(purpose).toLowerCase()}`} />
               </SelectTrigger>
               <SelectContent>
-                {getRelatedDocumentOptions(purpose).map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
+                {isCreatingNew ? (
+                  getRelatedDocumentOptions(purpose).map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value={pickList?.relatedDocument || "MAT-MR-2025-00005"}>
+                    {pickList?.relatedDocument || "MAT-MR-2025-00005"}
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
           </div>
 
           {/* Summary */}
-          {purpose && relatedDocument && (
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-2">Summary</h4>
-              <div className="text-sm text-blue-800 space-y-1">
-                <p><span className="font-medium">Purpose:</span> {purpose}</p>
-                <p><span className="font-medium">{getRelatedDocumentLabel(purpose)}:</span> {relatedDocument}</p>
-              </div>
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+            <h4 className="font-medium text-blue-900 mb-2">Summary</h4>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p><span className="font-medium">Purpose:</span> {purpose}</p>
+              <p><span className="font-medium">{getRelatedDocumentLabel(purpose)}:</span> {relatedDocument || pickList?.relatedDocument || "MAT-MR-2025-00005"}</p>
             </div>
-          )}
+          </div>
 
           {/* Start Picking Button */}
           <div className="flex justify-end pt-4">
             <Button 
               onClick={handleStartPicking}
               disabled={!canStartPicking}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 bg-gray-800 hover:bg-gray-900"
             >
               <Play className="w-4 h-4" />
               <span>Start Picking</span>

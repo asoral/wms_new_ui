@@ -1,9 +1,9 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import PickListDashboard from "@/components/picking/PickListDashboard";
-import PickListItemProcessor from "@/components/picking/PickListItemProcessor";
+import PickListDetails from "@/components/picking/PickListDetails";
+import PickingProcess from "@/components/picking/PickingProcess";
 
 // Export the types that other components need
 export interface PickList {
@@ -46,15 +46,19 @@ export interface PickListItem {
 export type PickListPurpose = 'Delivery' | 'Material Transfer' | 'Material Issue' | 'Manufacturing';
 export type PickListStatus = 'Draft' | 'Open' | 'Completed';
 
+type ViewState = 'dashboard' | 'details' | 'picking';
+
 const PickListPage = () => {
-  const [showDashboard, setShowDashboard] = useState(true);
-  const [selectedPickList, setSelectedPickList] = useState<any>(null);
-  const [processedItems, setProcessedItems] = useState<any[]>([]);
+  const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [selectedPickList, setSelectedPickList] = useState<PickList | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const handleCreateNew = () => {
-    alert('Create New Pick List');
+    setIsCreatingNew(true);
+    setSelectedPickList(null);
+    setCurrentView('details');
   };
 
   const handleSelectPickList = async (pickList: any) => {
@@ -68,7 +72,8 @@ const PickListPage = () => {
       
       if (pickListDetails.data) {
         setSelectedPickList(pickListDetails.data);
-        setShowDashboard(false);
+        setIsCreatingNew(false);
+        setCurrentView('details');
       }
     } catch (error) {
       console.error('Error loading pick list:', error);
@@ -82,19 +87,33 @@ const PickListPage = () => {
     }
   };
 
-  const handleItemsProcessed = (items: any[]) => {
-    setProcessedItems(items);
-    console.log('Processed items:', items);
-    alert('Items Processed');
+  const handleStartPicking = (pickList: PickList) => {
+    setSelectedPickList(pickList);
+    setCurrentView('picking');
   };
 
   const handleBackToDashboard = () => {
-    setShowDashboard(true);
+    setCurrentView('dashboard');
     setSelectedPickList(null);
-    setProcessedItems([]);
+    setIsCreatingNew(false);
   };
 
-  if (showDashboard) {
+  const handleBackToDetails = () => {
+    setCurrentView('details');
+  };
+
+  const handlePickingComplete = (items: PickListItem[]) => {
+    console.log('Picking completed with items:', items);
+    toast({
+      title: "Pick List Completed",
+      description: "All items have been successfully picked.",
+    });
+    setCurrentView('dashboard');
+    setSelectedPickList(null);
+    setIsCreatingNew(false);
+  };
+
+  if (currentView === 'dashboard') {
     return (
       <PickListDashboard
         onCreateNew={handleCreateNew}
@@ -103,18 +122,28 @@ const PickListPage = () => {
     );
   }
 
-  return (
-    <div>
-      {selectedPickList && (
-        <PickListItemProcessor
-          pickListNumber={selectedPickList.name}
-          pickListItems={selectedPickList.locations}
-          onItemsProcessed={handleItemsProcessed}
-          onBack={handleBackToDashboard}
-        />
-      )}
-    </div>
-  );
+  if (currentView === 'details') {
+    return (
+      <PickListDetails
+        pickList={selectedPickList}
+        isCreatingNew={isCreatingNew}
+        onStartPicking={handleStartPicking}
+        onBack={handleBackToDashboard}
+      />
+    );
+  }
+
+  if (currentView === 'picking' && selectedPickList) {
+    return (
+      <PickingProcess
+        pickList={selectedPickList}
+        onBack={handleBackToDetails}
+        onComplete={handlePickingComplete}
+      />
+    );
+  }
+
+  return null;
 };
 
 export default PickListPage;
