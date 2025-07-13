@@ -105,12 +105,18 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
       .filter((batch: any) => {
         // Filter out expired batches at API level
         if (batch.expiry_date) {
-          const expiryStr = batch.expiry_date.split(' ')[0]; // Get YYYY-MM-DD part
-          if (expiryStr <= todayStr) {
-            console.log(`Filtering out expired batch ${batch.name} - expiry: ${batch.expiry_date}`);
+          const today = new Date();
+          const expiryDate = new Date(batch.expiry_date);
+          
+          // Set time to end of expiry date to include batches expiring today
+          expiryDate.setHours(23, 59, 59, 999);
+          
+          if (expiryDate <= today) {
+            console.log(`Filtering out expired batch ${batch.name} - expiry: ${batch.expiry_date}, today: ${today.toISOString()}`);
             return false;
           }
         }
+        console.log(`Including batch ${batch.name} - expiry: ${batch.expiry_date || 'No expiry'}`);
         return true;
       })
       .map(async (batch: any) => {
