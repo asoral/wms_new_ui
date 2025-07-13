@@ -102,17 +102,45 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
       const batchNo = batch.name || batch.batch_id;
       const expiry_date = batch.expiry_date;
 
-      console.log(`🔥 DEBUGGING: Checking batch ${batchNo} stock in warehouse ${warehouse}`);
+      console.log(`🔥 DEBUGGING: Checking batch ${batchNo} expiry date: ${expiry_date}`);
 
-      // Check if batch is expired
+      // Check if batch is expired - handle different date formats
       if (expiry_date) {
-        const expiryDate = new Date(expiry_date);
-        expiryDate.setHours(23, 59, 59, 999);
+        let expiryDate: Date;
         
-        if (expiryDate < today) {
-          console.log(`🔥 DEBUGGING: Filtering expired batch ${batchNo} - expiry: ${expiry_date}`);
-          continue;
+        try {
+          // Handle DD/M/YYYY or DD/MM/YYYY format (like "17/7/2025")
+          if (expiry_date.includes('/')) {
+            console.log(`🔥 DEBUGGING: Parsing expiry date with / format: ${expiry_date}`);
+            const parts = expiry_date.split('/');
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+            const year = parseInt(parts[2], 10);
+            expiryDate = new Date(year, month, day, 23, 59, 59, 999);
+            console.log(`🔥 DEBUGGING: Parsed to: ${expiryDate.toISOString()}`);
+          } else {
+            // Handle YYYY-MM-DD format
+            console.log(`🔥 DEBUGGING: Parsing expiry date with - format: ${expiry_date}`);
+            expiryDate = new Date(expiry_date + 'T23:59:59.999Z');
+            console.log(`🔥 DEBUGGING: Parsed to: ${expiryDate.toISOString()}`);
+          }
+          
+          console.log(`🔥 DEBUGGING: Today: ${today.toISOString()}, Expiry: ${expiryDate.toISOString()}`);
+          console.log(`🔥 DEBUGGING: Is expired? ${expiryDate < today}`);
+          
+          if (expiryDate < today) {
+            console.log(`🔥 DEBUGGING: ❌ Filtering expired batch ${batchNo} - expiry: ${expiry_date}`);
+            continue;
+          } else {
+            console.log(`🔥 DEBUGGING: ✅ Batch ${batchNo} is not expired - expiry: ${expiry_date}`);
+          }
+        } catch (error) {
+          console.error(`🔥 DEBUGGING: Error parsing expiry date ${expiry_date}:`, error);
+          // If we can't parse the date, include the batch (don't filter it out)
+          console.log(`🔥 DEBUGGING: ⚠️ Including batch ${batchNo} due to date parsing error`);
         }
+      } else {
+        console.log(`🔥 DEBUGGING: ✅ Batch ${batchNo} has no expiry date, including it`);
       }
 
       // Check stock in warehouse using Bin resource
