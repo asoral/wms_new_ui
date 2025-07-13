@@ -59,103 +59,94 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
 
     console.log(`Fetching batches for item: ${itemCode}, warehouse: ${warehouse}`);
 
-    // Use the stock_ledger_entry method to get batches with stock in specific warehouse
-    const url = `${api.getBaseURL}/api/method/frappe.client.get_list`;
+    // First, get all non-expired, non-disabled batches for the item
+    const batchUrl = `${api.getBaseURL}/api/method/frappe.client.get_list`;
     
-    const body = {
-      doctype: 'Stock Ledger Entry',
-      fields: ['batch_no', 'sum(actual_qty) as balance_qty'],
+    const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+    console.log('Today date for comparison:', today);
+    
+    const batchBody = {
+      doctype: 'Batch',
+      fields: ['name', 'batch_id', 'expiry_date', 'disabled', 'item'],
       filters: [
-        ['item_code', '=', itemCode],
-        ['warehouse', '=', warehouse],
-        ['batch_no', '!=', ''],
-        ['is_cancelled', '=', 0]
+        ['item', '=', itemCode],
+        ['disabled', '=', 0],
+        // Only get batches that are not expired (expiry_date is null or > today)
+        ['ifnull(expiry_date, "2099-12-31")', '>', today]
       ],
-      group_by: 'batch_no',
-      having: 'sum(actual_qty) > 0',
       limit_page_length: 1000
     };
 
-    console.log('Fetching batch stock ledger entries:', body);
+    console.log('Fetching non-expired batches with filters:', batchBody);
 
-    const response = await fetch(url, {
+    const batchResponse = await fetch(batchUrl, {
       method: 'POST',
       headers: {
         'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(batchBody)
     });
 
-    if (!response.ok) {
-      console.error('Failed to fetch batch stock ledger entries:', response.status, response.statusText);
+    if (!batchResponse.ok) {
+      console.error('Failed to fetch batches:', batchResponse.status, batchResponse.statusText);
       return [];
     }
 
-    const stockData = await response.json();
-    console.log('Batch stock ledger response:', stockData);
+    const batchData = await batchResponse.json();
+    console.log('Batch list response:', batchData);
 
-    if (!stockData?.message || !Array.isArray(stockData.message)) {
-      console.warn('No batch stock ledger entries found');
+    if (!batchData?.message || !Array.isArray(batchData.message)) {
+      console.warn('No batches found');
       return [];
     }
 
-    // Now get batch details including expiry date for each batch with stock
-    const batchDetailsPromises = stockData.message.map(async (stockEntry: any) => {
+    // Now get stock balance for each non-expired batch in the specific warehouse
+    const stockPromises = batchData.message.map(async (batch: any) => {
       try {
-        const batchUrl = `${api.getBaseURL}/api/resource/Batch/${stockEntry.batch_no}`;
+        console.log(`Checking stock for batch ${batch.name} in warehouse ${warehouse}`);
         
-        const batchResponse = await fetch(batchUrl, {
+        const stockUrl = `${api.getBaseURL}/api/method/erpnext.stock.utils.get_stock_balance`;
+        const stockParams = new URLSearchParams({
+          item_code: itemCode,
+          warehouse: warehouse,
+          batch_no: batch.name
+        });
+
+        const stockResponse = await fetch(`${stockUrl}?${stockParams}`, {
           headers: {
             'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
             'Content-Type': 'application/json'
           }
         });
 
-        if (batchResponse.ok) {
-          const batchData = await batchResponse.json();
-          const batch = batchData.data;
+        if (stockResponse.ok) {
+          const stockData = await stockResponse.json();
+          const qty = parseFloat(stockData.message) || 0;
           
-          // Filter out expired batches here
-          if (batch.expiry_date) {
-            const today = new Date();
-            const expiryDate = new Date(batch.expiry_date);
-            
-            if (expiryDate <= today) {
-              console.log(`Filtering out expired batch ${batch.name} - expiry: ${batch.expiry_date}`);
-              return null;
-            }
+          console.log(`Batch ${batch.name}: qty=${qty}, expiry=${batch.expiry_date}`);
+          
+          if (qty > 0) {
+            return {
+              batch_no: batch.name,
+              qty: qty,
+              expiry_date: batch.expiry_date
+            };
           }
-          
-          // Filter out disabled batches
-          if (batch.disabled) {
-            console.log(`Filtering out disabled batch ${batch.name}`);
-            return null;
-          }
-          
-          return {
-            batch_no: batch.name,
-            qty: parseFloat(stockEntry.balance_qty) || 0,
-            expiry_date: batch.expiry_date
-          };
+        } else {
+          console.error(`Failed to get stock for batch ${batch.name}:`, stockResponse.status);
         }
         return null;
       } catch (error) {
-        console.error(`Error fetching details for batch ${stockEntry.batch_no}:`, error);
+        console.error(`Error checking stock for batch ${batch.name}:`, error);
         return null;
       }
     });
 
-    const batchDetails = await Promise.all(batchDetailsPromises);
-    const validBatches = batchDetails
-      .filter(batch => batch !== null && batch.qty > 0)
-      .map(batch => ({
-        batch_no: batch!.batch_no,
-        qty: batch!.qty,
-        expiry_date: batch!.expiry_date
-      }));
+    const stockResults = await Promise.all(stockPromises);
+    const validBatches = stockResults.filter(batch => batch !== null);
 
-    console.log('Final valid batches (non-expired, with stock in warehouse):', validBatches);
+    console.log(`Found ${validBatches.length} valid batches with stock in warehouse ${warehouse}:`, validBatches);
     return validBatches;
 
   } catch (error) {
