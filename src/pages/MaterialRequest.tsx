@@ -70,17 +70,24 @@ const MaterialRequest = () => {
         const allRequests = allRequestsResult?.data || [];
         
         // Calculate analytics
+        console.log('Material Requests for analytics:', allRequests.map((mr: any) => ({ 
+          name: mr.name, 
+          status: mr.status, 
+          docstatus: mr.docstatus 
+        })));
+        
         setAnalytics({
           total: allRequests.length,
           draft: allRequests.filter((mr: any) => 
             mr.docstatus === 0 || 
             mr.status === 'Draft' || 
-            !mr.docstatus
+            !mr.status
           ).length,
           pending: allRequests.filter((mr: any) => 
             mr.status === 'Pending' || 
             mr.status === 'Submitted' || 
-            (mr.docstatus === 1 && (!mr.status || mr.status === 'Open'))
+            mr.status === 'Open' ||
+            (mr.docstatus === 1 && mr.status !== 'Cancelled')
           ).length,
           completed: allRequests.filter((mr: any) => 
             ['Stopped', 'Ordered', 'Issued', 'Transferred', 'Received', 'Completed'].includes(mr.status)
