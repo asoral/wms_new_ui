@@ -164,7 +164,7 @@ const Deliver = () => {
       const deliveryNoteData = {
         company: defaultCompany || selectedSalesOrder.customer,
         customer: selectedSalesOrder.customer,
-        items: entries.map(entry => {
+        items: await Promise.all(entries.map(async (entry) => {
           const soItem = selectedSalesOrder.items.find(item => item.itemCode === entry.itemCode);
           const itemData: any = {
             item_code: entry.itemCode,
@@ -177,8 +177,54 @@ const Deliver = () => {
           
           // Handle batches for ERPNext v15+ Serial and Batch Bundle
           if (entry.batches && entry.batches.length > 0) {
-            itemData.use_serial_batch_fields = 1;
-            itemData.batch_no = entry.batches.map(b => `${b.batch_no}:${b.qty}`).join('\n');
+            // Create a Serial and Batch Bundle for this item
+            console.log('Creating Serial and Batch Bundle for batches:', entry.batches);
+            
+            try {
+              const { createSerialBatchBundle } = await import('@/services/serialBatchBundleApi');
+              
+              const bundleEntries = entry.batches.map(batch => ({
+                batch_no: batch.batch_no,
+                qty: batch.qty,
+                warehouse: entry.warehouse,
+                delivered_qty: 0,
+                incoming_rate: 0,
+                outgoing_rate: 0,
+                stock_value_difference: 0,
+                is_outward: 1
+              }));
+
+              const bundleData = {
+                item_code: entry.itemCode,
+                item_name: entry.itemName,
+                item_group: "All Item Groups", // Default item group
+                has_serial_no: 0,
+                has_batch_no: 1,
+                warehouse: entry.warehouse,
+                type_of_transaction: 'Outward',
+                total_qty: entry.deliveredQty,
+                avg_rate: entry.rate,
+                total_amount: entry.deliveredQty * entry.rate,
+                posting_date: new Date().toISOString().split('T')[0],
+                posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8),
+                voucher_type: 'Delivery Note',
+                entries: bundleEntries
+              };
+
+              const bundleResult = await createSerialBatchBundle(bundleData);
+              if (bundleResult?.data?.name) {
+                itemData.serial_and_batch_bundle = bundleResult.data.name;
+                console.log('Created Serial and Batch Bundle:', bundleResult.data.name);
+              } else {
+                console.error('Failed to create Serial and Batch Bundle');
+                // Fallback to old batch_no method
+                itemData.batch_no = entry.batches[0].batch_no;
+              }
+            } catch (error) {
+              console.error('Error creating Serial and Batch Bundle:', error);
+              // Fallback to old batch_no method
+              itemData.batch_no = entry.batches[0].batch_no;
+            }
           } else if (entry.batch) {
             itemData.batch_no = entry.batch;
           }
@@ -188,7 +234,7 @@ const Deliver = () => {
           }
           
           return itemData;
-        })
+        }))
       };
 
       const response = await erpnextAPI.createDeliveryNote(deliveryNoteData);
