@@ -118,14 +118,33 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
 
   const getProgressPercentage = () => {
     const completedItems = items.filter(item => item.status === "completed").length;
-    return (completedItems / items.length) * 100;
+    return items.length > 0 ? (completedItems / items.length) * 100 : 0;
   };
 
   const isAllCompleted = () => {
-    return items.every(item => (item.picked_qty || 0) === item.qty);
+    return items.length > 0 && items.every(item => (item.picked_qty || 0) === item.qty);
   };
 
-  const codeMatches = scannedCode === getCurrentItem().item_code;
+  // Early return if no items
+  if (!items || items.length === 0) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center space-x-2 mb-6">
+          <Package className="w-6 h-6 text-blue-600" />
+          <h1 className="text-2xl font-bold">Pick List</h1>
+        </div>
+        <div className="text-center py-8">
+          <p className="text-gray-500">No items to pick in this pick list.</p>
+          <Button onClick={onBack} className="mt-4">
+            Back to Pick List
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const currentItem = getCurrentItem();
+  const codeMatches = currentItem && scannedCode === currentItem.item_code;
 
   if (isAllCompleted()) {
     return (
