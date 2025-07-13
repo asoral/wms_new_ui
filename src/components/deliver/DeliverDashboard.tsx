@@ -7,7 +7,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import StatusBadge from "@/components/ui/status-badge";
-// import SalesOrderSelector from "./SalesOrderSelector";
+import SalesOrderSelector from "./SalesOrderSelector";
 
 interface DeliverDashboardProps {
   onSelectSalesOrder: (salesOrder: any) => void;
@@ -205,35 +205,12 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
         />
       </div>
 
-      {/* SO Selector - Commented out since we're handling selection in the dashboard */}
-      {/* <SalesOrderSelector 
-        onSelectSalesOrder={onSelectSalesOrder}
-        shortcuts={[]}
-      /> */}
+      {/* SO Selector */}
+      <SalesOrderSelector 
+        onSelectSO={onSelectSalesOrder}
+        shortcuts={shortcuts}
+      />
 
-      {/* Quick Actions */}
-      {shortcuts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {shortcuts.map((shortcut, index) => (
-                <Button
-                  key={index}
-                  onClick={shortcut.action}
-                  variant="outline"
-                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
-                >
-                  <shortcut.icon className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm font-medium">{shortcut.label}</span>
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Recent Sales Orders */}
       <Card>

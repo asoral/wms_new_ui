@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, ArrowLeft, Plus } from "lucide-react";
+import { Truck, ArrowLeft, Plus, Package, FileText, CheckCircle } from "lucide-react";
 import DeliverDashboard from "@/components/deliver/DeliverDashboard";
 import EnhancedDeliveryItemScanner from "@/components/deliver/EnhancedDeliveryItemScanner";
 import DeliveryTable from "@/components/deliver/DeliveryTable";
@@ -383,15 +383,19 @@ const Deliver = () => {
             }}
             shortcuts={[
               {
-                label: "Create New Delivery",
-                icon: Plus,
-                action: () => {
-                  // Handle creating new delivery without selecting SO first
-                  toast({
-                    title: "Feature Coming Soon",
-                    description: "Direct delivery creation will be available soon.",
-                  });
-                }
+                label: "View All SOs",
+                icon: FileText,
+                action: handleViewAllSalesOrders
+              },
+              {
+                label: "Print Label",
+                icon: Package,
+                action: () => navigate('/print-label')
+              },
+              {
+                label: "Quality Check",
+                icon: CheckCircle,
+                action: () => navigate('/quality-check')
               }
             ]}
           />
