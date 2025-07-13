@@ -56,12 +56,32 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       const response = await getMaterialRequests(filters);
       console.log('Raw API response for material requests:', response);
       
-      if (response?.data && Array.isArray(response.data)) {
-        console.log('All Material Requests from API:', response.data);
-        console.log('Number of material requests found:', response.data.length);
+      // Check the actual structure of the response
+      console.log('Response data type:', typeof response?.data);
+      console.log('Response data:', response?.data);
+      
+      // ERPNext API typically returns data in response.data.data format
+      let materialRequests = [];
+      if ((response as any)?.data?.data && Array.isArray((response as any).data.data)) {
+        materialRequests = (response as any).data.data;
+      } else if ((response as any)?.data && Array.isArray((response as any).data)) {
+        materialRequests = (response as any).data;
+      } else {
+        console.log('Unexpected response structure:', {
+          hasData: !!(response as any)?.data,
+          dataType: typeof (response as any)?.data,
+          hasNestedData: !!(response as any)?.data?.data,
+          nestedDataType: typeof (response as any)?.data?.data,
+          fullResponse: response
+        });
+      }
+      
+      if (materialRequests.length > 0) {
+        console.log('Material Requests found:', materialRequests);
+        console.log('Number of material requests found:', materialRequests.length);
         
         // Filter for Material Transfer type - include both Draft (0) and Submitted (1)
-        const transferRequests = response.data.filter((mr: any) => {
+        const transferRequests = materialRequests.filter((mr: any) => {
           console.log(`Material Request ${mr.name}:`, {
             type: mr.material_request_type,
             status: mr.status,
@@ -81,12 +101,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
           setRelatedDocument(transferRequests[0].name);
         }
       } else {
-        console.log('Response structure issue:', {
-          hasData: !!response?.data,
-          isArray: Array.isArray(response?.data),
-          dataType: typeof response?.data,
-          response: response
-        });
+        console.log('No material requests found in API response');
         setAvailableMaterialRequests([]);
       }
     } catch (error) {
