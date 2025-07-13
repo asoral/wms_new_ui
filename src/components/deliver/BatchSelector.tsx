@@ -72,7 +72,7 @@ const BatchSelector = ({
       
       if (batchData && Array.isArray(batchData)) {
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+        const todayStr = today.toISOString().split('T')[0]; // Get YYYY-MM-DD format
         
         const processedBatches = batchData.map((batch: any) => ({
           batch_no: batch.batch_no,
@@ -88,10 +88,10 @@ const BatchSelector = ({
           
           // Filter out expired batches
           if (batch.expiry_date) {
-            const expiryDate = new Date(batch.expiry_date);
-            expiryDate.setHours(0, 0, 0, 0); // Set to start of day for comparison
-            if (expiryDate <= today) {
-              console.log(`Filtering out expired batch ${batch.batch_no} with expiry date ${batch.expiry_date}`);
+            // Convert expiry date to YYYY-MM-DD format for comparison
+            const expiryStr = new Date(batch.expiry_date).toISOString().split('T')[0];
+            if (expiryStr <= todayStr) {
+              console.log(`Filtering out expired batch ${batch.batch_no} with expiry date ${batch.expiry_date} (${expiryStr} <= ${todayStr})`);
               return false;
             }
           }
