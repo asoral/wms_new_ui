@@ -227,90 +227,67 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
 
             console.log('Creating Pick List in ERPNext with data:', pickListData);
 
-            // Create Pick List in ERPNext
-            const createResponse = await fetch(`${process.env.VITE_ERPNEXT_URL || 'https://demo.dexciss.tech'}/api/resource/Pick List`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `token ${localStorage.getItem('erpnext_api_key')}:${localStorage.getItem('erpnext_api_secret')}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(pickListData)
-            });
-
-            if (!createResponse.ok) {
-              const errorText = await createResponse.text();
-              console.error('ERPNext Pick List creation failed:', createResponse.status, errorText);
+            // Create Pick List in ERPNext using the API service
+            const { createERPNextAPI } = await import('@/services/erpnextApi');
+            const api = await createERPNextAPI();
+            
+            if (!api) {
               toast({
-                title: "Error Creating Pick List",
-                description: `Failed to create pick list in ERPNext: ${errorText}`,
+                title: "API Error",
+                description: "Failed to initialize ERPNext API connection",
                 variant: "destructive"
               });
               return;
             }
 
-            const createdPickList = await createResponse.json();
+            const createdPickList = await api.createPickList(pickListData);
             console.log('Pick List created in ERPNext:', createdPickList);
 
             // Fetch the created Pick List with all details
             const pickListName = createdPickList.data?.name;
             if (pickListName) {
-              const detailResponse = await fetch(`${process.env.VITE_ERPNEXT_URL || 'https://demo.dexciss.tech'}/api/resource/Pick List/${encodeURIComponent(pickListName)}`, {
-                headers: {
-                  'Authorization': `token ${localStorage.getItem('erpnext_api_key')}:${localStorage.getItem('erpnext_api_secret')}`,
-                }
-              });
+              const pickListDetails = await api.getPickList(pickListName);
+              console.log('Pick List details from ERPNext:', pickListDetails);
+              
+              const plData = pickListDetails.data?.data || pickListDetails.data;
+              
+              // Convert ERPNext Pick List to local format
+              const items = Array.isArray(plData.locations) ? plData.locations.map((item: any, index: number) => ({
+                id: (index + 1).toString(),
+                item_code: item.item_code,
+                code: item.item_code,
+                item_name: item.item_name || item.item_code,
+                name: item.item_name || item.item_code,
+                warehouse: item.warehouse,
+                bin: item.warehouse,
+                batch_no: item.batch_no || '',
+                batch: item.batch_no || '',
+                serial_no: item.serial_no || '',
+                serial: item.serial_no || '',
+                qty: item.qty || 0,
+                requiredQty: item.qty || 0,
+                picked_qty: item.picked_qty || 0,
+                pickedQty: item.picked_qty || 0,
+                status: (item.picked_qty || 0) === 0 ? "pending" : 
+                        (item.picked_qty || 0) < item.qty ? "partial" : "completed"
+              })) : [];
 
-              if (detailResponse.ok) {
-                const pickListDetails = await detailResponse.json();
-                console.log('Pick List details from ERPNext:', pickListDetails);
-                
-                const plData = pickListDetails.data?.data || pickListDetails.data;
-                
-                // Convert ERPNext Pick List to local format
-                const items = Array.isArray(plData.locations) ? plData.locations.map((item: any, index: number) => ({
-                  id: (index + 1).toString(),
-                  item_code: item.item_code,
-                  code: item.item_code,
-                  item_name: item.item_name || item.item_code,
-                  name: item.item_name || item.item_code,
-                  warehouse: item.warehouse,
-                  bin: item.warehouse,
-                  batch_no: item.batch_no || '',
-                  batch: item.batch_no || '',
-                  serial_no: item.serial_no || '',
-                  serial: item.serial_no || '',
-                  qty: item.qty || 0,
-                  requiredQty: item.qty || 0,
-                  picked_qty: item.picked_qty || 0,
-                  pickedQty: item.picked_qty || 0,
-                  status: (item.picked_qty || 0) === 0 ? "pending" : 
-                          (item.picked_qty || 0) < item.qty ? "partial" : "completed"
-                })) : [];
-
-                const newPickList: PickList = {
-                  name: plData.name,
-                  number: plData.name,
-                  purpose: plData.purpose || "Material Transfer",
-                  relatedDocument: plData.material_request || relatedDocument,
-                  status: plData.status || "Draft",
-                  company: plData.company || "Default Company",
-                  docstatus: plData.docstatus || 0,
-                  creation: plData.creation || new Date().toISOString(),
-                  createdDate: plData.creation || new Date().toISOString(),
-                  owner: plData.owner || "Administrator",
-                  items
-                };
-                
-                console.log('Final Pick List object:', newPickList);
-                onStartPicking(newPickList);
-              } else {
-                console.error('Failed to fetch Pick List details');
-                toast({
-                  title: "Error",
-                  description: "Pick List created but failed to fetch details",
-                  variant: "destructive"
-                });
-              }
+              const newPickList: PickList = {
+                name: plData.name,
+                number: plData.name,
+                purpose: plData.purpose || "Material Transfer",
+                relatedDocument: plData.material_request || relatedDocument,
+                status: plData.status || "Draft",
+                company: plData.company || "Default Company",
+                docstatus: plData.docstatus || 0,
+                creation: plData.creation || new Date().toISOString(),
+                createdDate: plData.creation || new Date().toISOString(),
+                owner: plData.owner || "Administrator",
+                items
+              };
+              
+              console.log('Final Pick List object:', newPickList);
+              onStartPicking(newPickList);
             } else {
               console.error('No Pick List name in response');
               toast({
@@ -439,8 +416,8 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
         <h1 className="text-2xl font-bold">Pick List</h1>
       </div>
 
-      {/* Progress Steps */}
-      <div className="flex items-center space-x-4 mb-6">
+      {/* Progress Steps - Center aligned */}
+      <div className="flex items-center justify-center space-x-4 mb-6">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
             1
