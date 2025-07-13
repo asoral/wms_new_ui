@@ -11,6 +11,7 @@ import { DeliveryEntry, SalesOrderItem } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
 import { createERPNextAPI } from "@/services/erpnextApi";
+import { fetchAvailableBatches } from "@/services/serialBatchBundleApi";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface EnhancedDeliveryItemScannerProps {
@@ -78,20 +79,30 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
     }
 
     try {
-      const erpnextAPI = await createERPNextAPI();
-      if (!erpnextAPI) return;
-
-      // Mock batch data for demo
-      const mockBatches = [
-        { batch_no: "B001", available_qty: 10, expiry_date: "9/6/2025" },
-        { batch_no: "B8763518", available_qty: 10, expiry_date: "26/6/2025" },
-        { batch_no: "BAGFD25484", available_qty: 10, expiry_date: "11/7/2025" },
-      ];
-      setAvailableBatches(mockBatches);
+      console.log('🔥 ENHANCED SCANNER: Fetching batches for item:', selectedItem.itemCode, 'warehouse:', warehouse);
+      
+      const batchData = await fetchAvailableBatches(selectedItem.itemCode, warehouse);
+      console.log('🔥 ENHANCED SCANNER: Received batch data:', batchData);
+      
+      if (batchData && Array.isArray(batchData)) {
+        // Convert to the format expected by this component
+        const formattedBatches = batchData.map(batch => ({
+          batch_no: batch.batch_no,
+          available_qty: batch.qty,
+          expiry_date: batch.expiry_date
+        }));
+        
+        console.log('🔥 ENHANCED SCANNER: Setting available batches:', formattedBatches);
+        setAvailableBatches(formattedBatches);
+      } else {
+        console.log('🔥 ENHANCED SCANNER: No batch data received, setting empty array');
+        setAvailableBatches([]);
+      }
+      
       setShowBatchModal(true);
       setAutoFetchQty(quantity || "5");
     } catch (error) {
-      console.error('Error fetching batches:', error);
+      console.error('🔥 ENHANCED SCANNER: Error fetching batches:', error);
       toast({
         title: "Error",
         description: "Failed to fetch batch information.",
