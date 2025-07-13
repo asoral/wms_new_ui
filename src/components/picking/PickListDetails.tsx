@@ -200,30 +200,53 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
         // Fetch items from the selected material request
         try {
           const materialRequestResponse = await getMaterialRequest(relatedDocument);
+          console.log('Full Material Request Response:', materialRequestResponse);
           
-          if (materialRequestResponse?.data) {
-            const mrData: any = materialRequestResponse.data;
-            console.log('Material Request Data:', mrData);
+          // Handle different response structures
+          let mrData: any = null;
+          if ((materialRequestResponse as any)?.data?.data) {
+            mrData = (materialRequestResponse as any).data.data;
+          } else if ((materialRequestResponse as any)?.data) {
+            mrData = (materialRequestResponse as any).data;
+          }
+          
+          if (mrData) {
+            console.log('Processing Material Request Data:', mrData);
+            console.log('Material Request Items:', mrData.items);
             
             // Convert material request items to pick list items
-            const items = Array.isArray(mrData.items) ? mrData.items.map((item: any, index: number) => ({
-              id: (index + 1).toString(),
-              item_code: item.item_code,
-              code: item.item_code,
-              item_name: item.item_name,
-              name: item.item_name,
-              warehouse: item.warehouse,
-              bin: item.warehouse, // Use warehouse as bin for now
-              batch_no: item.batch_no,
-              batch: item.batch_no,
-              serial_no: item.serial_no,
-              serial: item.serial_no,
-              qty: item.qty,
-              requiredQty: item.qty,
-              picked_qty: 0,
-              pickedQty: 0,
-              status: "pending"
-            })) : [];
+            const items = Array.isArray(mrData.items) ? mrData.items.map((item: any, index: number) => {
+              console.log('Processing item:', item);
+              return {
+                id: (index + 1).toString(),
+                item_code: item.item_code,
+                code: item.item_code,
+                item_name: item.item_name || item.item_code,
+                name: item.item_name || item.item_code,
+                warehouse: item.warehouse || item.from_warehouse || mrData.set_from_warehouse,
+                bin: item.warehouse || item.from_warehouse || mrData.set_from_warehouse,
+                batch_no: item.batch_no || '',
+                batch: item.batch_no || '',
+                serial_no: item.serial_no || '',
+                serial: item.serial_no || '',
+                qty: item.qty || item.stock_qty || 0,
+                requiredQty: item.qty || item.stock_qty || 0,
+                picked_qty: 0,
+                pickedQty: 0,
+                status: "pending"
+              };
+            }) : [];
+
+            console.log('Processed items for Pick List:', items);
+
+            if (items.length === 0) {
+              toast({
+                title: "No Items",
+                description: "The selected material request has no items to pick",
+                variant: "destructive"
+              });
+              return;
+            }
 
             const newPickList: PickList = {
               name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
@@ -231,7 +254,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
               purpose,
               relatedDocument,
               status: "Draft",
-              company: (mrData as any).company || "Default Company",
+              company: mrData.company || "Default Company",
               docstatus: 0,
               creation: new Date().toISOString(),
               createdDate: new Date().toISOString(),
@@ -242,9 +265,10 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
             console.log('New Pick List with real items:', newPickList);
             onStartPicking(newPickList);
           } else {
+            console.error('No data found in material request response');
             toast({
               title: "Error",
-              description: "Failed to fetch material request items",
+              description: "Failed to fetch material request items - no data found",
               variant: "destructive"
             });
           }
