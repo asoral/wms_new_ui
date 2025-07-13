@@ -106,14 +106,19 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
         // Filter out expired batches at API level
         if (batch.expiry_date) {
           const today = new Date();
-          const expiryDate = new Date(batch.expiry_date);
           
-          // Set time to end of expiry date to include batches expiring today
-          expiryDate.setHours(23, 59, 59, 999);
-          
-          if (expiryDate <= today) {
-            console.log(`Filtering out expired batch ${batch.name} - expiry: ${batch.expiry_date}, today: ${today.toISOString()}`);
-            return false;
+          // Parse DD/MM/YYYY format from ERPNext
+          const dateParts = batch.expiry_date.split('/');
+          if (dateParts.length === 3) {
+            const day = parseInt(dateParts[0], 10);
+            const month = parseInt(dateParts[1], 10) - 1; // JavaScript months are 0-indexed
+            const year = parseInt(dateParts[2], 10);
+            const expiryDate = new Date(year, month, day, 23, 59, 59, 999);
+            
+            if (expiryDate <= today) {
+              console.log(`Filtering out expired batch ${batch.name} - expiry: ${batch.expiry_date}, today: ${today.toISOString()}`);
+              return false;
+            }
           }
         }
         console.log(`Including batch ${batch.name} - expiry: ${batch.expiry_date || 'No expiry'}`);
