@@ -71,14 +71,35 @@ const BatchSelector = ({
       console.log('fetchAvailableBatches result:', batchData);
       
       if (batchData && Array.isArray(batchData)) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+        
         const processedBatches = batchData.map((batch: any) => ({
           batch_no: batch.batch_no,
           qty: 0,
           available_qty: batch.qty || 0,
           expiry_date: batch.expiry_date || null
-        })).filter((batch: BatchInfo) => batch.available_qty && batch.available_qty > 0);
+        }))
+        .filter((batch: BatchInfo) => {
+          // Filter out batches with no available quantity
+          if (!batch.available_qty || batch.available_qty <= 0) {
+            return false;
+          }
+          
+          // Filter out expired batches
+          if (batch.expiry_date) {
+            const expiryDate = new Date(batch.expiry_date);
+            expiryDate.setHours(0, 0, 0, 0); // Set to start of day for comparison
+            if (expiryDate <= today) {
+              console.log(`Filtering out expired batch ${batch.batch_no} with expiry date ${batch.expiry_date}`);
+              return false;
+            }
+          }
+          
+          return true;
+        });
 
-        console.log('Processed batch data:', processedBatches);
+        console.log('Processed batch data (excluding expired):', processedBatches);
         setAvailableBatches(processedBatches);
         
         if (processedBatches.length === 0) {
