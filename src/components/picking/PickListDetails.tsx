@@ -60,7 +60,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
         console.log('All Material Requests from API:', response.data);
         console.log('Number of material requests found:', response.data.length);
         
-        // Filter for Material Transfer type
+        // Filter for Material Transfer type - include both Draft (0) and Submitted (1)
         const transferRequests = response.data.filter((mr: any) => {
           console.log(`Material Request ${mr.name}:`, {
             type: mr.material_request_type,
@@ -68,10 +68,12 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
             docstatus: mr.docstatus,
             company: mr.company
           });
-          return mr.material_request_type === 'Material Transfer';
+          // Include Material Transfer requests that are either Draft or Submitted
+          return mr.material_request_type === 'Material Transfer' && 
+                 (mr.docstatus === 0 || mr.docstatus === 1);
         });
         
-        console.log('Material Transfer requests:', transferRequests);
+        console.log('Filtered Material Transfer requests:', transferRequests);
         setAvailableMaterialRequests(transferRequests);
         
         // Auto-select the first one if available
@@ -79,7 +81,12 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
           setRelatedDocument(transferRequests[0].name);
         }
       } else {
-        console.log('No data returned from API or data is not an array:', response);
+        console.log('Response structure issue:', {
+          hasData: !!response?.data,
+          isArray: Array.isArray(response?.data),
+          dataType: typeof response?.data,
+          response: response
+        });
         setAvailableMaterialRequests([]);
       }
     } catch (error) {
