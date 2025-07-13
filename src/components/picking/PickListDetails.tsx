@@ -80,17 +80,28 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
         console.log('Material Requests found:', materialRequests);
         console.log('Number of material requests found:', materialRequests.length);
         
-        // Filter for Material Transfer type - include both Draft (0) and Submitted (1)
+        // Log the structure of the first material request to see available fields
+        console.log('First Material Request structure:', materialRequests[0]);
+        console.log('Available fields:', Object.keys(materialRequests[0]));
+        
+        // Filter for Material Transfer type - but first check what fields are available
         const transferRequests = materialRequests.filter((mr: any) => {
           console.log(`Material Request ${mr.name}:`, {
-            type: mr.material_request_type,
+            // Try different possible field names
+            material_request_type: mr.material_request_type,
+            type: mr.type,
+            purpose: mr.purpose,
             status: mr.status,
+            workflow_state: mr.workflow_state,
             docstatus: mr.docstatus,
-            company: mr.company
+            company: mr.company,
+            // Log all fields to see what's actually available
+            allFields: mr
           });
-          // Include Material Transfer requests that are either Draft or Submitted
-          return mr.material_request_type === 'Material Transfer' && 
-                 (mr.docstatus === 0 || mr.docstatus === 1);
+          
+          // For now, include all material requests to see them in the dropdown
+          // We'll filter properly once we know the correct field names
+          return true;
         });
         
         console.log('Filtered Material Transfer requests:', transferRequests);
