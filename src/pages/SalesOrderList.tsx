@@ -38,7 +38,6 @@ const SalesOrderList = () => {
         ['docstatus', '=', 1], // Only submitted orders
         ['status', 'in', ['To Deliver and Bill', 'To Deliver', 'Partially Delivered']] // Include all delivery-relevant statuses
       ];
-      // Don't filter by company to show all sales orders
 
       const response = await erpnextAPI.callAPI(
         (api) => api.sales.getSalesOrders(filters, undefined, 100)
