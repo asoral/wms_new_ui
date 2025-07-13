@@ -628,9 +628,9 @@ const Deliver = () => {
                     <p className="text-gray-600 mb-6">Review the items and submit the delivery note.</p>
                     
                     {deliveryEntries.length > 0 && (
-                      <DeliveryTable entries={deliveryEntries} onRemoveEntry={(index) => {
-                        setDeliveryEntries(prev => prev.filter((_, i) => i !== index));
-                      }} />
+                       <DeliveryTable entries={deliveryEntries} onRemove={(index) => {
+                         setDeliveryEntries(prev => prev.filter((_, i) => i !== index));
+                       }} />
                     )}
                     
                     <div className="flex justify-between items-center mt-6">

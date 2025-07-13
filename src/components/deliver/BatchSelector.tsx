@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -405,7 +404,7 @@ const BatchSelector = ({
             />
           </div>
 
-          {/* Available Batches Table */}
+          {/* Available Batches Table/Cards */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium">Available Batches (ERPNext v15+ Compatible)</h4>
@@ -414,7 +413,8 @@ const BatchSelector = ({
               </Badge>
             </div>
             
-            <div className="border rounded-lg overflow-hidden">
+            {/* Desktop Table View */}
+            <div className="hidden md:block border rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -477,25 +477,32 @@ const BatchSelector = ({
                   
                   {/* Selected batches that are not in available list (manual entries) */}
                   {selectedBatches
-                    .filter(selected => !availableBatches.find(avail => avail.batch_no === selected.batch_no))
+                    .filter(batch => !availableBatches.some(avail => avail.batch_no === batch.batch_no))
                     .map((batch, index) => (
-                      <tr key={`selected-${index}`} className="border-b bg-yellow-50">
+                      <tr key={`manual-${index}`} className="border-b hover:bg-gray-50">
                         <td className="p-3">
-                          <Checkbox checked={true} />
+                          <Checkbox
+                            checked={true}
+                            onCheckedChange={(checked) => {
+                              if (!checked) {
+                                setSelectedBatches(prev => prev.filter(b => b.batch_no !== batch.batch_no));
+                              }
+                            }}
+                          />
                         </td>
                         <td className="p-3">
                           <Input
                             value={batch.batch_no}
                             onChange={(e) => {
-                              const newBatches = [...selectedBatches];
-                              const batchIndex = selectedBatches.findIndex(b => b === batch);
-                              newBatches[batchIndex] = { ...batch, batch_no: e.target.value };
-                              setSelectedBatches(newBatches);
+                              setSelectedBatches(prev => 
+                                prev.map(b => b === batch ? { ...b, batch_no: e.target.value } : b)
+                              );
                             }}
                             placeholder="Enter batch number"
+                            className="w-full"
                           />
                         </td>
-                        <td className="p-3">-</td>
+                        <td className="p-3 text-gray-500">Manual</td>
                         <td className="p-3">
                           <Input
                             type="number"
@@ -505,11 +512,120 @@ const BatchSelector = ({
                             className="w-20"
                           />
                         </td>
-                        <td className="p-3">-</td>
+                        <td className="p-3 text-sm text-gray-600">
+                          {batch.expiry_date ? new Date(batch.expiry_date).toLocaleDateString() : '-'}
+                        </td>
                       </tr>
-                    ))}
+                    ))
+                  }
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden">
+              {loading ? (
+                <div className="p-4 text-center text-gray-500">
+                  Loading available batches...
+                </div>
+              ) : filteredBatches.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  {searchTerm ? 'No matching batches found' : `No batches with available stock found in warehouse: ${warehouse}`}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredBatches.map((batch) => {
+                    const selectedBatch = selectedBatches.find(s => s.batch_no === batch.batch_no);
+                    const isSelected = !!selectedBatch;
+                    
+                    return (
+                      <div key={batch.batch_no} className="border rounded-lg p-4 bg-white hover:bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => toggleBatch(batch, !!checked)}
+                            />
+                            <div>
+                              <div className="font-medium text-sm">{batch.batch_no}</div>
+                              <div className="text-xs text-gray-500">Available: {batch.available_qty}</div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {batch.expiry_date ? new Date(batch.expiry_date).toLocaleDateString() : 'No expiry'}
+                          </div>
+                        </div>
+                        
+                        {isSelected && (
+                          <div className="mt-3">
+                            <Label className="text-xs text-gray-600">Selected Quantity</Label>
+                            <Input
+                              type="number"
+                              value={selectedBatch.qty}
+                              onChange={(e) => updateBatchQty(batch.batch_no, Number(e.target.value))}
+                              min="1"
+                              max={batch.available_qty}
+                              className="mt-1"
+                              placeholder="Enter quantity"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Mobile Manual Entry Cards */}
+              <div className="mt-4">
+                {selectedBatches
+                  .filter(batch => !availableBatches.some(avail => avail.batch_no === batch.batch_no))
+                  .map((batch, index) => (
+                    <div key={`manual-${index}`} className="border rounded-lg p-4 bg-white mb-3">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            checked={true}
+                            onCheckedChange={(checked) => {
+                              if (!checked) {
+                                setSelectedBatches(prev => prev.filter(b => b.batch_no !== batch.batch_no));
+                              }
+                            }}
+                          />
+                          <div className="text-sm font-medium">Manual Entry</div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-xs text-gray-600">Batch Number</Label>
+                          <Input
+                            value={batch.batch_no}
+                            onChange={(e) => {
+                              setSelectedBatches(prev => 
+                                prev.map(b => b === batch ? { ...b, batch_no: e.target.value } : b)
+                              );
+                            }}
+                            placeholder="Enter batch number"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-600">Quantity</Label>
+                          <Input
+                            type="number"
+                            value={batch.qty}
+                            onChange={(e) => updateBatchQty(batch.batch_no, Number(e.target.value))}
+                            min="1"
+                            className="mt-1"
+                            placeholder="Enter quantity"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
             </div>
             
             <Button

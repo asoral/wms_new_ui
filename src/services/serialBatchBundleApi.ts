@@ -117,6 +117,12 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
           }
 
           // Filter batches with qty > 0 and add expiry dates
+          console.log('🔥 DEBUGGING: About to filter batches. Raw data:', batchQtyData.message);
+          
+          const today = new Date();
+          const todayStr = today.toISOString().split('T')[0];
+          console.log('🔥 DEBUGGING: Today for filtering:', todayStr);
+          
           const validBatches = batchQtyData.message
             .filter(h => h.qty > 0)
             .map(h => {
