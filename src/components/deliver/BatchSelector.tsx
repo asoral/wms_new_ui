@@ -332,15 +332,10 @@ const BatchSelector = ({
       return;
     }
 
-    try {
-      // Create Serial and Batch Bundle for the selected batches
-      const batchesWithBundle = await createSerialBatchBundleForBatches(validBatches);
-      onBatchesSelected(batchesWithBundle);
-      onClose();
-    } catch (error) {
-      // Error is already handled in createSerialBatchBundleForBatches
-      console.error('Failed to confirm batches:', error);
-    }
+    // Don't create bundle here - just pass the batches to the parent
+    // Bundle will be created during delivery note creation
+    onBatchesSelected(validBatches);
+    onClose();
   };
 
   const filteredBatches = availableBatches.filter(batch =>
