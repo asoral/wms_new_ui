@@ -197,7 +197,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
   const handleStartPicking = async () => {
     if (isCreatingNew) {
       if (purpose === "Material Transfer" && relatedDocument) {
-        // Fetch items from the selected material request
+        // Fetch items from the selected material request and create Pick List in ERPNext
         try {
           const materialRequestResponse = await getMaterialRequest(relatedDocument);
           console.log('Full Material Request Response:', materialRequestResponse);
@@ -210,65 +210,120 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
             mrData = (materialRequestResponse as any).data;
           }
           
-          if (mrData) {
+          if (mrData && mrData.items && Array.isArray(mrData.items) && mrData.items.length > 0) {
             console.log('Processing Material Request Data:', mrData);
-            console.log('Material Request Items:', mrData.items);
             
-            // Convert material request items to pick list items
-            const items = Array.isArray(mrData.items) ? mrData.items.map((item: any, index: number) => {
-              console.log('Processing item:', item);
-              return {
-                id: (index + 1).toString(),
+            // Create Pick List data structure for ERPNext
+            const pickListData = {
+              purpose: "Material Transfer",
+              material_request: relatedDocument,
+              company: mrData.company || "Default Company",
+              locations: mrData.items.map((item: any) => ({
                 item_code: item.item_code,
-                code: item.item_code,
-                item_name: item.item_name || item.item_code,
-                name: item.item_name || item.item_code,
-                warehouse: item.warehouse || item.from_warehouse || mrData.set_from_warehouse,
-                bin: item.warehouse || item.from_warehouse || mrData.set_from_warehouse,
-                batch_no: item.batch_no || '',
-                batch: item.batch_no || '',
-                serial_no: item.serial_no || '',
-                serial: item.serial_no || '',
                 qty: item.qty || item.stock_qty || 0,
-                requiredQty: item.qty || item.stock_qty || 0,
-                picked_qty: 0,
-                pickedQty: 0,
-                status: "pending"
-              };
-            }) : [];
+                warehouse: item.warehouse || item.from_warehouse || mrData.set_from_warehouse
+              }))
+            };
 
-            console.log('Processed items for Pick List:', items);
+            console.log('Creating Pick List in ERPNext with data:', pickListData);
 
-            if (items.length === 0) {
+            // Create Pick List in ERPNext
+            const createResponse = await fetch(`${process.env.VITE_ERPNEXT_URL || 'https://demo.dexciss.tech'}/api/resource/Pick List`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `token ${localStorage.getItem('erpnext_api_key')}:${localStorage.getItem('erpnext_api_secret')}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(pickListData)
+            });
+
+            if (!createResponse.ok) {
+              const errorText = await createResponse.text();
+              console.error('ERPNext Pick List creation failed:', createResponse.status, errorText);
               toast({
-                title: "No Items",
-                description: "The selected material request has no items to pick",
+                title: "Error Creating Pick List",
+                description: `Failed to create pick list in ERPNext: ${errorText}`,
                 variant: "destructive"
               });
               return;
             }
 
-            const newPickList: PickList = {
-              name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
-              number: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
-              purpose,
-              relatedDocument,
-              status: "Draft",
-              company: mrData.company || "Default Company",
-              docstatus: 0,
-              creation: new Date().toISOString(),
-              createdDate: new Date().toISOString(),
-              owner: "Administrator",
-              items
-            };
-            
-            console.log('New Pick List with real items:', newPickList);
-            onStartPicking(newPickList);
+            const createdPickList = await createResponse.json();
+            console.log('Pick List created in ERPNext:', createdPickList);
+
+            // Fetch the created Pick List with all details
+            const pickListName = createdPickList.data?.name;
+            if (pickListName) {
+              const detailResponse = await fetch(`${process.env.VITE_ERPNEXT_URL || 'https://demo.dexciss.tech'}/api/resource/Pick List/${encodeURIComponent(pickListName)}`, {
+                headers: {
+                  'Authorization': `token ${localStorage.getItem('erpnext_api_key')}:${localStorage.getItem('erpnext_api_secret')}`,
+                }
+              });
+
+              if (detailResponse.ok) {
+                const pickListDetails = await detailResponse.json();
+                console.log('Pick List details from ERPNext:', pickListDetails);
+                
+                const plData = pickListDetails.data?.data || pickListDetails.data;
+                
+                // Convert ERPNext Pick List to local format
+                const items = Array.isArray(plData.locations) ? plData.locations.map((item: any, index: number) => ({
+                  id: (index + 1).toString(),
+                  item_code: item.item_code,
+                  code: item.item_code,
+                  item_name: item.item_name || item.item_code,
+                  name: item.item_name || item.item_code,
+                  warehouse: item.warehouse,
+                  bin: item.warehouse,
+                  batch_no: item.batch_no || '',
+                  batch: item.batch_no || '',
+                  serial_no: item.serial_no || '',
+                  serial: item.serial_no || '',
+                  qty: item.qty || 0,
+                  requiredQty: item.qty || 0,
+                  picked_qty: item.picked_qty || 0,
+                  pickedQty: item.picked_qty || 0,
+                  status: (item.picked_qty || 0) === 0 ? "pending" : 
+                          (item.picked_qty || 0) < item.qty ? "partial" : "completed"
+                })) : [];
+
+                const newPickList: PickList = {
+                  name: plData.name,
+                  number: plData.name,
+                  purpose: plData.purpose || "Material Transfer",
+                  relatedDocument: plData.material_request || relatedDocument,
+                  status: plData.status || "Draft",
+                  company: plData.company || "Default Company",
+                  docstatus: plData.docstatus || 0,
+                  creation: plData.creation || new Date().toISOString(),
+                  createdDate: plData.creation || new Date().toISOString(),
+                  owner: plData.owner || "Administrator",
+                  items
+                };
+                
+                console.log('Final Pick List object:', newPickList);
+                onStartPicking(newPickList);
+              } else {
+                console.error('Failed to fetch Pick List details');
+                toast({
+                  title: "Error",
+                  description: "Pick List created but failed to fetch details",
+                  variant: "destructive"
+                });
+              }
+            } else {
+              console.error('No Pick List name in response');
+              toast({
+                title: "Error",
+                description: "Pick List created but no name returned",
+                variant: "destructive"
+              });
+            }
           } else {
-            console.error('No data found in material request response');
+            console.error('No items found in material request');
             toast({
-              title: "Error",
-              description: "Failed to fetch material request items - no data found",
+              title: "No Items",
+              description: "The selected material request has no items to pick",
               variant: "destructive"
             });
           }

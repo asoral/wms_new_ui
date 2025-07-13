@@ -188,4 +188,102 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       return { data: [] };
     }
   }
+
+  async getPickLists(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+    let finalFilters = this.convertToFrappeFilters(filters);
+    if (company) {
+      finalFilters.push(['company', '=', company]);
+    }
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Pick List API Error:', response.status, errorText);
+      throw new Error(`Failed to fetch pick lists: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPickList(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List/${encodeURIComponent(name)}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Pick List Detail API Error:', response.status, errorText);
+      throw new Error(`Failed to fetch pick list: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async createPickList(data: any): Promise<ERPNextResponse<any>> {
+    console.log('Creating Pick List with data:', data);
+    
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Create Pick List API Error:', response.status, errorText);
+      throw new Error(`Failed to create pick list: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('Pick List created successfully:', result);
+    return result;
+  }
+
+  async updatePickList(name: string, data: any): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Update Pick List API Error:', response.status, errorText);
+      throw new Error(`Failed to update pick list: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  async submitPickList(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        docstatus: 1
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Submit Pick List API Error:', response.status, errorText);
+      throw new Error(`Failed to submit pick list: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
 }
