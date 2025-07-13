@@ -43,16 +43,17 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
   }
 
   async searchSalesOrders(searchTerm: string, company?: string, limitPageLength: number = 20): Promise<ERPNextResponse<SalesOrder[]>> {
-    // Enhanced filters for sales orders ready for delivery
+    // More inclusive filters - let's see all submitted sales orders first  
     const filters = [
-      ['docstatus', '=', 1], // Submitted orders only
-      ['status', '!=', 'Closed'], // Exclude closed orders
-      ['per_delivered', '<', 100] // Orders with pending delivery
+      ['docstatus', '=', 1] // Only submitted orders
     ];
 
     if (company) {
       filters.push(['company', '=', company]);
     }
+
+    console.log('Searching for sales orders with term:', searchTerm);
+    console.log('Using filters:', filters);
 
     // Enhanced search filters with more fields
     const orFilters = [
@@ -66,30 +67,37 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
       filters: JSON.stringify(filters),
       or_filters: JSON.stringify(orFilters),
       fields: JSON.stringify([
-        'name', 
-        'customer', 
+        'name',
+        'customer',
         'customer_name', 
-        'delivery_date', 
-        'transaction_date', 
-        'grand_total', 
-        'status', 
-        'po_no',
+        'status',
+        'grand_total',
+        'delivery_date',
+        'transaction_date',
         'per_delivered',
+        'docstatus',
+        'po_no',
         'company'
       ]),
       limit_page_length: limitPageLength.toString(),
       order_by: 'delivery_date asc' // Order by delivery date
     });
 
+    console.log('API URL:', `${this.baseURL}/api/resource/Sales Order?${params.toString()}`);
+    
     const response = await fetch(`${this.baseURL}/api/resource/Sales Order?${params}`, {
       headers: this.getHeaders(),
     });
 
     if (!response.ok) {
+      console.error('Search failed:', response.status, response.statusText);
       throw new Error(`Failed to search sales orders: ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log('Search results:', result);
+    
+    return result;
   }
 
   async getDeliveryNotes(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<DeliveryNote[]>> {
