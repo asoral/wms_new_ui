@@ -59,118 +59,20 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
 
     console.log(`Fetching batches for item: ${itemCode}, warehouse: ${warehouse}`);
 
-    // Use the proper ERPNext method that's used in the frontend for batch selection
-    // This method returns batches with qty available in specific warehouse and filters expired batches
-    const url = `${api.getBaseURL}/api/method/erpnext.stock.doctype.batch.batch.get_batch_qty`;
-    
-    const params = new URLSearchParams({
-      item_code: itemCode,
-      warehouse: warehouse,
-      posting_date: new Date().toISOString().split('T')[0], // Today's date for expiry filtering
-      posting_time: new Date().toTimeString().split(' ')[0].slice(0, 8) // Current time
-    });
-
-    console.log('Calling get_batch_qty with params:', Object.fromEntries(params));
-
-    const response = await fetch(`${url}?${params}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      console.error('Failed to fetch batch quantities:', response.status, response.statusText);
-      
-      // Fallback to manual filtering if the direct method fails
-      return await fetchBatchesManualFilter(itemCode, warehouse);
-    }
-
-    const data = await response.json();
-    console.log('get_batch_qty response:', data);
-
-    if (data?.message && typeof data.message === 'object') {
-      // The response contains batch_no as keys and qty as values
-      const batches = Object.entries(data.message)
-        .filter(([batchNo, qty]) => parseFloat(qty as string) > 0)
-        .map(([batchNo, qty]) => ({
-          batch_no: batchNo,
-          qty: parseFloat(qty as string)
-        }));
-
-      // Get expiry dates for the batches
-      const batchesWithExpiry = await Promise.all(
-        batches.map(async (batch) => {
-          try {
-            const batchDetailUrl = `${api.getBaseURL}/api/resource/Batch/${batch.batch_no}`;
-            const batchResponse = await fetch(batchDetailUrl, {
-              headers: {
-                'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
-                'Content-Type': 'application/json'
-              }
-            });
-
-            if (batchResponse.ok) {
-              const batchData = await batchResponse.json();
-              return {
-                ...batch,
-                expiry_date: batchData.data?.expiry_date || null
-              };
-            }
-            return batch;
-          } catch (error) {
-            console.error(`Error fetching expiry for batch ${batch.batch_no}:`, error);
-            return batch;
-          }
-        })
-      );
-
-      console.log('Final batches with expiry dates:', batchesWithExpiry);
-      return batchesWithExpiry;
-    }
-
-    console.warn('No batch quantities found or invalid response format');
-    return [];
-
-  } catch (error) {
-    console.error('Error in get_batch_qty, falling back to manual filter:', error);
-    // Fallback to manual filtering
-    return await fetchBatchesManualFilter(itemCode, warehouse);
-  }
-};
-
-// Fallback method using manual filtering
-const fetchBatchesManualFilter = async (itemCode: string, warehouse: string): Promise<BatchInfo[]> => {
-  try {
-    const api = await createERPNextAPI();
-    if (!api) return [];
-
-    console.log('Using manual batch filtering fallback');
-
-    // Get current date for filtering expired batches
-    const today = new Date().toISOString().split('T')[0];
-    console.log('Today date for expiry filtering:', today);
-
-    // First get all batches for the item that are not expired and not disabled
+    // Get all batches for the item first
     const batchUrl = `${api.getBaseURL}/api/method/frappe.client.get_list`;
     
-    const batchFilters = [
-      ['item', '=', itemCode],
-      ['disabled', '=', 0]
-    ];
-
-    // Add expiry date filter to exclude expired batches
-    batchFilters.push(['ifnull(expiry_date, "2099-12-31")', '>', today]);
-
     const batchBody = {
       doctype: 'Batch',
-      fields: ['name', 'expiry_date'],
-      filters: batchFilters,
+      fields: ['name', 'expiry_date', 'disabled'],
+      filters: [
+        ['item', '=', itemCode],
+        ['disabled', '=', 0]
+      ],
       limit_page_length: 1000
     };
 
-    console.log('Fetching non-expired batches:', batchBody);
+    console.log('Fetching batches:', batchBody);
 
     const batchResponse = await fetch(batchUrl, {
       method: 'POST',
@@ -187,61 +89,77 @@ const fetchBatchesManualFilter = async (itemCode: string, warehouse: string): Pr
     }
 
     const batchData = await batchResponse.json();
-    console.log('Non-expired batches response:', batchData);
+    console.log('Batch list response:', batchData);
 
     if (!batchData?.message || !Array.isArray(batchData.message)) {
-      console.warn('No valid batches found');
+      console.warn('No batches found');
       return [];
     }
 
-    // Now check stock balance for each batch in the specific warehouse
-    const stockPromises = batchData.message.map(async (batch: any) => {
-      try {
-        const stockUrl = `${api.getBaseURL}/api/method/erpnext.stock.utils.get_stock_balance`;
-        const stockParams = new URLSearchParams({
-          item_code: itemCode,
-          warehouse: warehouse,
-          batch_no: batch.name
-        });
+    // Filter out expired batches and check stock in the specific warehouse
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    console.log('Today date for expiry filtering:', todayStr);
 
-        const stockResponse = await fetch(`${stockUrl}?${stockParams}`, {
-          headers: {
-            'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
-            'Content-Type': 'application/json'
+    const stockPromises = batchData.message
+      .filter((batch: any) => {
+        // Filter out expired batches at API level
+        if (batch.expiry_date) {
+          const expiryStr = batch.expiry_date.split(' ')[0]; // Get YYYY-MM-DD part
+          if (expiryStr <= todayStr) {
+            console.log(`Filtering out expired batch ${batch.name} - expiry: ${batch.expiry_date}`);
+            return false;
           }
-        });
-
-        if (stockResponse.ok) {
-          const stockData = await stockResponse.json();
-          const qty = parseFloat(stockData.message) || 0;
-          
-          console.log(`Batch ${batch.name}: qty=${qty}, expiry=${batch.expiry_date}, warehouse=${warehouse}`);
-          
-          if (qty > 0) {
-            return {
-              batch_no: batch.name,
-              qty: qty,
-              expiry_date: batch.expiry_date
-            };
-          }
-        } else {
-          console.error(`Failed to get stock for batch ${batch.name}:`, stockResponse.status);
         }
-        return null;
-      } catch (error) {
-        console.error(`Error checking stock for batch ${batch.name}:`, error);
-        return null;
-      }
-    });
+        return true;
+      })
+      .map(async (batch: any) => {
+        try {
+          const stockUrl = `${api.getBaseURL}/api/method/erpnext.stock.utils.get_stock_balance`;
+          const stockParams = new URLSearchParams({
+            item_code: itemCode,
+            warehouse: warehouse,
+            batch_no: batch.name
+          });
+
+          const stockResponse = await fetch(`${stockUrl}?${stockParams}`, {
+            headers: {
+              'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (stockResponse.ok) {
+            const stockData = await stockResponse.json();
+            const qty = parseFloat(stockData.message) || 0;
+            
+            console.log(`Batch ${batch.name}: qty=${qty}, expiry=${batch.expiry_date}, warehouse=${warehouse}`);
+            
+            if (qty > 0) {
+              return {
+                batch_no: batch.name,
+                qty: qty,
+                expiry_date: batch.expiry_date
+              };
+            }
+          } else {
+            console.error(`Failed to get stock for batch ${batch.name}:`, stockResponse.status);
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error checking stock for batch ${batch.name}:`, error);
+          return null;
+        }
+      });
 
     const stockResults = await Promise.all(stockPromises);
     const validBatches = stockResults.filter(batch => batch !== null);
 
-    console.log(`Manual filter result: ${validBatches.length} valid batches in warehouse ${warehouse}:`, validBatches);
+    console.log(`Found ${validBatches.length} valid non-expired batches with stock in warehouse ${warehouse}:`, validBatches);
     return validBatches;
 
   } catch (error) {
-    console.error('Error in manual batch filtering:', error);
+    console.error('Error fetching batches:', error);
     return [];
   }
 };
