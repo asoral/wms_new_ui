@@ -4,6 +4,7 @@ import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { Truck, ArrowLeft, Plus, Package, FileText, CheckCircle } from "lucide-react";
 import DeliverDashboard from "@/components/deliver/DeliverDashboard";
+import SOItemsDisplay from "@/components/deliver/SOItemsDisplay";
 import EnhancedDeliveryItemScanner from "@/components/deliver/EnhancedDeliveryItemScanner";
 import DeliveryTable from "@/components/deliver/DeliveryTable";
 import { SalesOrder, SalesOrderOption, DashboardData, DeliveryEntry } from "@/types";
@@ -78,35 +79,50 @@ const Deliver = () => {
         return;
       }
 
-      // Use the sales order data directly from the dashboard
-      const response = { data: salesOrder };
+      // Fetch full sales order details including items
+      const response = await erpnextAPI.getSalesOrder(salesOrder.name);
       
       if (response?.data) {
-        const salesOrder: SalesOrder = {
-          id: response.data.name,
-          name: response.data.name,
-          number: response.data.name,
-          customer: response.data.customer,
-          status: response.data.status,
-          totalValue: response.data.grand_total || 0,
-          grand_total: response.data.grand_total || 0,
-          totalItems: response.data.items?.length || 0,
-          percentDelivered: response.data.per_delivered || 0,
-          items: response.data.items?.map((item: any) => ({
+        const soData = response.data;
+        const transformedSO: SalesOrder = {
+          id: soData.name,
+          name: soData.name,
+          number: soData.name,
+          customer: soData.customer,
+          customer_name: soData.customer_name || soData.customer, // Use customer_name if available
+          status: soData.status,
+          totalValue: soData.grand_total || 0,
+          grand_total: soData.grand_total || 0,
+          totalItems: soData.items?.length || 0,
+          percentDelivered: soData.per_delivered || 0,
+          items: soData.items?.map((item: any) => ({
             name: item.name, // ERPNext Sales Order Item unique identifier
+            item_code: item.item_code,
             itemCode: item.item_code,
+            item_name: item.item_name,
             itemName: item.item_name,
-            orderedQty: item.qty,
+            qty: item.qty || 0,
+            orderedQty: item.qty || 0,
+            delivered_qty: item.delivered_qty || 0,
             deliveredQty: item.delivered_qty || 0,
+            pending_qty: (item.qty || 0) - (item.delivered_qty || 0),
             pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
-            rate: item.rate,
-            uom: item.uom,
-            warehouse: item.warehouse
+            rate: item.rate || 0,
+            stock_uom: item.uom || item.stock_uom || 'Nos',
+            uom: item.uom || item.stock_uom || 'Nos',
+            warehouse: item.warehouse || 'Main Store'
           })) || []
         };
 
-        setSelectedSalesOrder(salesOrder);
+        console.log('Selected SO with items:', transformedSO);
+        setSelectedSalesOrder(transformedSO);
         setCurrentStep('deliver');
+      } else {
+        toast({
+          title: "Error",
+          description: "No sales order data found",
+          variant: "destructive"
+        });
       }
 
     } catch (error) {
@@ -423,7 +439,7 @@ const Deliver = () => {
             </div>
             {selectedSalesOrder && (
               <div className="mt-4 text-sm text-gray-600">
-                Selected: {selectedSalesOrder.number} - {selectedSalesOrder.customer}
+                Selected: {selectedSalesOrder.number} - {selectedSalesOrder.customer_name || selectedSalesOrder.customer}
               </div>
             )}
           </div>
@@ -452,7 +468,7 @@ const Deliver = () => {
                         </div>
                         <div>
                           <div className="text-sm text-gray-600">Customer:</div>
-                          <div className="font-semibold">{selectedSalesOrder.customer}</div>
+                          <div className="font-semibold">{selectedSalesOrder.customer_name || selectedSalesOrder.customer}</div>
                         </div>
                         <div>
                           <div className="text-sm text-gray-600">Amount:</div>
@@ -474,46 +490,11 @@ const Deliver = () => {
                     onAddEntry={handleAddDeliveryEntry}
                   />
 
-                  {/* Items in Sales Order Table */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Items in {selectedSalesOrder.number}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse">
-                          <thead>
-                            <tr className="bg-gray-50">
-                              <th className="text-left p-3 border text-sm">Item Code</th>
-                              <th className="text-left p-3 border text-sm">Item Name</th>
-                              <th className="text-left p-3 border text-sm">Ordered</th>
-                              <th className="text-left p-3 border text-sm">Delivered</th>
-                              <th className="text-left p-3 border text-sm">Pending</th>
-                              <th className="text-left p-3 border text-sm">Rate</th>
-                              <th className="text-left p-3 border text-sm">Warehouse</th>
-                              <th className="text-left p-3 border text-sm">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selectedSalesOrder.items.map((item, index) => (
-                              <tr key={index} className="border-b">
-                                <td className="p-3 border text-sm">{item.itemCode}</td>
-                                <td className="p-3 border text-sm">{item.itemName}</td>
-                                <td className="p-3 border text-sm">{item.orderedQty} {item.uom}</td>
-                                <td className="p-3 border text-sm">{item.deliveredQty} {item.uom}</td>
-                                <td className="p-3 border text-sm text-orange-600 font-medium">{item.pendingQty} {item.uom}</td>
-                                <td className="p-3 border text-sm">₹{item.rate}</td>
-                                <td className="p-3 border text-sm">{item.warehouse}</td>
-                                <td className="p-3 border text-sm">
-                                  <Badge variant="secondary">Pending</Badge>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* Items in Sales Order Card View */}
+                  <SOItemsDisplay 
+                    items={selectedSalesOrder.items}
+                    salesOrderNumber={selectedSalesOrder.number}
+                  />
                 </div>
               )}
             </TabsContent>

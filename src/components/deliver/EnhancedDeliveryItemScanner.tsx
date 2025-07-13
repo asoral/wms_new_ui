@@ -7,14 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Package, Scan, Search } from "lucide-react";
-import { DeliveryEntry, SOItem } from "@/types";
+import { DeliveryEntry, SalesOrderItem } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface EnhancedDeliveryItemScannerProps {
-  soItems: SOItem[];
+  soItems: SalesOrderItem[];
   onAddEntry: (entry: DeliveryEntry) => void;
 }
 
@@ -34,6 +34,9 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
   const { toast } = useToast();
 
   const selectedItem = soItems.find(item => item.itemCode === selectedItemCode);
+
+  // Log items for debugging
+  console.log('SO Items passed to scanner:', soItems);
 
   useEffect(() => {
     fetchWarehouses();
@@ -251,20 +254,26 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
                 <label className="text-sm font-medium mb-2 block">Item Code / Name</label>
                 <Select value={selectedItemCode} onValueChange={handleItemSelect}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select an item to deliver..." />
+                    <SelectValue placeholder={soItems.length > 0 ? "Select an item to deliver..." : "No items available"} />
                   </SelectTrigger>
-                  <SelectContent>
-                    {soItems.map((item) => (
-                      <SelectItem key={item.itemCode} value={item.itemCode}>
-                        <div className="flex items-center space-x-2">
-                          <Package className="w-4 h-4" />
-                          <div>
-                            <div className="font-medium">{item.itemCode}</div>
-                            <div className="text-sm text-gray-500">{item.itemName}</div>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg z-[10000]">
+                    {soItems.length > 0 ? (
+                      soItems.map((item) => (
+                        <SelectItem key={item.itemCode} value={item.itemCode}>
+                          <div className="flex items-center space-x-2">
+                            <Package className="w-4 h-4" />
+                            <div>
+                              <div className="font-medium">{item.itemCode}</div>
+                              <div className="text-sm text-gray-500">{item.itemName}</div>
+                            </div>
                           </div>
-                        </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-items" disabled>
+                        No items available
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
