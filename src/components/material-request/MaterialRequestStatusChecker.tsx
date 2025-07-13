@@ -170,10 +170,24 @@ const MaterialRequestStatusChecker = ({ onEdit }: MaterialRequestStatusCheckerPr
               </div>
             </div>
             
-            {requestStatus.status === 'Draft' && onEdit && (
+            {(requestStatus.status === 'Draft' || requestStatus.docstatus === 0) && onEdit && (
               <div className="pt-3 border-t">
                 <Button 
-                  onClick={() => onEdit(requestStatus)}
+                  onClick={async () => {
+                    try {
+                      // Fetch detailed request data before editing
+                      const erpnextAPI = await createERPNextAPI();
+                      if (erpnextAPI) {
+                        const detailResult = await erpnextAPI.getMaterialRequest(requestStatus.name);
+                        onEdit(detailResult.data || requestStatus);
+                      } else {
+                        onEdit(requestStatus);
+                      }
+                    } catch (error) {
+                      console.error('Error fetching detailed request:', error);
+                      onEdit(requestStatus);
+                    }
+                  }}
                   size="sm"
                   className="w-full"
                 >

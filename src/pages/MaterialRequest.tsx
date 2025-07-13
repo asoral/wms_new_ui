@@ -47,19 +47,36 @@ const MaterialRequest = () => {
         return;
       }
 
-      const result = await api.getMaterialRequests(undefined, company || undefined, 50);
+      // Fetch list of recent material requests first
+      const result = await api.getMaterialRequests(undefined, company || undefined, 5);
       if (result && result.data) {
-        setMaterialRequests(result.data);
+        // Fetch detailed data for each request to get items and proper fields
+        const detailedRequests = await Promise.all(
+          result.data.map(async (request: any) => {
+            try {
+              const detailResult = await api.getMaterialRequest(request.name);
+              return detailResult.data || request;
+            } catch (error) {
+              console.error(`Error fetching details for ${request.name}:`, error);
+              return request; // Return original data if detail fetch fails
+            }
+          })
+        );
+        
+        setMaterialRequests(detailedRequests);
+        
+        // Fetch all requests for analytics (without details for performance)
+        const allRequestsResult = await api.getMaterialRequests(undefined, company || undefined, 200);
+        const allRequests = allRequestsResult?.data || [];
         
         // Calculate analytics
-        const requests = result.data;
         setAnalytics({
-          total: requests.length,
-          draft: requests.filter((mr: any) => mr.status === 'Draft').length,
-          pending: requests.filter((mr: any) => ['Pending', 'Submitted'].includes(mr.status)).length,
-          completed: requests.filter((mr: any) => ['Stopped', 'Ordered', 'Issued', 'Transferred', 'Received'].includes(mr.status)).length,
-          partial: requests.filter((mr: any) => mr.status === 'Partially Ordered').length,
-          cancelled: requests.filter((mr: any) => mr.status === 'Cancelled').length
+          total: allRequests.length,
+          draft: allRequests.filter((mr: any) => mr.docstatus === 0 || mr.status === 'Draft').length,
+          pending: allRequests.filter((mr: any) => ['Pending', 'Submitted'].includes(mr.status) || (mr.docstatus === 1 && !mr.status)).length,
+          completed: allRequests.filter((mr: any) => ['Stopped', 'Ordered', 'Issued', 'Transferred', 'Received'].includes(mr.status)).length,
+          partial: allRequests.filter((mr: any) => mr.status === 'Partially Ordered').length,
+          cancelled: allRequests.filter((mr: any) => mr.status === 'Cancelled' || mr.docstatus === 2).length
         });
       }
     } catch (error) {
@@ -120,11 +137,30 @@ const MaterialRequest = () => {
     setCurrentView('list');
   };
 
-  const handleEditFromList = (request: any) => {
-    setEditingRequest(request);
-    setCurrentDraft(request);
-    setSelectedPurpose(request.material_request_type);
-    setCurrentView('create');
+  const handleEditFromList = async (request: any) => {
+    try {
+      // Ensure we have detailed request data with items
+      let detailedRequest = request;
+      if (!request.items || request.items.length === 0) {
+        const api = await createERPNextAPI();
+        if (api) {
+          const detailResult = await api.getMaterialRequest(request.name);
+          detailedRequest = detailResult.data || request;
+        }
+      }
+      
+      setEditingRequest(detailedRequest);
+      setCurrentDraft(detailedRequest);
+      setSelectedPurpose(detailedRequest.material_request_type);
+      setCurrentView('create');
+    } catch (error) {
+      console.error('Error fetching request details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch request details",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleViewFromList = (request: any) => {
@@ -324,8 +360,17 @@ const MaterialRequest = () => {
 
           {/* Recent Material Requests */}
           <Card>
-            <CardHeader>
-              <CardTitle>Recent Material Requests</CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle>Recent Material Requests</CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentView('list')}
+                >
+                  Search All
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
