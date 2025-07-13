@@ -59,189 +59,113 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
     if (!api) return [];
 
     console.log(`🔥 DEBUGGING: Fetching batches for item: ${itemCode}, warehouse: ${warehouse}`);
-    console.log(`🔥 DEBUGGING: Trying ERPNext method get_batch_qty first`);
+    console.log(`🔥 DEBUGGING: Using simple Batch resource query (reverting to working approach)`);
 
-    // Try ERPNext's built-in method first
-    try {
-      const getBatchQtyUrl = `${api.getBaseURL}/api/method/erpnext.stock.get_item_details.get_batch_qty`;
-      const batchQtyResponse = await fetch(getBatchQtyUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          item_code: itemCode,
-          warehouse: warehouse
-        })
-      });
-
-      console.log('🔥 DEBUGGING: Batch qty method response status:', batchQtyResponse.status);
-      
-      if (batchQtyResponse.ok) {
-        const batchQtyData = await batchQtyResponse.json();
-        console.log('🔥 DEBUGGING: Batch qty method response:', batchQtyData);
-        
-        if (batchQtyData.message && Array.isArray(batchQtyData.message)) {
-          const validBatches: BatchInfo[] = [];
-          const today = new Date();
-          
-          for (const batchInfo of batchQtyData.message) {
-            if (batchInfo.qty > 0) {
-              // Get batch details for expiry check
-              try {
-                const batchDetailUrl = `${api.getBaseURL}/api/resource/Batch/${batchInfo.batch_no}`;
-                const batchDetailResponse = await fetch(batchDetailUrl, {
-                  headers: {
-                    'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                
-                if (batchDetailResponse.ok) {
-                  const batchDetail = await batchDetailResponse.json();
-                  const expiry_date = batchDetail.data?.expiry_date;
-                  
-                  // Check if not expired
-                  let isExpired = false;
-                  if (expiry_date) {
-                    const expiryDate = new Date(expiry_date);
-                    expiryDate.setHours(23, 59, 59, 999);
-                    isExpired = expiryDate < today;
-                  }
-                  
-                  if (!isExpired) {
-                    validBatches.push({
-                      batch_no: batchInfo.batch_no,
-                      qty: batchInfo.qty,
-                      expiry_date: expiry_date
-                    });
-                    console.log(`🔥 Including batch ${batchInfo.batch_no}: qty=${batchInfo.qty}, expiry=${expiry_date || 'No expiry'}`);
-                  } else {
-                    console.log(`🔥 Filtering expired batch ${batchInfo.batch_no}: expiry=${expiry_date}`);
-                  }
-                }
-              } catch (error) {
-                console.error(`Error fetching batch details for ${batchInfo.batch_no}:`, error);
-              }
-            }
-          }
-          
-          console.log(`🔥 DEBUGGING: Found ${validBatches.length} valid batches using get_batch_qty method`);
-          if (validBatches.length > 0) {
-            return validBatches.sort((a, b) => {
-              if (!a.expiry_date && !b.expiry_date) return 0;
-              if (!a.expiry_date) return 1;
-              if (!b.expiry_date) return -1;
-              return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime();
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('🔥 DEBUGGING: get_batch_qty method failed:', error);
-    }
-
-    console.log(`🔥 DEBUGGING: Falling back to Stock Ledger Entry approach`);
-
-    // Fallback to Stock Ledger Entry approach
-    const stockLedgerUrl = `${api.getBaseURL}/api/resource/Stock Ledger Entry`;
-    const stockLedgerParams = new URLSearchParams({
-      fields: JSON.stringify(['batch_no', 'actual_qty']),
+    // Simple approach: Get all batches for the item, then check stock for each
+    const batchUrl = `${api.getBaseURL}/api/resource/Batch`;
+    const batchParams = new URLSearchParams({
+      fields: JSON.stringify(['name', 'batch_id', 'item', 'expiry_date']),
       filters: JSON.stringify([
-        ['item_code', '=', itemCode],
-        ['warehouse', '=', warehouse],
-        ['batch_no', '!=', '']
+        ['item', '=', itemCode]
       ]),
       limit_page_length: '0'
     });
 
-    console.log('🔥 DEBUGGING: Stock Ledger API URL:', stockLedgerUrl + '?' + stockLedgerParams.toString());
-    console.log('🔥 DEBUGGING: Filters being sent:', JSON.parse(stockLedgerParams.get('filters') || '[]'));
+    console.log('🔥 DEBUGGING: Batch resource URL:', batchUrl + '?' + batchParams.toString());
 
-    const stockResponse = await fetch(`${stockLedgerUrl}?${stockLedgerParams.toString()}`, {
+    const batchResponse = await fetch(`${batchUrl}?${batchParams.toString()}`, {
       headers: {
         'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
         'Content-Type': 'application/json'
       }
     });
 
-    if (!stockResponse.ok) {
-      console.error('Failed to fetch stock ledger entries:', stockResponse.status, stockResponse.statusText);
+    if (!batchResponse.ok) {
+      console.error('🔥 DEBUGGING: Failed to fetch batches:', batchResponse.status, batchResponse.statusText);
       return [];
     }
 
-    const stockData = await stockResponse.json();
-    console.log('🔥 DEBUGGING: Stock ledger response status:', stockResponse.status);
-    console.log('🔥 DEBUGGING: Stock ledger response data:', stockData);
+    const batchData = await batchResponse.json();
+    console.log('🔥 DEBUGGING: Batch resource response:', batchData);
 
-    if (!stockData?.data || !Array.isArray(stockData.data)) {
-      console.warn('No stock ledger data found');
+    if (!batchData?.data || !Array.isArray(batchData.data)) {
+      console.warn('🔥 DEBUGGING: No batch data found');
       return [];
     }
 
-    // Group by batch_no and sum actual_qty to get current stock
-    const batchStockMap = new Map<string, number>();
-    
-    for (const entry of stockData.data) {
-      const batchNo = entry.batch_no;
-      const actualQty = parseFloat(entry.actual_qty) || 0;
-      
-      if (batchNo) {
-        const currentQty = batchStockMap.get(batchNo) || 0;
-        batchStockMap.set(batchNo, currentQty + actualQty);
-      }
-    }
-
-    console.log('🔥 DEBUGGING: Batch stock summary from ledger:', Object.fromEntries(batchStockMap));
-
-    // Now get batch details for batches with positive stock and check expiry
     const validBatches: BatchInfo[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    for (const [batchNo, qty] of batchStockMap.entries()) {
-      if (qty <= 0) {
-        console.log(`🔥 Filtering out batch ${batchNo} - zero or negative stock: ${qty}`);
-        continue;
+
+    // For each batch, check stock in the specific warehouse using Bin resource
+    for (const batch of batchData.data) {
+      const batchNo = batch.name || batch.batch_id;
+      const expiry_date = batch.expiry_date;
+
+      console.log(`🔥 DEBUGGING: Checking batch ${batchNo} stock in warehouse ${warehouse}`);
+
+      // Check if batch is expired
+      if (expiry_date) {
+        const expiryDate = new Date(expiry_date);
+        expiryDate.setHours(23, 59, 59, 999);
+        
+        if (expiryDate < today) {
+          console.log(`🔥 DEBUGGING: Filtering expired batch ${batchNo} - expiry: ${expiry_date}`);
+          continue;
+        }
       }
 
+      // Check stock in warehouse using Bin resource
       try {
-        const batchUrl = `${api.getBaseURL}/api/resource/Batch/${batchNo}`;
-        const batchResponse = await fetch(batchUrl, {
+        const binUrl = `${api.getBaseURL}/api/resource/Bin`;
+        const binParams = new URLSearchParams({
+          fields: JSON.stringify(['actual_qty', 'reserved_qty']),
+          filters: JSON.stringify([
+            ['item_code', '=', itemCode],
+            ['warehouse', '=', warehouse],
+            ['batch_no', '=', batchNo]
+          ])
+        });
+
+        console.log(`🔥 DEBUGGING: Checking bin stock for batch ${batchNo}:`, binUrl + '?' + binParams.toString());
+
+        const binResponse = await fetch(`${binUrl}?${binParams.toString()}`, {
           headers: {
             'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
             'Content-Type': 'application/json'
           }
         });
 
-        if (batchResponse.ok) {
-          const batchDetail = await batchResponse.json();
-          const expiry_date = batchDetail.data?.expiry_date;
+        if (binResponse.ok) {
+          const binData = await binResponse.json();
+          console.log(`🔥 DEBUGGING: Bin response for batch ${batchNo}:`, binData);
           
-          // Check if batch is expired
-          if (expiry_date) {
-            const expiryDate = new Date(expiry_date);
-            expiryDate.setHours(23, 59, 59, 999);
-            
-            if (expiryDate < today) {
-              console.log(`🔥 Filtering out expired batch ${batchNo} - expiry: ${expiry_date}, today: ${today.toISOString().split('T')[0]}`);
-              continue;
-            }
-          }
+          if (binData.data && binData.data.length > 0) {
+            const binInfo = binData.data[0];
+            const actualQty = parseFloat(binInfo.actual_qty) || 0;
+            const reservedQty = parseFloat(binInfo.reserved_qty) || 0;
+            const availableQty = actualQty - reservedQty;
 
-          validBatches.push({
-            batch_no: batchNo,
-            qty: qty,
-            expiry_date: expiry_date
-          });
-          
-          console.log(`🔥 Including batch ${batchNo}: qty=${qty}, expiry=${expiry_date || 'No expiry'}, warehouse=${warehouse}`);
+            console.log(`🔥 DEBUGGING: Batch ${batchNo} - actual: ${actualQty}, reserved: ${reservedQty}, available: ${availableQty}`);
+
+            if (availableQty > 0) {
+              validBatches.push({
+                batch_no: batchNo,
+                qty: availableQty,
+                expiry_date: expiry_date
+              });
+              console.log(`🔥 DEBUGGING: ✅ Including batch ${batchNo}: qty=${availableQty}, expiry=${expiry_date || 'No expiry'}`);
+            } else {
+              console.log(`🔥 DEBUGGING: ❌ Filtering batch ${batchNo} - no available stock (${availableQty})`);
+            }
+          } else {
+            console.log(`🔥 DEBUGGING: ❌ No bin record found for batch ${batchNo} in warehouse ${warehouse}`);
+          }
         } else {
-          console.warn(`Could not fetch details for batch ${batchNo}:`, batchResponse.status);
+          console.warn(`🔥 DEBUGGING: Failed to fetch bin data for batch ${batchNo}:`, binResponse.status);
         }
       } catch (error) {
-        console.error(`Error fetching batch details for ${batchNo}:`, error);
+        console.error(`🔥 DEBUGGING: Error checking bin stock for batch ${batchNo}:`, error);
       }
     }
 
@@ -253,7 +177,7 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
       return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime();
     });
 
-    console.log(`🔥 DEBUGGING: Found ${validBatches.length} valid non-expired batches with stock in warehouse ${warehouse}:`, validBatches);
+    console.log(`🔥 DEBUGGING: FINAL RESULT - Found ${validBatches.length} valid batches:`, validBatches);
     return validBatches;
 
   } catch (error) {
