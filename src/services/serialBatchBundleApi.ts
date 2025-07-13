@@ -59,61 +59,69 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
 
     console.log(`Fetching batches for item: ${itemCode}, warehouse: ${warehouse}`);
 
-    // Use ERPNext's method to get batch-wise stock balance for the specific warehouse
-    const stockUrl = `${api.getBaseURL}/api/method/erpnext.stock.report.batch_wise_balance_history.batch_wise_balance_history.execute`;
-    
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    
-    const stockBody = {
-      filters: {
-        company: "Demo India Process", // You might need to make this dynamic
-        from_date: todayStr,
-        to_date: todayStr,
-        item_code: itemCode,
-        warehouse: warehouse
-      }
-    };
+    // Query Stock Ledger Entry to get batch quantities in the specific warehouse
+    // This mimics the SQL: SELECT batch_no, SUM(actual_qty) as qty FROM `tabStock Ledger Entry` WHERE warehouse=X AND item_code=Y GROUP BY batch_no
+    const stockLedgerUrl = `${api.getBaseURL}/api/resource/Stock Ledger Entry`;
+    const stockLedgerParams = new URLSearchParams({
+      fields: JSON.stringify(['batch_no', 'actual_qty']),
+      filters: JSON.stringify([
+        ['item_code', '=', itemCode],
+        ['warehouse', '=', warehouse],
+        ['batch_no', '!=', '']
+      ]),
+      limit_page_length: '0' // Get all records
+    });
 
-    console.log('Fetching batch-wise stock:', stockBody);
+    console.log('Fetching stock ledger entries:', stockLedgerUrl + '?' + stockLedgerParams.toString());
 
-    const stockResponse = await fetch(stockUrl, {
-      method: 'POST',
+    const stockResponse = await fetch(`${stockLedgerUrl}?${stockLedgerParams.toString()}`, {
       headers: {
         'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(stockBody)
+      }
     });
 
     if (!stockResponse.ok) {
-      console.error('Failed to fetch batch-wise stock:', stockResponse.status, stockResponse.statusText);
+      console.error('Failed to fetch stock ledger entries:', stockResponse.status, stockResponse.statusText);
       return [];
     }
 
     const stockData = await stockResponse.json();
-    console.log('Batch-wise stock response:', stockData);
+    console.log('Stock ledger response:', stockData);
 
-    if (!stockData?.message?.result || !Array.isArray(stockData.message.result)) {
-      console.warn('No batch stock data found');
+    if (!stockData?.data || !Array.isArray(stockData.data)) {
+      console.warn('No stock ledger data found');
       return [];
     }
 
-    // Parse the response and filter out expired batches and zero stock
-    const validBatches: BatchInfo[] = [];
+    // Group by batch_no and sum actual_qty to get current stock
+    const batchStockMap = new Map<string, number>();
     
-    for (const row of stockData.message.result) {
-      // ERPNext batch report returns array format: [item, item_name, description, warehouse, batch, opening_qty, in_qty, out_qty, balance_qty, uom]
-      const balance_qty = parseFloat(row[8]) || 0;
-      const batch_no = row[4];
+    for (const entry of stockData.data) {
+      const batchNo = entry.batch_no;
+      const actualQty = parseFloat(entry.actual_qty) || 0;
       
-      if (balance_qty <= 0 || !batch_no) {
+      if (batchNo) {
+        const currentQty = batchStockMap.get(batchNo) || 0;
+        batchStockMap.set(batchNo, currentQty + actualQty);
+      }
+    }
+
+    console.log('Batch stock summary:', Object.fromEntries(batchStockMap));
+
+    // Now get batch details for batches with positive stock and check expiry
+    const validBatches: BatchInfo[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for proper comparison
+    
+    for (const [batchNo, qty] of batchStockMap.entries()) {
+      if (qty <= 0) {
+        console.log(`Filtering out batch ${batchNo} - zero or negative stock: ${qty}`);
         continue;
       }
 
-      // Now get batch details including expiry date
       try {
-        const batchUrl = `${api.getBaseURL}/api/resource/Batch/${batch_no}`;
+        const batchUrl = `${api.getBaseURL}/api/resource/Batch/${batchNo}`;
         const batchResponse = await fetch(batchUrl, {
           headers: {
             'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
@@ -127,38 +135,38 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
           
           // Check if batch is expired
           if (expiry_date) {
-            // Parse expiry date (handle both YYYY-MM-DD and DD/MM/YYYY formats)
-            let expiryDate: Date;
-            if (expiry_date.includes('/')) {
-              // DD/MM/YYYY format
-              const dateParts = expiry_date.split('/');
-              const day = parseInt(dateParts[0], 10);
-              const month = parseInt(dateParts[1], 10) - 1;
-              const year = parseInt(dateParts[2], 10);
-              expiryDate = new Date(year, month, day, 23, 59, 59, 999);
-            } else {
-              // YYYY-MM-DD format
-              expiryDate = new Date(expiry_date + 'T23:59:59.999Z');
-            }
+            // Parse expiry date - ERPNext typically stores dates in YYYY-MM-DD format
+            const expiryDate = new Date(expiry_date);
+            expiryDate.setHours(23, 59, 59, 999); // Set to end of expiry day
             
-            if (expiryDate <= today) {
-              console.log(`Filtering out expired batch ${batch_no} - expiry: ${expiry_date}, today: ${todayStr}`);
+            if (expiryDate < today) {
+              console.log(`Filtering out expired batch ${batchNo} - expiry: ${expiry_date}, today: ${today.toISOString().split('T')[0]}`);
               continue;
             }
           }
 
           validBatches.push({
-            batch_no: batch_no,
-            qty: balance_qty,
+            batch_no: batchNo,
+            qty: qty,
             expiry_date: expiry_date
           });
           
-          console.log(`Including batch ${batch_no}: qty=${balance_qty}, expiry=${expiry_date || 'No expiry'}, warehouse=${warehouse}`);
+          console.log(`Including batch ${batchNo}: qty=${qty}, expiry=${expiry_date || 'No expiry'}, warehouse=${warehouse}`);
+        } else {
+          console.warn(`Could not fetch details for batch ${batchNo}:`, batchResponse.status);
         }
       } catch (error) {
-        console.error(`Error fetching batch details for ${batch_no}:`, error);
+        console.error(`Error fetching batch details for ${batchNo}:`, error);
       }
     }
+
+    // Sort by expiry date (earliest first)
+    validBatches.sort((a, b) => {
+      if (!a.expiry_date && !b.expiry_date) return 0;
+      if (!a.expiry_date) return 1;
+      if (!b.expiry_date) return -1;
+      return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime();
+    });
 
     console.log(`Found ${validBatches.length} valid non-expired batches with stock in warehouse ${warehouse}:`, validBatches);
     return validBatches;
