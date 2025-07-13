@@ -32,9 +32,10 @@ interface MaterialRequestFormProps {
   onSubmit?: (data: any) => void;
   onCancel?: () => void;
   purpose?: string;
+  editData?: any; // Add editData prop for editing existing requests
 }
 
-const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" }: MaterialRequestFormProps) => {
+const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase", editData }: MaterialRequestFormProps) => {
   const [formData, setFormData] = useState({
     material_request_type: purpose,
     company: '',
@@ -50,6 +51,42 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    // Load edit data if provided
+    if (editData) {
+      setFormData({
+        material_request_type: editData.material_request_type || purpose,
+        company: editData.company || '',
+        set_warehouse: editData.set_warehouse || ''
+      });
+      
+      if (editData.items && editData.items.length > 0) {
+        const mappedItems = editData.items.map((item: any) => ({
+          item_code: item.item_code,
+          item_name: item.item_name,
+          qty: item.qty || 0,
+          uom: item.uom || 'Nos',
+          rate: item.rate || 0,
+          amount: item.amount || 0,
+          warehouse: item.warehouse || '',
+          schedule_date: item.schedule_date || new Date().toISOString().split('T')[0],
+          description: item.description || ''
+        }));
+        setItems(mappedItems);
+      }
+      
+      // Set warehouses for transfer
+      if (editData.material_request_type === "Material Transfer") {
+        setSelectedWarehouse(editData.set_from_warehouse || '');
+      } else {
+        // For other types, use the first item's warehouse as default
+        if (editData.items && editData.items[0]) {
+          setSelectedWarehouse(editData.items[0].warehouse || '');
+        }
+      }
+    }
+  }, [editData, purpose]);
 
   const loadInitialData = async () => {
     try {
@@ -171,7 +208,8 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
       }
 
       let requestData: any = {
-        ...formData,
+        material_request_type: formData.material_request_type || purpose, // Ensure purpose is set
+        company: formData.company,
         items: items.map(item => ({
           item_code: item.item_code,
           qty: item.qty,
@@ -184,9 +222,11 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
       };
 
       // For Material Transfer, set the correct warehouse fields
-      if (purpose === "Material Transfer") {
+      if ((formData.material_request_type || purpose) === "Material Transfer") {
         requestData.set_from_warehouse = selectedWarehouse; // Source warehouse
         requestData.set_warehouse = formData.set_warehouse; // Target warehouse
+      } else {
+        requestData.set_warehouse = selectedWarehouse; // Default warehouse for other types
       }
 
       const response = await erpnextAPI.createMaterialRequest(requestData);
@@ -231,7 +271,9 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
             </Button>
           )}
           <div>
-            <h2 className="text-xl font-semibold">Create {purpose} Request</h2>
+            <h2 className="text-xl font-semibold">
+              {editData ? 'Edit' : 'Create'} {editData?.material_request_type || purpose} Request
+            </h2>
             <p className="text-sm text-gray-600">Material Request</p>
           </div>
         </div>

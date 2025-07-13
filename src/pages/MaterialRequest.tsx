@@ -72,11 +72,27 @@ const MaterialRequest = () => {
         // Calculate analytics
         setAnalytics({
           total: allRequests.length,
-          draft: allRequests.filter((mr: any) => mr.docstatus === 0 || mr.status === 'Draft').length,
-          pending: allRequests.filter((mr: any) => ['Pending', 'Submitted'].includes(mr.status) || (mr.docstatus === 1 && !mr.status)).length,
-          completed: allRequests.filter((mr: any) => ['Stopped', 'Ordered', 'Issued', 'Transferred', 'Received'].includes(mr.status)).length,
-          partial: allRequests.filter((mr: any) => mr.status === 'Partially Ordered').length,
-          cancelled: allRequests.filter((mr: any) => mr.status === 'Cancelled' || mr.docstatus === 2).length
+          draft: allRequests.filter((mr: any) => 
+            mr.docstatus === 0 || 
+            mr.status === 'Draft' || 
+            !mr.docstatus
+          ).length,
+          pending: allRequests.filter((mr: any) => 
+            mr.status === 'Pending' || 
+            mr.status === 'Submitted' || 
+            (mr.docstatus === 1 && (!mr.status || mr.status === 'Open'))
+          ).length,
+          completed: allRequests.filter((mr: any) => 
+            ['Stopped', 'Ordered', 'Issued', 'Transferred', 'Received', 'Completed'].includes(mr.status)
+          ).length,
+          partial: allRequests.filter((mr: any) => 
+            mr.status === 'Partially Ordered' || 
+            mr.status === 'Partially Received'
+          ).length,
+          cancelled: allRequests.filter((mr: any) => 
+            mr.status === 'Cancelled' || 
+            mr.docstatus === 2
+          ).length
         });
       }
     } catch (error) {
@@ -216,6 +232,7 @@ const MaterialRequest = () => {
       <div className="min-h-screen bg-gray-50 p-4 md:p-6">
         <MaterialRequestFormImproved
           purpose={selectedPurpose as any}
+          editData={editingRequest || currentDraft}
           onSubmit={handleDraftCreated}
           onCancel={handleBackToDashboard}
         />
