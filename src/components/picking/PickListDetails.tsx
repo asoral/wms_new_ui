@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Package, Play } from "lucide-react";
 import { PickList, PickListPurpose } from "../../pages/PickList";
-import { useMaterialRequestAPI } from "@/hooks/useERPNextAPI";
+import { useMaterialRequestAPI, useSalesOrderAPI } from "@/hooks/useERPNextAPI";
 import { getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,15 +20,21 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
   const [purpose, setPurpose] = useState<PickListPurpose>(pickList?.purpose || "Material Transfer");
   const [relatedDocument, setRelatedDocument] = useState(pickList?.relatedDocument || "");
   const [availableMaterialRequests, setAvailableMaterialRequests] = useState<any[]>([]);
+  const [availableSalesOrders, setAvailableSalesOrders] = useState<any[]>([]);
   const [loadingMaterialRequests, setLoadingMaterialRequests] = useState(false);
   const { getMaterialRequests, getMaterialRequest } = useMaterialRequestAPI();
+  const { getSalesOrders, getSalesOrder } = useSalesOrderAPI();
   const { toast } = useToast();
 
   const purposeOptions: PickListPurpose[] = ["Material Transfer", "Delivery", "Manufacturing"];
 
   useEffect(() => {
-    if (isCreatingNew && purpose === "Material Transfer") {
-      fetchMaterialRequests();
+    if (isCreatingNew) {
+      if (purpose === "Material Transfer") {
+        fetchMaterialRequests();
+      } else if (purpose === "Delivery") {
+        fetchSalesOrders();
+      }
     }
   }, [purpose, isCreatingNew]);
 
@@ -36,34 +42,105 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
     try {
       setLoadingMaterialRequests(true);
       const company = await getUserDefaultCompany();
+      console.log('Fetching material requests for company:', company);
       
-      // Fetch material requests of type "Material Transfer" for the company
-      const filters = [
-        ['material_request_type', '=', 'Material Transfer'],
-        ['docstatus', '=', 1], // Only submitted material requests
-        ['status', 'in', ['Pending', 'Partially Ordered']] // Only pending ones that can be picked
-      ];
+      // First, let's fetch ALL material requests to debug
+      let filters: any[] = [];
       
       if (company) {
         filters.push(['company', '=', company]);
       }
       
+      console.log('Initial filters for material requests:', filters);
+      
       const response = await getMaterialRequests(filters);
+      console.log('Raw API response for material requests:', response);
       
       if (response?.data && Array.isArray(response.data)) {
-        console.log('Fetched Material Requests:', response.data);
-        setAvailableMaterialRequests(response.data);
+        console.log('All Material Requests from API:', response.data);
+        console.log('Number of material requests found:', response.data.length);
+        
+        // Filter for Material Transfer type
+        const transferRequests = response.data.filter((mr: any) => {
+          console.log(`Material Request ${mr.name}:`, {
+            type: mr.material_request_type,
+            status: mr.status,
+            docstatus: mr.docstatus,
+            company: mr.company
+          });
+          return mr.material_request_type === 'Material Transfer';
+        });
+        
+        console.log('Material Transfer requests:', transferRequests);
+        setAvailableMaterialRequests(transferRequests);
         
         // Auto-select the first one if available
-        if (response.data.length > 0 && !relatedDocument) {
-          setRelatedDocument(response.data[0].name);
+        if (transferRequests.length > 0 && !relatedDocument) {
+          setRelatedDocument(transferRequests[0].name);
         }
+      } else {
+        console.log('No data returned from API or data is not an array:', response);
+        setAvailableMaterialRequests([]);
       }
     } catch (error) {
       console.error('Error fetching material requests:', error);
       toast({
         title: "Error",
         description: "Failed to fetch material requests",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingMaterialRequests(false);
+    }
+  };
+
+  const fetchSalesOrders = async () => {
+    try {
+      setLoadingMaterialRequests(true);
+      const company = await getUserDefaultCompany();
+      console.log('Fetching sales orders for company:', company);
+      
+      let filters: any[] = [];
+      
+      if (company) {
+        filters.push(['company', '=', company]);
+      }
+      
+      console.log('Initial filters for sales orders:', filters);
+      
+      const response = await getSalesOrders(filters);
+      console.log('Raw API response for sales orders:', response);
+      
+      if (response?.data && Array.isArray(response.data)) {
+        console.log('All Sales Orders from API:', response.data);
+        console.log('Number of sales orders found:', response.data.length);
+        
+        // Filter for orders that can be picked
+        const deliverableOrders = response.data.filter((so: any) => {
+          console.log(`Sales Order ${so.name}:`, {
+            status: so.status,
+            docstatus: so.docstatus,
+            company: so.company
+          });
+          return so.status === 'To Deliver' || so.status === 'To Bill';
+        });
+        
+        console.log('Deliverable sales orders:', deliverableOrders);
+        setAvailableSalesOrders(deliverableOrders);
+        
+        // Auto-select the first one if available
+        if (deliverableOrders.length > 0 && !relatedDocument) {
+          setRelatedDocument(deliverableOrders[0].name);
+        }
+      } else {
+        console.log('No sales orders returned from API or data is not an array:', response);
+        setAvailableSalesOrders([]);
+      }
+    } catch (error) {
+      console.error('Error fetching sales orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch sales orders",
         variant: "destructive"
       });
     } finally {
@@ -86,62 +163,130 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
 
   const handleStartPicking = async () => {
     if (isCreatingNew) {
-      // Fetch items from the selected material request
-      try {
-        const materialRequestResponse = await getMaterialRequest(relatedDocument);
-        
-        if (materialRequestResponse?.data) {
-          const mrData: any = materialRequestResponse.data;
-          console.log('Material Request Data:', mrData);
+      if (purpose === "Material Transfer" && relatedDocument) {
+        // Fetch items from the selected material request
+        try {
+          const materialRequestResponse = await getMaterialRequest(relatedDocument);
           
-          // Convert material request items to pick list items
-          const items = Array.isArray(mrData.items) ? mrData.items.map((item: any, index: number) => ({
-            id: (index + 1).toString(),
-            item_code: item.item_code,
-            code: item.item_code,
-            item_name: item.item_name,
-            name: item.item_name,
-            warehouse: item.warehouse,
-            bin: item.warehouse, // Use warehouse as bin for now
-            batch_no: item.batch_no,
-            batch: item.batch_no,
-            serial_no: item.serial_no,
-            serial: item.serial_no,
-            qty: item.qty,
-            requiredQty: item.qty,
-            picked_qty: 0,
-            pickedQty: 0,
-            status: "pending"
-          })) : [];
+          if (materialRequestResponse?.data) {
+            const mrData: any = materialRequestResponse.data;
+            console.log('Material Request Data:', mrData);
+            
+            // Convert material request items to pick list items
+            const items = Array.isArray(mrData.items) ? mrData.items.map((item: any, index: number) => ({
+              id: (index + 1).toString(),
+              item_code: item.item_code,
+              code: item.item_code,
+              item_name: item.item_name,
+              name: item.item_name,
+              warehouse: item.warehouse,
+              bin: item.warehouse, // Use warehouse as bin for now
+              batch_no: item.batch_no,
+              batch: item.batch_no,
+              serial_no: item.serial_no,
+              serial: item.serial_no,
+              qty: item.qty,
+              requiredQty: item.qty,
+              picked_qty: 0,
+              pickedQty: 0,
+              status: "pending"
+            })) : [];
 
-          const newPickList: PickList = {
-            name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
-            number: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
-            purpose,
-            relatedDocument,
-            status: "Draft",
-            company: (mrData as any).company || "Default Company",
-            docstatus: 0,
-            creation: new Date().toISOString(),
-            createdDate: new Date().toISOString(),
-            owner: "Administrator",
-            items
-          };
-          
-          console.log('New Pick List with real items:', newPickList);
-          onStartPicking(newPickList);
-        } else {
+            const newPickList: PickList = {
+              name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
+              number: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
+              purpose,
+              relatedDocument,
+              status: "Draft",
+              company: (mrData as any).company || "Default Company",
+              docstatus: 0,
+              creation: new Date().toISOString(),
+              createdDate: new Date().toISOString(),
+              owner: "Administrator",
+              items
+            };
+            
+            console.log('New Pick List with real items:', newPickList);
+            onStartPicking(newPickList);
+          } else {
+            toast({
+              title: "Error",
+              description: "Failed to fetch material request items",
+              variant: "destructive"
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching material request items:', error);
           toast({
             title: "Error",
             description: "Failed to fetch material request items",
             variant: "destructive"
           });
         }
-      } catch (error) {
-        console.error('Error fetching material request items:', error);
+      } else if (purpose === "Delivery" && relatedDocument) {
+        // Fetch items from the selected sales order
+        try {
+          const salesOrderResponse = await getSalesOrder(relatedDocument);
+          
+          if (salesOrderResponse?.data) {
+            const soData: any = salesOrderResponse.data;
+            console.log('Sales Order Data:', soData);
+            
+            // Convert sales order items to pick list items
+            const items = Array.isArray(soData.items) ? soData.items.map((item: any, index: number) => ({
+              id: (index + 1).toString(),
+              item_code: item.item_code,
+              code: item.item_code,
+              item_name: item.item_name,
+              name: item.item_name,
+              warehouse: item.warehouse,
+              bin: item.warehouse,
+              batch_no: item.batch_no,
+              batch: item.batch_no,
+              serial_no: item.serial_no,
+              serial: item.serial_no,
+              qty: item.qty,
+              requiredQty: item.qty,
+              picked_qty: 0,
+              pickedQty: 0,
+              status: "pending"
+            })) : [];
+
+            const newPickList: PickList = {
+              name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
+              number: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
+              purpose,
+              relatedDocument,
+              status: "Draft",
+              company: (soData as any).company || "Default Company",
+              docstatus: 0,
+              creation: new Date().toISOString(),
+              createdDate: new Date().toISOString(),
+              owner: "Administrator",
+              items
+            };
+            
+            console.log('New Pick List with real SO items:', newPickList);
+            onStartPicking(newPickList);
+          } else {
+            toast({
+              title: "Error",
+              description: "Failed to fetch sales order items",
+              variant: "destructive"
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching sales order items:', error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch sales order items",
+            variant: "destructive"
+          });
+        }
+      } else {
         toast({
-          title: "Error",
-          description: "Failed to fetch material request items",
+          title: "No Document Selected",
+          description: "Please select a document to create pick list from",
           variant: "destructive"
         });
       }
@@ -285,14 +430,26 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
                         {loadingMaterialRequests ? "Loading..." : "No material requests available"}
                       </SelectItem>
                     )
+                  ) : purpose === "Delivery" ? (
+                    availableSalesOrders.length > 0 ? (
+                      availableSalesOrders.map((so) => (
+                        <SelectItem key={so.name} value={so.name}>
+                          {so.name} - {so.customer_name || so.customer}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-data" disabled>
+                        {loadingMaterialRequests ? "Loading..." : "No sales orders available"}
+                      </SelectItem>
+                    )
                   ) : (
                     <SelectItem value="not-implemented" disabled>
-                      {purpose} selection not implemented yet
+                      {purpose} selection coming soon
                     </SelectItem>
                   )
                 ) : (
-                  <SelectItem value={pickList?.relatedDocument || "MAT-MR-2025-00005"}>
-                    {pickList?.relatedDocument || "MAT-MR-2025-00005"}
+                  <SelectItem value={pickList?.relatedDocument || ""}>
+                    {pickList?.relatedDocument || ""}
                   </SelectItem>
                 )}
               </SelectContent>
@@ -305,10 +462,14 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
               <h4 className="font-medium text-blue-900 mb-2">Summary</h4>
               <div className="text-sm text-blue-800 space-y-1">
                 <p><span className="font-medium">Purpose:</span> {purpose}</p>
-                <p><span className="font-medium">{getRelatedDocumentLabel(purpose)}:</span> {relatedDocument || pickList?.relatedDocument || "MAT-MR-2025-00005"}</p>
-                {isCreatingNew && availableMaterialRequests.length > 0 && (
+                <p><span className="font-medium">{getRelatedDocumentLabel(purpose)}:</span> {relatedDocument || pickList?.relatedDocument || ""}</p>
+                {isCreatingNew && (
                   <p className="text-xs text-blue-600 mt-2">
-                    {availableMaterialRequests.length} material request(s) available for picking
+                    {purpose === "Material Transfer" 
+                      ? `${availableMaterialRequests.length} material request(s) available for picking`
+                      : purpose === "Delivery"
+                      ? `${availableSalesOrders.length} sales order(s) available for picking`
+                      : ""}
                   </p>
                 )}
               </div>
