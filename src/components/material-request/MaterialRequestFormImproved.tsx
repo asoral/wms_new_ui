@@ -229,12 +229,19 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase",
         requestData.set_warehouse = selectedWarehouse; // Default warehouse for other types
       }
 
-      const response = await erpnextAPI.createMaterialRequest(requestData);
+      let response;
+      if (editData?.name) {
+        // Update existing material request
+        response = await erpnextAPI.updateMaterialRequest(editData.name, requestData);
+      } else {
+        // Create new material request
+        response = await erpnextAPI.createMaterialRequest(requestData);
+      }
 
       if (response?.data) {
         toast({
-          title: "Draft Saved",
-          description: `Material request ${response.data.name} saved as draft.`,
+          title: editData?.name ? "Draft Updated" : "Draft Saved",
+          description: `Material request ${response.data.name || editData?.name} ${editData?.name ? 'updated' : 'saved as draft'}.`,
         });
         
         if (onSubmit) {
