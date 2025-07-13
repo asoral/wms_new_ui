@@ -229,9 +229,6 @@ const Deliver = () => {
                 // Link the bundle to the delivery note item
                 itemData.serial_and_batch_bundle = bundleResult.data.name;
                 console.log('✅ Successfully linked Serial and Batch Bundle to item:', bundleResult.data.name);
-                
-                // Also set use_serial_batch_fields for ERPNext v15+
-                itemData.use_serial_batch_fields = 1;
               } else {
                 console.error('❌ Failed to create Serial and Batch Bundle - no bundle name returned');
                 // Fallback to old batch_no method
