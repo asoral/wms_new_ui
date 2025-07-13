@@ -389,13 +389,85 @@ const Deliver = () => {
           </div>
           <DeliverDashboard
             onSelectSalesOrder={handleSelectSalesOrder}
-            onSelectDraftDelivery={(draftId) => {
-              // Handle selecting draft delivery note for continuation
-              setDraftDeliveryNote(draftId);
-              toast({
-                title: "Draft Selected",
-                description: `Draft delivery note ${draftId} selected for continuation.`,
-              });
+            onSelectDraftDelivery={async (draftId, salesOrderNumber) => {
+              try {
+                setLoading(true);
+                const erpnextAPI = await createERPNextAPI();
+                if (!erpnextAPI) return;
+
+                // Load the draft delivery note data
+                const draftResponse = await erpnextAPI.getDeliveryNote(draftId);
+                if (draftResponse?.data) {
+                  const draftData = draftResponse.data;
+                  
+                  // Load associated sales order if available
+                  if (salesOrderNumber) {
+                    const soResponse = await erpnextAPI.getSalesOrder(salesOrderNumber);
+                    if (soResponse?.data) {
+                      const soData = soResponse.data;
+                      const transformedSO: SalesOrder = {
+                        id: soData.name,
+                        name: soData.name,
+                        number: soData.name,
+                        customer: soData.customer,
+                        customer_name: soData.customer_name || soData.customer,
+                        status: soData.status,
+                        totalValue: soData.grand_total || 0,
+                        grand_total: soData.grand_total || 0,
+                        totalItems: soData.items?.length || 0,
+                        percentDelivered: soData.per_delivered || 0,
+                        items: soData.items?.map((item: any) => ({
+                          name: item.name,
+                          item_code: item.item_code,
+                          itemCode: item.item_code,
+                          item_name: item.item_name,
+                          itemName: item.item_name,
+                          qty: item.qty || 0,
+                          orderedQty: item.qty || 0,
+                          delivered_qty: item.delivered_qty || 0,
+                          deliveredQty: item.delivered_qty || 0,
+                          pending_qty: (item.qty || 0) - (item.delivered_qty || 0),
+                          pendingQty: (item.qty || 0) - (item.delivered_qty || 0),
+                          rate: item.rate || 0,
+                          stock_uom: item.uom || item.stock_uom || 'Nos',
+                          uom: item.uom || item.stock_uom || 'Nos',
+                          warehouse: item.warehouse || 'Main Store'
+                        })) || []
+                      };
+                      setSelectedSalesOrder(transformedSO);
+                    }
+                  }
+
+                  // Convert draft delivery note items to delivery entries
+                  const draftEntries: DeliveryEntry[] = draftData.items?.map((item: any) => ({
+                    itemCode: item.item_code,
+                    itemName: item.item_name,
+                    deliveredQty: item.qty,
+                    rate: item.rate,
+                    warehouse: item.warehouse,
+                    batch: item.batch_no,
+                    serial: item.serial_no
+                  })) || [];
+
+                  setDeliveryEntries(draftEntries);
+                  setDraftDeliveryNote(draftId);
+                  setCurrentStep('review'); // Go directly to review tab for draft continuation
+                  
+                  toast({
+                    title: "Draft Loaded",
+                    description: `Draft delivery note ${draftId} loaded for review and submission.`,
+                  });
+                }
+              } catch (error) {
+                console.error('Error loading draft delivery note:', error);
+                toast({
+                  title: "Error",
+                  description: "Failed to load draft delivery note",
+                  variant: "destructive"
+                });
+              } finally {
+                setLoading(false);
+              }
             }}
             shortcuts={[
               {

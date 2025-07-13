@@ -46,7 +46,8 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
     // Enhanced filters for sales orders ready for delivery
     const filters = [
       ['docstatus', '=', 1], // Submitted orders only
-      ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']] // Orders that need delivery
+      ['status', '!=', 'Closed'], // Exclude closed orders
+      ['per_delivered', '<', 100] // Orders with pending delivery
     ];
 
     if (company) {

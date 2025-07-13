@@ -11,7 +11,7 @@ import SalesOrderSelector from "./SalesOrderSelector";
 
 interface DeliverDashboardProps {
   onSelectSalesOrder: (salesOrder: any) => void;
-  onSelectDraftDelivery?: (deliveryId: string) => void;
+  onSelectDraftDelivery?: (deliveryId: string, salesOrderNumber?: string) => void;
   shortcuts?: Array<{
     label: string;
     icon: any;
@@ -321,7 +321,7 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
                   </div>
                   <div className="flex flex-col items-end space-y-2 ml-4">
                     <StatusBadge status={delivery.status || 'Draft'} />
-                    <Button size="sm" onClick={() => onSelectDraftDelivery?.(delivery.name)}>
+                    <Button size="sm" onClick={() => onSelectDraftDelivery?.(delivery.name, delivery.against_sales_order)}>
                       Continue
                     </Button>
                   </div>
