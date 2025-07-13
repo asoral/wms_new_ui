@@ -53,6 +53,7 @@ export const getAvailableSerialBatch = async (itemCode: string, warehouse: strin
 };
 
 export const fetchAvailableBatches = async (itemCode: string, warehouse: string): Promise<BatchInfo[]> => {
+  console.log('🚨🚨🚨 fetchAvailableBatches CALLED!!! itemCode:', itemCode, 'warehouse:', warehouse);
   try {
     const api = await createERPNextAPI();
     if (!api) return [];

@@ -79,6 +79,9 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
     }
 
     try {
+      console.log('🔥 ENHANCED SCANNER: START - About to fetch batches');
+      console.log('🔥 ENHANCED SCANNER: Item Code:', selectedItem.itemCode);
+      console.log('🔥 ENHANCED SCANNER: Warehouse:', warehouse);
       console.log('🔥 ENHANCED SCANNER: Fetching batches for item:', selectedItem.itemCode, 'warehouse:', warehouse);
       
       const batchData = await fetchAvailableBatches(selectedItem.itemCode, warehouse);
