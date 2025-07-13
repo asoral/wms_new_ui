@@ -57,7 +57,8 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
     const api = await createERPNextAPI();
     if (!api) return [];
 
-    console.log(`Fetching batches for item: ${itemCode}, warehouse: ${warehouse}`);
+    console.log(`🔥 DEBUGGING: Fetching batches for item: ${itemCode}, warehouse: ${warehouse}`);
+    console.log(`🔥 DEBUGGING: Using NEW Stock Ledger Entry approach`);
 
     // Query Stock Ledger Entry to get batch quantities in the specific warehouse
     // This mimics the SQL: SELECT batch_no, SUM(actual_qty) as qty FROM `tabStock Ledger Entry` WHERE warehouse=X AND item_code=Y GROUP BY batch_no
