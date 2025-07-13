@@ -3,6 +3,7 @@ import { createERPNextAPI } from './erpnextApi';
 interface BatchInfo {
   batch_no: string;
   qty: number;
+  expiry_date?: string;
 }
 
 interface SerialInfo {
@@ -56,18 +57,28 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
     const api = await createERPNextAPI();
     if (!api) return [];
 
-    const url = `${api.getBaseURL}/api/method/erpnext.stock.doctype.batch.batch.get_batch_qty`;
+    // Use frappe.client.get_list to get batch details with expiry date
+    const url = `${api.getBaseURL}/api/method/frappe.client.get_list`;
     
-    const params = new URLSearchParams({
-      item_code: itemCode,
-      warehouse: warehouse
-    });
+    const body = {
+      doctype: 'Batch',
+      fields: ['name', 'batch_id', 'expiry_date', 'disabled'],
+      filters: [
+        ['item', '=', itemCode],
+        ['disabled', '=', 0]
+      ],
+      limit_page_length: 1000
+    };
 
-    const response = await fetch(`${url}?${params}`, {
+    console.log('Fetching batches with body:', body);
+
+    const response = await fetch(url, {
+      method: 'POST',
       headers: {
         'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {
@@ -76,9 +87,55 @@ export const fetchAvailableBatches = async (itemCode: string, warehouse: string)
     }
 
     const data = await response.json();
+    console.log('Batch list response:', data);
 
-    if (data && data.message) {
-      return data.message as BatchInfo[];
+    if (data && data.message && Array.isArray(data.message)) {
+      // Now get stock balance for each batch in the specific warehouse
+      const batchStockPromises = data.message.map(async (batch: any) => {
+        try {
+          const stockUrl = `${api.getBaseURL}/api/method/erpnext.stock.utils.get_stock_balance`;
+          const stockParams = new URLSearchParams({
+            item_code: itemCode,
+            warehouse: warehouse,
+            batch_no: batch.name
+          });
+
+          const stockResponse = await fetch(`${stockUrl}?${stockParams}`, {
+            headers: {
+              'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (stockResponse.ok) {
+            const stockData = await stockResponse.json();
+            const qty = stockData.message || 0;
+            
+            return {
+              batch_no: batch.name,
+              qty: qty,
+              expiry_date: batch.expiry_date,
+              disabled: batch.disabled
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error fetching stock for batch ${batch.name}:`, error);
+          return null;
+        }
+      });
+
+      const batchStocks = await Promise.all(batchStockPromises);
+      const validBatches = batchStocks
+        .filter(batch => batch !== null && batch.qty > 0)
+        .map(batch => ({
+          batch_no: batch!.batch_no,
+          qty: batch!.qty,
+          expiry_date: batch!.expiry_date
+        }));
+
+      console.log('Valid batches with stock:', validBatches);
+      return validBatches;
     } else {
       console.warn('No batches found or invalid response');
       return [];

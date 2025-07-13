@@ -74,32 +74,46 @@ const BatchSelector = ({
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0]; // Get YYYY-MM-DD format
         
-        const processedBatches = batchData.map((batch: any) => ({
-          batch_no: batch.batch_no,
-          qty: 0,
-          available_qty: batch.qty || 0,
-          expiry_date: batch.expiry_date || null
-        }))
-        .filter((batch: BatchInfo) => {
-          // Filter out batches with no available quantity
-          if (!batch.available_qty || batch.available_qty <= 0) {
+        console.log('Processing batch data:', batchData);
+        console.log('Today is:', todayStr);
+        
+        const processedBatches = batchData
+        .filter((batch: any) => {
+          // Filter out batches with no available quantity first
+          if (!batch.qty || batch.qty <= 0) {
+            console.log(`Filtering out batch ${batch.batch_no} - no available quantity (${batch.qty})`);
             return false;
           }
           
           // Filter out expired batches
           if (batch.expiry_date) {
-            // Convert expiry date to YYYY-MM-DD format for comparison
-            const expiryStr = new Date(batch.expiry_date).toISOString().split('T')[0];
+            // Handle both date formats that might come from ERPNext
+            let expiryStr: string;
+            try {
+              const expiryDate = new Date(batch.expiry_date);
+              expiryStr = expiryDate.toISOString().split('T')[0];
+            } catch (error) {
+              // If date parsing fails, assume it's already in YYYY-MM-DD format
+              expiryStr = batch.expiry_date.split(' ')[0]; // Remove time part if present
+            }
+            
             if (expiryStr <= todayStr) {
               console.log(`Filtering out expired batch ${batch.batch_no} with expiry date ${batch.expiry_date} (${expiryStr} <= ${todayStr})`);
               return false;
             }
           }
           
+          console.log(`Including batch ${batch.batch_no} - qty: ${batch.qty}, expiry: ${batch.expiry_date || 'No expiry'}`);
           return true;
-        });
+        })
+        .map((batch: any) => ({
+          batch_no: batch.batch_no,
+          qty: 0, // Reset to 0 for selection
+          available_qty: batch.qty,
+          expiry_date: batch.expiry_date || null
+        }));
 
-        console.log('Processed batch data (excluding expired):', processedBatches);
+        console.log('Final processed batch data (excluding expired and zero qty):', processedBatches);
         setAvailableBatches(processedBatches);
         
         if (processedBatches.length === 0) {
