@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Package, Play } from "lucide-react";
 import { PickList, PickListPurpose } from "../../pages/PickList";
+import { useMaterialRequestAPI } from "@/hooks/useERPNextAPI";
+import { getUserDefaultCompany } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface PickListDetailsProps {
   pickList: PickList | null;
@@ -16,19 +19,55 @@ interface PickListDetailsProps {
 const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: PickListDetailsProps) => {
   const [purpose, setPurpose] = useState<PickListPurpose>(pickList?.purpose || "Material Transfer");
   const [relatedDocument, setRelatedDocument] = useState(pickList?.relatedDocument || "");
+  const [availableMaterialRequests, setAvailableMaterialRequests] = useState<any[]>([]);
+  const [loadingMaterialRequests, setLoadingMaterialRequests] = useState(false);
+  const { getMaterialRequests, getMaterialRequest } = useMaterialRequestAPI();
+  const { toast } = useToast();
 
   const purposeOptions: PickListPurpose[] = ["Material Transfer", "Delivery", "Manufacturing"];
-  
-  const getRelatedDocumentOptions = (purpose: PickListPurpose) => {
-    switch (purpose) {
-      case "Material Transfer":
-        return ["MAT-MR-2025-00005", "MAT-MR-2025-00006", "MAT-MR-2025-00007"];
-      case "Delivery":
-        return ["SO-2025-00012", "SO-2025-00013", "SO-2025-00014"];
-      case "Manufacturing":
-        return ["WO-2025-00003", "WO-2025-00004", "WO-2025-00005"];
-      default:
-        return [];
+
+  useEffect(() => {
+    if (isCreatingNew && purpose === "Material Transfer") {
+      fetchMaterialRequests();
+    }
+  }, [purpose, isCreatingNew]);
+
+  const fetchMaterialRequests = async () => {
+    try {
+      setLoadingMaterialRequests(true);
+      const company = await getUserDefaultCompany();
+      
+      // Fetch material requests of type "Material Transfer" for the company
+      const filters = [
+        ['material_request_type', '=', 'Material Transfer'],
+        ['docstatus', '=', 1], // Only submitted material requests
+        ['status', 'in', ['Pending', 'Partially Ordered']] // Only pending ones that can be picked
+      ];
+      
+      if (company) {
+        filters.push(['company', '=', company]);
+      }
+      
+      const response = await getMaterialRequests(filters);
+      
+      if (response?.data && Array.isArray(response.data)) {
+        console.log('Fetched Material Requests:', response.data);
+        setAvailableMaterialRequests(response.data);
+        
+        // Auto-select the first one if available
+        if (response.data.length > 0 && !relatedDocument) {
+          setRelatedDocument(response.data[0].name);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching material requests:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch material requests",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingMaterialRequests(false);
     }
   };
 
@@ -45,56 +84,67 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
     }
   };
 
-  const handleStartPicking = () => {
+  const handleStartPicking = async () => {
     if (isCreatingNew) {
-      // Create new pick list with the selected purpose and related document
-      const newPickList: PickList = {
-        name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
-        number: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
-        purpose,
-        relatedDocument,
-        status: "Draft",
-        company: "Default Company",
-        docstatus: 0,
-        creation: new Date().toISOString(),
-        createdDate: new Date().toISOString(),
-        owner: "Administrator",
-        items: [
-          {
-            id: "1",
-            item_code: "7",
-            code: "7",
-            item_name: "Finished Metal Chair",
-            name: "Finished Metal Chair",
-            warehouse: "Main Store",
-            bin: "A-001",
-            batch_no: "BATCH-001",
-            batch: "BATCH-001",
-            qty: 5,
-            requiredQty: 5,
+      // Fetch items from the selected material request
+      try {
+        const materialRequestResponse = await getMaterialRequest(relatedDocument);
+        
+        if (materialRequestResponse?.data) {
+          const mrData: any = materialRequestResponse.data;
+          console.log('Material Request Data:', mrData);
+          
+          // Convert material request items to pick list items
+          const items = Array.isArray(mrData.items) ? mrData.items.map((item: any, index: number) => ({
+            id: (index + 1).toString(),
+            item_code: item.item_code,
+            code: item.item_code,
+            item_name: item.item_name,
+            name: item.item_name,
+            warehouse: item.warehouse,
+            bin: item.warehouse, // Use warehouse as bin for now
+            batch_no: item.batch_no,
+            batch: item.batch_no,
+            serial_no: item.serial_no,
+            serial: item.serial_no,
+            qty: item.qty,
+            requiredQty: item.qty,
             picked_qty: 0,
             pickedQty: 0,
             status: "pending"
-          },
-          {
-            id: "2",
-            item_code: "8",
-            code: "8",
-            item_name: "Office Desk",
-            name: "Office Desk",
-            warehouse: "Main Store", 
-            bin: "B-002",
-            serial_no: "SN-12345",
-            serial: "SN-12345",
-            qty: 2,
-            requiredQty: 2,
-            picked_qty: 0,
-            pickedQty: 0,
-            status: "pending"
-          }
-        ]
-      };
-      onStartPicking(newPickList);
+          })) : [];
+
+          const newPickList: PickList = {
+            name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
+            number: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
+            purpose,
+            relatedDocument,
+            status: "Draft",
+            company: (mrData as any).company || "Default Company",
+            docstatus: 0,
+            creation: new Date().toISOString(),
+            createdDate: new Date().toISOString(),
+            owner: "Administrator",
+            items
+          };
+          
+          console.log('New Pick List with real items:', newPickList);
+          onStartPicking(newPickList);
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to fetch material request items",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching material request items:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch material request items",
+          variant: "destructive"
+        });
+      }
     } else if (pickList) {
       // Map existing pick list to proper format
       const formattedPickList: PickList = {
@@ -210,20 +260,36 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
           <div className="space-y-2">
             <Label htmlFor="relatedDocument">{getRelatedDocumentLabel(purpose)}</Label>
             <Select 
-              value={relatedDocument || (pickList?.relatedDocument || getRelatedDocumentOptions(purpose)[0] || "")} 
+              value={relatedDocument || (pickList?.relatedDocument || "")} 
               onValueChange={setRelatedDocument}
-              disabled={!isCreatingNew}
+              disabled={!isCreatingNew || loadingMaterialRequests}
             >
               <SelectTrigger>
-                <SelectValue placeholder={`Select ${getRelatedDocumentLabel(purpose).toLowerCase()}`} />
+                <SelectValue placeholder={
+                  loadingMaterialRequests 
+                    ? "Loading material requests..." 
+                    : `Select ${getRelatedDocumentLabel(purpose).toLowerCase()}`
+                } />
               </SelectTrigger>
               <SelectContent>
                 {isCreatingNew ? (
-                  getRelatedDocumentOptions(purpose).map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
+                  purpose === "Material Transfer" ? (
+                    availableMaterialRequests.length > 0 ? (
+                      availableMaterialRequests.map((mr) => (
+                        <SelectItem key={mr.name} value={mr.name}>
+                          {mr.name} - {mr.title || 'Material Transfer'}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-data" disabled>
+                        {loadingMaterialRequests ? "Loading..." : "No material requests available"}
+                      </SelectItem>
+                    )
+                  ) : (
+                    <SelectItem value="not-implemented" disabled>
+                      {purpose} selection not implemented yet
                     </SelectItem>
-                  ))
+                  )
                 ) : (
                   <SelectItem value={pickList?.relatedDocument || "MAT-MR-2025-00005"}>
                     {pickList?.relatedDocument || "MAT-MR-2025-00005"}
@@ -234,13 +300,20 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
           </div>
 
           {/* Summary */}
-          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">Summary</h4>
-            <div className="text-sm text-blue-800 space-y-1">
-              <p><span className="font-medium">Purpose:</span> {purpose}</p>
-              <p><span className="font-medium">{getRelatedDocumentLabel(purpose)}:</span> {relatedDocument || pickList?.relatedDocument || "MAT-MR-2025-00005"}</p>
+          {purpose && (relatedDocument || !isCreatingNew) && (
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+              <h4 className="font-medium text-blue-900 mb-2">Summary</h4>
+              <div className="text-sm text-blue-800 space-y-1">
+                <p><span className="font-medium">Purpose:</span> {purpose}</p>
+                <p><span className="font-medium">{getRelatedDocumentLabel(purpose)}:</span> {relatedDocument || pickList?.relatedDocument || "MAT-MR-2025-00005"}</p>
+                {isCreatingNew && availableMaterialRequests.length > 0 && (
+                  <p className="text-xs text-blue-600 mt-2">
+                    {availableMaterialRequests.length} material request(s) available for picking
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Start Picking Button */}
           <div className="flex justify-end pt-4">
