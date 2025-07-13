@@ -36,8 +36,7 @@ const SalesOrderList = () => {
       setLoading(true);
       const filters = [
         ['docstatus', '=', 1], // Only submitted orders
-        ['status', '!=', 'Closed'], // Exclude closed orders
-        ['per_delivered', '<', 100] // Orders with pending delivery
+        ['status', 'in', ['To Deliver and Bill', 'To Deliver', 'Partially Delivered']] // Include all delivery-relevant statuses
       ];
 
       const response = await erpnextAPI.callAPI(
@@ -94,6 +93,7 @@ const SalesOrderList = () => {
     const statusColors = {
       'To Deliver and Bill': 'bg-yellow-100 text-yellow-800',
       'To Deliver': 'bg-blue-100 text-blue-800',
+      'Partially Delivered': 'bg-orange-100 text-orange-800',
       'To Bill': 'bg-green-100 text-green-800',
       'Completed': 'bg-gray-100 text-gray-800',
       'Closed': 'bg-red-100 text-red-800'
