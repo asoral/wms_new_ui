@@ -56,8 +56,8 @@ const MaterialRequest = () => {
         setAnalytics({
           total: requests.length,
           draft: requests.filter((mr: any) => mr.status === 'Draft').length,
-          pending: requests.filter((mr: any) => mr.status === 'Pending').length,
-          completed: requests.filter((mr: any) => mr.status === 'Stopped').length,
+          pending: requests.filter((mr: any) => ['Pending', 'Submitted'].includes(mr.status)).length,
+          completed: requests.filter((mr: any) => ['Stopped', 'Ordered', 'Issued', 'Transferred', 'Received'].includes(mr.status)).length,
           partial: requests.filter((mr: any) => mr.status === 'Partially Ordered').length,
           cancelled: requests.filter((mr: any) => mr.status === 'Cancelled').length
         });
@@ -325,102 +325,82 @@ const MaterialRequest = () => {
           {/* Recent Material Requests */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Recent Material Requests</span>
-                <Button variant="outline" size="sm" onClick={handleViewAll}>
-                  View All
-                </Button>
-              </CardTitle>
+              <CardTitle>Recent Material Requests</CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="text-center py-4">Loading material requests...</div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Request ID</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead># Items</TableHead>
-                        <TableHead>Total Qty</TableHead>
-                        <TableHead>Required By</TableHead>
-                        <TableHead>Requested By</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {materialRequests.slice(0, 5).map((request) => (
-                        <TableRow key={request.name} className="hover:bg-muted/50">
-                          <TableCell className="font-medium">
-                            <div>
-                              <div className="font-semibold">{request.name}</div>
-                              {request.title && (
-                                <div className="text-sm text-muted-foreground">{request.title}</div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {getTypeBadge(request.material_request_type)}
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(request.status)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-1">
-                              <Package className="w-4 h-4 text-muted-foreground" />
-                              <span>{getTotalItems(request)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium">{getTotalQty(request)}</span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="w-4 h-4 text-muted-foreground" />
-                              <span>
-                                {request.schedule_date 
-                                  ? new Date(request.schedule_date).toLocaleDateString()
-                                  : 'Not set'
-                                }
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-1">
-                              <User className="w-4 h-4 text-muted-foreground" />
-                              <span>{request.requested_by || 'Not specified'}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {new Date(request.creation).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex space-x-1">
+                <div className="space-y-4">
+                  {materialRequests.slice(0, 5).map((request) => (
+                    <Card key={request.name} className="hover:bg-muted/20 transition-colors">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{request.name}</h3>
+                            <p className="text-sm text-muted-foreground">{request.title || 'Material Request'}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleViewFromList(request)}
+                              title="View"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            {request.status === 'Draft' && (
                               <Button 
                                 size="sm" 
                                 variant="outline"
-                                onClick={() => handleViewFromList(request)}
+                                onClick={() => handleEditFromList(request)}
+                                title="Edit"
                               >
-                                <Eye className="w-4 h-4" />
+                                <Edit3 className="w-4 h-4" />
                               </Button>
-                              {request.status === 'Draft' && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleEditFromList(request)}
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                </Button>
-                              )}
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Type:</span>
+                            <div className="mt-1">{getTypeBadge(request.material_request_type)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Status:</span>
+                            <div className="mt-1">{getStatusBadge(request.status)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground"># Items:</span>
+                            <div className="mt-1 font-medium">{getTotalItems(request)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Total Qty:</span>
+                            <div className="mt-1 font-medium">{getTotalQty(request)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Required By:</span>
+                            <div className="mt-1">
+                              {request.schedule_date ? new Date(request.schedule_date).toLocaleDateString() : 'Not set'}
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Requested By:</span>
+                            <div className="mt-1">{request.owner || 'Not specified'}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Created:</span>
+                            <div className="mt-1">{new Date(request.creation).toLocaleDateString()}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Company:</span>
+                            <div className="mt-1">{request.company || 'Not specified'}</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                   
                   {materialRequests.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">

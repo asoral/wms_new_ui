@@ -142,20 +142,6 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
     }));
   };
 
-  const handleAddItemRow = () => {
-    const newItem: MaterialRequestItem = {
-      item_code: '',
-      item_name: '',
-      qty: 1,
-      uom: 'Nos',
-      rate: 0,
-      amount: 0,
-      warehouse: '',
-      schedule_date: new Date().toISOString().split('T')[0],
-      description: ''
-    };
-    setItems([...items, newItem]);
-  };
 
   const handleSaveDraft = async () => {
     if (items.length === 0) {
@@ -313,13 +299,7 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
       {/* Items Section */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Items</CardTitle>
-            <Button onClick={handleAddItemRow} size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item Row
-            </Button>
-          </div>
+          <CardTitle>Items</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Item Search */}
@@ -438,10 +418,7 @@ const MaterialRequestFormImproved = ({ onSubmit, onCancel, purpose = "Purchase" 
               <div className="text-center py-8 text-gray-500">
                 <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No items added yet.</p>
-                <Button onClick={handleAddItemRow} className="mt-2">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add First Item
-                </Button>
+                <p className="text-sm mt-2">Use the search above to add items to your material request.</p>
               </div>
             )}
           </div>

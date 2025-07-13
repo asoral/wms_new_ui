@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,29 @@ interface MaterialRequestReviewProps {
 
 const MaterialRequestReview = ({ draftData, onBack, onEdit, onSubmitted }: MaterialRequestReviewProps) => {
   const [loading, setLoading] = useState(false);
+  const [companyCurrency, setCompanyCurrency] = useState('USD');
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchCompanyCurrency();
+  }, [draftData.company]);
+
+  const fetchCompanyCurrency = async () => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI || !draftData.company) return;
+
+      // Get company details using the direct API call
+      const response = await erpnextAPI.callAPI(`Company/${encodeURIComponent(draftData.company)}`, 'GET');
+      if (response?.data?.default_currency) {
+        setCompanyCurrency(response.data.default_currency);
+      }
+    } catch (error) {
+      console.error('Error fetching company currency:', error);
+      // Fallback to USD if we can't fetch company currency
+      setCompanyCurrency('USD');
+    }
+  };
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -115,7 +137,7 @@ const MaterialRequestReview = ({ draftData, onBack, onEdit, onSubmitted }: Mater
           <Card>
             <CardContent className="p-4 text-center">
               <DollarSign className="w-6 h-6 mx-auto mb-2 text-purple-600" />
-              <div className="text-2xl font-bold text-purple-600">${getTotalAmount().toFixed(2)}</div>
+              <div className="text-2xl font-bold text-purple-600">{companyCurrency} {getTotalAmount().toFixed(2)}</div>
               <div className="text-sm text-muted-foreground">Est. Amount</div>
             </CardContent>
           </Card>
@@ -223,7 +245,7 @@ const MaterialRequestReview = ({ draftData, onBack, onEdit, onSubmitted }: Mater
                     <div className="font-semibold">{item.qty} {item.uom}</div>
                     {item.rate > 0 && (
                       <div className="text-sm text-muted-foreground">
-                        @ ${item.rate} = ${(item.qty * item.rate).toFixed(2)}
+                        @ {companyCurrency} {item.rate} = {companyCurrency} {(item.qty * item.rate).toFixed(2)}
                       </div>
                     )}
                   </div>
@@ -265,7 +287,7 @@ const MaterialRequestReview = ({ draftData, onBack, onEdit, onSubmitted }: Mater
               <div className="flex justify-between items-center text-lg font-semibold">
                 <span>Total Estimated Amount:</span>
                 <Badge variant="default" className="text-lg px-3 py-1">
-                  ${getTotalAmount().toFixed(2)}
+                  {companyCurrency} {getTotalAmount().toFixed(2)}
                 </Badge>
               </div>
             </>
