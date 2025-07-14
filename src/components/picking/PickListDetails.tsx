@@ -318,18 +318,47 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       throw new Error("Pick List created but no name returned");
     }
 
-    // First call get_items to populate the items in the pick list
+    // Manually populate the pick list with items based on the purpose
     try {
-      await api.callMethod('Pick List', pickListName, 'get_items', {});
-    } catch (error) {
-      console.warn('get_items method call failed:', error);
-    }
+      if (pickListData.material_request) {
+        const materialRequestData = await api.getMaterialRequest(pickListData.material_request);
+        if (materialRequestData.data?.items?.length > 0) {
+          const locations = materialRequestData.data.items.map((item: any) => ({
+            item_code: item.item_code,
+            qty: item.qty,
+            stock_qty: item.stock_qty,
+            uom: item.uom,
+            stock_uom: item.stock_uom,
+            warehouse: item.warehouse,
+            batch_no: item.batch_no || '',
+            serial_no: item.serial_no || ''
+          }));
 
-    // Then call get_item_locations to assign warehouse locations
-    try {
-      await api.callMethod('Pick List', pickListName, 'get_item_locations', {});
+          // Update the pick list with the items
+          await api.updatePickList(pickListName, {
+            locations: locations
+          });
+        }
+      } else if (items && items.length > 0) {
+        // For delivery and other purposes, use the provided items
+        const locations = items.map((item: any) => ({
+          item_code: item.item_code,
+          qty: item.qty || item.pending_qty || 1,
+          stock_qty: item.stock_qty || item.qty || item.pending_qty || 1,
+          uom: item.uom || item.stock_uom,
+          stock_uom: item.stock_uom || item.uom,
+          warehouse: item.warehouse || '',
+          batch_no: item.batch_no || '',
+          serial_no: item.serial_no || ''
+        }));
+
+        // Update the pick list with the items
+        await api.updatePickList(pickListName, {
+          locations: locations
+        });
+      }
     } catch (error) {
-      console.warn('get_item_locations method call failed:', error);
+      console.warn('Failed to populate pick list items:', error);
     }
 
     // Fetch the updated pick list with items
