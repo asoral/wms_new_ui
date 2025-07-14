@@ -70,13 +70,35 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
         });
       }
     } else if (scannerMode === 'batch') {
+      // Validate batch matches expected batch
+      if (currentItem.batch_no && code !== currentItem.batch_no) {
+        toast({
+          title: "Batch Mismatch",
+          description: `Expected batch: ${currentItem.batch_no}, Scanned: ${code}`,
+          variant: "destructive"
+        });
+        return;
+      }
       setScannedBatch(code);
       setScanningStep('qty');
       toast({
-        title: "Batch Scanned",
-        description: `Batch ${code} scanned`,
+        title: "Batch Verified",
+        description: `Batch ${code} verified`,
       });
     } else if (scannerMode === 'serial') {
+      // Validate serial number exists in expected serials if available
+      if (currentItem.serial_no) {
+        const expectedSerials = currentItem.serial_no.split('\n').map(s => s.trim()).filter(s => s);
+        if (expectedSerials.length > 0 && !expectedSerials.includes(code)) {
+          toast({
+            title: "Serial Not Found",
+            description: `Serial ${code} not in expected list`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+      
       if (!scannedSerials.includes(code)) {
         const newSerials = [...scannedSerials, code];
         setScannedSerials(newSerials);
@@ -90,7 +112,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
         }
         
         toast({
-          title: "Serial Scanned",
+          title: "Serial Verified",
           description: `Serial ${code} added (${newSerials.length}/${currentItem.qty})`,
         });
       } else {
@@ -117,9 +139,11 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
     } else {
       toast({
         title: "Item Mismatch",
-        description: "Code does not match item code",
+        description: "Code does not match item code. Please scan correct item or skip.",
         variant: "destructive"
       });
+      // Don't allow progression with wrong item
+      return;
     }
   };
 
@@ -132,9 +156,47 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
     });
   };
 
-  const handleConfirmPick = () => {
+  const handleConfirmPick = async () => {
     const currentItem = getCurrentItem();
     const quantity = (currentItem.serial_no || currentItem.has_serial_no) ? scannedSerials.length : parseInt(scannedQty);
+
+    // Validate item verification
+    if (!isItemVerified) {
+      toast({
+        title: "Item Not Verified",
+        description: "Please verify the item first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate batch if required
+    if (currentItem.batch_no && scannedBatch !== currentItem.batch_no) {
+      toast({
+        title: "Batch Validation Failed",
+        description: `Expected: ${currentItem.batch_no}, Got: ${scannedBatch}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate serials if required
+    if (currentItem.serial_no) {
+      const expectedSerials = currentItem.serial_no.split('\n').map(s => s.trim()).filter(s => s);
+      const invalidSerials = scannedSerials.filter(s => !expectedSerials.includes(s));
+      if (invalidSerials.length > 0) {
+        toast({
+          title: "Invalid Serial Numbers",
+          description: `Remove invalid serials: ${invalidSerials.join(', ')}`,
+          variant: "destructive"
+        });
+        // Remove invalid serials
+        const validSerials = scannedSerials.filter(s => expectedSerials.includes(s));
+        setScannedSerials(validSerials);
+        setScannedQty(validSerials.length.toString());
+        return;
+      }
+    }
 
     if (!quantity || quantity <= 0) {
       toast({
@@ -154,9 +216,9 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
       return;
     }
 
-    // Update the current item
+    // Update the current item and send to ERPNext
     const updatedItems = [...items];
-    updatedItems[currentItemIndex] = {
+    const updatedItem = {
       ...currentItem,
       picked_qty: quantity,
       pickedQty: quantity,
@@ -164,6 +226,33 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
       scanned_serials: scannedSerials,
       scanned_batch: scannedBatch
     };
+    
+    // Update ERPNext with picked quantities
+    try {
+      const { createERPNextAPI } = await import("@/services/erpnextApi");
+      const erpnextAPI = await createERPNextAPI();
+      
+      if (erpnextAPI) {
+        // Update the pick list item with picked quantities
+        const updateData = {
+          locations: [{
+            ...updatedItem,
+            serial_and_batch_bundle: scannedSerials.length > 0 ? scannedSerials.join('\n') : null
+          }]
+        };
+        
+        await erpnextAPI.updatePickList(pickList.name, updateData);
+      }
+    } catch (error) {
+      console.error('Error updating pick list:', error);
+      toast({
+        title: "Update Warning",
+        description: "Item picked locally but failed to sync with ERPNext",
+        variant: "destructive"
+      });
+    }
+    
+    updatedItems[currentItemIndex] = updatedItem;
     setItems(updatedItems);
 
     toast({
@@ -171,19 +260,15 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
       description: `Successfully picked ${quantity} units`,
     });
 
-    // Check if all items are completed
-    const allCompleted = updatedItems.every(item => (item.picked_qty || 0) === item.qty);
-    
-    if (allCompleted) {
-      // Show completion state
+    // Check if this is the last item or all items are processed
+    if (currentItemIndex === items.length - 1) {
+      // Show review page
       setTimeout(() => {
         onComplete(updatedItems);
-      }, 2000);
+      }, 1000);
     } else {
-      // Move to next item if not the last one
-      if (currentItemIndex < items.length - 1) {
-        setCurrentItemIndex(currentItemIndex + 1);
-      }
+      // Move to next item
+      setCurrentItemIndex(currentItemIndex + 1);
     }
   };
 
@@ -521,9 +606,21 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
               )}
 
               <Button
-                onClick={() => setScanningStep('qty')}
+                onClick={() => {
+                  // Validate batch before proceeding
+                  if (getCurrentItem().batch_no && scannedBatch !== getCurrentItem().batch_no) {
+                    toast({
+                      title: "Batch Required",
+                      description: `Please scan the correct batch: ${getCurrentItem().batch_no}`,
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  setScanningStep('qty');
+                }}
                 size="sm"
                 className="w-full"
+                disabled={getCurrentItem().batch_no && scannedBatch !== getCurrentItem().batch_no}
               >
                 Continue to Quantity
               </Button>

@@ -284,6 +284,10 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI(`Pick List/${name}`, 'PUT', data);
   }
 
+  async submitPickList(name: string) {
+    return this.stockAPI.submitPickList(name);
+  }
+
   async getPickListItems(pickListName: string) {
     const response = await this.getPickList(pickListName);
     return response?.data?.locations || [];

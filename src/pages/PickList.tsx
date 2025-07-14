@@ -4,6 +4,7 @@ import { createERPNextAPI } from "@/services/erpnextApi";
 import PickListDashboard from "@/components/picking/PickListDashboard";
 import PickListDetails from "@/components/picking/PickListDetails";
 import PickingProcess from "@/components/picking/PickingProcess";
+import PickListReviewSubmit from "@/components/picking/PickListReviewSubmit";
 
 // Export the types that other components need
 export interface PickList {
@@ -50,13 +51,14 @@ export interface PickListItem {
 export type PickListPurpose = 'Delivery' | 'Material Transfer' | 'Material Transfer for Manufacture' | 'Manufacturing';
 export type PickListStatus = 'Draft' | 'Open' | 'Completed';
 
-type ViewState = 'dashboard' | 'details' | 'picking';
+type ViewState = 'dashboard' | 'details' | 'picking' | 'review';
 
 const PickListPage = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [selectedPickList, setSelectedPickList] = useState<PickList | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pickedItems, setPickedItems] = useState<PickListItem[]>([]);
   const { toast } = useToast();
 
   const handleCreateNew = () => {
@@ -108,13 +110,24 @@ const PickListPage = () => {
 
   const handlePickingComplete = (items: PickListItem[]) => {
     console.log('Picking completed with items:', items);
+    setPickedItems(items);
+    setCurrentView('review');
+  };
+
+  const handleEditItem = (index: number) => {
+    // Go back to picking at specific item
+    setCurrentView('picking');
+  };
+
+  const handleFinalSubmit = () => {
     toast({
-      title: "Pick List Completed",
-      description: "All items have been successfully picked.",
+      title: "Pick List Submitted",
+      description: "Pick list has been successfully submitted.",
     });
     setCurrentView('dashboard');
     setSelectedPickList(null);
     setIsCreatingNew(false);
+    setPickedItems([]);
   };
 
   if (currentView === 'dashboard') {
@@ -143,6 +156,18 @@ const PickListPage = () => {
         pickList={selectedPickList}
         onBack={handleBackToDetails}
         onComplete={handlePickingComplete}
+      />
+    );
+  }
+
+  if (currentView === 'review' && selectedPickList) {
+    return (
+      <PickListReviewSubmit
+        pickList={selectedPickList}
+        items={pickedItems}
+        onBack={() => setCurrentView('picking')}
+        onEditItem={handleEditItem}
+        onSubmit={handleFinalSubmit}
       />
     );
   }

@@ -1,69 +1,52 @@
-
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Package, ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Package, CheckCircle, Edit, AlertTriangle } from "lucide-react";
+import { PickList, PickListItem } from "../../pages/PickList";
 import { useToast } from "@/hooks/use-toast";
 
-interface ProcessedPickItem {
-  item_code: string;
-  item_name: string;
-  qty: number;
-  uom: string;
-  warehouse: string;
-  bin?: string;
-  batch_no?: string;
-  serial_no?: string;
-  scanned: boolean;
-  skipped: boolean;
-}
-
 interface PickListReviewSubmitProps {
-  pickListNumber: string;
-  processedItems: ProcessedPickItem[];
+  pickList: PickList;
+  items: PickListItem[];
   onBack: () => void;
+  onEditItem: (index: number) => void;
   onSubmit: () => void;
 }
 
-const PickListReviewSubmit = ({
-  pickListNumber,
-  processedItems,
-  onBack,
-  onSubmit
+const PickListReviewSubmit = ({ 
+  pickList, 
+  items, 
+  onBack, 
+  onEditItem, 
+  onSubmit 
 }: PickListReviewSubmitProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const pickedItems = processedItems.filter(item => !item.skipped);
-  const skippedItems = processedItems.filter(item => item.skipped);
-  const totalQuantity = pickedItems.reduce((sum, item) => sum + item.qty, 0);
-
   const handleSubmit = async () => {
-    if (pickedItems.length === 0) {
-      toast({
-        title: "No Items to Submit",
-        description: "Please pick at least one item before submitting",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsSubmitting(true);
+    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const { createERPNextAPI } = await import("@/services/erpnextApi");
+      const erpnextAPI = await createERPNextAPI();
       
-      toast({
-        title: "Pick List Submitted",
-        description: `${pickListNumber} has been submitted successfully with ${pickedItems.length} items`,
-      });
-      
-      onSubmit();
+      if (erpnextAPI) {
+        // Submit the pick list in ERPNext
+        await erpnextAPI.submitPickList(pickList.name);
+        
+        toast({
+          title: "Pick List Submitted",
+          description: "Pick list has been successfully submitted to ERPNext",
+        });
+        
+        onSubmit();
+      }
     } catch (error) {
+      console.error('Error submitting pick list:', error);
       toast({
         title: "Submission Failed",
-        description: "Failed to submit pick list. Please try again.",
+        description: "Failed to submit pick list to ERPNext",
         variant: "destructive"
       });
     } finally {
@@ -71,149 +54,197 @@ const PickListReviewSubmit = ({
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Summary Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span>Review & Submit: {pickListNumber}</span>
-            </CardTitle>
-            <Badge variant="outline" className="bg-green-50 text-green-800">
-              Ready to Submit
-            </Badge>
-          </div>
-        </CardHeader>
-      </Card>
+  const getItemStats = () => {
+    const completed = items.filter(item => item.status === "completed").length;
+    const partial = items.filter(item => item.status === "partial").length;
+    const pending = items.filter(item => !item.status || item.status === "pending").length;
+    
+    return { completed, partial, pending };
+  };
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="text-2xl font-bold text-green-600">{pickedItems.length}</div>
-            <div className="text-sm text-gray-600">Items Picked</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="text-2xl font-bold text-orange-600">{skippedItems.length}</div>
-            <div className="text-sm text-gray-600">Items Skipped</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="text-2xl font-bold text-blue-600">{totalQuantity}</div>
-            <div className="text-sm text-gray-600">Total Quantity</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {processedItems.filter(item => item.scanned && !item.skipped).length}
-            </div>
-            <div className="text-sm text-gray-600">Items Scanned</div>
-          </CardContent>
-        </Card>
+  const { completed, partial, pending } = getItemStats();
+  const canSubmit = pending === 0; // Can submit if no pending items
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header with stepper */}
+      <div className="flex items-center space-x-2 mb-6">
+        <Package className="w-6 h-6 text-blue-600" />
+        <h1 className="text-2xl font-bold">Pick List Review</h1>
       </div>
 
-      {/* Picked Items Table */}
-      {pickedItems.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Package className="w-5 h-5" />
-              <span>Picked Items ({pickedItems.length})</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left p-3">Item Code</th>
-                    <th className="text-left p-3">Item Name</th>
-                    <th className="text-left p-3">Warehouse</th>
-                    <th className="text-left p-3">Bin</th>
-                    <th className="text-left p-3">Quantity</th>
-                    <th className="text-left p-3">Batch/Serial</th>
-                    <th className="text-left p-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pickedItems.map((item, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="p-3 font-medium">{item.item_code}</td>
-                      <td className="p-3">{item.item_name}</td>
-                      <td className="p-3">{item.warehouse}</td>
-                      <td className="p-3">{item.bin || '-'}</td>
-                      <td className="p-3">{item.qty} {item.uom}</td>
-                      <td className="p-3 text-xs">
-                        {item.batch_no && <div>Batch: {item.batch_no}</div>}
-                        {item.serial_no && <div>Serial: {item.serial_no}</div>}
-                        {!item.batch_no && !item.serial_no && '-'}
-                      </td>
-                      <td className="p-3">
-                        {item.scanned ? (
-                          <Badge className="bg-green-100 text-green-800">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Scanned
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">Manual</Badge>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Progress Steps */}
+      <div className="flex items-center space-x-4 mb-6">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+            1
+          </div>
+          <span className="text-gray-400">Select</span>
+        </div>
+        <div className="w-8 h-px bg-gray-200"></div>
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+            2
+          </div>
+          <span className="text-gray-400">Details</span>
+        </div>
+        <div className="w-8 h-px bg-gray-200"></div>
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+            3
+          </div>
+          <span className="text-gray-400">Pick</span>
+        </div>
+        <div className="w-8 h-px bg-gray-200"></div>
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
+            4
+          </div>
+          <span className="text-blue-600 font-medium">Review</span>
+        </div>
+      </div>
 
-      {/* Skipped Items */}
-      {skippedItems.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-orange-600">Skipped Items ({skippedItems.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {skippedItems.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded">
-                  <div>
-                    <span className="font-medium">{item.item_code}</span> - {item.item_name}
-                  </div>
-                  <Badge variant="outline" className="bg-orange-100 text-orange-800">
-                    Skipped
-                  </Badge>
-                </div>
-              ))}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={onBack} className="flex items-center space-x-2">
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Picking</span>
+        </Button>
+        <div className="flex items-center space-x-4">
+          <span className="font-semibold">{pickList.name}</span>
+          <Badge className="bg-blue-100 text-blue-800">{items.length} Items</Badge>
+        </div>
+      </div>
+
+      {/* Summary Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Package className="w-5 h-5" />
+            <span>Pick Summary</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{completed}</div>
+              <div className="text-sm text-muted-foreground">Completed</div>
             </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">{partial}</div>
+              <div className="text-sm text-muted-foreground">Partial</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-600">{pending}</div>
+              <div className="text-sm text-muted-foreground">Pending</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Items List */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Items Review</h3>
+        {items.map((item, index) => (
+          <Card key={index} className="border-l-4 border-l-blue-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <h4 className="font-medium">{item.item_code}</h4>
+                    <Badge 
+                      className={
+                        item.status === "completed" 
+                          ? "bg-green-100 text-green-800"
+                          : item.status === "partial"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-gray-100 text-gray-800"
+                      }
+                    >
+                      {item.status || "pending"}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">{item.item_name}</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Required:</span>
+                      <span className="ml-1 font-medium">{item.qty}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Picked:</span>
+                      <span className="ml-1 font-medium text-green-600">{item.picked_qty || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Warehouse:</span>
+                      <span className="ml-1">{item.warehouse}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Bin:</span>
+                      <span className="ml-1">{item.bin || "N/A"}</span>
+                    </div>
+                  </div>
+                  {item.scanned_batch && (
+                    <div className="text-sm mt-1">
+                      <span className="text-muted-foreground">Batch:</span>
+                      <span className="ml-1">{item.scanned_batch}</span>
+                    </div>
+                  )}
+                  {item.scanned_serials && item.scanned_serials.length > 0 && (
+                    <div className="text-sm mt-1">
+                      <span className="text-muted-foreground">Serials:</span>
+                      <span className="ml-1">{item.scanned_serials.length} items</span>
+                    </div>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEditItem(index)}
+                  className="ml-4"
+                >
+                  <Edit className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Warning if can't submit */}
+      {!canSubmit && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 text-yellow-800">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="font-medium">Cannot Submit</span>
+            </div>
+            <p className="text-yellow-700 text-sm mt-1">
+              Please complete all pending items before submitting the pick list.
+            </p>
           </CardContent>
         </Card>
       )}
 
       {/* Action Buttons */}
-      <div className="flex justify-between items-center pt-6">
-        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Picking
+      <div className="flex space-x-4">
+        <Button
+          variant="outline"
+          onClick={onBack}
+          className="flex-1"
+        >
+          Continue Picking
         </Button>
-        
-        <Button 
-          onClick={handleSubmit} 
-          disabled={pickedItems.length === 0 || isSubmitting}
-          size="lg"
-          className="px-8"
+        <Button
+          onClick={handleSubmit}
+          disabled={!canSubmit || isSubmitting}
+          className="flex-1 bg-green-600 hover:bg-green-700"
         >
           {isSubmitting ? (
-            "Submitting..."
+            <>Submitting...</>
           ) : (
             <>
-              <Send className="w-4 h-4 mr-2" />
+              <CheckCircle className="w-4 h-4 mr-2" />
               Submit Pick List
             </>
           )}
