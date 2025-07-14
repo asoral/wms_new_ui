@@ -264,3 +264,75 @@ export const usePickListAPI = () => {
     deletePickList
   };
 };
+
+export const useWorkOrderAPI = () => {
+  const { callAPI, loading } = useERPNextAPI();
+
+  const getWorkOrders = useCallback(async (filters?: any, company?: string, limitPageLength?: number) => {
+    return callAPI(
+      async (api) => await api.getWorkOrders(filters, company, limitPageLength),
+      "Failed to fetch work orders"
+    );
+  }, [callAPI]);
+
+  const getWorkOrder = useCallback(async (name: string) => {
+    return callAPI(
+      async (api) => await api.getWorkOrder(name),
+      "Failed to fetch work order"
+    );
+  }, [callAPI]);
+
+  const searchWorkOrders = useCallback(async (searchTerm: string, company?: string, limitPageLength?: number) => {
+    return callAPI(
+      async (api) => await api.searchWorkOrders(searchTerm, company, limitPageLength),
+      "Failed to search work orders"
+    );
+  }, [callAPI]);
+
+  return {
+    loading,
+    getWorkOrders,
+    getWorkOrder,
+    searchWorkOrders
+  };
+};
+
+export const useCustomerAPI = () => {
+  const { callAPI, loading } = useERPNextAPI();
+
+  const getCustomers = useCallback(async (filters?: any, company?: string, limitPageLength?: number) => {
+    return callAPI(
+      async (api) => await api.getCustomers(filters, company, limitPageLength),
+      "Failed to fetch customers"
+    );
+  }, [callAPI]);
+
+  const getCustomer = useCallback(async (name: string) => {
+    return callAPI(
+      async (api) => await api.getCustomer(name),
+      "Failed to fetch customer"
+    );
+  }, [callAPI]);
+
+  const searchCustomers = useCallback(async (searchTerm: string, company?: string, limitPageLength?: number) => {
+    return callAPI(
+      async (api) => await api.searchCustomers(searchTerm, company, limitPageLength),
+      "Failed to search customers"
+    );
+  }, [callAPI]);
+
+  const getSalesOrdersForCustomer = useCallback(async (customerName: string, company?: string) => {
+    return callAPI(
+      async (api) => await api.getSalesOrdersForCustomer(customerName, company),
+      "Failed to get sales orders for customer"
+    );
+  }, [callAPI]);
+
+  return {
+    loading,
+    getCustomers,
+    getCustomer,
+    searchCustomers,
+    getSalesOrdersForCustomer
+  };
+};

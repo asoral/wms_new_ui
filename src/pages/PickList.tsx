@@ -43,7 +43,7 @@ export interface PickListItem {
   status?: string;
 }
 
-export type PickListPurpose = 'Delivery' | 'Material Transfer' | 'Material Issue' | 'Manufacturing';
+export type PickListPurpose = 'Delivery' | 'Material Transfer' | 'Material Transfer for Manufacture' | 'Manufacturing';
 export type PickListStatus = 'Draft' | 'Open' | 'Completed';
 
 type ViewState = 'dashboard' | 'details' | 'picking';

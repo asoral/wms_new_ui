@@ -5,11 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowLeft, Package, Play, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Package, Play, Check, ChevronsUpDown, Search } from "lucide-react";
 import { PickList, PickListPurpose } from "../../pages/PickList";
-import { useMaterialRequestAPI, useSalesOrderAPI } from "@/hooks/useERPNextAPI";
+import { useMaterialRequestAPI, useSalesOrderAPI, useWorkOrderAPI, useCustomerAPI } from "@/hooks/useERPNextAPI";
 import { getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface PickListDetailsProps {
   pickList: PickList | null;
@@ -21,102 +22,68 @@ interface PickListDetailsProps {
 const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: PickListDetailsProps) => {
   const [purpose, setPurpose] = useState<PickListPurpose>(pickList?.purpose || "Material Transfer");
   const [relatedDocument, setRelatedDocument] = useState(pickList?.relatedDocument || "");
+  const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [showSalesOrders, setShowSalesOrders] = useState(false);
+  const [selectedSalesOrders, setSelectedSalesOrders] = useState<string[]>([]);
+  
+  // Available options
   const [availableMaterialRequests, setAvailableMaterialRequests] = useState<any[]>([]);
+  const [availableWorkOrders, setAvailableWorkOrders] = useState<any[]>([]);
+  const [availableCustomers, setAvailableCustomers] = useState<any[]>([]);
   const [availableSalesOrders, setAvailableSalesOrders] = useState<any[]>([]);
-  const [loadingMaterialRequests, setLoadingMaterialRequests] = useState(false);
+  
+  // Loading states
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [customerOpen, setCustomerOpen] = useState(false);
+  
+  // API hooks
   const { getMaterialRequests, getMaterialRequest } = useMaterialRequestAPI();
   const { getSalesOrders, getSalesOrder } = useSalesOrderAPI();
+  const { getWorkOrders, getWorkOrder, searchWorkOrders } = useWorkOrderAPI();
+  const { searchCustomers, getSalesOrdersForCustomer } = useCustomerAPI();
   const { toast } = useToast();
 
-  const purposeOptions: PickListPurpose[] = ["Material Transfer", "Delivery", "Manufacturing"];
+  const purposeOptions: PickListPurpose[] = ["Material Transfer", "Delivery", "Material Transfer for Manufacture"];
 
   useEffect(() => {
     if (isCreatingNew) {
       if (purpose === "Material Transfer") {
         fetchMaterialRequests();
+      } else if (purpose === "Material Transfer for Manufacture") {
+        fetchWorkOrders();
       } else if (purpose === "Delivery") {
-        fetchSalesOrders();
+        fetchCustomers();
       }
     }
   }, [purpose, isCreatingNew]);
 
   const fetchMaterialRequests = async () => {
     try {
-      setLoadingMaterialRequests(true);
+      setLoading(true);
       const company = await getUserDefaultCompany();
-      console.log('Fetching material requests for company:', company);
       
-      // First, let's fetch ALL material requests to debug
-      let filters: any[] = [];
+      let filters: any[] = [
+        ['docstatus', '=', 1], // Only submitted material requests
+        ['material_request_type', '=', 'Material Transfer'] // Only transfer type
+      ];
       
       if (company) {
         filters.push(['company', '=', company]);
       }
       
-      console.log('Initial filters for material requests:', filters);
-      
       const response = await getMaterialRequests(filters);
-      console.log('Raw API response for material requests:', response);
       
-      // Check the actual structure of the response
-      console.log('Response data type:', typeof response?.data);
-      console.log('Response data:', response?.data);
-      
-      // ERPNext API typically returns data in response.data.data format
-      let materialRequests = [];
       if ((response as any)?.data?.data && Array.isArray((response as any).data.data)) {
-        materialRequests = (response as any).data.data;
-      } else if ((response as any)?.data && Array.isArray((response as any).data)) {
-        materialRequests = (response as any).data;
-      } else {
-        console.log('Unexpected response structure:', {
-          hasData: !!(response as any)?.data,
-          dataType: typeof (response as any)?.data,
-          hasNestedData: !!(response as any)?.data?.data,
-          nestedDataType: typeof (response as any)?.data?.data,
-          fullResponse: response
-        });
-      }
-      
-      if (materialRequests.length > 0) {
-        console.log('Material Requests found:', materialRequests);
-        console.log('Number of material requests found:', materialRequests.length);
-        
-        // Log the structure of the first material request to see available fields
-        console.log('First Material Request structure:', materialRequests[0]);
-        console.log('Available fields:', Object.keys(materialRequests[0]));
-        
-        // Filter for Material Transfer type - but first check what fields are available
-        const transferRequests = materialRequests.filter((mr: any) => {
-          console.log(`Material Request ${mr.name}:`, {
-            // Try different possible field names
-            material_request_type: mr.material_request_type,
-            type: mr.type,
-            purpose: mr.purpose,
-            status: mr.status,
-            workflow_state: mr.workflow_state,
-            docstatus: mr.docstatus,
-            company: mr.company,
-            // Log all fields to see what's actually available
-            allFields: mr
-          });
-          
-          // For now, include all material requests to see them in the dropdown
-          // We'll filter properly once we know the correct field names
-          return true;
-        });
-        
-        console.log('Filtered Material Transfer requests:', transferRequests);
-        setAvailableMaterialRequests(transferRequests);
-        
-        // Auto-select the first one if available
-        if (transferRequests.length > 0 && !relatedDocument) {
-          setRelatedDocument(transferRequests[0].name);
+        setAvailableMaterialRequests((response as any).data.data);
+        if ((response as any).data.data.length > 0 && !relatedDocument) {
+          setRelatedDocument((response as any).data.data[0].name);
         }
-      } else {
-        console.log('No material requests found in API response');
-        setAvailableMaterialRequests([]);
+      } else if ((response as any)?.data && Array.isArray((response as any).data)) {
+        setAvailableMaterialRequests((response as any).data);
+        if ((response as any).data.length > 0 && !relatedDocument) {
+          setRelatedDocument((response as any).data[0].name);
+        }
       }
     } catch (error) {
       console.error('Error fetching material requests:', error);
@@ -126,61 +93,107 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
         variant: "destructive"
       });
     } finally {
-      setLoadingMaterialRequests(false);
+      setLoading(false);
     }
   };
 
-  const fetchSalesOrders = async () => {
+  const fetchWorkOrders = async () => {
     try {
-      setLoadingMaterialRequests(true);
+      setLoading(true);
       const company = await getUserDefaultCompany();
-      console.log('Fetching sales orders for company:', company);
       
-      let filters: any[] = [];
+      let filters: any[] = [
+        ['docstatus', '=', 1], // Only submitted work orders
+        ['status', 'in', ['Not Started', 'In Process']] // Only orders ready for picking
+      ];
       
       if (company) {
         filters.push(['company', '=', company]);
       }
       
-      console.log('Initial filters for sales orders:', filters);
+      const response = await getWorkOrders(filters, company, 20);
       
-      const response = await getSalesOrders(filters);
-      console.log('Raw API response for sales orders:', response);
-      
-      if (response?.data && Array.isArray(response.data)) {
-        console.log('All Sales Orders from API:', response.data);
-        console.log('Number of sales orders found:', response.data.length);
-        
-        // Filter for orders that can be picked
-        const deliverableOrders = response.data.filter((so: any) => {
-          console.log(`Sales Order ${so.name}:`, {
-            status: so.status,
-            docstatus: so.docstatus,
-            company: so.company
-          });
-          return so.status === 'To Deliver' || so.status === 'To Bill';
-        });
-        
-        console.log('Deliverable sales orders:', deliverableOrders);
-        setAvailableSalesOrders(deliverableOrders);
-        
-        // Auto-select the first one if available
-        if (deliverableOrders.length > 0 && !relatedDocument) {
-          setRelatedDocument(deliverableOrders[0].name);
-        }
-      } else {
-        console.log('No sales orders returned from API or data is not an array:', response);
-        setAvailableSalesOrders([]);
+      if (response?.data?.data && Array.isArray(response.data.data)) {
+        setAvailableWorkOrders(response.data.data);
+      } else if (response?.data && Array.isArray(response.data)) {
+        setAvailableWorkOrders(response.data);
       }
     } catch (error) {
-      console.error('Error fetching sales orders:', error);
+      console.error('Error fetching work orders:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch sales orders",
+        description: "Failed to fetch work orders",
         variant: "destructive"
       });
     } finally {
-      setLoadingMaterialRequests(false);
+      setLoading(false);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      const company = await getUserDefaultCompany();
+      
+      const response = await searchCustomers("", company, 50);
+      
+      if (response?.data?.data && Array.isArray(response.data.data)) {
+        setAvailableCustomers(response.data.data);
+      } else if (response?.data && Array.isArray(response.data)) {
+        setAvailableCustomers(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch customers",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGetItems = async () => {
+    if (!selectedCustomer) {
+      toast({
+        title: "Customer Required",
+        description: "Please select a customer first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const company = await getUserDefaultCompany();
+      
+      const response = await getSalesOrdersForCustomer(selectedCustomer, company);
+      
+      if (response?.data?.data && Array.isArray(response.data.data)) {
+        setAvailableSalesOrders(response.data.data);
+      } else if (response?.data && Array.isArray(response.data)) {
+        setAvailableSalesOrders(response.data);
+      }
+      
+      setShowSalesOrders(true);
+    } catch (error) {
+      console.error('Error fetching sales orders for customer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch sales orders for customer",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSalesOrderSelection = (salesOrderName: string, checked: boolean) => {
+    if (checked) {
+      setSelectedSalesOrders(prev => [...prev, salesOrderName]);
+    } else {
+      setSelectedSalesOrders(prev => prev.filter(so => so !== salesOrderName));
     }
   };
 
@@ -189,8 +202,8 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       case "Material Transfer":
         return "Material Request";
       case "Delivery":
-        return "Sales Order";
-      case "Manufacturing":
+        return "Customer";
+      case "Material Transfer for Manufacture":
         return "Work Order";
       default:
         return "Related Document";
@@ -198,483 +211,549 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
   };
 
   const handleStartPicking = async () => {
-    if (isCreatingNew) {
+    if (!isCreatingNew) {
+      // Existing pick list - just start picking
+      onStartPicking(pickList!);
+      return;
+    }
+
+    // Create new pick list based on purpose
+    try {
+      setLoading(true);
+      
       if (purpose === "Material Transfer" && relatedDocument) {
-        // Fetch items from the selected material request and create Pick List in ERPNext
-        try {
-          const materialRequestResponse = await getMaterialRequest(relatedDocument);
-          console.log('Full Material Request Response:', materialRequestResponse);
-          
-          // Handle different response structures
-          let mrData: any = null;
-          if ((materialRequestResponse as any)?.data?.data) {
-            mrData = (materialRequestResponse as any).data.data;
-          } else if ((materialRequestResponse as any)?.data) {
-            mrData = (materialRequestResponse as any).data;
-          }
-          
-          if (mrData && mrData.items && Array.isArray(mrData.items) && mrData.items.length > 0) {
-            console.log('Processing Material Request Data:', mrData);
-            
-            // Create Pick List data structure for ERPNext
-            const pickListData = {
-              purpose: "Material Transfer",
-              material_request: relatedDocument,
-              company: mrData.company || "Default Company",
-              locations: mrData.items.map((item: any) => ({
-                item_code: item.item_code,
-                qty: item.qty || item.stock_qty || 0,
-                warehouse: item.warehouse || item.from_warehouse || mrData.set_from_warehouse
-              }))
-            };
-
-            console.log('Creating Pick List in ERPNext with data:', pickListData);
-
-            // Create Pick List in ERPNext using the API service
-            const { createERPNextAPI } = await import('@/services/erpnextApi');
-            const api = await createERPNextAPI();
-            
-            if (!api) {
-              toast({
-                title: "API Error",
-                description: "Failed to initialize ERPNext API connection",
-                variant: "destructive"
-              });
-              return;
-            }
-
-            const createdPickList = await api.createPickList(pickListData);
-            console.log('Pick List created in ERPNext:', createdPickList);
-
-            // Important: Call get_items method to populate the Pick List items after creation
-            const pickListName = createdPickList.data?.name;
-            if (pickListName) {
-              try {
-                // First, update the material_request field to trigger the onchange event
-                await api.updatePickList(pickListName, {
-                  material_request: relatedDocument
-                });
-                console.log('Updated Pick List with material request');
-                
-                // Try multiple API approaches to call get_items
-                let methodCallSuccess = false;
-                
-                // Approach 1: Direct method call
-                try {
-                  await api.callMethod('Pick List', pickListName, 'get_items', {});
-                  console.log('Called get_items method successfully');
-                  methodCallSuccess = true;
-                } catch (methodError) {
-                  console.warn('Direct get_items method call failed:', methodError);
-                }
-                
-                // Approach 2: Alternative API call if first approach fails
-                if (!methodCallSuccess) {
-                  try {
-                    const { createERPNextAPI } = await import('@/services/erpnextApi');
-                    const erpnextAPI = await createERPNextAPI();
-                    if (erpnextAPI) {
-                      const methodResponse = await fetch(`${erpnextAPI.baseURL}/api/method/frappe.client.run_doc_method`, {
-                        method: 'POST',
-                        headers: {
-                          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-                          'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                          dt: 'Pick List',
-                          dn: pickListName,
-                          method: 'get_items'
-                        })
-                      });
-                      
-                      if (methodResponse.ok) {
-                        console.log('Alternative get_items method call successful');
-                        methodCallSuccess = true;
-                      }
-                    }
-                  } catch (altError) {
-                    console.warn('Alternative method call also failed:', altError);
-                  }
-                }
-                
-              } catch (methodError) {
-                console.warn('get_items method call failed, proceeding without it:', methodError);
-              }
-              
-              // Now fetch the Pick List with populated items
-              const pickListDetails = await api.getPickList(pickListName);
-              console.log('Pick List details from ERPNext:', pickListDetails);
-              
-              const plData = pickListDetails.data?.data || pickListDetails.data;
-              
-              // Convert ERPNext Pick List to local format
-              const items = Array.isArray(plData.locations) ? plData.locations.map((item: any, index: number) => ({
-                id: (index + 1).toString(),
-                item_code: item.item_code,
-                code: item.item_code,
-                item_name: item.item_name || item.item_code,
-                name: item.item_name || item.item_code,
-                warehouse: item.warehouse,
-                bin: item.warehouse,
-                batch_no: item.batch_no || '',
-                batch: item.batch_no || '',
-                serial_no: item.serial_no || '',
-                serial: item.serial_no || '',
-                qty: item.qty || 0,
-                requiredQty: item.qty || 0,
-                picked_qty: item.picked_qty || 0,
-                pickedQty: item.picked_qty || 0,
-                status: (item.picked_qty || 0) === 0 ? "pending" : 
-                        (item.picked_qty || 0) < item.qty ? "partial" : "completed"
-              })) : [];
-
-              const newPickList: PickList = {
-                name: plData.name,
-                number: plData.name,
-                purpose: plData.purpose || "Material Transfer",
-                relatedDocument: plData.material_request || relatedDocument,
-                status: plData.status || "Draft",
-                company: plData.company || "Default Company",
-                docstatus: plData.docstatus || 0,
-                creation: plData.creation || new Date().toISOString(),
-                createdDate: plData.creation || new Date().toISOString(),
-                owner: plData.owner || "Administrator",
-                items
-              };
-              
-              console.log('Final Pick List object:', newPickList);
-              onStartPicking(newPickList);
-            } else {
-              console.error('No Pick List name in response');
-              toast({
-                title: "Error",
-                description: "Pick List created but no name returned",
-                variant: "destructive"
-              });
-            }
-          } else {
-            console.error('No items found in material request');
-            toast({
-              title: "No Items",
-              description: "The selected material request has no items to pick",
-              variant: "destructive"
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching material request items:', error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch material request items",
-            variant: "destructive"
-          });
-        }
-      } else if (purpose === "Delivery" && relatedDocument) {
-        // Fetch items from the selected sales order
-        try {
-          const salesOrderResponse = await getSalesOrder(relatedDocument);
-          
-          if (salesOrderResponse?.data) {
-            const soData: any = salesOrderResponse.data;
-            console.log('Sales Order Data:', soData);
-            
-            // Convert sales order items to pick list items
-            const items = Array.isArray(soData.items) ? soData.items.map((item: any, index: number) => ({
-              id: (index + 1).toString(),
-              item_code: item.item_code,
-              code: item.item_code,
-              item_name: item.item_name,
-              name: item.item_name,
-              warehouse: item.warehouse,
-              bin: item.warehouse,
-              batch_no: item.batch_no,
-              batch: item.batch_no,
-              serial_no: item.serial_no,
-              serial: item.serial_no,
-              qty: item.qty,
-              requiredQty: item.qty,
-              picked_qty: 0,
-              pickedQty: 0,
-              status: "pending"
-            })) : [];
-
-            const newPickList: PickList = {
-              name: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
-              number: `STO-PICK-2025-${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`,
-              purpose,
-              relatedDocument,
-              status: "Draft",
-              company: (soData as any).company || "Default Company",
-              docstatus: 0,
-              creation: new Date().toISOString(),
-              createdDate: new Date().toISOString(),
-              owner: "Administrator",
-              items
-            };
-            
-            console.log('New Pick List with real SO items:', newPickList);
-            onStartPicking(newPickList);
-          } else {
-            toast({
-              title: "Error",
-              description: "Failed to fetch sales order items",
-              variant: "destructive"
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching sales order items:', error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch sales order items",
-            variant: "destructive"
-          });
-        }
+        await createPickListFromMaterialRequest();
+      } else if (purpose === "Material Transfer for Manufacture" && relatedDocument) {
+        await createPickListFromWorkOrder();
+      } else if (purpose === "Delivery" && selectedSalesOrders.length > 0) {
+        await createPickListFromSalesOrders();
       } else {
         toast({
-          title: "No Document Selected",
-          description: "Please select a document to create pick list from",
+          title: "Selection Required",
+          description: "Please select the required documents first",
           variant: "destructive"
         });
       }
-    } else if (pickList) {
-      // Map existing pick list to proper format
-      const formattedPickList: PickList = {
-        ...pickList,
-        items: pickList.locations?.map((item, index) => ({
-          ...item,
-          id: (index + 1).toString(),
-          code: item.item_code,
-          name: item.item_name,
-          requiredQty: item.qty,
-          pickedQty: item.picked_qty || 0,
-          bin: item.warehouse,
-          batch: item.batch_no,
-          serial: item.serial_no,
-          status: (item.picked_qty || 0) === 0 ? "pending" : 
-                  (item.picked_qty || 0) < item.qty ? "partial" : "completed"
-        })) || []
-      };
-      onStartPicking(formattedPickList);
+    } catch (error) {
+      console.error('Error creating pick list:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create pick list",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const canStartPicking = purpose && (isCreatingNew ? relatedDocument : true);
+  const createPickListFromMaterialRequest = async () => {
+    const materialRequestResponse = await getMaterialRequest(relatedDocument);
+    const mrData = (materialRequestResponse as any)?.data?.data || (materialRequestResponse as any)?.data;
+    
+    if (mrData && mrData.items && Array.isArray(mrData.items)) {
+      const pickListData = {
+        purpose: "Material Transfer",
+        material_request: relatedDocument,
+        company: mrData.company || await getUserDefaultCompany()
+      };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      await createAndProcessPickList(pickListData, mrData.items);
+    }
   };
 
-  return (
-    <div className="p-6 space-y-6">
-      {/* Header with stepper */}
-      <div className="flex items-center space-x-2 mb-6">
-        <Package className="w-6 h-6 text-blue-600" />
-        <h1 className="text-2xl font-bold">Pick List</h1>
-      </div>
+  const createPickListFromWorkOrder = async () => {
+    const workOrderResponse = await getWorkOrder(relatedDocument);
+    const woData = workOrderResponse?.data?.data || workOrderResponse?.data;
+    
+    if (woData) {
+      const pickListData = {
+        purpose: "Material Transfer for Manufacture",
+        work_order: relatedDocument,
+        company: woData.company || await getUserDefaultCompany()
+      };
 
-      {/* Progress Steps - Center aligned */}
-      <div className="flex items-center justify-center space-x-4 mb-6">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
-            1
-          </div>
-          <span className="text-gray-400">Select</span>
-        </div>
-        <div className="w-8 h-px bg-gray-200"></div>
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
-            2
-          </div>
-          <span className="text-blue-600 font-medium">Details</span>
-        </div>
-        <div className="w-8 h-px bg-gray-200"></div>
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
-            3
-          </div>
-          <span className="text-gray-400">Pick</span>
-        </div>
-      </div>
+      // Work orders require calling get_items to fetch required materials
+      await createAndProcessPickList(pickListData, []);
+    }
+  };
 
-      {/* Back Button */}
-      <Button variant="ghost" onClick={onBack} className="flex items-center space-x-2">
-        <ArrowLeft className="w-4 h-4" />
-        <span>Back to Selection</span>
-      </Button>
+  const createPickListFromSalesOrders = async () => {
+    const company = await getUserDefaultCompany();
+    const pickListData = {
+      purpose: "Delivery",
+      company: company
+    };
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Package className="w-5 h-5 text-blue-600" />
-            <span>{isCreatingNew ? "Create New Pick List" : "Pick List Details"}</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {!isCreatingNew && pickList && (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-gray-600">Pick List Number:</span>
-                  <p className="text-gray-900">{pickList.number || pickList.name}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Created Date:</span>
-                  <p className="text-gray-900">{formatDate(pickList.createdDate || pickList.creation)}</p>
-                </div>
+    // Collect all items from selected sales orders
+    const allItems: any[] = [];
+    
+    for (const soName of selectedSalesOrders) {
+      const soResponse = await getSalesOrder(soName);
+      const soData = (soResponse as any)?.data?.data || (soResponse as any)?.data;
+      
+      if (soData && soData.items) {
+        allItems.push(...soData.items.map((item: any) => ({
+          ...item,
+          against_sales_order: soName
+        })));
+      }
+    }
+
+    await createAndProcessPickList(pickListData, allItems);
+  };
+
+  const createAndProcessPickList = async (pickListData: any, items: any[]) => {
+    const { createERPNextAPI } = await import('@/services/erpnextApi');
+    const api = await createERPNextAPI();
+    
+    if (!api) {
+      throw new Error("Failed to initialize ERPNext API connection");
+    }
+
+    // Create the pick list
+    const createdPickList = await api.createPickList(pickListData);
+    const pickListName = createdPickList.data?.name;
+    
+    if (!pickListName) {
+      throw new Error("Pick List created but no name returned");
+    }
+
+    // Call get_item_locations method to populate items and warehouses
+    try {
+      await api.callMethod('Pick List', pickListName, 'get_item_locations', {});
+    } catch (error) {
+      console.warn('get_item_locations method call failed:', error);
+    }
+
+    // Fetch the updated pick list with items
+    const pickListDetails = await api.getPickList(pickListName);
+    const plData = pickListDetails.data?.data || pickListDetails.data;
+    
+    // Convert to local format
+    const formattedItems = Array.isArray(plData.locations) ? plData.locations.map((item: any, index: number) => ({
+      id: (index + 1).toString(),
+      item_code: item.item_code,
+      code: item.item_code,
+      item_name: item.item_name || item.item_code,
+      name: item.item_name || item.item_code,
+      warehouse: item.warehouse,
+      bin: item.warehouse,
+      batch_no: item.batch_no || '',
+      batch: item.batch_no || '',
+      serial_no: item.serial_no || '',
+      serial: item.serial_no || '',
+      qty: item.qty || 0,
+      requiredQty: item.qty || 0,
+      picked_qty: item.picked_qty || 0,
+      pickedQty: item.picked_qty || 0,
+      status: (item.picked_qty || 0) === 0 ? "pending" : 
+              (item.picked_qty || 0) < item.qty ? "partial" : "completed"
+    })) : [];
+
+    const newPickList: PickList = {
+      name: plData.name,
+      number: plData.name,
+      purpose: plData.purpose as PickListPurpose,
+      relatedDocument: plData.material_request || plData.work_order || selectedSalesOrders.join(', '),
+      status: plData.status || "Draft",
+      company: plData.company || "Default Company",
+      docstatus: plData.docstatus || 0,
+      creation: plData.creation || new Date().toISOString(),
+      createdDate: plData.creation || new Date().toISOString(),
+      owner: plData.owner || "Administrator",
+      items: formattedItems
+    };
+    
+    onStartPicking(newPickList);
+  };
+
+  if (!isCreatingNew && pickList) {
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="outline" size="sm" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold">Pick List Details</h1>
+                <p className="text-muted-foreground">Review pick list information</p>
               </div>
             </div>
-          )}
-
-          {/* Purpose Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="purpose">Purpose</Label>
-            <Select 
-              value={purpose} 
-              onValueChange={(value: PickListPurpose) => setPurpose(value)}
-              disabled={!isCreatingNew}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select purpose" />
-              </SelectTrigger>
-              <SelectContent>
-                {purposeOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
-          {/* Related Document Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="relatedDocument">{getRelatedDocumentLabel(purpose)}</Label>
-            {isCreatingNew && purpose === "Material Transfer" ? (
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between"
-                    disabled={loadingMaterialRequests}
-                  >
-                    {relatedDocument
-                      ? availableMaterialRequests.find((mr) => mr.name === relatedDocument)?.name +
-                        " - " + (availableMaterialRequests.find((mr) => mr.name === relatedDocument)?.title || 'Material Transfer')
-                      : loadingMaterialRequests 
-                        ? "Loading material requests..." 
-                        : "Select material request..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput placeholder="Search material requests..." />
-                    <CommandList>
-                      <CommandEmpty>
-                        {loadingMaterialRequests ? "Loading..." : "No material requests found."}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {availableMaterialRequests.map((mr) => (
-                          <CommandItem
-                            key={mr.name}
-                            value={mr.name}
-                            onSelect={(currentValue) => {
-                              setRelatedDocument(currentValue === relatedDocument ? "" : currentValue);
-                              setOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                relatedDocument === mr.name ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            {mr.name} - {mr.title || 'Material Transfer'}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <Select 
-                value={relatedDocument || (pickList?.relatedDocument || "")} 
-                onValueChange={setRelatedDocument}
-                disabled={!isCreatingNew || loadingMaterialRequests}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={
-                    loadingMaterialRequests 
-                      ? "Loading..." 
-                      : `Select ${getRelatedDocumentLabel(purpose).toLowerCase()}`
-                  } />
-                </SelectTrigger>
-                <SelectContent>
-                  {isCreatingNew ? (
-                    purpose === "Delivery" ? (
-                      availableSalesOrders.length > 0 ? (
-                        availableSalesOrders.map((so) => (
-                          <SelectItem key={so.name} value={so.name}>
-                            {so.name} - {so.customer_name || so.customer}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-data" disabled>
-                          {loadingMaterialRequests ? "Loading..." : "No sales orders available"}
-                        </SelectItem>
-                      )
-                    ) : (
-                      <SelectItem value="not-implemented" disabled>
-                        {purpose} selection coming soon
-                      </SelectItem>
-                    )
-                  ) : (
-                    <SelectItem value={pickList?.relatedDocument || ""}>
-                      {pickList?.relatedDocument || ""}
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          {/* Summary */}
-          {purpose && (relatedDocument || !isCreatingNew) && (
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-2">Summary</h4>
-              <div className="text-sm text-blue-800 space-y-1">
-                <p><span className="font-medium">Purpose:</span> {purpose}</p>
-                <p><span className="font-medium">{getRelatedDocumentLabel(purpose)}:</span> {relatedDocument || pickList?.relatedDocument || ""}</p>
-                {isCreatingNew && (
-                  <p className="text-xs text-blue-600 mt-2">
-                    {purpose === "Material Transfer" 
-                      ? `${availableMaterialRequests.length} material request(s) available for picking`
-                      : purpose === "Delivery"
-                      ? `${availableSalesOrders.length} sales order(s) available for picking`
-                      : ""}
-                  </p>
-                )}
+          {/* Steps Indicator */}
+          <div className="flex items-center justify-center space-x-4 text-sm">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                <Check className="h-4 w-4" />
               </div>
+              <span className="text-primary font-medium">1. Select</span>
             </div>
-          )}
+            <div className="w-8 h-0.5 bg-primary"></div>
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-full bg-muted border-2 border-primary text-primary flex items-center justify-center">
+                2
+              </div>
+              <span className="text-primary font-medium">2. Details</span>
+            </div>
+            <div className="w-8 h-0.5 bg-muted"></div>
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
+                3
+              </div>
+              <span className="text-muted-foreground">3. Picking</span>
+            </div>
+          </div>
 
-          {/* Start Picking Button */}
-          <div className="flex justify-end pt-4">
-            <Button 
-              onClick={handleStartPicking}
-              disabled={!canStartPicking}
-              className="flex items-center space-x-2 bg-gray-800 hover:bg-gray-900"
-            >
-              <Play className="w-4 h-4" />
-              <span>Start Picking</span>
+          {/* Pick List Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Package className="h-5 w-5" />
+                <span>Pick List Information</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Pick List Number</Label>
+                  <p className="text-lg font-semibold">{pickList.name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Purpose</Label>
+                  <p className="text-lg">{pickList.purpose}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Company</Label>
+                  <p className="text-lg">{pickList.company}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Status</Label>
+                  <p className="text-lg">{pickList.status}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Related Document</Label>
+                  <p className="text-lg">{pickList.relatedDocument}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Items Count</Label>
+                  <p className="text-lg">{pickList.items?.length || 0}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-4">
+            <Button variant="outline" onClick={onBack}>
+              Cancel
+            </Button>
+            <Button onClick={handleStartPicking} disabled={loading}>
+              <Play className="h-4 w-4 mr-2" />
+              Start Picking
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" size="sm" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">New Pick List</h1>
+              <p className="text-muted-foreground">Create a new pick list</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Steps Indicator */}
+        <div className="flex items-center justify-center space-x-4 text-sm">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+              <Check className="h-4 w-4" />
+            </div>
+            <span className="text-primary font-medium">1. Select</span>
+          </div>
+          <div className="w-8 h-0.5 bg-primary"></div>
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-full bg-muted border-2 border-primary text-primary flex items-center justify-center">
+              2
+            </div>
+            <span className="text-primary font-medium">2. Details</span>
+          </div>
+          <div className="w-8 h-0.5 bg-muted"></div>
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
+              3
+            </div>
+            <span className="text-muted-foreground">3. Picking</span>
+          </div>
+        </div>
+
+        {/* Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pick List Configuration</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Purpose Selection */}
+            <div className="space-y-2">
+              <Label>Purpose</Label>
+              <Select value={purpose} onValueChange={(value) => setPurpose(value as PickListPurpose)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select purpose" />
+                </SelectTrigger>
+                <SelectContent>
+                  {purposeOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Document Selection based on Purpose */}
+            {purpose === "Material Transfer" && (
+              <div className="space-y-2">
+                <Label>Material Request</Label>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between"
+                      disabled={loading}
+                    >
+                      {relatedDocument
+                        ? availableMaterialRequests.find((mr) => mr.name === relatedDocument)?.name
+                        : "Select material request..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search material requests..." />
+                      <CommandList>
+                        <CommandEmpty>No material requests found.</CommandEmpty>
+                        <CommandGroup>
+                          {availableMaterialRequests.map((mr) => (
+                            <CommandItem
+                              key={mr.name}
+                              onSelect={() => {
+                                setRelatedDocument(mr.name);
+                                setOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  relatedDocument === mr.name ? "opacity-100" : "opacity-0"
+                                }`}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{mr.name}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  Status: {mr.status} | Items: {mr.items?.length || 0}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {purpose === "Material Transfer for Manufacture" && (
+              <div className="space-y-2">
+                <Label>Work Order</Label>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between"
+                      disabled={loading}
+                    >
+                      {relatedDocument
+                        ? availableWorkOrders.find((wo) => wo.name === relatedDocument)?.name
+                        : "Select work order..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search work orders..." />
+                      <CommandList>
+                        <CommandEmpty>No work orders found.</CommandEmpty>
+                        <CommandGroup>
+                          {availableWorkOrders.map((wo) => (
+                            <CommandItem
+                              key={wo.name}
+                              onSelect={() => {
+                                setRelatedDocument(wo.name);
+                                setOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  relatedDocument === wo.name ? "opacity-100" : "opacity-0"
+                                }`}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{wo.name}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  Item: {wo.production_item} | Qty: {wo.qty} | Status: {wo.status}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {purpose === "Delivery" && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Customer</Label>
+                  <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={customerOpen}
+                        className="w-full justify-between"
+                        disabled={loading}
+                      >
+                        {selectedCustomer
+                          ? availableCustomers.find((c) => c.name === selectedCustomer)?.customer_name || selectedCustomer
+                          : "Select customer..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Search customers..." />
+                        <CommandList>
+                          <CommandEmpty>No customers found.</CommandEmpty>
+                          <CommandGroup>
+                            {availableCustomers.map((customer) => (
+                              <CommandItem
+                                key={customer.name}
+                                onSelect={() => {
+                                  setSelectedCustomer(customer.name);
+                                  setCustomerOpen(false);
+                                  setShowSalesOrders(false);
+                                  setSelectedSalesOrders([]);
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    selectedCustomer === customer.name ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{customer.customer_name || customer.name}</span>
+                                  <span className="text-sm text-muted-foreground">{customer.name}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {selectedCustomer && (
+                  <Button onClick={handleGetItems} disabled={loading} className="w-full">
+                    <Search className="h-4 w-4 mr-2" />
+                    Get Items
+                  </Button>
+                )}
+
+                {showSalesOrders && availableSalesOrders.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Select Sales Orders</Label>
+                    <div className="border rounded-lg p-4 space-y-3 max-h-64 overflow-y-auto">
+                      {availableSalesOrders.map((so) => (
+                        <div key={so.name} className="flex items-start space-x-3">
+                          <Checkbox
+                            id={so.name}
+                            checked={selectedSalesOrders.includes(so.name)}
+                            onCheckedChange={(checked) =>
+                              handleSalesOrderSelection(so.name, checked as boolean)
+                            }
+                          />
+                          <div className="grid gap-1.5 leading-none">
+                            <label
+                              htmlFor={so.name}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                              {so.name}
+                            </label>
+                            <p className="text-xs text-muted-foreground">
+                              Customer: {so.customer_name} | Total: {so.grand_total} | Status: {so.status}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-4">
+          <Button variant="outline" onClick={onBack}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleStartPicking} 
+            disabled={loading || !canProceed()}
+          >
+            <Play className="h-4 w-4 mr-2" />
+            {loading ? "Creating..." : "Create & Start Picking"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
+
+  function canProceed(): boolean {
+    if (purpose === "Material Transfer") {
+      return !!relatedDocument;
+    } else if (purpose === "Material Transfer for Manufacture") {
+      return !!relatedDocument;
+    } else if (purpose === "Delivery") {
+      return selectedSalesOrders.length > 0;
+    }
+    return false;
+  }
 };
 
 export default PickListDetails;

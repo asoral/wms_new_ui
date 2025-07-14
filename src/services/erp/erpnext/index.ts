@@ -293,6 +293,125 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI('Pick List', 'POST', data);
   }
 
+  // Work Order methods
+  async getWorkOrders(filters?: any, company?: string, limitPageLength?: number) {
+    return this.callAPI('Work Order', 'GET', undefined, filters, limitPageLength);
+  }
+
+  async getWorkOrder(name: string) {
+    return this.callAPI(`Work Order/${name}`, 'GET');
+  }
+
+  async searchWorkOrders(searchTerm: string, company?: string, limitPageLength?: number) {
+    const filters = [];
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+    
+    const orFilters = [
+      ['name', 'like', `%${searchTerm}%`],
+      ['production_item', 'like', `%${searchTerm}%`],
+      ['item_name', 'like', `%${searchTerm}%`]
+    ];
+
+    const params = new URLSearchParams({
+      filters: JSON.stringify(filters),
+      or_filters: JSON.stringify(orFilters),
+      fields: JSON.stringify([
+        'name',
+        'production_item',
+        'item_name',
+        'qty',
+        'status',
+        'planned_start_date',
+        'company'
+      ]),
+      limit_page_length: String(limitPageLength || 20)
+    });
+
+    const response = await fetch(`${this.baseURL}/api/resource/Work Order?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search work orders: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Customer methods
+  async getCustomers(filters?: any, company?: string, limitPageLength?: number) {
+    return this.callAPI('Customer', 'GET', undefined, filters, limitPageLength);
+  }
+
+  async getCustomer(name: string) {
+    return this.callAPI(`Customer/${name}`, 'GET');
+  }
+
+  async searchCustomers(searchTerm: string, company?: string, limitPageLength?: number) {
+    const filters = [];
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+    
+    const orFilters = [
+      ['name', 'like', `%${searchTerm}%`],
+      ['customer_name', 'like', `%${searchTerm}%`]
+    ];
+
+    const params = new URLSearchParams({
+      filters: JSON.stringify(filters),
+      or_filters: JSON.stringify(orFilters),
+      fields: JSON.stringify([
+        'name',
+        'customer_name',
+        'customer_group',
+        'territory',
+        'mobile_no',
+        'email_id'
+      ]),
+      limit_page_length: String(limitPageLength || 20)
+    });
+
+    const response = await fetch(`${this.baseURL}/api/resource/Customer?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to search customers: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Get Sales Orders for Customer for Delivery Pick Lists
+  async getSalesOrdersForCustomer(customerName: string, company?: string) {
+    const filters = [
+      ['customer', '=', customerName],
+      ['docstatus', '=', 1], // Only submitted orders
+      ['status', 'in', ['To Deliver', 'To Bill']] // Only orders ready for delivery
+    ];
+    
+    if (company) {
+      filters.push(['company', '=', company]);
+    }
+
+    const fields = [
+      'name',
+      'customer',
+      'customer_name',
+      'transaction_date',
+      'delivery_date',
+      'grand_total',
+      'status',
+      'per_delivered',
+      'items'
+    ];
+
+    return this.callAPI('Sales Order', 'GET', undefined, filters, undefined, fields);
+  }
+
   // Call ERPNext server method
   async callMethod(doctype: string, docname: string, method: string, args: any = {}) {
     return this.stockAPI.callMethod(doctype, docname, method, args);
