@@ -30,7 +30,7 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
     inProgressPickLists: 0,
     completedPickLists: 0
   });
-  const { getPickLists, loading } = usePickListAPI();
+  const { getPickLists, deletePickList, loading } = usePickListAPI();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -40,11 +40,13 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
   useEffect(() => {
     // Filter pick lists based on search term
     if (searchTerm.trim() === "") {
-      setFilteredPickLists(pickLists);
+      // Show only last 5 pick lists if no search term
+      setFilteredPickLists(pickLists.slice(0, 5));
     } else {
       const filtered = pickLists.filter(pl => 
         pl.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pl.purpose?.toLowerCase().includes(searchTerm.toLowerCase())
+        pl.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pl.material_request?.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredPickLists(filtered);
     }
@@ -53,27 +55,46 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
   const fetchPickLists = async () => {
     try {
       const company = await getUserDefaultCompany();
+      console.log('Fetching pick lists for company:', company);
+      
+      // Fetch with filters for the company, ordered by creation date
       const response = await getPickLists(company ? [['company', '=', company]] : undefined);
+      console.log('Pick lists API response:', response);
       
       if (response?.data && Array.isArray(response.data)) {
-        const pickListsData = response.data.map((pl: any) => ({
+        // Sort by creation date descending (newest first)
+        const sortedData = response.data.sort((a: any, b: any) => 
+          new Date(b.creation).getTime() - new Date(a.creation).getTime()
+        );
+        
+        const pickListsData = sortedData.map((pl: any) => ({
           ...pl,
           status: pl.docstatus === 0 ? 'Draft' : pl.docstatus === 1 ? 'Open' : 'Completed'
         }));
         
+        console.log('Processed pick lists data:', pickListsData);
         setPickLists(pickListsData);
-        setFilteredPickLists(pickListsData);
         
         // Calculate analytics
         const pending = pickListsData.filter((pl: any) => pl.status === 'Draft').length;
         const inProgress = pickListsData.filter((pl: any) => pl.status === 'Open').length; 
         const completed = pickListsData.filter((pl: any) => pl.status === 'Completed').length;
         
+        console.log('Analytics:', { pending, inProgress, completed });
         setAnalytics({
           totalPickLists: pickListsData.length,
           pendingPickLists: pending,
           inProgressPickLists: inProgress,
           completedPickLists: completed
+        });
+      } else {
+        console.log('No pick lists data found in response');
+        setPickLists([]);
+        setAnalytics({
+          totalPickLists: 0,
+          pendingPickLists: 0,
+          inProgressPickLists: 0,
+          completedPickLists: 0
         });
       }
     } catch (error) {
@@ -115,45 +136,30 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         </div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
-            1
+      {/* Progress Steps - Center Aligned */}
+      <div className="flex justify-center">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
+              1
+            </div>
+            <span className="text-blue-600 font-medium">Select</span>
           </div>
-          <span className="text-blue-600 font-medium">Select</span>
-        </div>
-        <div className="w-8 h-px bg-gray-200"></div>
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
-            2
+          <div className="w-8 h-px bg-gray-200"></div>
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+              2
+            </div>
+            <span className="text-gray-400">Details</span>
           </div>
-          <span className="text-gray-400">Details</span>
-        </div>
-        <div className="w-8 h-px bg-gray-200"></div>
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
-            3
+          <div className="w-8 h-px bg-gray-200"></div>
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+              3
+            </div>
+            <span className="text-gray-400">Pick</span>
           </div>
-          <span className="text-gray-400">Pick</span>
         </div>
-      </div>
-
-      {/* Search and Create */}
-      <div className="flex items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Search pick lists..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Button onClick={onCreateNew} className="ml-4">
-          <Plus className="w-4 h-4 mr-2" />
-          Create New
-        </Button>
       </div>
 
       {/* Status Cards */}
@@ -187,6 +193,24 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         </Card>
       </div>
 
+      {/* Search - Placed above the list */}
+      <div className="flex items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search pick lists..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Button onClick={onCreateNew} className="ml-4">
+          <Plus className="w-4 h-4 mr-2" />
+          Create New
+        </Button>
+      </div>
+
+
       {/* Pick Lists */}
       <div className="space-y-4">
         {loading ? (
@@ -196,33 +220,74 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
             {searchTerm ? "No pick lists found matching your search" : "No pick lists found"}
           </div>
         ) : (
-          filteredPickLists.map((pickList) => (
-            <Card key={pickList.name} className="border-l-4 border-l-blue-500">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-3">
-                      <Package className="w-5 h-5 text-blue-600" />
-                      <h3 className="font-semibold text-lg">{pickList.name}</h3>
-                      {getStatusBadge(pickList.status)}
+          <div className="grid gap-4">
+            {!searchTerm && (
+              <p className="text-sm text-gray-500 mb-2">
+                Showing last 5 pick lists. Use search to find more.
+              </p>
+            )}
+            {filteredPickLists.map((pickList) => (
+              <Card key={pickList.name} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                        <h3 className="font-semibold text-lg">{pickList.name}</h3>
+                        {getStatusBadge(pickList.status)}
+                      </div>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p><span className="font-medium">Purpose:</span> {pickList.purpose || 'Material Transfer'}</p>
+                        <p><span className="font-medium">Company:</span> {pickList.company}</p>
+                        {pickList.material_request && (
+                          <p><span className="font-medium">Material Request:</span> {pickList.material_request}</p>
+                        )}
+                        <p><span className="font-medium">Created:</span> {formatDate(pickList.creation)}</p>
+                        {pickList.owner && (
+                          <p><span className="font-medium">Owner:</span> {pickList.owner}</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <p><span className="font-medium">Purpose:</span> {pickList.purpose || 'Material Transfer'}</p>
-                      <p><span className="font-medium">Related Document:</span> {pickList.material_request || 'MAT-MR-2025-00005'}</p>
-                      <p><span className="font-medium">Created:</span> {formatDate(pickList.creation)}</p>
+                    <div className="flex flex-col space-y-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => onSelectPickList(pickList)}
+                        disabled={loading}
+                        className="min-w-20"
+                      >
+                        {pickList.status === 'Draft' ? 'Start' : 'View'}
+                      </Button>
+                      {pickList.status === 'Draft' && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              await deletePickList(pickList.name);
+                              toast({
+                                title: "Success",
+                                description: "Pick List deleted successfully",
+                              });
+                              fetchPickLists(); // Refresh the list
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description: "Failed to delete pick list",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          className="min-w-20"
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => onSelectPickList(pickList)}
-                    disabled={loading}
-                  >
-                    View
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
     </div>

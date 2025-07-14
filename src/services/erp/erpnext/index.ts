@@ -298,6 +298,11 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.stockAPI.callMethod(doctype, docname, method, args);
   }
 
+  // Delete Pick List
+  async deletePickList(name: string) {
+    return this.stockAPI.deletePickList(name);
+  }
+
   // Quality Inspections
   async getQualityInspections(filters?: any, limitPageLength?: number) {
     return this.callAPI('Quality Inspection', 'GET', undefined, filters, limitPageLength);

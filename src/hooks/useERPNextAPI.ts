@@ -247,12 +247,20 @@ export const usePickListAPI = () => {
     );
   }, [callAPI]);
 
+  const deletePickList = useCallback((name: string) => {
+    return callAPI(
+      (api) => api.deletePickList(name),
+      "Failed to delete pick list"
+    );
+  }, [callAPI]);
+
   return {
     loading,
     getPickLists,
     getPickList,
     getPickListItems,
     createPickListFromDocument,
-    getPickListAnalytics
+    getPickListAnalytics,
+    deletePickList
   };
 };

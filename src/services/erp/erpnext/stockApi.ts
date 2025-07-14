@@ -311,4 +311,20 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
     return response.json();
   }
+
+  // Delete Pick List
+  async deletePickList(name: string): Promise<ERPNextResponse<any>> {
+    const response = await fetch(`${this.baseURL}/api/resource/Pick List/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Delete Pick List API Error:', response.status, errorText);
+      throw new Error(`Failed to delete pick list: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
 }
