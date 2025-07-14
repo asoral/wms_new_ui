@@ -289,17 +289,15 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
   // Call ERPNext server method
   async callMethod(doctype: string, docname: string, method: string, args: any = {}): Promise<ERPNextResponse<any>> {
-    const response = await fetch(`${this.baseURL}/api/method/frappe.desk.form.utils.call_link_method`, {
+    const response = await fetch(`${this.baseURL}/api/method/${doctype.toLowerCase().replace(' ', '_')}.${method}`, {
       method: 'POST',
       headers: {
         ...this.getHeaders(),
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        doctype,
-        name: docname,
-        method,
-        args: JSON.stringify(args)
+        doc: docname,
+        ...args
       })
     });
 

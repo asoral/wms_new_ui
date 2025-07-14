@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Package, Play } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ArrowLeft, Package, Play, Check, ChevronsUpDown } from "lucide-react";
 import { PickList, PickListPurpose } from "../../pages/PickList";
 import { useMaterialRequestAPI, useSalesOrderAPI } from "@/hooks/useERPNextAPI";
 import { getUserDefaultCompany } from "@/services/erpnextApi";
@@ -22,6 +24,7 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
   const [availableMaterialRequests, setAvailableMaterialRequests] = useState<any[]>([]);
   const [availableSalesOrders, setAvailableSalesOrders] = useState<any[]>([]);
   const [loadingMaterialRequests, setLoadingMaterialRequests] = useState(false);
+  const [open, setOpen] = useState(false);
   const { getMaterialRequests, getMaterialRequest } = useMaterialRequestAPI();
   const { getSalesOrders, getSalesOrder } = useSalesOrderAPI();
   const { toast } = useToast();
@@ -508,56 +511,95 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
           {/* Related Document Selection */}
           <div className="space-y-2">
             <Label htmlFor="relatedDocument">{getRelatedDocumentLabel(purpose)}</Label>
-            <Select 
-              value={relatedDocument || (pickList?.relatedDocument || "")} 
-              onValueChange={setRelatedDocument}
-              disabled={!isCreatingNew || loadingMaterialRequests}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={
-                  loadingMaterialRequests 
-                    ? "Loading material requests..." 
-                    : `Select ${getRelatedDocumentLabel(purpose).toLowerCase()}`
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {isCreatingNew ? (
-                  purpose === "Material Transfer" ? (
-                    availableMaterialRequests.length > 0 ? (
-                      availableMaterialRequests.map((mr) => (
-                        <SelectItem key={mr.name} value={mr.name}>
-                          {mr.name} - {mr.title || 'Material Transfer'}
+            {isCreatingNew && purpose === "Material Transfer" ? (
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-full justify-between"
+                    disabled={loadingMaterialRequests}
+                  >
+                    {relatedDocument
+                      ? availableMaterialRequests.find((mr) => mr.name === relatedDocument)?.name +
+                        " - " + (availableMaterialRequests.find((mr) => mr.name === relatedDocument)?.title || 'Material Transfer')
+                      : loadingMaterialRequests 
+                        ? "Loading material requests..." 
+                        : "Select material request..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search material requests..." />
+                    <CommandList>
+                      <CommandEmpty>
+                        {loadingMaterialRequests ? "Loading..." : "No material requests found."}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {availableMaterialRequests.map((mr) => (
+                          <CommandItem
+                            key={mr.name}
+                            value={mr.name}
+                            onSelect={(currentValue) => {
+                              setRelatedDocument(currentValue === relatedDocument ? "" : currentValue);
+                              setOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                relatedDocument === mr.name ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {mr.name} - {mr.title || 'Material Transfer'}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <Select 
+                value={relatedDocument || (pickList?.relatedDocument || "")} 
+                onValueChange={setRelatedDocument}
+                disabled={!isCreatingNew || loadingMaterialRequests}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    loadingMaterialRequests 
+                      ? "Loading..." 
+                      : `Select ${getRelatedDocumentLabel(purpose).toLowerCase()}`
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {isCreatingNew ? (
+                    purpose === "Delivery" ? (
+                      availableSalesOrders.length > 0 ? (
+                        availableSalesOrders.map((so) => (
+                          <SelectItem key={so.name} value={so.name}>
+                            {so.name} - {so.customer_name || so.customer}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>
+                          {loadingMaterialRequests ? "Loading..." : "No sales orders available"}
                         </SelectItem>
-                      ))
+                      )
                     ) : (
-                      <SelectItem value="no-data" disabled>
-                        {loadingMaterialRequests ? "Loading..." : "No material requests available"}
-                      </SelectItem>
-                    )
-                  ) : purpose === "Delivery" ? (
-                    availableSalesOrders.length > 0 ? (
-                      availableSalesOrders.map((so) => (
-                        <SelectItem key={so.name} value={so.name}>
-                          {so.name} - {so.customer_name || so.customer}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-data" disabled>
-                        {loadingMaterialRequests ? "Loading..." : "No sales orders available"}
+                      <SelectItem value="not-implemented" disabled>
+                        {purpose} selection coming soon
                       </SelectItem>
                     )
                   ) : (
-                    <SelectItem value="not-implemented" disabled>
-                      {purpose} selection coming soon
+                    <SelectItem value={pickList?.relatedDocument || ""}>
+                      {pickList?.relatedDocument || ""}
                     </SelectItem>
-                  )
-                ) : (
-                  <SelectItem value={pickList?.relatedDocument || ""}>
-                    {pickList?.relatedDocument || ""}
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Summary */}
