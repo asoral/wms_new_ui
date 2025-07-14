@@ -31,6 +31,8 @@ export interface PickListItem {
   warehouse: string;
   batch_no?: string;
   serial_no?: string;
+  has_batch_no?: boolean;
+  has_serial_no?: boolean;
   // Additional properties used by components
   id?: string;
   code?: string;
@@ -41,6 +43,8 @@ export interface PickListItem {
   batch?: string;
   serial?: string;
   status?: string;
+  scanned_serials?: string[];
+  scanned_batch?: string;
 }
 
 export type PickListPurpose = 'Delivery' | 'Material Transfer' | 'Material Transfer for Manufacture' | 'Manufacturing';
