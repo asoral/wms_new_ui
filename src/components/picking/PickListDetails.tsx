@@ -318,7 +318,14 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       throw new Error("Pick List created but no name returned");
     }
 
-    // Call get_item_locations method to populate items and warehouses
+    // First call get_items to populate the items in the pick list
+    try {
+      await api.callMethod('Pick List', pickListName, 'get_items', {});
+    } catch (error) {
+      console.warn('get_items method call failed:', error);
+    }
+
+    // Then call get_item_locations to assign warehouse locations
     try {
       await api.callMethod('Pick List', pickListName, 'get_item_locations', {});
     } catch (error) {
