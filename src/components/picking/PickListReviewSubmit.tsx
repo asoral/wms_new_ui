@@ -32,7 +32,19 @@ const PickListReviewSubmit = ({
       const erpnextAPI = await createERPNextAPI();
       
       if (erpnextAPI) {
-        // Submit the pick list in ERPNext
+        // First update the pick list with picked items
+        const updateData = {
+          locations: items.map(item => ({
+            ...item,
+            picked_qty: item.picked_qty,
+            batch_no: item.scanned_batch || item.batch_no,
+            serial_no: item.scanned_serials ? item.scanned_serials.join('\n') : item.serial_no
+          }))
+        };
+        
+        await erpnextAPI.updatePickList(pickList.name, updateData);
+        
+        // Then submit the pick list in ERPNext
         await erpnextAPI.submitPickList(pickList.name);
         
         toast({
@@ -74,7 +86,7 @@ const PickListReviewSubmit = ({
       </div>
 
       {/* Progress Steps */}
-      <div className="flex items-center space-x-4 mb-6">
+      <div className="flex items-center justify-center space-x-4 mb-6">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
             1
@@ -165,7 +177,7 @@ const PickListReviewSubmit = ({
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">{item.item_name}</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Required:</span>
                       <span className="ml-1 font-medium">{item.qty}</span>
@@ -176,11 +188,11 @@ const PickListReviewSubmit = ({
                     </div>
                     <div>
                       <span className="text-muted-foreground">Warehouse:</span>
-                      <span className="ml-1">{item.warehouse}</span>
+                      <span className="ml-1 text-xs">{item.warehouse}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Bin:</span>
-                      <span className="ml-1">{item.bin || "N/A"}</span>
+                      <span className="ml-1 text-xs">{item.bin || "N/A"}</span>
                     </div>
                   </div>
                   {item.scanned_batch && (
