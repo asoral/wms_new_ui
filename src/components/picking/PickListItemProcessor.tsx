@@ -158,14 +158,16 @@ const PickListItemProcessor = ({
         </Card>
       ) : (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-2xl font-bold">
-              <Package className="mr-2 h-5 w-5 inline-block align-middle" />
-              Pick List Item
-            </CardTitle>
-            <Badge variant="secondary">
-              Item {currentItemIndex + 1} of {items.length}
-            </Badge>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <CardTitle className="text-xl md:text-2xl font-bold">
+                <Package className="mr-2 h-5 w-5 inline-block align-middle" />
+                Pick List Item
+              </CardTitle>
+              <Badge variant="secondary">
+                Item {currentItemIndex + 1} of {items.length}
+              </Badge>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

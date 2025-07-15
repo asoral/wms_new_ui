@@ -170,19 +170,23 @@ const ReceiptDetail = () => {
   return (
     <div className="w-full max-w-7xl mx-auto mt-6 md:mt-8">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-2xl font-bold">
-            <FileText className="mr-2 h-5 w-5 inline-block align-middle" />
-            Purchase Receipt: {receipt.name}
-          </CardTitle>
-          <Button onClick={generateReceiptPDF}>
-            <Download className="mr-2 h-4 w-4" />
-            Generate PDF
-          </Button>
-          <Button onClick={generateExcel}>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-xl md:text-2xl font-bold truncate">
+              <FileText className="mr-2 h-5 w-5 inline-block align-middle" />
+              Purchase Receipt: {receipt.name}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button onClick={generateReceiptPDF}>
+                <Download className="mr-2 h-4 w-4" />
+                Generate PDF
+              </Button>
+              <Button onClick={generateExcel}>
             <Download className="mr-2 h-4 w-4" />
             Generate Excel
-          </Button>
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4">

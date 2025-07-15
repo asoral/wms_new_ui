@@ -342,11 +342,13 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
 
       {/* Recent Stock Entries */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Recent Stock Entries</CardTitle>
-          <Button variant="outline" onClick={onViewList}>
-            View All
-          </Button>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle>Recent Stock Entries</CardTitle>
+            <Button variant="outline" onClick={onViewList}>
+              View All
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (

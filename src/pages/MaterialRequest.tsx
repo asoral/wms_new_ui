@@ -274,30 +274,29 @@ const MaterialRequest = () => {
 
   // Dashboard view
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <Database className="w-6 h-6 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Material Request</h1>
-              <p className="text-muted-foreground">Create and manage material requests</p>
-            </div>
+    <div className="w-full max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+          <Database className="w-6 h-6 text-blue-600" />
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Material Request</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Create and manage material requests</p>
           </div>
         </div>
+      </div>
 
-        <div className="space-y-6">
-          {/* Status Checker */}
-          <MaterialRequestStatusChecker onEdit={handleEditFromList} />
+      <div className="space-y-6">
+        {/* Status Checker */}
+        <MaterialRequestStatusChecker onEdit={handleEditFromList} />
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
                 <Button
                   onClick={() => handleCreateNew("Purchase")}
                   variant="outline"
@@ -342,8 +341,8 @@ const MaterialRequest = () => {
             </CardContent>
           </Card>
 
-          {/* Dashboard Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* Dashboard Metrics */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
             <Card>
               <CardContent className="p-6 text-center">
                 <div className="text-2xl font-bold text-blue-600">{analytics.total}</div>
@@ -382,8 +381,8 @@ const MaterialRequest = () => {
             </Card>
           </div>
 
-          {/* Recent Material Requests */}
-          <Card>
+        {/* Recent Material Requests */}
+        <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle>Recent Material Requests</CardTitle>
@@ -431,7 +430,7 @@ const MaterialRequest = () => {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                           <div>
                             <span className="text-muted-foreground">Type:</span>
                             <div className="mt-1">{getTypeBadge(request.material_request_type)}</div>
@@ -482,7 +481,6 @@ const MaterialRequest = () => {
               )}
             </CardContent>
           </Card>
-        </div>
       </div>
     </div>
   );

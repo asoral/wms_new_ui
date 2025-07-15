@@ -126,75 +126,75 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-3 md:p-6 space-y-6">
       {/* Header with stepper */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Package className="w-6 h-6 text-blue-600" />
-          <h1 className="text-2xl font-bold">Pick List</h1>
+          <h1 className="text-xl md:text-2xl font-bold">Pick List</h1>
           <RefreshCw className="w-4 h-4 text-gray-400" />
         </div>
       </div>
 
       {/* Progress Steps - Center Aligned */}
       <div className="flex justify-center">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
+        <div className="flex items-center space-x-2 md:space-x-4">
+          <div className="flex items-center space-x-1 md:space-x-2">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs md:text-sm font-medium">
               1
             </div>
-            <span className="text-blue-600 font-medium">Select</span>
+            <span className="text-blue-600 font-medium text-sm md:text-base">Select</span>
           </div>
-          <div className="w-8 h-px bg-gray-200"></div>
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+          <div className="w-4 md:w-8 h-px bg-gray-200"></div>
+          <div className="flex items-center space-x-1 md:space-x-2">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-xs md:text-sm font-medium">
               2
             </div>
-            <span className="text-gray-400">Details</span>
+            <span className="text-gray-400 text-sm md:text-base">Details</span>
           </div>
-          <div className="w-8 h-px bg-gray-200"></div>
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
+          <div className="w-4 md:w-8 h-px bg-gray-200"></div>
+          <div className="flex items-center space-x-1 md:space-x-2">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-xs md:text-sm font-medium">
               3
             </div>
-            <span className="text-gray-400">Pick</span>
+            <span className="text-gray-400 text-sm md:text-base">Pick</span>
           </div>
         </div>
       </div>
 
       {/* Status Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
         <Card className="text-center">
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-center space-x-2 mb-2">
-              <Package className="w-5 h-5 text-orange-600" />
-              <span className="text-2xl font-bold">{analytics.pendingPickLists}</span>
+              <Package className="w-4 h-4 md:w-5 md:h-5 text-orange-600" />
+              <span className="text-xl md:text-2xl font-bold">{analytics.pendingPickLists}</span>
             </div>
-            <p className="text-sm text-gray-600">Pending ({analytics.pendingPickLists})</p>
+            <p className="text-xs md:text-sm text-gray-600">Pending ({analytics.pendingPickLists})</p>
           </CardContent>
         </Card>
         <Card className="text-center">
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-center space-x-2 mb-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              <span className="text-2xl font-bold">{analytics.inProgressPickLists}</span>
+              <Clock className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
+              <span className="text-xl md:text-2xl font-bold">{analytics.inProgressPickLists}</span>
             </div>
-            <p className="text-sm text-gray-600">In Progress ({analytics.inProgressPickLists})</p>
+            <p className="text-xs md:text-sm text-gray-600">In Progress ({analytics.inProgressPickLists})</p>
           </CardContent>
         </Card>
         <Card className="text-center">
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-center space-x-2 mb-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-2xl font-bold">{analytics.completedPickLists}</span>
+              <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
+              <span className="text-xl md:text-2xl font-bold">{analytics.completedPickLists}</span>
             </div>
-            <p className="text-sm text-gray-600">Completed ({analytics.completedPickLists})</p>
+            <p className="text-xs md:text-sm text-gray-600">Completed ({analytics.completedPickLists})</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Search - Placed above the list */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
@@ -204,7 +204,7 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
             className="pl-10"
           />
         </div>
-        <Button onClick={onCreateNew} className="ml-4">
+        <Button onClick={onCreateNew} className="whitespace-nowrap">
           <Plus className="w-4 h-4 mr-2" />
           Create New
         </Button>

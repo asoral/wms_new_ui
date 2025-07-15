@@ -214,16 +214,18 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
 
       {/* Recent Sales Orders */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Recent Sales Orders to Deliver</CardTitle>
-          <div className="relative w-72">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search sales orders..."
-              value={soSearchTerm}
-              onChange={(e) => setSOSearchTerm(e.target.value)}
-              className="pl-8"
-            />
+        <CardHeader className="pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle>Recent Sales Orders to Deliver</CardTitle>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search sales orders..."
+                value={soSearchTerm}
+                onChange={(e) => setSOSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -232,34 +234,36 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
           ) : (
             <div className="space-y-4">
               {filteredSOs.slice(0, 5).map((so) => (
-                <div key={so.name} className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{so.name}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Customer</p>
-                        <p className="text-sm">{getCustomerName(so)}</p>
+                <div key={so.name} className="border rounded-lg p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg truncate">{so.name}</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Customer</p>
+                          <p className="text-sm truncate">{getCustomerName(so)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                          <p className="text-sm">{getItemCount(so)} items</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Delivery Date</p>
+                          <p className="text-sm">{getSODeliveryDate(so)}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-                        <p className="text-sm">{getItemCount(so)} items</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Delivery Date</p>
-                        <p className="text-sm">{getSODeliveryDate(so)}</p>
+                      <div className="mt-2">
+                        <p className="text-sm text-muted-foreground">
+                          Total Value: <span className="font-medium">₹{getTotalValue(so).toLocaleString()}</span>
+                        </p>
                       </div>
                     </div>
-                    <div className="mt-2">
-                      <p className="text-sm text-muted-foreground">
-                        Total Value: <span className="font-medium">₹{getTotalValue(so).toLocaleString()}</span>
-                      </p>
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2">
+                      <StatusBadge status={so.status || 'Unknown'} />
+                      <Button size="sm" onClick={() => onSelectSalesOrder(so)} className="whitespace-nowrap">
+                        Deliver
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end space-y-2 ml-4">
-                    <StatusBadge status={so.status || 'Unknown'} />
-                    <Button size="sm" onClick={() => onSelectSalesOrder(so)}>
-                      Deliver
-                    </Button>
                   </div>
                 </div>
               ))}
@@ -281,49 +285,53 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
       {/* Draft Delivery Notes */}
       {draftDeliveries.length > 0 && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>Draft Delivery Notes</CardTitle>
-            <div className="relative w-72">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search draft deliveries..."
-                value={draftSearchTerm}
-                onChange={(e) => setDraftSearchTerm(e.target.value)}
-                className="pl-8"
-              />
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <CardTitle>Draft Delivery Notes</CardTitle>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search draft deliveries..."
+                  value={draftSearchTerm}
+                  onChange={(e) => setDraftSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {filteredDrafts.slice(0, 5).map((delivery) => (
-                <div key={delivery.name} className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{delivery.name}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Customer</p>
-                        <p className="text-sm">{getCustomerName(delivery)}</p>
+                <div key={delivery.name} className="border rounded-lg p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg truncate">{delivery.name}</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Customer</p>
+                          <p className="text-sm truncate">{getCustomerName(delivery)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                          <p className="text-sm">{getItemCount(delivery)} items</p>
+                        </div>
+                         <div>
+                           <p className="text-sm font-medium text-muted-foreground">Created On</p>
+                           <p className="text-sm">{getDeliveryCreatedDate(delivery)}</p>
+                         </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-                        <p className="text-sm">{getItemCount(delivery)} items</p>
+                      <div className="mt-2">
+                        <p className="text-sm text-muted-foreground">
+                          Total Value: <span className="font-medium">₹{getTotalValue(delivery).toLocaleString()}</span>
+                        </p>
                       </div>
-                       <div>
-                         <p className="text-sm font-medium text-muted-foreground">Created On</p>
-                         <p className="text-sm">{getDeliveryCreatedDate(delivery)}</p>
-                       </div>
                     </div>
-                    <div className="mt-2">
-                      <p className="text-sm text-muted-foreground">
-                        Total Value: <span className="font-medium">₹{getTotalValue(delivery).toLocaleString()}</span>
-                      </p>
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2">
+                      <StatusBadge status={delivery.status || 'Draft'} />
+                      <Button size="sm" onClick={() => onSelectDraftDelivery?.(delivery.name, delivery.against_sales_order)} className="whitespace-nowrap">
+                        Continue
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end space-y-2 ml-4">
-                    <StatusBadge status={delivery.status || 'Draft'} />
-                    <Button size="sm" onClick={() => onSelectDraftDelivery?.(delivery.name, delivery.against_sales_order)}>
-                      Continue
-                    </Button>
                   </div>
                 </div>
               ))}

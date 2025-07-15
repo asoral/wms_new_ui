@@ -211,12 +211,13 @@ const BarcodeScanner = ({
 
   const ScannerContent = () => (
     <>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-lg flex items-center">
-          <Camera className="w-5 h-5 mr-2" />
-          {title}
-        </CardTitle>
-        <div className="flex items-center space-x-2">
+      <CardHeader className="pb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <CardTitle className="text-lg flex items-center">
+            <Camera className="w-5 h-5 mr-2" />
+            {title}
+          </CardTitle>
+          <div className="flex items-center space-x-2">
           {flashSupported && (
             <Button
               variant="outline"
@@ -231,6 +232,7 @@ const BarcodeScanner = ({
           <Button variant="outline" size="sm" onClick={handleClose}>
             <X className="w-4 h-4" />
           </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
