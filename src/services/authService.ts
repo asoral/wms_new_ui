@@ -70,16 +70,8 @@ export const saveERPNextConfig = async (config: {
 
     if (error) throw error;
 
-    // Also update localStorage for backward compatibility
-    localStorage.setItem('erpnextBaseURL', config.erpnext_url);
-    localStorage.setItem('erpnextApiKey', config.erpnext_api_key);
-    localStorage.setItem('erpnextApiSecret', config.erpnext_api_secret);
-    if (config.erpnext_default_company) {
-      localStorage.setItem('erpnextDefaultCompany', config.erpnext_default_company);
-    }
-    if (config.erpnext_pallet_template_item) {
-      localStorage.setItem('erpnextPalletTemplateItem', config.erpnext_pallet_template_item);
-    }
+    // Security: Do not store sensitive credentials in localStorage
+    // All credentials are now securely stored in the database with RLS protection
 
     return { success: true };
   } catch (error) {
