@@ -169,8 +169,8 @@ const StockCount = () => {
   return (
     <div className="w-full max-w-7xl mx-auto py-4 md:py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Stock Count Management</h1>
-        <p className="text-gray-500">Manage stock reconciliation and counting sessions</p>
+        <h1 className="text-2xl font-bold text-foreground">Stock Count Management</h1>
+        <p className="text-muted-foreground">Manage stock reconciliation and counting sessions</p>
       </div>
 
       {/* Dashboard Metrics */}
@@ -245,7 +245,7 @@ const StockCount = () => {
             <Label htmlFor="purpose">Select Count Purpose *</Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card 
-                className={`cursor-pointer transition-all ${selectedPurpose === 'Stock Reconciliation' ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}
+                className={`cursor-pointer transition-all ${selectedPurpose === 'Stock Reconciliation' ? 'bg-blue-50 border-blue-500 dark:bg-blue-900/20' : 'hover:bg-accent'}`}
                 onClick={() => setSelectedPurpose('Stock Reconciliation')}
               >
                 <CardContent className="p-6 text-center">
@@ -255,7 +255,7 @@ const StockCount = () => {
               </Card>
 
               <Card 
-                className={`cursor-pointer transition-all ${selectedPurpose === 'Opening Stock' ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}
+                className={`cursor-pointer transition-all ${selectedPurpose === 'Opening Stock' ? 'bg-blue-50 border-blue-500 dark:bg-blue-900/20' : 'hover:bg-accent'}`}
                 onClick={() => setSelectedPurpose('Opening Stock')}
               >
                 <CardContent className="p-6 text-center">
@@ -283,7 +283,7 @@ const StockCount = () => {
             <CardTitle>Stock Reco List</CardTitle>
             <div className="flex items-center space-x-2">
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search sessions..."
                   value={searchTerm}
@@ -293,15 +293,15 @@ const StockCount = () => {
               </div>
             </div>
           </div>
-          <p className="text-sm text-gray-600 mt-2">
+          <p className="text-sm text-muted-foreground mt-2">
             {searchTerm ? `Showing search results for "${searchTerm}"` : "Showing last 5 stock reconciliations"}
           </p>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">
-              <Loader2 className="w-6 h-6 mx-auto animate-spin text-gray-500 mb-2" />
-              <p className="text-gray-500">Loading stock reconciliations...</p>
+              <Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground mb-2" />
+              <p className="text-muted-foreground">Loading stock reconciliations...</p>
             </div>
           ) : filteredSessions.length > 0 ? (
             <div className="grid gap-4">
@@ -316,8 +316,8 @@ const StockCount = () => {
             </div>
           ) : (
             <div className="text-center py-8">
-              <AlertTriangle className="w-10 h-10 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">
+              <AlertTriangle className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">
                 {searchTerm ? "No stock reconciliations found matching your search." : "No stock reconciliations found."}
               </p>
             </div>

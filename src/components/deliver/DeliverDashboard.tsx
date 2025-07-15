@@ -230,11 +230,11 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-4">Loading sales orders...</div>
+            <div className="text-center py-4 text-muted-foreground">Loading sales orders...</div>
           ) : (
             <div className="space-y-4">
               {filteredSOs.slice(0, 5).map((so) => (
-                <div key={so.name} className="border rounded-lg p-4">
+                <div key={so.name} className="border border-border rounded-lg p-4">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-lg truncate">{so.name}</h3>
@@ -268,12 +268,12 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
                 </div>
               ))}
               {filteredSOs.length === 0 && soSearchTerm && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-muted-foreground">
                   No sales orders found matching "{soSearchTerm}"
                 </div>
               )}
               {salesOrders.length === 0 && !soSearchTerm && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-muted-foreground">
                   No sales orders to deliver
                 </div>
               )}
@@ -302,7 +302,7 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
           <CardContent>
             <div className="space-y-4">
               {filteredDrafts.slice(0, 5).map((delivery) => (
-                <div key={delivery.name} className="border rounded-lg p-4">
+                <div key={delivery.name} className="border border-border rounded-lg p-4">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-lg truncate">{delivery.name}</h3>
@@ -336,7 +336,7 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
                 </div>
               ))}
               {filteredDrafts.length === 0 && draftSearchTerm && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-muted-foreground">
                   No draft deliveries found matching "{draftSearchTerm}"
                 </div>
               )}

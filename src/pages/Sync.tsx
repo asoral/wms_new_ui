@@ -50,7 +50,7 @@ const Sync = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
@@ -59,7 +59,7 @@ const Sync = () => {
             ) : (
               <WifiOff className="w-6 h-6 text-red-600" />
             )}
-            <h1 className="text-2xl font-bold text-gray-900">Data Sync</h1>
+            <h1 className="text-2xl font-bold text-foreground">Data Sync</h1>
           </div>
           <Button onClick={handleSync} disabled={syncing}>
             <RefreshCcw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
@@ -73,7 +73,7 @@ const Sync = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Records</p>
+                  <p className="text-sm text-muted-foreground">Total Records</p>
                   <p className="text-2xl font-bold text-blue-600">{syncStatus.totalRecords}</p>
                 </div>
                 <Database className="w-8 h-8 text-blue-500" />
@@ -85,7 +85,7 @@ const Sync = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Synced</p>
+                  <p className="text-sm text-muted-foreground">Synced</p>
                   <p className="text-2xl font-bold text-green-600">{syncStatus.syncedRecords}</p>
                 </div>
                 <CheckCircle className="w-8 h-8 text-green-500" />
@@ -97,7 +97,7 @@ const Sync = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Pending</p>
+                  <p className="text-sm text-muted-foreground">Pending</p>
                   <p className="text-2xl font-bold text-yellow-600">{syncStatus.pendingRecords}</p>
                 </div>
                 <Clock className="w-8 h-8 text-yellow-500" />
@@ -109,7 +109,7 @@ const Sync = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Failed</p>
+                  <p className="text-sm text-muted-foreground">Failed</p>
                   <p className="text-2xl font-bold text-red-600">{syncStatus.failedRecords}</p>
                 </div>
                 <XCircle className="w-8 h-8 text-red-500" />
@@ -134,17 +134,17 @@ const Sync = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span>Status:</span>
-                <Badge className={isOnline ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                <Badge className={isOnline ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"}>
                   {isOnline ? "Online" : "Offline"}
                 </Badge>
               </div>
               <div className="flex justify-between items-center">
                 <span>Last Sync:</span>
-                <span className="text-gray-600">{syncStatus.lastSync}</span>
+                <span className="text-muted-foreground">{syncStatus.lastSync}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Sync Rate:</span>
-                <span className="text-gray-600">
+                <span className="text-muted-foreground">
                   {Math.round((syncStatus.syncedRecords / syncStatus.totalRecords) * 100)}%
                 </span>
               </div>
@@ -171,8 +171,8 @@ const Sync = () => {
                         {record.status}
                       </Badge>
                     </div>
-                    <p className="text-sm text-gray-600 mb-1">{record.type}</p>
-                    <p className="text-xs text-gray-500">{record.timestamp}</p>
+                    <p className="text-sm text-muted-foreground mb-1">{record.type}</p>
+                    <p className="text-xs text-muted-foreground">{record.timestamp}</p>
                   </div>
                 ))}
               </div>
@@ -201,12 +201,12 @@ const Sync = () => {
                         Retry
                       </Button>
                     </div>
-                    <p className="text-sm text-gray-600 mb-1">{record.type}</p>
+                    <p className="text-sm text-muted-foreground mb-1">{record.type}</p>
                     <p className="text-sm text-red-600 mb-1 flex items-center">
                       <AlertTriangle className="w-4 h-4 mr-1" />
                       {record.error}
                     </p>
-                    <p className="text-xs text-gray-500">{record.timestamp}</p>
+                    <p className="text-xs text-muted-foreground">{record.timestamp}</p>
                   </div>
                 ))}
               </div>

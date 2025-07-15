@@ -101,14 +101,14 @@ const MaterialRequestDashboard = ({ onCreateNew, onEditDraft }: MaterialRequestD
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-4">Loading material requests...</div>
+            <div className="text-center py-4 text-muted-foreground">Loading material requests...</div>
           ) : (
             <div className="space-y-4">
               {materialRequests.map((materialRequest) => (
-                <div key={materialRequest.name} className="border rounded-lg p-4 flex items-center justify-between">
+                <div key={materialRequest.name} className="border border-border rounded-lg p-4 flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold">{materialRequest.name}</h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       {materialRequest.company} - {materialRequest.creation}
                     </p>
                   </div>
@@ -121,7 +121,7 @@ const MaterialRequestDashboard = ({ onCreateNew, onEditDraft }: MaterialRequestD
                 </div>
               ))}
               {materialRequests.length === 0 && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-muted-foreground">
                   No material requests found
                 </div>
               )}

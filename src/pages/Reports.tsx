@@ -111,11 +111,11 @@ const Reports = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span className="text-gray-500">Quantity:</span>
+                          <span className="text-muted-foreground">Quantity:</span>
                           <p className="font-medium">{item.qty} {item.uom}</p>
                         </div>
                         <div>
-                          <span className="text-gray-500">Value:</span>
+                          <span className="text-muted-foreground">Value:</span>
                           <p className="font-medium">₹{item.value.toLocaleString()}</p>
                         </div>
                       </div>
@@ -129,22 +129,22 @@ const Reports = () => {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-3">Item Code</th>
-                    <th className="text-left p-3">Warehouse</th>
-                    <th className="text-right p-3">Quantity</th>
-                    <th className="text-left p-3">UOM</th>
-                    <th className="text-right p-3">Value</th>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 text-foreground">Item Code</th>
+                    <th className="text-left p-3 text-foreground">Warehouse</th>
+                    <th className="text-right p-3 text-foreground">Quantity</th>
+                    <th className="text-left p-3 text-foreground">UOM</th>
+                    <th className="text-right p-3 text-foreground">Value</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sampleStockBalance.map((item, index) => (
-                    <tr key={index} className="border-b hover:bg-gray-50">
-                      <td className="p-3">{item.item}</td>
-                      <td className="p-3">{item.warehouse}</td>
-                      <td className="p-3 text-right">{item.qty}</td>
-                      <td className="p-3">{item.uom}</td>
-                      <td className="p-3 text-right">₹{item.value.toLocaleString()}</td>
+                    <tr key={index} className="border-b border-border hover:bg-accent">
+                      <td className="p-3 text-foreground">{item.item}</td>
+                      <td className="p-3 text-foreground">{item.warehouse}</td>
+                      <td className="p-3 text-right text-foreground">{item.qty}</td>
+                      <td className="p-3 text-foreground">{item.uom}</td>
+                      <td className="p-3 text-right text-foreground">₹{item.value.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -155,7 +155,7 @@ const Reports = () => {
       default:
         return (
           <div className="text-center py-8">
-            <p className="text-gray-500">Report data will be displayed here</p>
+            <p className="text-muted-foreground">Report data will be displayed here</p>
           </div>
         );
     }
@@ -163,14 +163,14 @@ const Reports = () => {
 
   if (selectedReport) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="min-h-screen bg-background p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
               <Button variant="outline" onClick={() => setSelectedReport(null)}>
                 ← Back
               </Button>
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-2xl font-bold text-foreground">
                 {reportCategories.flatMap(c => c.reports).find(r => r.id === selectedReport)?.name}
               </h1>
             </div>
@@ -195,12 +195,12 @@ const Reports = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <BarChart3 className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+            <h1 className="text-2xl font-bold text-foreground">Reports</h1>
           </div>
         </div>
 
@@ -226,7 +226,7 @@ const Reports = () => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-gray-600">{report.description}</p>
+                        <p className="text-muted-foreground">{report.description}</p>
                       </CardContent>
                     </Card>
                   );

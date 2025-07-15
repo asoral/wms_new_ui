@@ -110,11 +110,11 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Draft':
-        return <Badge variant="secondary" className="bg-orange-100 text-orange-800">Draft</Badge>;
+        return <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300">Draft</Badge>;
       case 'Open':
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">In Progress</Badge>;
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">In Progress</Badge>;
       case 'Completed':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800">Completed</Badge>;
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">Completed</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -130,9 +130,9 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       {/* Header with stepper */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <Package className="w-6 h-6 text-blue-600" />
-          <h1 className="text-xl md:text-2xl font-bold">Pick List</h1>
-          <RefreshCw className="w-4 h-4 text-gray-400" />
+          <Package className="w-6 h-6 text-primary" />
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Pick List</h1>
+          <RefreshCw className="w-4 h-4 text-muted-foreground" />
         </div>
       </div>
 
@@ -140,24 +140,24 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       <div className="flex justify-center">
         <div className="flex items-center space-x-2 md:space-x-4">
           <div className="flex items-center space-x-1 md:space-x-2">
-            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs md:text-sm font-medium">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs md:text-sm font-medium">
               1
             </div>
-            <span className="text-blue-600 font-medium text-sm md:text-base">Select</span>
+            <span className="text-primary font-medium text-sm md:text-base">Select</span>
           </div>
-          <div className="w-4 md:w-8 h-px bg-gray-200"></div>
+          <div className="w-4 md:w-8 h-px bg-border"></div>
           <div className="flex items-center space-x-1 md:space-x-2">
-            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-xs md:text-sm font-medium">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs md:text-sm font-medium">
               2
             </div>
-            <span className="text-gray-400 text-sm md:text-base">Details</span>
+            <span className="text-muted-foreground text-sm md:text-base">Details</span>
           </div>
-          <div className="w-4 md:w-8 h-px bg-gray-200"></div>
+          <div className="w-4 md:w-8 h-px bg-border"></div>
           <div className="flex items-center space-x-1 md:space-x-2">
-            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-xs md:text-sm font-medium">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs md:text-sm font-medium">
               3
             </div>
-            <span className="text-gray-400 text-sm md:text-base">Pick</span>
+            <span className="text-muted-foreground text-sm md:text-base">Pick</span>
           </div>
         </div>
       </div>
@@ -168,27 +168,27 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
           <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-center space-x-2 mb-2">
               <Package className="w-4 h-4 md:w-5 md:h-5 text-orange-600" />
-              <span className="text-xl md:text-2xl font-bold">{analytics.pendingPickLists}</span>
+              <span className="text-xl md:text-2xl font-bold text-foreground">{analytics.pendingPickLists}</span>
             </div>
-            <p className="text-xs md:text-sm text-gray-600">Pending ({analytics.pendingPickLists})</p>
+            <p className="text-xs md:text-sm text-muted-foreground">Pending ({analytics.pendingPickLists})</p>
           </CardContent>
         </Card>
         <Card className="text-center">
           <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-center space-x-2 mb-2">
               <Clock className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
-              <span className="text-xl md:text-2xl font-bold">{analytics.inProgressPickLists}</span>
+              <span className="text-xl md:text-2xl font-bold text-foreground">{analytics.inProgressPickLists}</span>
             </div>
-            <p className="text-xs md:text-sm text-gray-600">In Progress ({analytics.inProgressPickLists})</p>
+            <p className="text-xs md:text-sm text-muted-foreground">In Progress ({analytics.inProgressPickLists})</p>
           </CardContent>
         </Card>
         <Card className="text-center">
           <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-center space-x-2 mb-2">
               <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
-              <span className="text-xl md:text-2xl font-bold">{analytics.completedPickLists}</span>
+              <span className="text-xl md:text-2xl font-bold text-foreground">{analytics.completedPickLists}</span>
             </div>
-            <p className="text-xs md:text-sm text-gray-600">Completed ({analytics.completedPickLists})</p>
+            <p className="text-xs md:text-sm text-muted-foreground">Completed ({analytics.completedPickLists})</p>
           </CardContent>
         </Card>
       </div>
@@ -196,7 +196,7 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       {/* Search - Placed above the list */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search pick lists..."
             value={searchTerm}
@@ -214,15 +214,15 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       {/* Pick Lists */}
       <div className="space-y-4">
         {loading ? (
-          <div className="text-center py-8">Loading pick lists...</div>
+          <div className="text-center py-8 text-muted-foreground">Loading pick lists...</div>
         ) : filteredPickLists.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-muted-foreground">
             {searchTerm ? "No pick lists found matching your search" : "No pick lists found"}
           </div>
         ) : (
           <div className="grid gap-4">
             {!searchTerm && (
-              <p className="text-sm text-gray-500 mb-2">
+              <p className="text-sm text-muted-foreground mb-2">
                 Showing last 5 pick lists. Use search to find more.
               </p>
             )}
@@ -236,7 +236,7 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
                         <h3 className="font-semibold text-lg">{pickList.name}</h3>
                         {getStatusBadge(pickList.status)}
                       </div>
-                      <div className="text-sm text-gray-600 space-y-1">
+                      <div className="text-sm text-muted-foreground space-y-1">
                         <p><span className="font-medium">Purpose:</span> {pickList.purpose || 'Material Transfer'}</p>
                         <p><span className="font-medium">Company:</span> {pickList.company}</p>
                         {pickList.material_request && (

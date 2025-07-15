@@ -255,11 +255,11 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-4">Loading purchase orders...</div>
+            <div className="text-center py-4 text-muted-foreground">Loading purchase orders...</div>
           ) : (
             <div className="space-y-4">
               {filteredPOs.slice(0, 5).map((po) => (
-                <div key={po.name} className="border rounded-lg p-4">
+                <div key={po.name} className="border border-border rounded-lg p-4">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-lg truncate">{po.name}</h3>
@@ -293,12 +293,12 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                 </div>
               ))}
               {filteredPOs.length === 0 && poSearchTerm && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-muted-foreground">
                   No purchase orders found matching "{poSearchTerm}"
                 </div>
               )}
               {purchaseOrders.length === 0 && !poSearchTerm && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-muted-foreground">
                   No purchase orders to receive
                 </div>
               )}
@@ -327,7 +327,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
           <CardContent>
             <div className="space-y-4">
               {filteredDrafts.slice(0, 5).map((receipt) => (
-                <div key={receipt.name} className="border rounded-lg p-4">
+                <div key={receipt.name} className="border border-border rounded-lg p-4">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-lg truncate">{receipt.name}</h3>
@@ -361,7 +361,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
                 </div>
               ))}
               {filteredDrafts.length === 0 && draftSearchTerm && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-muted-foreground">
                   No draft receipts found matching "{draftSearchTerm}"
                 </div>
               )}

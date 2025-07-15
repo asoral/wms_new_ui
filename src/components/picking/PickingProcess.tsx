@@ -294,11 +294,11 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
   const getItemStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300";
       case "partial":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -403,34 +403,36 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-3 md:p-6 space-y-6 overflow-x-hidden">
       {/* Header with stepper */}
       <div className="flex items-center space-x-2 mb-6">
-        <Package className="w-6 h-6 text-blue-600" />
-        <h1 className="text-2xl font-bold">Pick List</h1>
+        <Package className="w-6 h-6 text-primary" />
+        <h1 className="text-xl md:text-2xl font-bold text-foreground">Pick List</h1>
       </div>
 
       {/* Progress Steps */}
-      <div className="flex items-center space-x-4 mb-6">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
-            1
+      <div className="flex justify-center mb-6">
+        <div className="flex items-center space-x-2 md:space-x-4">
+          <div className="flex items-center space-x-1 md:space-x-2">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs md:text-sm font-medium">
+              1
+            </div>
+            <span className="text-muted-foreground text-sm md:text-base">Select</span>
           </div>
-          <span className="text-gray-400">Select</span>
-        </div>
-        <div className="w-8 h-px bg-gray-200"></div>
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm font-medium">
-            2
+          <div className="w-4 md:w-8 h-px bg-border"></div>
+          <div className="flex items-center space-x-1 md:space-x-2">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs md:text-sm font-medium">
+              2
+            </div>
+            <span className="text-muted-foreground text-sm md:text-base">Details</span>
           </div>
-          <span className="text-gray-400">Details</span>
-        </div>
-        <div className="w-8 h-px bg-gray-200"></div>
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
-            3
+          <div className="w-4 md:w-8 h-px bg-border"></div>
+          <div className="flex items-center space-x-1 md:space-x-2">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs md:text-sm font-medium">
+              3
+            </div>
+            <span className="text-primary font-medium text-sm md:text-base">Pick</span>
           </div>
-          <span className="text-blue-600 font-medium">Pick</span>
         </div>
       </div>
 
@@ -442,7 +444,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
         </Button>
         <div className="flex items-center space-x-4">
           <span className="font-semibold">{pickList.name}</span>
-          <Badge className="bg-blue-100 text-blue-800">{Math.floor(getProgressPercentage() / (100 / items.length))}/{items.length} Items</Badge>
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">{Math.floor(getProgressPercentage() / (100 / items.length))}/{items.length} Items</Badge>
         </div>
       </div>
 
@@ -456,12 +458,12 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
       </div>
 
       {/* Compact Item Card */}
-      <Card className="border-l-4 border-l-blue-500">
+      <Card className="border-l-4 border-l-primary overflow-hidden">
         <CardContent className="p-4">
           {/* Item Header - Compact */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
-              <Package className="w-4 h-4 text-blue-600" />
+              <Package className="w-4 h-4 text-primary" />
               <h3 className="text-sm font-semibold">Item {currentItemIndex + 1} of {items.length}</h3>
             </div>
             <Badge className={getItemStatusColor(getCurrentItem().status || "pending")}>
@@ -470,28 +472,28 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
           </div>
 
           {/* Item Details - 2 rows on mobile, 1 row on desktop */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-sm">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-sm">
+            <div className="min-w-0">
               <span className="text-xs text-muted-foreground">Item Code:</span>
               <p className="font-medium text-sm truncate">{getCurrentItem().item_code}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-xs text-muted-foreground">Item Name:</span>
               <p className="font-medium text-sm truncate">{getCurrentItem().item_name}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-xs text-muted-foreground">Warehouse:</span>
-              <p className="text-sm">{getCurrentItem().warehouse}</p>
+              <p className="text-sm truncate">{getCurrentItem().warehouse}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-xs text-muted-foreground">Bin:</span>
-              <p className="text-sm">{getCurrentItem().bin || "N/A"}</p>
+              <p className="text-sm truncate">{getCurrentItem().bin || "N/A"}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mb-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 text-sm">
             {getCurrentItem().batch_no && (
-              <div>
+              <div className="min-w-0">
                 <span className="text-xs text-muted-foreground">Batch:</span>
                 <p className="text-sm">{getCurrentItem().batch_no}</p>
               </div>

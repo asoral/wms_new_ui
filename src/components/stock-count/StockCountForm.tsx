@@ -311,8 +311,8 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
 
       {loading ? (
         <div className="text-center py-8">
-          <Loader2 className="w-6 h-6 mx-auto animate-spin text-gray-500 mb-2" />
-          <p className="text-gray-500">Loading warehouse stock...</p>
+          <Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground mb-2" />
+          <p className="text-muted-foreground">Loading warehouse stock...</p>
         </div>
       ) : filteredItems.length > 0 ? (
         <div className="overflow-x-auto">
@@ -362,7 +362,6 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
                     <Button 
                       onClick={() => handleSubmit(item)}
                       size="sm"
-                      className="bg-gray-800 hover:bg-gray-900 text-white"
                     >
                       Add Entry
                     </Button>
@@ -376,13 +375,13 @@ const StockCountForm = ({ onEntryAdded }: StockCountFormProps) => {
         <div className="text-center py-8">
           {stockItems.length === 0 ? (
             <>
-              <Package className="w-10 h-10 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">Loading warehouse stock...</p>
+              <Package className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Loading warehouse stock...</p>
             </>
           ) : (
             <>
-              <Search className="w-10 h-10 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">No items found matching your search.</p>
+              <Search className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No items found matching your search.</p>
             </>
           )}
         </div>
