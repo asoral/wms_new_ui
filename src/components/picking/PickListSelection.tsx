@@ -153,7 +153,7 @@ const PickListSelection = ({ onSelectPickList, onCreateNew }: PickListSelectionP
 
       {/* Tabs for different statuses */}
       <Tabs defaultValue="pending" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid grid-cols-1 sm:grid-cols-3 w-full max-w-md mx-auto">
           <TabsTrigger value="pending" className="flex items-center space-x-2">
             <Package className="w-4 h-4" />
             <span>Pending ({draftPickLists.length})</span>

@@ -93,139 +93,137 @@ const PalletPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <Package className="w-6 h-6 text-purple-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Pallet Management</h1>
-          </div>
+    <div className="w-full max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+          <Package className="w-6 h-6 text-purple-600" />
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Pallet Management</h1>
         </div>
+      </div>
 
-        {/* Pallet Scanner */}
+      {/* Pallet Scanner */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Scan className="w-5 h-5" />
+            <span>Scan Pallet</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PalletScanner onPalletScanned={handlePalletScanned} />
+        </CardContent>
+      </Card>
+
+      {/* Pallet Details */}
+      {scannedPallet && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Scan className="w-5 h-5" />
-              <span>Scan Pallet</span>
+            <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span>Pallet Details</span>
+              <div className="flex flex-wrap gap-2">
+                <Badge className="bg-purple-100 text-purple-800">{scannedPallet.status}</Badge>
+                <Button size="sm" onClick={handlePrintLabel} className="flex items-center space-x-1">
+                  <Printer className="w-3 h-3" />
+                  <span>Print Label</span>
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <PalletScanner onPalletScanned={handlePalletScanned} />
-          </CardContent>
-        </Card>
-
-        {/* Pallet Details */}
-        {scannedPallet && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <span>Pallet Details</span>
-                <div className="flex flex-wrap gap-2">
-                  <Badge className="bg-purple-100 text-purple-800">{scannedPallet.status}</Badge>
-                  <Button size="sm" onClick={handlePrintLabel} className="flex items-center space-x-1">
-                    <Printer className="w-3 h-3" />
-                    <span>Print Label</span>
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div>
-                  <Label className="text-sm text-gray-600">Pallet ID</Label>
-                  <p className="font-medium">{scannedPallet.barcode}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-600">Location</Label>
-                  <p className="font-medium">{scannedPallet.location}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-600">Created</Label>
-                  <p className="font-medium">{scannedPallet.createdDate}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-600">Total Items</Label>
-                  <p className="font-medium">{getTotalItems()} items</p>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div>
+                <Label className="text-sm text-gray-600">Pallet ID</Label>
+                <p className="font-medium">{scannedPallet.barcode}</p>
               </div>
+              <div>
+                <Label className="text-sm text-gray-600">Location</Label>
+                <p className="font-medium">{scannedPallet.location}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-600">Created</Label>
+                <p className="font-medium">{scannedPallet.createdDate}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-600">Total Items</Label>
+                <p className="font-medium">{getTotalItems()} items</p>
+              </div>
+            </div>
 
-              {/* Items in Pallet */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-gray-900">Items in Pallet</h4>
-                <div className="space-y-2">
-                  {scannedPallet.items.map((item, index) => (
-                    <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex-1">
-                          <h5 className="font-medium">{item.itemCode}</h5>
-                          <p className="text-sm text-gray-600">{item.itemName}</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            <span className="text-sm font-medium">{item.qty} {item.uom}</span>
-                            {item.batch && (
-                              <Badge variant="outline" className="text-xs">Batch: {item.batch}</Badge>
-                            )}
-                            {item.serial && (
-                              <Badge variant="outline" className="text-xs">Serial: {item.serial}</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-sm text-gray-600 shrink-0">
-                          {item.warehouse}
+            {/* Items in Pallet */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-gray-900">Items in Pallet</h4>
+              <div className="space-y-2">
+                {scannedPallet.items.map((item, index) => (
+                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex-1">
+                        <h5 className="font-medium">{item.itemCode}</h5>
+                        <p className="text-sm text-gray-600">{item.itemName}</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          <span className="text-sm font-medium">{item.qty} {item.uom}</span>
+                          {item.batch && (
+                            <Badge variant="outline" className="text-xs">Batch: {item.batch}</Badge>
+                          )}
+                          {item.serial && (
+                            <Badge variant="outline" className="text-xs">Serial: {item.serial}</Badge>
+                          )}
                         </div>
                       </div>
+                      <div className="text-sm text-gray-600 shrink-0">
+                        {item.warehouse}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
+            </div>
 
-              {/* Quick Actions */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <Button onClick={handleMovePallet} className="flex items-center space-x-2">
-                  <ArrowRight className="w-4 h-4" />
-                  <span>Move Pallet</span>
-                </Button>
-                <Button onClick={handleDepalletize} variant="outline" className="flex items-center space-x-2">
-                  <Minus className="w-4 h-4" />
-                  <span>De-palletize</span>
-                </Button>
-              </div>
+            {/* Quick Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-6">
+              <Button onClick={handleMovePallet} className="flex items-center space-x-2">
+                <ArrowRight className="w-4 h-4" />
+                <span>Move Pallet</span>
+              </Button>
+              <Button onClick={handleDepalletize} variant="outline" className="flex items-center space-x-2">
+                <Minus className="w-4 h-4" />
+                <span>De-palletize</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pallet Operations */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full max-w-2xl mx-auto">
+          <TabsTrigger value="scan">Scan</TabsTrigger>
+          <TabsTrigger value="create">Create</TabsTrigger>
+          <TabsTrigger value="move" disabled={!scannedPallet}>Move</TabsTrigger>
+          <TabsTrigger value="depalletize" disabled={!scannedPallet}>De-palletize</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="scan" className="mt-6">
+          <Card>
+            <CardContent className="p-6 text-center">
+              <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600">Scan a pallet barcode above to view its contents and manage it.</p>
             </CardContent>
           </Card>
-        )}
+        </TabsContent>
 
-        {/* Pallet Operations */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl mx-auto">
-            <TabsTrigger value="scan">Scan</TabsTrigger>
-            <TabsTrigger value="create">Create</TabsTrigger>
-            <TabsTrigger value="move" disabled={!scannedPallet}>Move</TabsTrigger>
-            <TabsTrigger value="depalletize" disabled={!scannedPallet}>De-palletize</TabsTrigger>
-          </TabsList>
+        <TabsContent value="create" className="mt-6">
+          <PalletCreator />
+        </TabsContent>
 
-          <TabsContent value="scan" className="mt-6">
-            <Card>
-              <CardContent className="p-6 text-center">
-                <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">Scan a pallet barcode above to view its contents and manage it.</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
+        <TabsContent value="move" className="mt-6">
+          {scannedPallet && <PalletMover pallet={scannedPallet} />}
+        </TabsContent>
 
-          <TabsContent value="create" className="mt-6">
-            <PalletCreator />
-          </TabsContent>
-
-          <TabsContent value="move" className="mt-6">
-            {scannedPallet && <PalletMover pallet={scannedPallet} />}
-          </TabsContent>
-
-          <TabsContent value="depalletize" className="mt-6">
-            {scannedPallet && <PalletDepalletizer pallet={scannedPallet} />}
-          </TabsContent>
-        </Tabs>
-      </div>
+        <TabsContent value="depalletize" className="mt-6">
+          {scannedPallet && <PalletDepalletizer pallet={scannedPallet} />}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -578,7 +578,7 @@ const Deliver = () => {
 
           {/* Main Content with Tabs */}
           <Tabs value={currentStep} onValueChange={(value) => setCurrentStep(value as any)}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid grid-cols-1 sm:grid-cols-3 w-full max-w-md mx-auto">
               <TabsTrigger value="dashboard" disabled>Dashboard</TabsTrigger>
               <TabsTrigger value="deliver">Deliver Items</TabsTrigger>
               <TabsTrigger value="review">Review & Submit</TabsTrigger>

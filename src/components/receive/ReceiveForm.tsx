@@ -288,11 +288,11 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
 
             {/* Selected Item Details */}
             {selectedItem && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-sm">
                   <div>
                     <p className="text-gray-600">Item Name</p>
-                    <p className="font-medium">{selectedItem.itemName}</p>
+                    <p className="font-medium truncate">{selectedItem.itemName}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">Pending Qty</p>
@@ -304,7 +304,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                   </div>
                   <div>
                     <p className="text-gray-600">Warehouse</p>
-                    <p className="font-medium">{selectedItem.warehouse}</p>
+                    <p className="font-medium truncate">{selectedItem.warehouse}</p>
                   </div>
                 </div>
                 {/* Item Tracking indicators */}
@@ -360,7 +360,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                     </TabsList>
                     
                     <TabsContent value="traditional" className="space-y-4 mt-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         {/* Only show batch input if item is batch tracked */}
                         {selectedItem.has_batch_no && (
                           <div className="space-y-2">
@@ -385,7 +385,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                             />
                           </div>
                         )}
-                        <div className="space-y-2">
+                        <div className="space-y-2 md:col-span-2">
                           <Label htmlFor="received-qty">Actual Quantity *</Label>
                           <Input
                             id="received-qty"
@@ -419,13 +419,13 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                         
                         {batchEntries.length > 0 && (
                           <div className="space-y-2">
-                            <div className="grid grid-cols-3 gap-4 text-sm font-medium text-gray-600 pb-2 border-b">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs md:text-sm font-medium text-gray-600 pb-2 border-b">
                               <div>Batch Number</div>
                               <div>Quantity</div>
                               <div>Action</div>
                             </div>
                             {batchEntries.map((entry, index) => (
-                              <div key={index} className="grid grid-cols-3 gap-4 items-center">
+                              <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
                                 <Input
                                   placeholder="Enter batch number"
                                   value={entry.batchNumber}

@@ -698,7 +698,7 @@ const Receive = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-3 w-full max-w-md mx-auto">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="receive" disabled={!selectedPO && !currentPurchaseReceipt}>
               Receive Items

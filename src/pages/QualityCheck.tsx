@@ -78,69 +78,67 @@ const QualityCheckPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-          <div className="flex items-center space-x-3">
-            <TestTube className="w-6 h-6 text-purple-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Quality Check</h1>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon">
-              <RefreshCcw className="w-4 h-4" />
-            </Button>
-          </div>
+    <div className="w-full max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+        <div className="flex items-center space-x-3">
+          <TestTube className="w-6 h-6 text-purple-600" />
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Quality Check</h1>
         </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="icon">
+            <RefreshCcw className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
 
-        {/* Content */}
-        {currentView === "dashboard" && (
-          <div className="space-y-6">
-            <QualityDashboard 
-              data={dashboardData}
-              onViewInspections={handleViewInspections}
-              onCreateInspection={handleCreateInspection}
-            />
-          </div>
-        )}
+      {/* Content */}
+      {currentView === "dashboard" && (
+        <div className="space-y-6">
+          <QualityDashboard 
+            data={dashboardData}
+            onViewInspections={handleViewInspections}
+            onCreateInspection={handleCreateInspection}
+          />
+        </div>
+      )}
 
-        {currentView === "list" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <h2 className="text-xl font-semibold">Quality Inspections</h2>
-              <div className="flex space-x-2">
-                <Button onClick={handleCreateInspection}>
-                  New Inspection
-                </Button>
-                <Button variant="outline" onClick={handleBackToDashboard}>
-                  Back to Dashboard
-                </Button>
-              </div>
-            </div>
-            <QualityInspectionList 
-              onCreateNew={handleCreateInspection}
-              onEditInspection={handleEditInspection} 
-            />
-          </div>
-        )}
-
-        {currentView === "create" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <h2 className="text-xl font-semibold">
-                {selectedInspection ? "Edit Inspection" : "Create Quality Inspection"}
-              </h2>
-              <Button variant="outline" onClick={handleBackToList}>
-                Back to List
+      {currentView === "list" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h2 className="text-xl font-semibold">Quality Inspections</h2>
+            <div className="flex space-x-2">
+              <Button onClick={handleCreateInspection}>
+                New Inspection
+              </Button>
+              <Button variant="outline" onClick={handleBackToDashboard}>
+                Back to Dashboard
               </Button>
             </div>
-            <QualityInspectionForm 
-              inspection={selectedInspection}
-              onBack={() => handleBackToList()}
-            />
           </div>
-        )}
-      </div>
+          <QualityInspectionList 
+            onCreateNew={handleCreateInspection}
+            onEditInspection={handleEditInspection} 
+          />
+        </div>
+      )}
+
+      {currentView === "create" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h2 className="text-xl font-semibold">
+              {selectedInspection ? "Edit Inspection" : "Create Quality Inspection"}
+            </h2>
+            <Button variant="outline" onClick={handleBackToList}>
+              Back to List
+            </Button>
+          </div>
+          <QualityInspectionForm 
+            inspection={selectedInspection}
+            onBack={() => handleBackToList()}
+          />
+        </div>
+      )}
     </div>
   );
 };
