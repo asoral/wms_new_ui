@@ -8,10 +8,10 @@ interface SelectedItemDisplayProps {
 
 const SelectedItemDisplay = ({ item }: SelectedItemDisplayProps) => {
   return (
-    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+    <div className="p-4 bg-accent border border-border rounded-lg">
       <div className="flex items-center space-x-2 mb-2">
-        <Package className="w-4 h-4 text-green-600" />
-        <span className="font-medium text-green-900">Selected Item</span>
+        <Package className="w-4 h-4 text-accent-foreground" />
+        <span className="font-medium text-accent-foreground">Selected Item</span>
       </div>
       <div className="space-y-1 text-sm">
         <p><span className="font-medium">Name:</span> {item.item_name}</p>

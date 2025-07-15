@@ -40,19 +40,19 @@ const StockCountSummary = ({ session }: StockCountSummaryProps) => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{session.totalItems}</div>
-            <div className="text-sm text-gray-600">Total Items</div>
+            <div className="text-sm text-muted-foreground">Total Items</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">{session.matchedItems}</div>
-            <div className="text-sm text-gray-600">Matched</div>
+            <div className="text-sm text-muted-foreground">Matched</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">{session.varianceItems}</div>
-            <div className="text-sm text-gray-600">Variance</div>
+            <div className="text-sm text-muted-foreground">Variance</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">{session.totalItems - session.matchedItems - session.varianceItems}</div>
-            <div className="text-sm text-gray-600">Pending</div>
+            <div className="text-2xl font-bold text-muted-foreground">{session.totalItems - session.matchedItems - session.varianceItems}</div>
+            <div className="text-sm text-muted-foreground">Pending</div>
           </div>
         </div>
       </CardContent>

@@ -148,15 +148,15 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
             </div>
 
             {selectedItem && (
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-muted rounded-lg">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-3">
                   <div>
-                    <p className="font-medium text-gray-600">Item Code</p>
-                    <p className="text-gray-900">{selectedItem.item_code}</p>
+                    <p className="font-medium text-muted-foreground">Item Code</p>
+                    <p className="text-foreground">{selectedItem.item_code}</p>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-600">UOM</p>
-                    <p className="text-gray-900">{selectedItem.stock_uom}</p>
+                    <p className="font-medium text-muted-foreground">UOM</p>
+                    <p className="text-foreground">{selectedItem.stock_uom}</p>
                   </div>
                 </div>
                 
@@ -164,7 +164,7 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
                 {isItemTracked(selectedItem) && (
                   <div className="flex flex-wrap items-center space-x-2 mb-2">
                     <AlertCircle className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium text-gray-700">Item Tracking:</span>
+                    <span className="text-sm font-medium text-foreground">Item Tracking:</span>
                     {selectedItem.has_serial_no === 1 && (
                       <Badge variant="outline" className="text-xs">Serial Tracked</Badge>
                     )}
@@ -200,7 +200,7 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
                     {serialBatchBundle && (
                       <div className="mt-2 flex flex-wrap items-center space-x-2">
                         <Badge variant="secondary">Bundle: {serialBatchBundle}</Badge>
-                        <span className="text-sm text-gray-600">Qty: {actualQty}</span>
+                        <span className="text-sm text-muted-foreground">Qty: {actualQty}</span>
                       </div>
                     )}
                   </div>
@@ -247,11 +247,11 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
           </TabsContent>
 
           <TabsContent value="scan" className="space-y-4 mt-6">
-            <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
-              <ScanBarcode className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Scan Barcode</h3>
-              <p className="text-gray-600 mb-4">Use your device camera or barcode scanner</p>
-              <p className="text-sm text-gray-500">Feature coming soon...</p>
+            <div className="text-center p-8 border-2 border-dashed border-border rounded-lg">
+              <ScanBarcode className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">Scan Barcode</h3>
+              <p className="text-muted-foreground mb-4">Use your device camera or barcode scanner</p>
+              <p className="text-sm text-muted-foreground">Feature coming soon...</p>
             </div>
           </TabsContent>
         </Tabs>

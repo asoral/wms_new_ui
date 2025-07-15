@@ -68,6 +68,7 @@ const App = () => {
                             <Route path="/item-enquiry" element={<ItemEnquiry />} />
                             <Route path="/bin-enquiry" element={<BinEnquiry />} />
                             <Route path="/material-request" element={<MaterialRequest />} />
+                            <Route path="/mat-request" element={<MaterialRequest />} />
                             <Route path="/stock-entry" element={<StockEntry />} />
                             <Route path="/receive" element={<Receive />} />
                             <Route path="/deliver" element={<Deliver />} />

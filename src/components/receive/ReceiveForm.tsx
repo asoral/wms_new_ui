@@ -278,7 +278,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                         <div className="flex justify-between">
                           <span className="font-medium">{item.itemName}</span>
                         </div>
-                        <div className="text-xs text-gray-500">{item.itemCode}</div>
+                        <div className="text-xs text-muted-foreground">{item.itemCode}</div>
                       </div>
                     </SelectItem>
                   ))}
@@ -291,19 +291,19 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
               <div className="p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-sm">
                   <div>
-                    <p className="text-gray-600">Item Name</p>
+                    <p className="text-muted-foreground">Item Name</p>
                     <p className="font-medium truncate">{selectedItem.itemName}</p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Pending Qty</p>
+                    <p className="text-muted-foreground">Pending Qty</p>
                     <p className="font-medium text-orange-600">{selectedItem.pendingQty} {selectedItem.uom}</p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Rate</p>
+                    <p className="text-muted-foreground">Rate</p>
                     <p className="font-medium">₹{selectedItem.rate}</p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Warehouse</p>
+                    <p className="text-muted-foreground">Warehouse</p>
                     <p className="font-medium truncate">{selectedItem.warehouse}</p>
                   </div>
                 </div>
@@ -412,14 +412,14 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <Label className="text-base font-medium">Batch Entries</Label>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-muted-foreground">
                             Total: {getTotalBatchQuantity()} / {selectedItem.pendingQty} {selectedItem.uom}
                           </div>
                         </div>
                         
                         {batchEntries.length > 0 && (
                           <div className="space-y-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs md:text-sm font-medium text-gray-600 pb-2 border-b">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs md:text-sm font-medium text-muted-foreground pb-2 border-b">
                               <div>Batch Number</div>
                               <div>Quantity</div>
                               <div>Action</div>
@@ -480,9 +480,9 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
 
           <TabsContent value="scan" className="space-y-4 mt-6">
             <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
-              <ScanLine className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Scan Item Code</h3>
-              <p className="text-gray-600 mb-4">Use a barcode scanner or enter the item code manually</p>
+               <ScanLine className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">Scan Item Code</h3>
+              <p className="text-muted-foreground mb-4">Use a barcode scanner or enter the item code manually</p>
               
               <div className="max-w-md mx-auto space-y-4">
                 <Input

@@ -211,15 +211,15 @@ const MaterialRequest = () => {
 
   const getTypeBadge = (type: string) => {
     const typeMap: Record<string, string> = {
-      'Purchase': 'bg-blue-100 text-blue-800',
-      'Material Transfer': 'bg-green-100 text-green-800',
-      'Material Issue': 'bg-red-100 text-red-800',
-      'Manufacture': 'bg-purple-100 text-purple-800',
-      'Customer Provided': 'bg-orange-100 text-orange-800'
+      'Purchase': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      'Material Transfer': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      'Material Issue': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      'Manufacture': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      'Customer Provided': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeMap[type] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeMap[type] || 'bg-muted text-muted-foreground'}`}>
         {type}
       </span>
     );
@@ -236,7 +236,7 @@ const MaterialRequest = () => {
   // Render different views based on currentView state
   if (currentView === 'create') {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="min-h-screen bg-background p-4 md:p-6">
         <MaterialRequestFormImproved
           purpose={selectedPurpose as any}
           editData={editingRequest || currentDraft}
@@ -249,7 +249,7 @@ const MaterialRequest = () => {
 
   if (currentView === 'review' && currentDraft) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="min-h-screen bg-background p-4 md:p-6">
         <MaterialRequestReview
           draftData={currentDraft}
           onBack={() => setCurrentView('create')}
@@ -262,7 +262,7 @@ const MaterialRequest = () => {
 
   if (currentView === 'list') {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="min-h-screen bg-background p-4 md:p-6">
         <MaterialRequestList
           onBack={handleBackToDashboard}
           onEdit={handleEditFromList}
@@ -280,7 +280,7 @@ const MaterialRequest = () => {
         <div className="flex items-center space-x-3">
           <Database className="w-6 h-6 text-blue-600" />
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Material Request</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">Material Request</h1>
             <p className="text-sm md:text-base text-muted-foreground">Create and manage material requests</p>
           </div>
         </div>
@@ -300,7 +300,7 @@ const MaterialRequest = () => {
                 <Button
                   onClick={() => handleCreateNew("Purchase")}
                   variant="outline"
-                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50 hover:border-blue-200"
+                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-accent hover:border-accent-foreground"
                 >
                   <FileText className="w-5 h-5 text-blue-600" />
                   <span className="text-sm font-medium">Purchase Request</span>
@@ -308,7 +308,7 @@ const MaterialRequest = () => {
                 <Button
                   onClick={() => handleCreateNew("Material Transfer")}
                   variant="outline"
-                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-green-50 hover:border-green-200"
+                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-accent hover:border-accent-foreground"
                 >
                   <Package className="w-5 h-5 text-green-600" />
                   <span className="text-sm font-medium">Transfer Request</span>
@@ -316,7 +316,7 @@ const MaterialRequest = () => {
                 <Button
                   onClick={() => handleCreateNew("Material Issue")}
                   variant="outline"
-                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-red-50 hover:border-red-200"
+                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-accent hover:border-accent-foreground"
                 >
                   <AlertTriangle className="w-5 h-5 text-red-600" />
                   <span className="text-sm font-medium">Issue Request</span>
@@ -324,7 +324,7 @@ const MaterialRequest = () => {
                 <Button
                   onClick={() => handleCreateNew("Manufacture")}
                   variant="outline"
-                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-purple-50 hover:border-purple-200"
+                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-accent hover:border-accent-foreground"
                 >
                   <CheckCircle className="w-5 h-5 text-purple-600" />
                   <span className="text-sm font-medium">Manufacture Request</span>
@@ -332,7 +332,7 @@ const MaterialRequest = () => {
                 <Button
                   onClick={() => handleCreateNew("Customer Provided")}
                   variant="outline"
-                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-orange-50 hover:border-orange-200"
+                  className="h-16 flex flex-col items-center justify-center space-y-2 hover:bg-accent hover:border-accent-foreground"
                 >
                   <Database className="w-5 h-5 text-orange-600" />
                   <span className="text-sm font-medium">Customer Provided</span>
@@ -346,37 +346,37 @@ const MaterialRequest = () => {
             <Card>
               <CardContent className="p-6 text-center">
                 <div className="text-2xl font-bold text-blue-600">{analytics.total}</div>
-                <div className="text-sm text-gray-600">Total</div>
+                <div className="text-sm text-muted-foreground">Total</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-6 text-center">
-                <div className="text-2xl font-bold text-gray-600">{analytics.draft}</div>
-                <div className="text-sm text-gray-600">Draft</div>
+                <div className="text-2xl font-bold text-muted-foreground">{analytics.draft}</div>
+                <div className="text-sm text-muted-foreground">Draft</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-6 text-center">
                 <div className="text-2xl font-bold text-orange-600">{analytics.pending}</div>
-                <div className="text-sm text-gray-600">Pending</div>
+                <div className="text-sm text-muted-foreground">Pending</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-6 text-center">
                 <div className="text-2xl font-bold text-green-600">{analytics.completed}</div>
-                <div className="text-sm text-gray-600">Completed</div>
+                <div className="text-sm text-muted-foreground">Completed</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-6 text-center">
                 <div className="text-2xl font-bold text-yellow-600">{analytics.partial}</div>
-                <div className="text-sm text-gray-600">Partial</div>
+                <div className="text-sm text-muted-foreground">Partial</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-6 text-center">
                 <div className="text-2xl font-bold text-red-600">{analytics.cancelled}</div>
-                <div className="text-sm text-gray-600">Cancelled</div>
+                <div className="text-sm text-muted-foreground">Cancelled</div>
               </CardContent>
             </Card>
           </div>
@@ -405,7 +405,7 @@ const MaterialRequest = () => {
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            <h3 className="font-semibold text-gray-900">{request.name}</h3>
+                            <h3 className="font-semibold text-foreground">{request.name}</h3>
                             <p className="text-sm text-muted-foreground">{request.title || 'Material Request'}</p>
                           </div>
                           <div className="flex gap-2">

@@ -268,7 +268,7 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
       case "To Receive": return "bg-yellow-100 text-yellow-800 border-yellow-200";
       case "To Receive and Bill": return "bg-blue-100 text-blue-800 border-blue-200";
       case "Partially Received": return "bg-orange-100 text-orange-800 border-orange-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+      default: return "bg-muted text-muted-foreground border-border";
     }
   };
 
@@ -311,7 +311,7 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[10000]" align="start">
+            <PopoverContent className="w-full p-0 bg-card border border-border shadow-lg z-[10000]" align="start">
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search purchase orders..." 
@@ -350,7 +350,7 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
                               <Package className="w-4 h-4 text-muted-foreground shrink-0" />
                               <div>
                                 <div className="font-semibold text-sm">{po.name}</div>
-                                <div className="text-xs text-gray-600 flex items-center">
+                                <div className="text-xs text-muted-foreground flex items-center">
                                   <User className="w-3 h-3 mr-1" />
                                   {po.supplier_name}
                                 </div>
@@ -366,11 +366,11 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
                             <Badge className={getStatusColor(po.status)} variant="outline">
                               {po.status}
                             </Badge>
-                            <div className="text-xs text-gray-500 flex items-center">
+                            <div className="text-xs text-muted-foreground flex items-center">
                               <Calendar className="w-3 h-3 mr-1" />
                               Due: {po.schedule_date ? new Date(po.schedule_date).toLocaleDateString() : 'N/A'}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-muted-foreground">
                               Received: {po.per_received}%
                             </div>
                           </div>

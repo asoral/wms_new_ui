@@ -83,7 +83,7 @@ const POItemsDisplay = ({ items }: POItemsDisplayProps) => {
                     </Badge>
                   )}
                   {!item.has_batch_no && !item.has_serial_no && (
-                    <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+                    <Badge variant="secondary" className="bg-muted text-muted-foreground">
                       No Tracking Required
                     </Badge>
                   )}

@@ -43,7 +43,7 @@ const StockCountTable = ({ entries, onUpdateEntry, readOnly }: StockCountTablePr
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-100">
+              <tr className="bg-muted">
                 <th className="p-2 border text-left">Item</th>
                 <th className="p-2 border text-left">Warehouse</th>
                 <th className="p-2 border text-left">Current Qty</th>

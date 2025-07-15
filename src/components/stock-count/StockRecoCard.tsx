@@ -60,8 +60,8 @@ export const StockRecoCard = ({ session, onEdit, onView }: StockRecoCardProps) =
           {/* Header */}
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="font-semibold text-lg text-gray-900">{session.id}</h3>
-              <p className="text-sm text-gray-600 mt-1">{session.purpose}</p>
+              <h3 className="font-semibold text-lg text-foreground">{session.id}</h3>
+              <p className="text-sm text-muted-foreground mt-1">{session.purpose}</p>
             </div>
             {getStatusBadge(session.status)}
           </div>
@@ -69,16 +69,16 @@ export const StockRecoCard = ({ session, onEdit, onView }: StockRecoCardProps) =
           {/* Details */}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <span className="text-gray-500">Started:</span>
+              <span className="text-muted-foreground">Started:</span>
               <p className="font-medium">{formatDateTime(session.startedAt, session.postingTime)}</p>
             </div>
             <div>
-              <span className="text-gray-500">Total Items:</span>
+              <span className="text-muted-foreground">Total Items:</span>
               <p className="font-medium text-blue-600">{session.totalItems}</p>
             </div>
             {session.differenceAmount !== undefined && (
               <div className="col-span-2">
-                <span className="text-gray-500">Difference Amount:</span>
+                <span className="text-muted-foreground">Difference Amount:</span>
                 <p className="font-medium text-red-600">₹ {session.differenceAmount?.toLocaleString() || 0}</p>
               </div>
             )}

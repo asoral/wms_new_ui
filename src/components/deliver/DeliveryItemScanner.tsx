@@ -130,7 +130,7 @@ const DeliveryItemScanner = ({ soItems, onAddEntry }: DeliveryItemScannerProps) 
                     <SelectItem key={item.itemCode} value={item.itemCode}>
                       <div className="flex flex-col">
                         <span className="font-medium">{item.itemCode}</span>
-                        <span className="text-xs text-gray-500">{item.itemName}</span>
+                        <span className="text-xs text-muted-foreground">{item.itemName}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -184,24 +184,24 @@ const DeliveryItemScanner = ({ soItems, onAddEntry }: DeliveryItemScannerProps) 
             </div>
 
             {/* Item Details */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-medium mb-2">Item Details</h4>
+            <div className="bg-muted rounded-lg p-4">
+              <h4 className="font-medium mb-2 text-foreground">Item Details</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                 <div>
-                  <span className="text-gray-600">Name:</span>
-                  <div className="font-medium">{selectedItem.itemName}</div>
+                  <span className="text-muted-foreground">Name:</span>
+                  <div className="font-medium text-foreground">{selectedItem.itemName}</div>
                 </div>
                 <div>
-                  <span className="text-gray-600">Pending:</span>
-                  <div className="font-medium">{selectedItem.pendingQty} {selectedItem.uom}</div>
+                  <span className="text-muted-foreground">Pending:</span>
+                  <div className="font-medium text-foreground">{selectedItem.pendingQty} {selectedItem.uom}</div>
                 </div>
                 <div>
-                  <span className="text-gray-600">Rate:</span>
-                  <div className="font-medium">₹{selectedItem.rate.toLocaleString()}</div>
+                  <span className="text-muted-foreground">Rate:</span>
+                  <div className="font-medium text-foreground">₹{selectedItem.rate.toLocaleString()}</div>
                 </div>
                 <div>
-                  <span className="text-gray-600">UOM:</span>
-                  <div className="font-medium">{selectedItem.uom}</div>
+                  <span className="text-muted-foreground">UOM:</span>
+                  <div className="font-medium text-foreground">{selectedItem.uom}</div>
                 </div>
               </div>
             </div>

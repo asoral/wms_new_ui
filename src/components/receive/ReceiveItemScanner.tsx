@@ -81,12 +81,12 @@ const ReceiveItemScanner = ({ poItems, onItemScanned, isLoading }: ReceiveItemSc
         <TabsContent value="scan" className="mt-4">
           {!showCamera ? (
             <div className="text-center space-y-4">
-              <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg">
-                <ScanBarcode className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <div className="p-8 border-2 border-dashed border-border rounded-lg">
+                <ScanBarcode className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   Scan Item Barcode
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-muted-foreground mb-6">
                   Use your camera to scan an item barcode from the Purchase Order
                 </p>
                 <Button 

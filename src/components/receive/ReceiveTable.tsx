@@ -62,7 +62,7 @@ const ReceiveTable = ({ entries, onUpdateEntry, onDeleteEntry, mode = 'edit' }: 
       {entries.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-gray-500">No items added yet. Scan or select items to add them to the receipt.</p>
+            <p className="text-muted-foreground">No items added yet. Scan or select items to add them to the receipt.</p>
           </CardContent>
         </Card>
       ) : (
@@ -76,19 +76,19 @@ const ReceiveTable = ({ entries, onUpdateEntry, onDeleteEntry, mode = 'edit' }: 
                     {/* Header with Item Info and Total */}
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-lg text-gray-900">{entry.itemCode}</h3>
-                        <p className="text-gray-600 text-sm">{entry.itemName}</p>
+                         <h3 className="font-semibold text-lg text-foreground">{entry.itemCode}</h3>
+                        <p className="text-muted-foreground text-sm">{entry.itemName}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-lg text-green-600">{formatCurrency(entry.receivedQty * entry.rate)}</p>
-                        <p className="text-sm text-gray-600">{formatCurrency(entry.rate)}/unit</p>
+                        <p className="text-sm text-muted-foreground">{formatCurrency(entry.rate)}/unit</p>
                       </div>
                     </div>
 
                     {/* Details Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-600">Received Qty:</span>
+                        <span className="text-muted-foreground">Received Qty:</span>
                         {editingIndex === index ? (
                           <Input
                             type="number"
@@ -106,11 +106,11 @@ const ReceiveTable = ({ entries, onUpdateEntry, onDeleteEntry, mode = 'edit' }: 
                         )}
                       </div>
                       <div>
-                        <span className="text-gray-600">Warehouse:</span>
+                        <span className="text-muted-foreground">Warehouse:</span>
                         <p className="font-medium">{entry.warehouse}</p>
                       </div>
                       <div>
-                        <span className="text-gray-600">UOM:</span>
+                        <span className="text-muted-foreground">UOM:</span>
                         <p className="font-medium">{entry.uom}</p>
                       </div>
                     </div>
@@ -120,7 +120,7 @@ const ReceiveTable = ({ entries, onUpdateEntry, onDeleteEntry, mode = 'edit' }: 
                       <div className="flex flex-wrap gap-2">
                         {entry.batch && (
                           <div>
-                            <span className="text-gray-600 text-sm">Batch:</span>
+                            <span className="text-muted-foreground text-sm">Batch:</span>
                             {editingIndex === index ? (
                               <Input
                                 value={editingEntry?.batch || ''}
@@ -138,7 +138,7 @@ const ReceiveTable = ({ entries, onUpdateEntry, onDeleteEntry, mode = 'edit' }: 
                         )}
                         {entry.serial && (
                           <div>
-                            <span className="text-gray-600 text-sm">Serial:</span>
+                            <span className="text-muted-foreground text-sm">Serial:</span>
                             {editingIndex === index ? (
                               <Input
                                 value={editingEntry?.serial || ''}
@@ -212,11 +212,11 @@ const ReceiveTable = ({ entries, onUpdateEntry, onDeleteEntry, mode = 'edit' }: 
           </div>
 
           {/* Summary Card */}
-          <Card className="bg-gray-50 border-2 border-dashed border-gray-300">
+          <Card className="bg-muted border-2 border-dashed border-border">
             <CardContent className="p-4">
               <div className="text-center space-y-2">
-                <p className="text-sm text-gray-600">Total Items: {entries.length}</p>
-                <p className="text-xl font-bold text-gray-900">Total Value: {formatCurrency(getTotalValue())}</p>
+                <p className="text-sm text-muted-foreground">Total Items: {entries.length}</p>
+                <p className="text-xl font-bold text-foreground">Total Value: {formatCurrency(getTotalValue())}</p>
               </div>
             </CardContent>
           </Card>
