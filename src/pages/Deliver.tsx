@@ -437,7 +437,7 @@ const Deliver = () => {
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="w-full max-w-7xl mx-auto py-4 md:py-6">
       {currentStep === 'dashboard' ? (
         <>
           <div className="mb-6">

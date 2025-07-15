@@ -101,7 +101,7 @@ const DraftReceipts = () => {
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="w-full max-w-7xl mx-auto py-4 md:py-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <FileText className="w-6 h-6 mr-2 text-blue-600" />
@@ -147,7 +147,7 @@ const DraftReceipts = () => {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-600">
                     <div>
                       <span className="font-medium">Supplier:</span>
                       <p className="text-gray-900">{receipt.supplier_name || receipt.supplier}</p>

@@ -129,7 +129,7 @@ const SalesOrderList = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto py-4 md:py-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Sales Orders</h1>
         <Button onClick={fetchSalesOrders} variant="outline">

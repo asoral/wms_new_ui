@@ -167,7 +167,7 @@ const StockCount = () => {
   };
 
   return (
-    <div className="container mx-auto py-4 px-4 md:py-6">
+    <div className="w-full max-w-7xl mx-auto py-4 md:py-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Stock Count Management</h1>
         <p className="text-gray-500">Manage stock reconciliation and counting sessions</p>
@@ -243,7 +243,7 @@ const StockCount = () => {
 
           <div className="space-y-2">
             <Label htmlFor="purpose">Select Count Purpose *</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card 
                 className={`cursor-pointer transition-all ${selectedPurpose === 'Stock Reconciliation' ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}
                 onClick={() => setSelectedPurpose('Stock Reconciliation')}

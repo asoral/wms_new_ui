@@ -225,7 +225,7 @@ const ItemEnquiry = () => {
   const totalValuation = Math.round(stockItems.reduce((sum, item) => sum + item.valuation, 0) * 100) / 100;
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="w-full max-w-7xl mx-auto py-4 md:py-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold flex items-center space-x-2">
           <Package className="w-6 h-6" />
@@ -270,7 +270,7 @@ const ItemEnquiry = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Card className="bg-blue-50 border-blue-200">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">

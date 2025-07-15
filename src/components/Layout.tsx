@@ -21,7 +21,7 @@ const Layout = ({ children }: LayoutProps) => {
         
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="pb-20 md:pb-6">
+          <div className="max-w-full overflow-x-hidden px-3 md:px-6 pb-20 md:pb-6">
             {children}
           </div>
         </div>

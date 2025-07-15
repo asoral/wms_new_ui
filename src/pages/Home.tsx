@@ -119,9 +119,9 @@ const Home = () => {
   };
 
   return (
-    <div className="container mx-auto py-6 px-4 md:px-6 space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+    <div className="w-full max-w-7xl mx-auto py-4 md:py-6 space-y-6 md:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
         <div className="flex items-center space-x-3">
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-32">
@@ -142,7 +142,7 @@ const Home = () => {
       </div>
 
             {/* Main Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               {isLoading ? (
                 // Loading skeletons
                 Array.from({ length: 4 }).map((_, i) => (
@@ -179,7 +179,7 @@ const Home = () => {
             </div>
 
             {/* Enhanced Financial Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <Card key={i}>
@@ -224,13 +224,13 @@ const Home = () => {
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {Array.from({ length: 6 }).map((_, i) => (
                       <Skeleton key={i} className="h-20 w-full" />
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Target className="w-4 h-4 text-green-600" />
@@ -284,7 +284,7 @@ const Home = () => {
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
               {/* Quick Actions */}
               <div className="lg:col-span-1">
                 <Card>
@@ -389,14 +389,14 @@ const Home = () => {
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Skeleton key={i} className="h-20 w-full" />
                     ))}
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
                       <div className="space-y-2">
                         <h4 className="font-medium text-green-600">Fresh Stock (0-30 days)</h4>
                         <p className="text-2xl font-bold">{safeStockAgingData.items_count - safeStockAgingData.aged_30_days}</p>
@@ -420,7 +420,7 @@ const Home = () => {
                         <PieChart className="w-4 h-4 mr-2" />
                         ABC Analysis Distribution
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">Class A Items</span>

@@ -468,7 +468,7 @@ const StockCountSession = () => {
   };
 
   return (
-    <div className="container mx-auto py-4 px-4 md:py-6">
+    <div className="w-full max-w-7xl mx-auto py-4 md:py-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
         <div>
           <div className="flex items-center space-x-4">
@@ -538,7 +538,7 @@ const StockCountSession = () => {
             </CardTitle>
           </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-4 md:gap-6 text-center">
+          <div className="grid grid-cols-3 gap-3 md:gap-6 text-center">
             <div>
               <div className="text-2xl md:text-3xl font-bold text-gray-600">{totalItems}</div>
               <div className="text-xs md:text-sm text-gray-500">Total Items</div>

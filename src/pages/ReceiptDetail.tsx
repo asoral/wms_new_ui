@@ -168,7 +168,7 @@ const ReceiptDetail = () => {
   }
 
   return (
-    <div className="container mx-auto mt-8">
+    <div className="w-full max-w-7xl mx-auto mt-6 md:mt-8">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-2xl font-bold">
