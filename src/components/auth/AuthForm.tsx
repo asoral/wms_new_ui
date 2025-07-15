@@ -172,14 +172,14 @@ const AuthForm = () => {
   // Show signup form after onboarding
   if (showSignupForm) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center mb-8">
             <div className="flex items-center space-x-2">
               <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Warehouse className="w-6 h-6 text-white" />
               </div>
-              <span className="font-bold text-2xl text-gray-900">WMS</span>
+              <span className="font-bold text-2xl text-foreground">WMS</span>
             </div>
           </div>
 
@@ -323,14 +323,14 @@ const AuthForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center mb-8">
           <div className="flex items-center space-x-2">
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
               <Warehouse className="w-6 h-6 text-white" />
             </div>
-            <span className="font-bold text-2xl text-gray-900">WMS</span>
+            <span className="font-bold text-2xl text-foreground">WMS</span>
           </div>
         </div>
 
@@ -402,7 +402,7 @@ const AuthForm = () => {
 
               <TabsContent value="signup">
                 <div className="text-center space-y-4">
-                  <p className="text-gray-600">
+                  <p className="text-muted-foreground">
                     Discover how WMS can transform your warehouse operations
                   </p>
                   <Button onClick={handleSignupClick} size="lg" className="w-full">

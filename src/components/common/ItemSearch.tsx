@@ -97,7 +97,7 @@ const ItemSearch = ({ onItemSelect, placeholder = "Search items...", disabled = 
     <div className="relative">
       <div className="flex space-x-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -109,22 +109,22 @@ const ItemSearch = ({ onItemSelect, placeholder = "Search items...", disabled = 
       </div>
 
       {showResults && items.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {items.map((item) => (
             <div
               key={item.name}
-              className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+              className="p-3 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
               onClick={() => handleItemSelect(item)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Package className="w-4 h-4 text-gray-400" />
+                  <Package className="w-4 h-4 text-muted-foreground" />
                   <div>
-                    <p className="font-medium text-sm">{item.item_name}</p>
-                    <p className="text-xs text-gray-600">{item.item_code}</p>
+                    <p className="font-medium text-sm text-foreground">{item.item_name}</p>
+                    <p className="text-xs text-muted-foreground">{item.item_code}</p>
                   </div>
                 </div>
-                <span className="text-xs text-gray-500">{item.stock_uom}</span>
+                <span className="text-xs text-muted-foreground">{item.stock_uom}</span>
               </div>
             </div>
           ))}
@@ -132,8 +132,8 @@ const ItemSearch = ({ onItemSelect, placeholder = "Search items...", disabled = 
       )}
 
       {loading && (
-        <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg p-3">
-          <div className="text-center text-sm text-gray-500">Searching...</div>
+        <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg p-3">
+          <div className="text-center text-sm text-muted-foreground">Searching...</div>
         </div>
       )}
     </div>

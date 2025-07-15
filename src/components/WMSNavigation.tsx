@@ -53,7 +53,7 @@ const WMSNavigation = () => {
           variant="outline"
           size="icon"
           onClick={() => setIsOpen(!isOpen)}
-          className="bg-white shadow-lg"
+          className="bg-sidebar shadow-lg"
         >
           {isOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </Button>
@@ -61,7 +61,7 @@ const WMSNavigation = () => {
 
       {/* Sidebar - Always visible on desktop */}
       <div className={`
-        fixed left-0 top-0 h-screen bg-white shadow-lg z-40 w-64 transform transition-transform duration-300 ease-in-out
+        fixed left-0 top-0 h-screen bg-sidebar shadow-lg z-40 w-64 transform transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0 md:static md:shadow-none md:border-r border-gray-200
         flex flex-col
@@ -69,7 +69,7 @@ const WMSNavigation = () => {
         {/* App Header with Icon - Always visible */}
         <div className="p-4 border-b border-gray-200 bg-blue-600">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-sidebar-accent rounded-lg flex items-center justify-center">
               <Warehouse className="w-5 h-5 text-blue-600" />
             </div>
             <div className="text-white">
@@ -91,7 +91,7 @@ const WMSNavigation = () => {
                 className={`w-full justify-start space-x-3 h-11 ${
                   active 
                     ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm" 
-                    : "hover:bg-blue-50 hover:text-blue-600 text-gray-700"
+                    : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground"
                 }`}
                 onClick={() => {
                   navigate(item.path);
@@ -107,7 +107,7 @@ const WMSNavigation = () => {
 
         {/* Footer */}
         <div className="p-4 border-t border-gray-200">
-          <div className="text-xs text-gray-500 text-center">
+          <div className="text-xs text-muted-foreground text-center">
             Version 1.0.0
           </div>
         </div>

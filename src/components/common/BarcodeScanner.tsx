@@ -238,7 +238,7 @@ const BarcodeScanner = ({
       <CardContent className="space-y-4">
         {error ? (
           <div className="text-center p-8">
-            <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <Camera className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-red-600 mb-4">{error}</p>
             <Button onClick={handleManualInput} className="w-full">
               Enter Manually
@@ -289,7 +289,7 @@ const BarcodeScanner = ({
               </Button>
             </div>
 
-            <div className="text-sm text-gray-600 text-center">
+            <div className="text-sm text-muted-foreground text-center">
               {description}
             </div>
           </>

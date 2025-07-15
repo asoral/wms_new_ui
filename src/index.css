@@ -96,7 +96,7 @@
 
 @layer components {
   .glass-effect {
-    @apply bg-white/80 backdrop-blur-lg border border-white/20 shadow-xl;
+    @apply bg-background/80 backdrop-blur-lg border border-border shadow-xl;
   }
   
   .gradient-bg {
@@ -129,7 +129,7 @@
   }
   
   .bike-card {
-    @apply bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100;
+    @apply bg-gradient-to-br from-card to-muted rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-border;
   }
   
   .bike-card:hover {

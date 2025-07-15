@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +40,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { signOut, user } = useAuth();
-  const [darkMode, setDarkMode] = useState(false);
+  const { theme, setTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   
   // Mock notification count
@@ -81,8 +82,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
   };
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    // Implement dark mode toggle logic
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   const handleSignOut = async () => {
@@ -96,7 +96,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
   };
 
   return (
-    <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
+    <div className="bg-card border-b border-border px-4 py-3 sticky top-0 z-50">
       <div className="flex items-center justify-between">
         {/* Left Section - Logo & App Name (Mobile Only) */}
         <div className="flex items-center space-x-4">
@@ -105,7 +105,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Warehouse className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-xl text-gray-900">WMS</span>
+              <span className="font-bold text-xl text-foreground">WMS</span>
             </div>
           )}
         </div>
@@ -113,7 +113,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
         {/* Center Section - Search/Scan */}
         <div className="flex-1 max-w-lg mx-8">
           <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input 
               placeholder="Search or scan items, orders, warehouses..." 
               className="pl-10"
@@ -180,7 +180,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
               <DropdownMenuSeparator />
               
               <DropdownMenuItem onClick={toggleDarkMode}>
-                {darkMode ? (
+                {theme === 'dark' ? (
                   <>
                     <Sun className="w-4 h-4 mr-2" />
                     Light Mode
