@@ -46,7 +46,7 @@ const WarehouseStockTable = ({ warehouseStock }: WarehouseStockTableProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-muted-foreground">
             No stock information available.
           </div>
         </CardContent>
@@ -70,32 +70,32 @@ const WarehouseStockTable = ({ warehouseStock }: WarehouseStockTableProps) => {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-3 font-medium text-gray-700">Warehouse</th>
-                    <th className="text-right p-3 font-medium text-gray-700">Quantity</th>
-                    <th className="text-right p-3 font-medium text-gray-700">Valuation</th>
-                    <th className="text-center p-3 font-medium text-gray-700">Batch</th>
-                    <th className="text-center p-3 font-medium text-gray-700">Serial</th>
-                    <th className="text-center p-3 font-medium text-gray-700">Age (Days)</th>
-                    <th className="text-center p-3 font-medium text-gray-700">Status</th>
+                    <th className="text-left p-3 font-medium text-foreground">Warehouse</th>
+                    <th className="text-right p-3 font-medium text-foreground">Quantity</th>
+                    <th className="text-right p-3 font-medium text-foreground">Valuation</th>
+                    <th className="text-center p-3 font-medium text-foreground">Batch</th>
+                    <th className="text-center p-3 font-medium text-foreground">Serial</th>
+                    <th className="text-center p-3 font-medium text-foreground">Age (Days)</th>
+                    <th className="text-center p-3 font-medium text-foreground">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {warehouseStock.map((stock, index) => {
                     const status = getStockStatus(stock.actualQty);
                     return (
-                      <tr key={index} className="border-b hover:bg-gray-50">
+                      <tr key={index} className="border-b border-border hover:bg-accent">
                         <td className="p-3">
                           <div className="font-medium">{stock.warehouse}</div>
                         </td>
                         <td className="p-3 text-right">
                           <div className="font-medium">{stock.qty} {stock.uom}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             Available: {stock.availableQty} | Reserved: {stock.reservedQty}
                           </div>
                         </td>
                         <td className="p-3 text-right">
                           <div className="font-medium">{formatCurrency(stock.valuation)}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             Rate: {formatCurrency(stock.valuationRate)}
                           </div>
                         </td>
@@ -103,14 +103,14 @@ const WarehouseStockTable = ({ warehouseStock }: WarehouseStockTableProps) => {
                           {stock.batch ? (
                             <Badge variant="outline">{stock.batch}</Badge>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </td>
                         <td className="p-3 text-center">
                           {stock.serial ? (
                             <Badge variant="outline">{stock.serial}</Badge>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </td>
                         <td className="p-3 text-center">
@@ -135,7 +135,7 @@ const WarehouseStockTable = ({ warehouseStock }: WarehouseStockTableProps) => {
                 <div key={index} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <Warehouse className="w-4 h-4 text-gray-500" />
+                      <Warehouse className="w-4 h-4 text-muted-foreground" />
                       <span className="font-medium">{stock.warehouse}</span>
                     </div>
                     <Badge className={status.color}>{status.label}</Badge>
@@ -143,16 +143,16 @@ const WarehouseStockTable = ({ warehouseStock }: WarehouseStockTableProps) => {
                   
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div className="flex items-center space-x-2">
-                      <Package className="w-4 h-4 text-gray-500" />
+                      <Package className="w-4 h-4 text-muted-foreground" />
                       <span>{stock.qty} {stock.uom}</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <DollarSign className="w-4 h-4 text-gray-500" />
+                      <DollarSign className="w-4 h-4 text-muted-foreground" />
                       <span>{formatCurrency(stock.valuation)}</span>
                     </div>
                   </div>
 
-                  <div className="text-xs text-gray-600 space-y-1">
+                  <div className="text-xs text-muted-foreground space-y-1">
                     <div>Available: {stock.availableQty} | Reserved: {stock.reservedQty}</div>
                     <div>Rate: {formatCurrency(stock.valuationRate)}</div>
                   </div>
@@ -168,7 +168,7 @@ const WarehouseStockTable = ({ warehouseStock }: WarehouseStockTableProps) => {
                     </div>
                   )}
 
-                  <div className="flex items-center space-x-2 text-xs text-gray-600">
+                  <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                     <Calendar className="w-3 h-3" />
                     <span>Age: {stock.age} days</span>
                   </div>

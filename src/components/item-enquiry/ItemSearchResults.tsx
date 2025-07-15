@@ -21,15 +21,15 @@ const ItemSearchResults = ({
       {results.map((item) => (
         <div
           key={item.name}
-          className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+          className="p-3 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
           onClick={() => onItemSelect(item)}
         >
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">{item.item_name}</p>
-              <p className="text-sm text-gray-600">{item.item_code}</p>
+              <p className="text-sm text-muted-foreground">{item.item_code}</p>
               {item.description && (
-                <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+                <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
               )}
             </div>
             <Badge variant="outline">{item.stock_uom || 'Nos'}</Badge>

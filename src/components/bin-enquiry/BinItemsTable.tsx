@@ -35,17 +35,17 @@ const BinItemsTable = ({ items }: BinItemsTableProps) => {
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-semibold text-lg">{item.itemCode}</h3>
-                    <p className="text-gray-600 text-sm">{item.itemName}</p>
+                    <p className="text-muted-foreground text-sm">{item.itemName}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold text-green-600">{item.qty}</p>
-                    <p className="text-sm text-gray-600">{item.uom}</p>
+                    <p className="text-sm text-muted-foreground">{item.uom}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">Age:</span>
+                    <span className="text-muted-foreground">Age:</span>
                     <div className="mt-1">
                       <Badge className={getAgeColor(item.age)}>
                         {item.age} days
@@ -53,7 +53,7 @@ const BinItemsTable = ({ items }: BinItemsTableProps) => {
                     </div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Valuation:</span>
+                    <span className="text-muted-foreground">Valuation:</span>
                     <p className="font-semibold mt-1">{formatCurrency(item.valuation)}</p>
                   </div>
                 </div>
@@ -80,7 +80,7 @@ const BinItemsTable = ({ items }: BinItemsTableProps) => {
         {items.length === 0 && (
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-gray-500">No items found in this bin.</p>
+              <p className="text-muted-foreground">No items found in this bin.</p>
             </CardContent>
           </Card>
         )}
@@ -122,7 +122,7 @@ const BinItemsTable = ({ items }: BinItemsTableProps) => {
                   </Badge>
                 )}
                 {!item.batch && !item.serial && (
-                  <span className="text-gray-400">-</span>
+                  <span className="text-muted-foreground">-</span>
                 )}
               </TableCell> */}
               <TableCell className="text-right">

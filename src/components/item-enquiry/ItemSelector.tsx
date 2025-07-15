@@ -66,7 +66,7 @@ const ItemSelector = ({ onItemSelected, isLoading = false }: ItemSelectorProps) 
             <div className="text-center py-4">
               <div className="inline-flex items-center space-x-2">
                 <div className="animate-spin rounded-full w-4 h-4 border-b-2 border-blue-600"></div>
-                <span className="text-sm text-gray-600">Searching...</span>
+                <span className="text-sm text-muted-foreground">Searching...</span>
               </div>
             </div>
           )}
