@@ -97,15 +97,34 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
             company || undefined,
             20
           );
-          // Extract item count from Material Request
           console.log('Material Requests Response:', materialRequests);
-          documentsData = materialRequests.data.map((mr: any) => {
-            // Try to get item count from the material request data
+          
+          // Handle different response structures
+          let mrData = [];
+          if ((materialRequests as any)?.data?.data && Array.isArray((materialRequests as any).data.data)) {
+            mrData = (materialRequests as any).data.data;
+          } else if ((materialRequests as any)?.data && Array.isArray((materialRequests as any).data)) {
+            mrData = (materialRequests as any).data;
+          } else if (materialRequests && Array.isArray(materialRequests)) {
+            mrData = materialRequests;
+          }
+          
+          documentsData = mrData.map((mr: any) => {
+            console.log('Processing Material Request:', mr);
+            
+            // Try to get item count from different sources
             let itemCount = 0;
             if (mr.items && Array.isArray(mr.items)) {
               itemCount = mr.items.length;
+              console.log('Found items array with length:', itemCount);
             } else if (mr.total_qty) {
               itemCount = mr.total_qty;
+              console.log('Using total_qty:', itemCount);
+            } else if (mr.qty) {
+              itemCount = mr.qty;
+              console.log('Using qty:', itemCount);
+            } else {
+              console.log('No item count found for MR:', mr);
             }
             
             return {
@@ -115,6 +134,7 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
               itemCount: itemCount
             };
           });
+          console.log('Final documents data for Material Transfer:', documentsData);
           break;
           
         case "Manufacturing":

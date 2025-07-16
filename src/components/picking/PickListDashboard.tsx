@@ -65,31 +65,47 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         ['docstatus', 'in', [0, 1]]
       ];
       
+      console.log('Using filters:', filters);
       const response = await getPickLists(filters);
       console.log('Pick lists API response:', response);
       
-      if (response?.data && Array.isArray(response.data)) {
+      // Check different response structure possibilities
+      let pickListsData = [];
+      if ((response as any)?.data?.data && Array.isArray((response as any).data.data)) {
+        console.log('Found data in response.data.data');
+        pickListsData = (response as any).data.data;
+      } else if ((response as any)?.data && Array.isArray((response as any).data)) {
+        console.log('Found data in response.data');
+        pickListsData = (response as any).data;
+      } else if (response && Array.isArray(response)) {
+        console.log('Found data in response directly');
+        pickListsData = response;
+      } else {
+        console.log('No pick lists found in response structure:', response);
+      }
+      
+      if (pickListsData.length > 0) {
         // Sort by creation date descending (newest first)
-        const sortedData = response.data.sort((a: any, b: any) => 
+        const sortedData = pickListsData.sort((a: any, b: any) => 
           new Date(b.creation).getTime() - new Date(a.creation).getTime()
         );
         
-        const pickListsData = sortedData.map((pl: any) => ({
+        const processedPickLists = sortedData.map((pl: any) => ({
           ...pl,
           status: pl.docstatus === 0 ? 'Draft' : pl.docstatus === 1 ? 'Open' : 'Completed'
         }));
         
-        console.log('Processed pick lists data:', pickListsData);
-        setPickLists(pickListsData);
+        console.log('Processed pick lists data:', processedPickLists);
+        setPickLists(processedPickLists);
         
         // Calculate analytics
-        const pending = pickListsData.filter((pl: any) => pl.status === 'Draft').length;
-        const inProgress = pickListsData.filter((pl: any) => pl.status === 'Open').length; 
-        const completed = pickListsData.filter((pl: any) => pl.status === 'Completed').length;
+        const pending = processedPickLists.filter((pl: any) => pl.status === 'Draft').length;
+        const inProgress = processedPickLists.filter((pl: any) => pl.status === 'Open').length; 
+        const completed = processedPickLists.filter((pl: any) => pl.status === 'Completed').length;
         
         console.log('Analytics:', { pending, inProgress, completed });
         setAnalytics({
-          totalPickLists: pickListsData.length,
+          totalPickLists: processedPickLists.length,
           pendingPickLists: pending,
           inProgressPickLists: inProgress,
           completedPickLists: completed
