@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { User, Settings, Warehouse, LogOut, Building2, Server, Key, Globe } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { User, Settings, Warehouse, LogOut, Building2, Server, Key, Globe, MessageCircle, Mail, ExternalLink } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { getERPNextConfig, saveERPNextConfig } from "@/services/authService";
@@ -24,6 +25,7 @@ const Profile = () => {
     erpnext_pallet_template_item: ''
   });
   const [configLoading, setConfigLoading] = useState(false);
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
 
   useEffect(() => {
     loadERPNextConfig();
@@ -337,11 +339,75 @@ const Profile = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Need help? Contact our support team at support@dexciss.io
+              Need help? Contact our support team
             </p>
-            <Button variant="outline" className="w-full dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
-              Contact Support
-            </Button>
+            <Dialog open={supportDialogOpen} onOpenChange={setSupportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+                  Contact Support
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Contact Support</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Choose how you'd like to get in touch with our support team:
+                  </p>
+                  
+                  <div className="space-y-2">
+                    {/* WhatsApp Option */}
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-auto p-4"
+                      onClick={() => {
+                        window.open(`https://wa.me/917028581588`, '_blank');
+                        setSupportDialogOpen(false);
+                      }}
+                    >
+                      <MessageCircle className="h-5 w-5 mr-3 text-green-600" />
+                      <div className="text-left">
+                        <div className="font-medium">WhatsApp</div>
+                        <div className="text-sm text-muted-foreground">+91 7028581588</div>
+                      </div>
+                    </Button>
+                    
+                    {/* Email Option */}
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-auto p-4"
+                      onClick={() => {
+                        window.open(`mailto:asoral@dexciss.io`, '_blank');
+                        setSupportDialogOpen(false);
+                      }}
+                    >
+                      <Mail className="h-5 w-5 mr-3 text-blue-600" />
+                      <div className="text-left">
+                        <div className="font-medium">Email</div>
+                        <div className="text-sm text-muted-foreground">asoral@dexciss.io</div>
+                      </div>
+                    </Button>
+                    
+                    {/* Support Portal Option */}
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-auto p-4"
+                      onClick={() => {
+                        window.open(`https://support.dexciss.io`, '_blank');
+                        setSupportDialogOpen(false);
+                      }}
+                    >
+                      <ExternalLink className="h-5 w-5 mr-3 text-purple-600" />
+                      <div className="text-left">
+                        <div className="font-medium">Support Portal</div>
+                        <div className="text-sm text-muted-foreground">Visit our help center</div>
+                      </div>
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
 
