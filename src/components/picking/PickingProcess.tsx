@@ -30,13 +30,30 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
   const { toast } = useToast();
 
   useEffect(() => {
-    // Initialize items with proper status
-    const initializedItems = (pickList.items || []).map(item => ({
-      ...item,
+    // Initialize items with proper status - check both items and locations
+    let itemsToUse = pickList.items || pickList.locations || [];
+    
+    if (itemsToUse.length === 0 && pickList.locations) {
+      // Use locations if items are empty
+      itemsToUse = pickList.locations;
+    }
+    
+    const initializedItems = itemsToUse.map((item: any, index: number) => ({
+      id: item.id || (index + 1).toString(),
+      item_code: item.item_code,
+      item_name: item.item_name || item.item_code,
+      qty: item.qty || 0,
       picked_qty: item.picked_qty || 0,
-      pickedQty: item.pickedQty || 0,
+      pickedQty: item.pickedQty || item.picked_qty || 0,
+      warehouse: item.warehouse,
+      batch_no: item.batch_no || '',
+      serial_no: item.serial_no || '',
+      has_batch_no: item.has_batch_no || false,
+      has_serial_no: item.has_serial_no || false,
       status: item.status || "pending"
     }));
+    
+    console.log('Initialized items for picking:', initializedItems);
     setItems(initializedItems);
   }, [pickList]);
 
@@ -311,22 +328,48 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
     return items.length > 0 && items.every(item => (item.picked_qty || 0) === item.qty);
   };
 
-  // Early return if no items
+  // Early return if no items - first check if locations exist
   if (!items || items.length === 0) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center space-x-2 mb-6">
-          <Package className="w-6 h-6 text-blue-600" />
-          <h1 className="text-2xl font-bold">Pick List</h1>
+    // Check if pickList has locations instead of items
+    const locations = pickList.locations || [];
+    if (locations.length > 0) {
+      // Convert locations to items format
+      const convertedItems = locations.map((loc: any, index: number) => ({
+        id: (index + 1).toString(),
+        item_code: loc.item_code,
+        item_name: loc.item_name || loc.item_code,
+        qty: loc.qty || 0,
+        picked_qty: loc.picked_qty || 0,
+        warehouse: loc.warehouse,
+        batch_no: loc.batch_no || '',
+        serial_no: loc.serial_no || '',
+        has_batch_no: loc.has_batch_no || false,
+        has_serial_no: loc.has_serial_no || false,
+        status: (loc.picked_qty || 0) === 0 ? "pending" : 
+                (loc.picked_qty || 0) < loc.qty ? "partial" : "completed"
+      }));
+      
+      // Update items state with converted locations
+      if (convertedItems.length > 0) {
+        setItems(convertedItems);
+        // Don't return early, continue with normal flow
+      }
+    } else {
+      return (
+        <div className="p-6 space-y-6">
+          <div className="flex items-center space-x-2 mb-6">
+            <Package className="w-6 h-6 text-blue-600" />
+            <h1 className="text-2xl font-bold">Pick List</h1>
+          </div>
+          <div className="text-center py-8">
+            <p className="text-gray-500">No items to pick in this pick list.</p>
+            <Button onClick={onBack} className="mt-4">
+              Back to Pick List
+            </Button>
+          </div>
         </div>
-        <div className="text-center py-8">
-          <p className="text-gray-500">No items to pick in this pick list.</p>
-          <Button onClick={onBack} className="mt-4">
-            Back to Pick List
-          </Button>
-        </div>
-      </div>
-    );
+      );
+    }
   }
 
   const currentItem = getCurrentItem();

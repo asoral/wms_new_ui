@@ -289,7 +289,16 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
   // Call ERPNext server method
   async callMethod(doctype: string, docname: string, method: string, args: any = {}): Promise<ERPNextResponse<any>> {
-    const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.doctype.pick_list.pick_list.${method}`, {
+    let apiEndpoint;
+    
+    // Handle different method endpoints
+    if (method === 'get_item_locations') {
+      apiEndpoint = `${this.baseURL}/api/method/erpnext.stock.doctype.pick_list.pick_list.get_item_locations`;
+    } else {
+      apiEndpoint = `${this.baseURL}/api/method/erpnext.stock.doctype.pick_list.pick_list.${method}`;
+    }
+    
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
         ...this.getHeaders(),
@@ -297,6 +306,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       },
       body: JSON.stringify({
         doc: docname,
+        doctype: doctype,
         ...args
       })
     });

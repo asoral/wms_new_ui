@@ -57,8 +57,15 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       const company = await getUserDefaultCompany();
       console.log('Fetching pick lists for company:', company);
       
-      // Fetch with filters for the company, ordered by creation date
-      const response = await getPickLists(company ? [['company', '=', company]] : undefined);
+      // Filter for draft pick lists (docstatus = 0) and open pick lists (docstatus = 1)
+      const filters = company ? [
+        ['company', '=', company],
+        ['docstatus', 'in', [0, 1]]  // Include both draft and submitted
+      ] : [
+        ['docstatus', 'in', [0, 1]]
+      ];
+      
+      const response = await getPickLists(filters);
       console.log('Pick lists API response:', response);
       
       if (response?.data && Array.isArray(response.data)) {
@@ -102,6 +109,39 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       toast({
         title: "Error",
         description: "Failed to fetch pick lists",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleGetItemLocation = async (pickList: any) => {
+    try {
+      const { createERPNextAPI } = await import('@/services/erpnextApi');
+      const api = await createERPNextAPI();
+      
+      if (!api) {
+        toast({
+          title: "Error",
+          description: "Failed to connect to ERPNext",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Call the get_item_locations method in ERPNext
+      await api.callMethod('Pick List', pickList.name, 'get_item_locations');
+      
+      toast({
+        title: "Item Locations Updated",
+        description: "Pick list item locations have been refreshed from current stock",
+      });
+      
+      fetchPickLists(); // Refresh the list
+    } catch (error) {
+      console.error('Error updating item locations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update item locations",
         variant: "destructive"
       });
     }
@@ -255,8 +295,21 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
                         disabled={loading}
                         className="min-w-20"
                       >
+                        <FileText className="w-4 h-4 mr-2" />
                         {pickList.status === 'Draft' ? 'Start' : 'View'}
                       </Button>
+                      {pickList.status === 'Draft' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleGetItemLocation(pickList)}
+                          disabled={loading}
+                          className="min-w-20"
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Get Items
+                        </Button>
+                      )}
                       {pickList.status === 'Draft' && (
                         <Button 
                           variant="destructive" 

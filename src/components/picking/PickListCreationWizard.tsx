@@ -97,12 +97,24 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
             company || undefined,
             20
           );
-          documentsData = materialRequests.data.map((mr: any) => ({
-            id: mr.name,
-            name: mr.name,
-            date: mr.transaction_date,
-            itemCount: mr.items?.length || 0
-          }));
+          // Extract item count from Material Request
+          console.log('Material Requests Response:', materialRequests);
+          documentsData = materialRequests.data.map((mr: any) => {
+            // Try to get item count from the material request data
+            let itemCount = 0;
+            if (mr.items && Array.isArray(mr.items)) {
+              itemCount = mr.items.length;
+            } else if (mr.total_qty) {
+              itemCount = mr.total_qty;
+            }
+            
+            return {
+              id: mr.name,
+              name: mr.name,
+              date: mr.transaction_date || mr.creation,
+              itemCount: itemCount
+            };
+          });
           break;
           
         case "Manufacturing":

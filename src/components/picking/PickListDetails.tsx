@@ -76,14 +76,10 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       
       if ((response as any)?.data?.data && Array.isArray((response as any).data.data)) {
         setAvailableMaterialRequests((response as any).data.data);
-        if ((response as any).data.data.length > 0 && !relatedDocument) {
-          setRelatedDocument((response as any).data.data[0].name);
-        }
+        // Don't set default selection - let user choose
       } else if ((response as any)?.data && Array.isArray((response as any).data)) {
         setAvailableMaterialRequests((response as any).data);
-        if ((response as any).data.length > 0 && !relatedDocument) {
-          setRelatedDocument((response as any).data[0].name);
-        }
+        // Don't set default selection - let user choose
       }
     } catch (error) {
       console.error('Error fetching material requests:', error);
