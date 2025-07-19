@@ -314,27 +314,12 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       throw new Error("Pick List created but no name returned");
     }
 
-    // Manually populate the pick list with items based on the purpose
+    // Call get_item_locations to auto-populate items with batch/serial tracking
     try {
       if (pickListData.material_request) {
-        const materialRequestData = await api.getMaterialRequest(pickListData.material_request);
-        if (materialRequestData.data?.items?.length > 0) {
-          const locations = materialRequestData.data.items.map((item: any) => ({
-            item_code: item.item_code,
-            qty: item.qty,
-            stock_qty: item.stock_qty,
-            uom: item.uom,
-            stock_uom: item.stock_uom,
-            warehouse: item.warehouse,
-            batch_no: item.batch_no || '',
-            serial_no: item.serial_no || ''
-          }));
-
-          // Update the pick list with the items
-          await api.updatePickList(pickListName, {
-            locations: locations
-          });
-        }
+        // For material transfer, call get_item_locations which handles batch/serial auto-selection
+        await api.getItemLocations(pickListName);
+        console.log('Called get_item_locations for material transfer pick list');
       } else if (items && items.length > 0) {
         // For delivery and other purposes, use the provided items
         const locations = items.map((item: any) => ({
@@ -348,10 +333,14 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
           serial_no: item.serial_no || ''
         }));
 
-        // Update the pick list with the items
+        // Update the pick list with the items first
         await api.updatePickList(pickListName, {
           locations: locations
         });
+        
+        // Then call get_item_locations to populate batch/serial data
+        await api.getItemLocations(pickListName);
+        console.log('Called get_item_locations for delivery pick list');
       }
     } catch (error) {
       console.warn('Failed to populate pick list items:', error);

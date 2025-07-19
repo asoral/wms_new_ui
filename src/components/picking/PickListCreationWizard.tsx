@@ -92,48 +92,44 @@ const PickListCreationWizard = ({ onBack, onComplete }: PickListCreationWizardPr
           break;
           
         case "Material Transfer":
-          const materialRequests = await api.getMaterialRequests(
-            [['material_request_type', '=', 'Material Transfer'], ['status', '!=', 'Cancelled']],
-            company || undefined,
-            20
-          );
+          // Get material requests with fields that include items count
+          const materialRequests = await api.getMaterialRequests([
+            ['material_request_type', '=', 'Material Transfer'], 
+            ['status', '!=', 'Cancelled'],
+            ['docstatus', '=', '1']
+          ], company, 20);
+          
           console.log('Material Requests Response:', materialRequests);
           
-          // Handle different response structures
-          let mrData = [];
-          if ((materialRequests as any)?.data?.data && Array.isArray((materialRequests as any).data.data)) {
-            mrData = (materialRequests as any).data.data;
-          } else if ((materialRequests as any)?.data && Array.isArray((materialRequests as any).data)) {
-            mrData = (materialRequests as any).data;
-          } else if (materialRequests && Array.isArray(materialRequests)) {
-            mrData = materialRequests;
-          }
+          // Get detailed information for each material request to count items
+          const mrList = (materialRequests as any)?.data?.data || (materialRequests as any)?.data || [];
+          const detailedRequests = await Promise.all(
+            mrList.map(async (mr: any) => {
+              try {
+                const detailResponse = await api.getMaterialRequest(mr.name);
+                const detailData = (detailResponse as any)?.data?.data || (detailResponse as any)?.data;
+                const itemCount = detailData?.items?.length || 0;
+                console.log(`Material Request ${mr.name} has ${itemCount} items`);
+                
+                return {
+                  id: mr.name,
+                  name: mr.name,
+                  date: mr.transaction_date || mr.creation,
+                  itemCount: itemCount
+                };
+              } catch (error) {
+                console.error(`Error fetching details for ${mr.name}:`, error);
+                return {
+                  id: mr.name,
+                  name: mr.name,
+                  date: mr.transaction_date || mr.creation,
+                  itemCount: 0
+                };
+              }
+            })
+          );
           
-          documentsData = mrData.map((mr: any) => {
-            console.log('Processing Material Request:', mr);
-            
-            // Try to get item count from different sources
-            let itemCount = 0;
-            if (mr.items && Array.isArray(mr.items)) {
-              itemCount = mr.items.length;
-              console.log('Found items array with length:', itemCount);
-            } else if (mr.total_qty) {
-              itemCount = mr.total_qty;
-              console.log('Using total_qty:', itemCount);
-            } else if (mr.qty) {
-              itemCount = mr.qty;
-              console.log('Using qty:', itemCount);
-            } else {
-              console.log('No item count found for MR:', mr);
-            }
-            
-            return {
-              id: mr.name,
-              name: mr.name,
-              date: mr.transaction_date || mr.creation,
-              itemCount: itemCount
-            };
-          });
+          documentsData = detailedRequests;
           console.log('Final documents data for Material Transfer:', documentsData);
           break;
           

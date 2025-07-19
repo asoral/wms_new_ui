@@ -529,8 +529,8 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
               <p className="text-sm truncate">{getCurrentItem().warehouse}</p>
             </div>
             <div className="min-w-0">
-              <span className="text-xs text-muted-foreground">Bin:</span>
-              <p className="text-sm truncate">{getCurrentItem().bin || "N/A"}</p>
+              <span className="text-xs text-muted-foreground">Status:</span>
+              <p className="text-sm truncate">{getCurrentItem().status || "pending"}</p>
             </div>
           </div>
 

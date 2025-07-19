@@ -195,7 +195,20 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+    // Include important fields including status
+    const fields = [
+      'name',
+      'purpose',
+      'company',
+      'docstatus',
+      'status',
+      'creation',
+      'owner',
+      'material_request',
+      'work_order'
+    ];
+    
+    const params = this.buildQueryParams(finalFilters, fields, limitPageLength);
 
     const response = await fetch(`${this.baseURL}/api/resource/Pick List?${params}`, {
       headers: this.getHeaders(),
@@ -264,6 +277,31 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     }
 
     return response.json();
+  }
+
+  async getItemLocations(pickListName: string): Promise<ERPNextResponse<any>> {
+    console.log('Calling get_item_locations for pick list:', pickListName);
+    
+    const response = await fetch(`${this.baseURL}/api/method/erpnext.stock.doctype.pick_list.pick_list.get_item_locations`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        pick_list: pickListName
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Get Item Locations API Error:', response.status, errorText);
+      throw new Error(`Failed to get item locations: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('Get item locations result:', result);
+    return result;
   }
 
   async submitPickList(name: string): Promise<ERPNextResponse<any>> {

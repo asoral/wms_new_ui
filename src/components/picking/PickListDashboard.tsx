@@ -92,7 +92,7 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         
         const processedPickLists = sortedData.map((pl: any) => ({
           ...pl,
-          status: pl.docstatus === 0 ? 'Draft' : pl.docstatus === 1 ? 'Open' : 'Completed'
+          status: pl.status || (pl.docstatus === 0 ? 'Draft' : pl.docstatus === 1 ? 'Open' : 'Completed')
         }));
         
         console.log('Processed pick lists data:', processedPickLists);
