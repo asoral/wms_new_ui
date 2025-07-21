@@ -16,7 +16,7 @@ const SubscriptionSuccess = () => {
   }, [refreshSubscription]);
 
   const handleContinue = () => {
-    navigate('/');
+    navigate('/app/home');
   };
 
   return (

@@ -100,7 +100,7 @@ const App = () => {
                   />
                   
                   {/* Catch-all redirect */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route path="*" element={<Navigate to="/app/home" replace />} />
                 </Routes>
               </div>
               <Toaster />
