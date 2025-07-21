@@ -91,73 +91,34 @@ const IPhoneCarousel = () => {
         </div>
 
         <div className="relative flex justify-center items-center min-h-[700px]">
-          {/* Main carousel container with 3D perspective */}
-          <div className="relative w-80 h-[640px]" style={{ perspective: '1000px' }}>
+          {/* iPhone mockup container */}
+          <div className="relative w-80 h-[640px]">
             
-            {/* iPhone Frame using uploaded mockup */}
+            {/* Screenshot display area - positioned inside iPhone frame */}
+            <div className="absolute top-[60px] left-[32px] w-[256px] h-[520px] rounded-[32px] overflow-hidden bg-black z-10">
+              <img
+                src={screenshots[currentIndex].image}
+                alt={screenshots[currentIndex].title}
+                className="w-full h-full object-cover transition-all duration-700 ease-in-out"
+              />
+            </div>
+            
+            {/* iPhone Frame overlay - positioned on top */}
             <div 
-              className="absolute inset-0 z-30 pointer-events-none bg-contain bg-center bg-no-repeat"
+              className="absolute inset-0 z-20 pointer-events-none bg-contain bg-center bg-no-repeat"
               style={{
                 backgroundImage: "url('/lovable-uploads/cc9b6f0e-9234-48d1-8b25-6e977b364d50.png')",
               }}
             />
-            
-            {/* 3D Carousel Container */}
-            <div
-              className="relative w-full h-full transition-transform duration-700 ease-in-out"
-              style={{
-                transformStyle: 'preserve-3d',
-                transform: `rotateY(${-currentIndex * angle}deg)`,
-              }}
-            >
-              {screenshots.map((screenshot, index) => {
-                const itemAngle = index * angle;
-                const radius = 200; // Distance from center for 3D effect
-                const isActive = index === currentIndex;
-                
-                return (
-                  <div
-                    key={screenshot.id}
-                    className="absolute inset-0 flex items-center justify-center"
-                    style={{
-                      transform: `rotateY(${itemAngle}deg) translateZ(${radius}px)`,
-                      backfaceVisibility: 'hidden',
-                    }}
-                  >
-                    <div className="relative w-64 h-[520px] overflow-hidden">
-                      <img
-                        src={screenshot.image}
-                        alt={screenshot.title}
-                        className="w-full h-full object-cover rounded-[32px] shadow-2xl transition-all duration-700"
-                        style={{
-                          filter: isActive ? 'brightness(1) blur(0px)' : 'brightness(0.6) blur(1px)',
-                          transform: isActive ? 'scale(1)' : 'scale(0.9)',
-                        }}
-                      />
-                      
-                      {/* Floating screenshots on sides with tilt */}
-                      {!isActive && (
-                        <div 
-                          className="absolute inset-0 bg-black/20 rounded-[32px]"
-                          style={{
-                            transform: index < currentIndex ? 'rotateY(-15deg)' : 'rotateY(15deg)',
-                          }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
 
-          {/* Side floating screenshots for visual depth */}
+          {/* Side thumbnails for visual depth */}
           <div className="absolute left-0 top-1/2 transform -translate-y-1/2 hidden lg:block">
             <div className="space-y-4 transform -translate-x-8 rotate-12 opacity-30">
               {screenshots.slice(Math.max(0, currentIndex - 2), currentIndex).map((screenshot, index) => (
                 <div
                   key={`left-${screenshot.id}`}
-                  className="w-20 h-36 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 hover:opacity-60"
+                  className="w-16 h-28 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 hover:opacity-60"
                   onClick={() => goToSlide(Math.max(0, currentIndex - 2) + index)}
                 >
                   <img 
@@ -175,7 +136,7 @@ const IPhoneCarousel = () => {
               {screenshots.slice(currentIndex + 1, Math.min(screenshots.length, currentIndex + 3)).map((screenshot, index) => (
                 <div
                   key={`right-${screenshot.id}`}
-                  className="w-20 h-36 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 hover:opacity-60"
+                  className="w-16 h-28 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 hover:opacity-60"
                   onClick={() => goToSlide(currentIndex + 1 + index)}
                 >
                   <img 
