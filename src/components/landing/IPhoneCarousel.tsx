@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -53,7 +53,7 @@ const screenshots = [
   }
 ];
 
-const iPhone3DCarousel = () => {
+const IPhoneCarousel = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const totalItems = screenshots.length;
@@ -244,4 +244,4 @@ const iPhone3DCarousel = () => {
   );
 };
 
-export default iPhone3DCarousel;
+export default IPhoneCarousel;
