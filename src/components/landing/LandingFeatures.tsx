@@ -56,7 +56,7 @@ const features = [
 
 const LandingFeatures = () => {
   return (
-    <section id="features" className="py-20 bg-background">
+    <section id="features" className="py-20 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -82,10 +82,10 @@ const LandingFeatures = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
               viewport={{ once: true }}
-              className="p-6 bg-card border border-border rounded-lg hover:shadow-lg transition-shadow"
+              className="p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-lg transition-shadow"
             >
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mb-4">
-                <feature.icon className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/50 rounded-lg flex items-center justify-center mb-4">
+                <feature.icon className="w-6 h-6 text-blue-500" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
                 {feature.title}

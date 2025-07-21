@@ -59,7 +59,7 @@ const AnimatedCounter = ({ end, duration = 2000, suffix = "" }: { end: number; d
       onViewportEnter={() => setIsVisible(true)}
       className="text-center"
     >
-      <div className="text-4xl md:text-6xl font-bold text-blue-600 mb-2">
+      <div className="text-4xl md:text-6xl font-bold text-blue-500 mb-2">
         {count}{suffix}
       </div>
     </motion.div>
@@ -68,7 +68,7 @@ const AnimatedCounter = ({ end, duration = 2000, suffix = "" }: { end: number; d
 
 const BenefitsSection = () => {
   return (
-    <section id="benefits" className="py-20 bg-muted/50">
+    <section id="benefits" className="py-20 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -93,7 +93,7 @@ const BenefitsSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: index * 0.2 }}
               viewport={{ once: true }}
-              className="text-center p-6 bg-card rounded-lg border border-border"
+              className="text-center p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
             >
               <AnimatedCounter end={benefit.number} suffix={benefit.suffix} />
               <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -114,7 +114,7 @@ const BenefitsSection = () => {
           viewport={{ once: true }}
           className="mt-16 text-center"
         >
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-8 max-w-2xl mx-auto">
+          <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-8 max-w-2xl mx-auto">
             <h3 className="text-2xl font-bold text-foreground mb-4">
               Calculate Your ROI
             </h3>
@@ -122,7 +122,7 @@ const BenefitsSection = () => {
               Most warehouses see a complete return on investment within 3-6 months.
               See how much you could save with our WMS solution.
             </p>
-            <div className="text-3xl font-bold text-blue-600 mb-4">
+            <div className="text-3xl font-bold text-blue-500 mb-4">
               Average ROI: 300%
             </div>
             <p className="text-sm text-muted-foreground">

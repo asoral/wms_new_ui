@@ -17,7 +17,7 @@ const LandingHero = () => {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-900 pt-16">
+    <section className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 pt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center">
           <motion.div
@@ -28,7 +28,7 @@ const LandingHero = () => {
             <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6 leading-tight">
               Transform Your
               <br />
-              <span className="text-blue-600">Warehouse Operations</span>
+              <span className="text-blue-500">Warehouse Operations</span>
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto">
               Mobile-first WMS that integrates seamlessly with ERPNext. 
@@ -45,7 +45,7 @@ const LandingHero = () => {
             <Button
               onClick={handleStartNow}
               size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-6 h-auto"
+              className="bg-blue-500 hover:bg-blue-600 text-white text-lg px-8 py-6 h-auto"
             >
               Start Now - Free Trial
             </Button>
@@ -72,9 +72,9 @@ const LandingHero = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: item.delay }}
-                className="flex flex-col items-center p-4 bg-background/80 backdrop-blur-sm rounded-lg border border-border"
+                className="flex flex-col items-center p-4 bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 dark:bg-gray-800/90 dark:border-gray-700"
               >
-                <item.icon className="w-8 h-8 text-blue-600 mb-2" />
+                <item.icon className="w-8 h-8 text-blue-500 mb-2" />
                 <span className="text-sm font-medium text-foreground">{item.label}</span>
               </motion.div>
             ))}

@@ -16,7 +16,7 @@ const LandingCTA = () => {
   };
 
   return (
-    <section className="py-20 bg-gradient-to-br from-blue-600 to-indigo-700">
+    <section className="py-20 bg-gradient-to-br from-blue-500 to-blue-600">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -37,7 +37,7 @@ const LandingCTA = () => {
             <Button
               onClick={handleStartNow}
               size="lg"
-              className="bg-white text-blue-600 hover:bg-blue-50 text-lg px-8 py-6 h-auto"
+              className="bg-white text-blue-500 hover:bg-blue-50 text-lg px-8 py-6 h-auto"
             >
               Start Free Trial
               <ArrowRight className="ml-2 w-5 h-5" />

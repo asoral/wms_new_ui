@@ -44,7 +44,7 @@ const AppShowcase = () => {
   };
 
   return (
-    <section id="screenshots" className="py-20 bg-muted/50">
+    <section id="screenshots" className="py-20 bg-white dark:bg-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -80,9 +80,9 @@ const AppShowcase = () => {
                   <div className="w-full h-full bg-white rounded-2xl flex items-center justify-center">
                     <div className="text-center p-8">
                       {screenshots[currentSlide].device === 'mobile' ? (
-                        <Smartphone className="w-16 h-16 mx-auto mb-4 text-blue-600" />
+                        <Smartphone className="w-16 h-16 mx-auto mb-4 text-blue-500" />
                       ) : (
-                        <Tablet className="w-16 h-16 mx-auto mb-4 text-blue-600" />
+                        <Tablet className="w-16 h-16 mx-auto mb-4 text-blue-500" />
                       )}
                       <h3 className="text-lg font-semibold text-slate-800 mb-2">
                         {screenshots[currentSlide].title}
@@ -134,7 +134,7 @@ const AppShowcase = () => {
                 key={index}
                 onClick={() => setCurrentSlide(index)}
                 className={`w-3 h-3 rounded-full transition-colors ${
-                  index === currentSlide ? 'bg-blue-600' : 'bg-muted-foreground/30'
+                  index === currentSlide ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
                 }`}
               />
             ))}
