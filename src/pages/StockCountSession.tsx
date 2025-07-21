@@ -456,7 +456,7 @@ const StockCountSession = () => {
       });
       
       // Navigate back to stock count list
-      navigate('/stock-count');
+      navigate('/app/stock-count');
     } catch (error: any) {
       console.error('Failed to submit stock reconciliation:', error);
       toast({
@@ -481,7 +481,7 @@ const StockCountSession = () => {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => navigate('/stock-count')}
+              onClick={() => navigate('/app/stock-count')}
             >
               ← Back to Dashboard
             </Button>

@@ -107,7 +107,7 @@ const DraftReceipts = () => {
           <FileText className="w-6 h-6 mr-2 text-blue-600" />
           <h1 className="text-2xl font-bold">Draft Receipts</h1>
         </div>
-        <Button variant="outline" onClick={() => navigate('/receive')}>
+        <Button variant="outline" onClick={() => navigate('/app/receive')}>
           <Truck className="w-4 h-4 mr-2" />
           Back to Receive
         </Button>

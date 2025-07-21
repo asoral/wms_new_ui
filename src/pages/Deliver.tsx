@@ -425,7 +425,7 @@ const Deliver = () => {
 
   const handleViewAllSalesOrders = () => {
     // Navigate to sales orders list
-    navigate('/sales-orders');
+    navigate('/app/sales-orders');
   };
 
   const formatCurrency = (amount: number) => {
@@ -543,7 +543,7 @@ const Deliver = () => {
               {
                 label: "Quality Check",
                 icon: CheckCircle,
-                action: () => navigate('/quality-check')
+                action: () => navigate('/app/quality-check')
               }
             ]}
           />

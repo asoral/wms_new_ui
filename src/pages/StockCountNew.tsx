@@ -61,7 +61,7 @@ const StockCountNew = () => {
     }
 
     // Navigate to stock count session with parameters
-    navigate(`/stock-count/session?warehouse=${encodeURIComponent(selectedWarehouse)}&purpose=${encodeURIComponent(selectedPurpose)}`);
+    navigate(`/app/stock-count/session?warehouse=${encodeURIComponent(selectedWarehouse)}&purpose=${encodeURIComponent(selectedPurpose)}`);
   };
 
   return (
