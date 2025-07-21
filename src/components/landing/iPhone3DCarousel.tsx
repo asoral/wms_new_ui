@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -56,42 +55,32 @@ const screenshots = [
 
 const iPhone3DCarousel = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState(0);
 
-  // Auto-advance slides
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setDirection(1);
-      setCurrentIndex((prev) => (prev + 1) % screenshots.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [currentIndex]);
+  const totalItems = screenshots.length;
+  const angle = 360 / totalItems;
 
   const nextSlide = () => {
-    setDirection(1);
-    setCurrentIndex((prev) => (prev + 1) % screenshots.length);
+    setCurrentIndex((prev) => (prev + 1) % totalItems);
   };
 
   const prevSlide = () => {
-    setDirection(-1);
-    setCurrentIndex((prev) => (prev - 1 + screenshots.length) % screenshots.length);
+    setCurrentIndex((prev) => (prev - 1 + totalItems) % totalItems);
   };
 
   const goToSlide = (index: number) => {
-    setDirection(index > currentIndex ? 1 : -1);
     setCurrentIndex(index);
   };
 
+  // Auto-rotate carousel
+  useEffect(() => {
+    const interval = setInterval(nextSlide, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <section className="py-20 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+    <section className="py-20 bg-gradient-to-br from-background via-background/50 to-primary/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
-        >
+        <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             Experience WMS on Mobile
           </h2>
@@ -99,149 +88,156 @@ const iPhone3DCarousel = () => {
             Designed specifically for mobile-first warehouse operations. 
             See how our intuitive interface makes complex tasks simple.
           </p>
-        </motion.div>
+        </div>
 
-        <div className="relative flex items-center justify-center">
-          {/* Left Stack - Previous Screenshots */}
-          <div className="hidden lg:flex absolute left-0 z-10 space-x-4">
-            {screenshots.slice(Math.max(0, currentIndex - 2), currentIndex).map((screenshot, index) => (
-              <motion.div
-                key={screenshot.id}
-                initial={{ opacity: 0, x: -100, rotateY: -45 }}
-                animate={{ 
-                  opacity: 0.6, 
-                  x: 0, 
-                  rotateY: -25 - (index * 10),
-                  scale: 0.7 - (index * 0.1)
-                }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="w-48 h-96 rounded-3xl overflow-hidden shadow-xl cursor-pointer"
-                onClick={() => goToSlide(Math.max(0, currentIndex - 2) + index)}
-                style={{
-                  transform: `perspective(1000px) rotateY(${-25 - (index * 10)}deg) scale(${0.7 - (index * 0.1)})`
-                }}
-              >
-                <img 
-                  src={screenshot.image} 
-                  alt={screenshot.title}
-                  className="w-full h-full object-cover"
-                />
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Center iPhone with Current Screenshot */}
-          <motion.div 
-            className="relative z-20 flex items-center justify-center"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="relative w-80 h-[640px]">
-              {/* iPhone Frame - Using generated mockup */}
-              <div className="absolute inset-0 z-30 bg-black rounded-[3rem] p-2">
-                <div className="w-full h-full bg-gray-900 rounded-[2.5rem] relative overflow-hidden">
-                  {/* Notch */}
-                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-black rounded-full z-40"></div>
-                  
-                  {/* Screenshot Content */}
-                  <div className="absolute inset-0 z-20 rounded-[2.5rem] overflow-hidden">
-                    <AnimatePresence mode="wait" custom={direction}>
-                      <motion.img
-                        key={currentIndex}
-                        src={screenshots[currentIndex].image}
-                        alt={screenshots[currentIndex].title}
-                        custom={direction}
-                        initial={{ opacity: 0, x: direction > 0 ? 300 : -300 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: direction > 0 ? -300 : 300 }}
-                        transition={{ duration: 0.4, ease: "easeInOut" }}
-                        className="w-full h-full object-cover"
+        <div className="relative flex justify-center items-center min-h-[700px]">
+          {/* Main carousel container with 3D perspective */}
+          <div className="relative w-80 h-[640px]" style={{ perspective: '1000px' }}>
+            
+            {/* iPhone Frame using uploaded mockup */}
+            <div 
+              className="absolute inset-0 z-30 pointer-events-none bg-contain bg-center bg-no-repeat"
+              style={{
+                backgroundImage: "url('/lovable-uploads/cc9b6f0e-9234-48d1-8b25-6e977b364d50.png')",
+              }}
+            />
+            
+            {/* 3D Carousel Container */}
+            <div
+              className="relative w-full h-full transition-transform duration-700 ease-in-out"
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: `rotateY(${-currentIndex * angle}deg)`,
+              }}
+            >
+              {screenshots.map((screenshot, index) => {
+                const itemAngle = index * angle;
+                const radius = 200; // Distance from center for 3D effect
+                const isActive = index === currentIndex;
+                
+                return (
+                  <div
+                    key={screenshot.id}
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{
+                      transform: `rotateY(${itemAngle}deg) translateZ(${radius}px)`,
+                      backfaceVisibility: 'hidden',
+                    }}
+                  >
+                    <div className="relative w-64 h-[520px] overflow-hidden">
+                      <img
+                        src={screenshot.image}
+                        alt={screenshot.title}
+                        className="w-full h-full object-cover rounded-[32px] shadow-2xl transition-all duration-700"
+                        style={{
+                          filter: isActive ? 'brightness(1) blur(0px)' : 'brightness(0.6) blur(1px)',
+                          transform: isActive ? 'scale(1)' : 'scale(0.9)',
+                        }}
                       />
-                    </AnimatePresence>
+                      
+                      {/* Floating screenshots on sides with tilt */}
+                      {!isActive && (
+                        <div 
+                          className="absolute inset-0 bg-black/20 rounded-[32px]"
+                          style={{
+                            transform: index < currentIndex ? 'rotateY(-15deg)' : 'rotateY(15deg)',
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
-          </motion.div>
-
-          {/* Right Stack - Next Screenshots */}
-          <div className="hidden lg:flex absolute right-0 z-10 space-x-4">
-            {screenshots.slice(currentIndex + 1, Math.min(screenshots.length, currentIndex + 3)).map((screenshot, index) => (
-              <motion.div
-                key={screenshot.id}
-                initial={{ opacity: 0, x: 100, rotateY: 45 }}
-                animate={{ 
-                  opacity: 0.6, 
-                  x: 0, 
-                  rotateY: 25 + (index * 10),
-                  scale: 0.7 - (index * 0.1)
-                }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="w-48 h-96 rounded-3xl overflow-hidden shadow-xl cursor-pointer"
-                onClick={() => goToSlide(currentIndex + 1 + index)}
-                style={{
-                  transform: `perspective(1000px) rotateY(${25 + (index * 10)}deg) scale(${0.7 - (index * 0.1)})`
-                }}
-              >
-                <img 
-                  src={screenshot.image} 
-                  alt={screenshot.title}
-                  className="w-full h-full object-cover"
-                />
-              </motion.div>
-            ))}
           </div>
 
-          {/* Navigation Buttons */}
+          {/* Side floating screenshots for visual depth */}
+          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 hidden lg:block">
+            <div className="space-y-4 transform -translate-x-8 rotate-12 opacity-30">
+              {screenshots.slice(Math.max(0, currentIndex - 2), currentIndex).map((screenshot, index) => (
+                <div
+                  key={`left-${screenshot.id}`}
+                  className="w-20 h-36 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 hover:opacity-60"
+                  onClick={() => goToSlide(Math.max(0, currentIndex - 2) + index)}
+                >
+                  <img 
+                    src={screenshot.image} 
+                    alt={screenshot.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="absolute right-0 top-1/2 transform -translate-y-1/2 hidden lg:block">
+            <div className="space-y-4 transform translate-x-8 -rotate-12 opacity-30">
+              {screenshots.slice(currentIndex + 1, Math.min(screenshots.length, currentIndex + 3)).map((screenshot, index) => (
+                <div
+                  key={`right-${screenshot.id}`}
+                  className="w-20 h-36 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 hover:opacity-60"
+                  onClick={() => goToSlide(currentIndex + 1 + index)}
+                >
+                  <img 
+                    src={screenshot.image} 
+                    alt={screenshot.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Controls */}
+        <div className="flex items-center justify-center gap-4 mt-8">
           <Button
             variant="outline"
             size="icon"
             onClick={prevSlide}
-            className="absolute left-4 lg:left-80 z-30 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white"
+            className="w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 bg-background/80 backdrop-blur-sm"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-5 h-5" />
           </Button>
-          
+
+          {/* Dot indicators */}
+          <div className="flex gap-2 mx-4">
+            {screenshots.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  index === currentIndex
+                    ? 'bg-primary scale-125 shadow-lg'
+                    : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                }`}
+              />
+            ))}
+          </div>
+
           <Button
             variant="outline"
             size="icon"
             onClick={nextSlide}
-            className="absolute right-4 lg:right-80 z-30 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white"
+            className="w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 bg-background/80 backdrop-blur-sm"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-5 h-5" />
           </Button>
         </div>
 
-        {/* Content Description */}
-        <motion.div 
-          className="text-center mt-12"
-          key={currentIndex}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
+        {/* Current slide info */}
+        <div className="text-center mt-8">
           <h3 className="text-2xl font-semibold text-foreground mb-2">
             {screenshots[currentIndex].title}
           </h3>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             {screenshots[currentIndex].description}
           </p>
-        </motion.div>
+        </div>
 
-        {/* Dots Navigation */}
-        <div className="flex justify-center space-x-2 mt-8">
-          {screenshots.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                index === currentIndex 
-                  ? 'bg-blue-500 scale-125' 
-                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400'
-              }`}
-            />
-          ))}
+        {/* Instructions */}
+        <div className="text-center mt-6 text-sm text-muted-foreground">
+          <p>Use arrows or dots to navigate • Auto-rotates every 4 seconds</p>
         </div>
       </div>
     </section>
