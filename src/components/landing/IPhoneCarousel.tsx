@@ -103,13 +103,6 @@ const IPhoneCarousel = () => {
               />
             </div>
             
-            {/* iPhone Frame overlay - positioned on top */}
-            <div 
-              className="absolute inset-0 z-20 pointer-events-none bg-contain bg-center bg-no-repeat"
-              style={{
-                backgroundImage: "url('/lovable-uploads/cc9b6f0e-9234-48d1-8b25-6e977b364d50.png')",
-              }}
-            />
           </div>
 
           {/* Side thumbnails for visual depth */}
