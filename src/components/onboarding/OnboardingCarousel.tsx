@@ -56,84 +56,84 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl">
-        <Card className="border-0 shadow-2xl overflow-hidden">
+      <div className="w-full max-w-sm mx-auto">
+        <Card className="border-0 shadow-xl overflow-hidden">
           <CardContent className="p-0">
-            <div className={`bg-gradient-to-r ${currentSlideData.bgGradient} text-white p-8 text-center`}>
-              <div className="text-6xl mb-4">{currentSlideData.image}</div>
-              <h2 className="text-3xl font-bold mb-4">
+            {/* Mobile-First Hero Section */}
+            <div className={`bg-gradient-to-r ${currentSlideData.bgGradient} text-white p-6 text-center`}>
+              <div className="text-4xl mb-3">{currentSlideData.image}</div>
+              <h2 className="text-xl font-bold mb-2 leading-tight">
                 {currentSlideData.title}
               </h2>
-              <p className="text-xl opacity-90 max-w-2xl mx-auto">
+              <p className="text-sm opacity-90 leading-relaxed">
                 {currentSlideData.description}
               </p>
             </div>
             
-            <div className="p-8 md:p-12">
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div className="space-y-6">
-                  <h3 className="text-2xl font-semibold text-gray-800 mb-6">Key Features:</h3>
-                  <div className="space-y-4">
-                    {currentSlideData.features.map((feature, featureIndex) => (
-                      <div key={featureIndex} className="flex items-center text-gray-700">
-                        <CheckCircle className="w-6 h-6 text-green-500 mr-4 flex-shrink-0" />
-                        <span className="text-lg">{feature}</span>
-                      </div>
-                    ))}
+            {/* Mobile-Optimized Content */}
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Key Features:</h3>
+              <div className="space-y-3 mb-6">
+                {currentSlideData.features.map((feature, featureIndex) => (
+                  <div key={featureIndex} className="flex items-start text-gray-700">
+                    <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm leading-relaxed">{feature}</span>
                   </div>
-                </div>
-                
-                <div className="text-center">
-                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl p-8 shadow-inner">
-                    <div className="text-8xl mb-4">📱</div>
-                    <div className="text-sm text-gray-600">
-                      {currentSlide === 0 && "Scan items instantly with your mobile camera"}
-                      {currentSlide === 1 && "Manage complex inventory operations with ease"}
-                      {currentSlide === 2 && "Access powerful analytics on the go"}
-                    </div>
+                ))}
+              </div>
+              
+              {/* Mobile Device Mockup */}
+              <div className="text-center mb-6">
+                <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl p-6 shadow-inner">
+                  <div className="text-5xl mb-2">📱</div>
+                  <div className="text-xs text-gray-600 leading-relaxed">
+                    {currentSlide === 0 && "Scan items instantly with your mobile camera"}
+                    {currentSlide === 1 && "Manage complex inventory operations with ease"}
+                    {currentSlide === 2 && "Access powerful analytics on the go"}
                   </div>
                 </div>
               </div>
               
               {/* Progress indicators */}
-              <div className="flex justify-center space-x-3 my-8">
+              <div className="flex justify-center space-x-2 mb-6">
                 {slides.map((_, dotIndex) => (
                   <button
                     key={dotIndex}
                     onClick={() => setCurrentSlide(dotIndex)}
-                    className={`w-4 h-4 rounded-full transition-all duration-300 ${
+                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
                       dotIndex === currentSlide 
-                        ? 'bg-blue-600 transform scale-125' 
-                        : 'bg-gray-300 hover:bg-gray-400'
+                        ? 'bg-blue-600' 
+                        : 'bg-gray-300'
                     }`}
                   />
                 ))}
               </div>
               
-              {/* Navigation buttons */}
-              <div className="flex justify-between items-center">
-                <Button 
-                  onClick={prevSlide}
-                  variant="outline"
-                  disabled={currentSlide === 0}
-                  className="px-6"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Previous
-                </Button>
-                
-                <div className="text-sm text-gray-500">
-                  {currentSlide + 1} of {slides.length}
-                </div>
-                
+              {/* Mobile-First Navigation */}
+              <div className="space-y-3">
                 <Button 
                   onClick={nextSlide}
                   size="lg"
-                  className="px-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-base py-3"
                 >
-                  {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
+                  {currentSlide === slides.length - 1 ? 'Start Now' : 'Next'}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
+                
+                {currentSlide > 0 && (
+                  <Button 
+                    onClick={prevSlide}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Previous
+                  </Button>
+                )}
+                
+                <div className="text-center text-xs text-gray-500 pt-2">
+                  {currentSlide + 1} of {slides.length}
+                </div>
               </div>
             </div>
           </CardContent>
