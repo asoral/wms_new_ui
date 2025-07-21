@@ -663,8 +663,8 @@ const Receive = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-background">
+      <div className="w-full max-w-7xl mx-auto px-4 py-4 md:py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
@@ -698,12 +698,12 @@ const Receive = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-3 w-full max-w-md mx-auto">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="receive" disabled={!selectedPO && !currentPurchaseReceipt}>
+          <TabsList className="grid grid-cols-1 sm:grid-cols-3 w-full max-w-md mx-auto mb-6">
+            <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
+            <TabsTrigger value="receive" disabled={!selectedPO && !currentPurchaseReceipt} className="text-xs sm:text-sm">
               Receive Items
             </TabsTrigger>
-            <TabsTrigger value="review" disabled={receiveEntries.length === 0} className="relative">
+            <TabsTrigger value="review" disabled={receiveEntries.length === 0} className="relative text-xs sm:text-sm">
               Review & Submit
               {receiveEntries.length > 0 && (
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
@@ -725,30 +725,37 @@ const Receive = () => {
                 {/* PO Summary */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      Purchase Order Details
+                    <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <span className="text-lg">Purchase Order Details</span>
                       <Badge variant={selectedPO.status === 'pending' ? 'destructive' : 'default'}>
                         {selectedPO.status}
                       </Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-600">PO Number</p>
-                        <p className="font-medium">{selectedPO.poNumber}</p>
+                    <div className="space-y-4">
+                      {/* PO Number - Full width on mobile */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">PO Number</p>
+                          <p className="font-medium text-foreground">{selectedPO.poNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Supplier</p>
+                          <p className="font-medium text-foreground">{selectedPO.supplierName || selectedPO.supplier}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-gray-600">Supplier</p>
-                        <p className="font-medium">{selectedPO.supplierName || selectedPO.supplier}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Date</p>
-                        <p className="font-medium">{selectedPO.date}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Total Amount</p>
-                        <p className="font-medium">₹{((selectedPO.totalAmount && typeof selectedPO.totalAmount === 'number') ? selectedPO.totalAmount : 0).toLocaleString()}</p>
+                      
+                      {/* Date and Amount */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Date</p>
+                          <p className="font-medium text-foreground">{selectedPO.date}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Total Amount</p>
+                          <p className="font-medium text-foreground">₹{((selectedPO.totalAmount && typeof selectedPO.totalAmount === 'number') ? selectedPO.totalAmount : 0).toLocaleString()}</p>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -757,15 +764,15 @@ const Receive = () => {
                 {/* Warehouse Selection */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Select Receiving Warehouse</CardTitle>
+                    <CardTitle className="text-lg">Select Receiving Warehouse</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
                     <WarehouseSelector 
                       onWarehouseSelected={handleWarehouseSelected}
                       isLoading={loading}
                     />
                     {selectedWarehouse && (
-                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-md">
                         <p className="text-sm text-green-800">
                           <strong>Selected Warehouse:</strong> {selectedWarehouse}
                         </p>
@@ -787,9 +794,9 @@ const Receive = () => {
                 {/* Purchase Order Items Table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Purchase Order Items</CardTitle>
+                    <CardTitle className="text-lg">Purchase Order Items</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 md:p-6">
                     <POItemsDisplay items={selectedPO.items} />
                   </CardContent>
                 </Card>
@@ -797,12 +804,12 @@ const Receive = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="review">
+          <TabsContent value="review" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Review Receipt</CardTitle>
+                <CardTitle className="text-lg">Review Receipt</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 md:p-6">
                 <ReceiveTable 
                   entries={receiveEntries} 
                   onUpdateEntry={updateReceiveEntry}

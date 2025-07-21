@@ -141,17 +141,17 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   }, [warehouses, searchValue]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
-        <Label htmlFor="warehouse-search">Warehouse Code / Name</Label>
-        <div className="flex-1 min-w-0 mt-1">
+        <Label htmlFor="warehouse-search" className="text-sm font-medium">Warehouse Code / Name</Label>
+        <div className="mt-2">
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
                 aria-expanded={open}
-                className="w-full justify-between text-left h-auto min-h-[40px] py-2 px-3"
+                className="w-full justify-between text-left h-auto min-h-[44px] py-3 px-4"
                 disabled={isLoading}
               >
                 <div className="flex-1 min-w-0 text-left">
@@ -170,7 +170,7 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-popover border border-border shadow-lg z-[10000]" align="start">
+            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md p-0 bg-popover border border-border shadow-lg z-[10000]" align="start">
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search warehouses..." 
