@@ -538,7 +538,7 @@ const Deliver = () => {
               {
                 label: "Print Label",
                 icon: Package,
-                action: () => navigate('/print-label')
+                action: () => navigate('/app/print-label')
               },
               {
                 label: "Quality Check",

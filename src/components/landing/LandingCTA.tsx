@@ -46,7 +46,7 @@ const LandingCTA = () => {
               onClick={handleLogin}
               variant="outline"
               size="lg"
-              className="border-white text-white hover:bg-white/10 text-lg px-8 py-6 h-auto"
+              className="border-white/70 text-white bg-white/20 hover:bg-white/30 hover:border-white backdrop-blur-sm text-lg px-8 py-6 h-auto"
             >
               Already have an account? Login
             </Button>

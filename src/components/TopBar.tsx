@@ -56,29 +56,29 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
       
       // Check if it's a warehouse/bin search
       if (query.includes('wh-') || query.includes('warehouse') || query.includes('bin-')) {
-        navigate(`/bin-enquiry?search=${encodeURIComponent(searchQuery)}`);
+        navigate(`/app/bin-enquiry?search=${encodeURIComponent(searchQuery)}`);
         return;
       }
       
       // Check if it's a purchase order
       if (query.includes('po-') || query.includes('pur-ord')) {
-        navigate(`/receive?po=${encodeURIComponent(searchQuery)}`);
+        navigate(`/app/receive?po=${encodeURIComponent(searchQuery)}`);
         return;
       }
       
       // Check if it's a sales order
       if (query.includes('so-') || query.includes('sal-ord')) {
-        navigate(`/deliver?so=${encodeURIComponent(searchQuery)}`);
+        navigate(`/app/deliver?so=${encodeURIComponent(searchQuery)}`);
         return;
       }
       
       // Default to item enquiry for any other search
-      navigate(`/item-enquiry?search=${encodeURIComponent(searchQuery)}`);
+      navigate(`/app/item-enquiry?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 
   const handleNotificationClick = () => {
-    navigate("/notifications");
+    navigate("/app/notifications");
   };
 
   const toggleDarkMode = () => {
@@ -92,7 +92,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
 
   const handleProfileSettings = () => {
     console.log("Navigating to profile page");
-    navigate("/profile");
+    navigate("/app/profile");
   };
 
   return (
@@ -127,7 +127,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
         <div className="flex items-center space-x-2">
           {/* Reports (Desktop only) */}
           {!isMobile && (
-            <Button variant="ghost" size="icon" onClick={() => navigate("/reports")}>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/app/reports")}>
               <BarChart3 className="w-5 h-5" />
             </Button>
           )}
@@ -137,7 +137,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => navigate("/sync")}
+              onClick={() => navigate("/app/sync")}
               className="relative"
             >
               {isOnline ? (

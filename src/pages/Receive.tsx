@@ -657,9 +657,9 @@ const Receive = () => {
   };
 
   const shortcuts = [
-    { label: 'Print Label', icon: Printer, action: () => navigate('/print-label') },
-    { label: 'Request QC', icon: CheckCircle, action: () => navigate('/quality-check') },
-    { label: 'Transfer Stock', icon: ArrowRight, action: () => navigate('/stock-entry') }
+    { label: 'Print Label', icon: Printer, action: () => navigate('/app/print-label') },
+    { label: 'Request QC', icon: CheckCircle, action: () => navigate('/app/quality-check') },
+    { label: 'Transfer Stock', icon: ArrowRight, action: () => navigate('/app/stock-entry') }
   ];
 
   return (
