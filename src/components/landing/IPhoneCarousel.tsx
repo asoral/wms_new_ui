@@ -90,56 +90,25 @@ const IPhoneCarousel = () => {
           </p>
         </div>
 
-        <div className="relative flex justify-center items-center min-h-[700px]">
-          {/* iPhone mockup container */}
-          <div className="relative w-80 h-[640px]">
-            
-            {/* Screenshot display area - positioned inside iPhone frame */}
-            <div className="absolute top-[60px] left-[32px] w-[256px] h-[520px] rounded-[32px] overflow-hidden bg-black z-10">
-              <img
-                src={screenshots[currentIndex].image}
-                alt={screenshots[currentIndex].title}
-                className="w-full h-full object-cover transition-all duration-700 ease-in-out"
-              />
-            </div>
-            
-          </div>
-
-          {/* Side thumbnails for visual depth */}
-          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 hidden lg:block">
-            <div className="space-y-4 transform -translate-x-8 rotate-12 opacity-30">
-              {screenshots.slice(Math.max(0, currentIndex - 2), currentIndex).map((screenshot, index) => (
-                <div
-                  key={`left-${screenshot.id}`}
-                  className="w-16 h-28 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 hover:opacity-60"
-                  onClick={() => goToSlide(Math.max(0, currentIndex - 2) + index)}
-                >
-                  <img 
-                    src={screenshot.image} 
-                    alt={screenshot.title}
-                    className="w-full h-full object-cover"
-                  />
+        {/* Simple horizontal carousel */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/5 to-accent/5 p-8">
+          <div 
+            className="flex transition-transform duration-500 ease-in-out"
+            style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+          >
+            {screenshots.map((screenshot, index) => (
+              <div key={screenshot.id} className="w-full flex-shrink-0 flex justify-center">
+                <div className="w-80 h-[640px] rounded-3xl bg-gradient-to-b from-slate-800 to-slate-900 p-2 shadow-2xl">
+                  <div className="w-full h-full rounded-2xl overflow-hidden bg-white">
+                    <img
+                      src={screenshot.image}
+                      alt={screenshot.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="absolute right-0 top-1/2 transform -translate-y-1/2 hidden lg:block">
-            <div className="space-y-4 transform translate-x-8 -rotate-12 opacity-30">
-              {screenshots.slice(currentIndex + 1, Math.min(screenshots.length, currentIndex + 3)).map((screenshot, index) => (
-                <div
-                  key={`right-${screenshot.id}`}
-                  className="w-16 h-28 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-110 hover:opacity-60"
-                  onClick={() => goToSlide(currentIndex + 1 + index)}
-                >
-                  <img 
-                    src={screenshot.image} 
-                    alt={screenshot.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
 
