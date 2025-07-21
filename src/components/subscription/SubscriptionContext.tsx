@@ -38,7 +38,9 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
   const [lastCheckTime, setLastCheckTime] = useState(0);
 
   const refreshSubscription = async () => {
+    // Don't check subscription for unauthenticated users
     if (!user || !session) {
+      setHasAccess(true); // Allow access to public routes
       setLoading(false);
       return;
     }
@@ -105,7 +107,14 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       }
     };
 
-    // Only run if we haven't checked recently or don't have access
+    // For unauthenticated users, just set loading to false and allow access
+    if (!user) {
+      setHasAccess(true);
+      setLoading(false);
+      return;
+    }
+
+    // Only run subscription check for authenticated users
     if (!hasAccess || lastCheckTime === 0) {
       checkSubscription();
     } else {
