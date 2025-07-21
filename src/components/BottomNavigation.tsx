@@ -31,26 +31,26 @@ const BottomNavigation = ({ isOnline = true, onSync }: BottomNavigationProps) =>
   const [actionsOpen, setActionsOpen] = useState(false);
 
   const navItems = [
-    { path: "/", icon: Home, label: "Dashboard" },
+    { path: "/app/home", icon: Home, label: "Dashboard" },
     { path: "/actions", icon: Zap, label: "Actions", isAction: true },
-    { path: "/reports", icon: BarChart3, label: "Reports", isReport: true },
-    { path: "/sync", icon: isOnline ? Wifi : WifiOff, label: "Sync", isSync: true },
-    { path: "/item-enquiry", icon: Search, label: "Item Enquiry" }
+    { path: "/app/reports", icon: BarChart3, label: "Reports", isReport: true },
+    { path: "/app/sync", icon: isOnline ? Wifi : WifiOff, label: "Sync", isSync: true },
+    { path: "/app/item-enquiry", icon: Search, label: "Item Enquiry" }
   ];
 
   const actionItems = [
-    { path: "/item-enquiry", label: "Item Enquiry", icon: "🔍" },
-    { path: "/bin-enquiry", label: "Bin Enquiry", icon: "📦" },
-    { path: "/stock-count", label: "Stock Count", icon: "🔢" },
-    { path: "/receive", label: "Receive", icon: "📥" },
-    { path: "/deliver", label: "Deliver", icon: "🚚" },
-    { path: "/mat-request", label: "Material Request", icon: "📋" },
-    { path: "/stock-entry", label: "Stock Entry", icon: "📊" },
-    { path: "/pick-list", label: "Pick List", icon: "📝" },
-    { path: "/packing", label: "Packing", icon: "📦" },
-    { path: "/print-label", label: "Print Label", icon: "🏷️" },
-    { path: "/quality-check", label: "Quality Check", icon: "✅" },
-    { path: "/pallet", label: "Pallet", icon: "🏗️" },
+    { path: "/app/item-enquiry", label: "Item Enquiry", icon: "🔍" },
+    { path: "/app/bin-enquiry", label: "Bin Enquiry", icon: "📦" },
+    { path: "/app/stock-count", label: "Stock Count", icon: "🔢" },
+    { path: "/app/receive", label: "Receive", icon: "📥" },
+    { path: "/app/deliver", label: "Deliver", icon: "🚚" },
+    { path: "/app/material-request", label: "Material Request", icon: "📋" },
+    { path: "/app/stock-entry", label: "Stock Entry", icon: "📊" },
+    { path: "/app/pick-list", label: "Pick List", icon: "📝" },
+    { path: "/app/packing", label: "Packing", icon: "📦" },
+    { path: "/app/print-label", label: "Print Label", icon: "🏷️" },
+    { path: "/app/quality-check", label: "Quality Check", icon: "✅" },
+    { path: "/app/pallet", label: "Pallet", icon: "🏗️" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -59,9 +59,9 @@ const BottomNavigation = ({ isOnline = true, onSync }: BottomNavigationProps) =>
     if (item.isAction) {
       setActionsOpen(true);
     } else if (item.isSync) {
-      navigate("/sync");
+      navigate("/app/sync");
     } else if (item.isReport) {
-      navigate("/reports");
+      navigate("/app/reports");
     } else {
       navigate(item.path);
     }

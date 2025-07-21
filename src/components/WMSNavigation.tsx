@@ -38,7 +38,7 @@ const WMSNavigation = () => {
     { icon: ClipboardList, label: "Pick List", path: "/app/pick-list" },
     { icon: Package2, label: "Packing", path: "/app/packing" },
     { icon: Printer, label: "Print Label", path: "/app/print-label" },
-    { icon: CheckCircle, label: "Quality Check", path: "/app/quality" },
+    { icon: CheckCircle, label: "Quality Check", path: "/app/quality-check" },
     { icon: Layers, label: "Pallet", path: "/app/pallet" },
     { icon: BarChart3, label: "Reports", path: "/app/reports" }
   ];

@@ -13,8 +13,9 @@ const Index = () => {
         // User is authenticated, redirect to app
         navigate('/app/home');
       } else {
-        // User is not authenticated, redirect to landing page
-        navigate('/');
+        // User is not authenticated, show landing page - but we need LandingPage component here
+        // For now, redirect to auth page
+        navigate('/auth');
       }
     }
   }, [user, loading, navigate]);
