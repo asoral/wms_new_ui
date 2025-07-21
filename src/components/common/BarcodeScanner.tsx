@@ -169,7 +169,13 @@ const BarcodeScanner = ({
 
     setIsScanning(false);
     setFlashOn(false);
+    setError(null);
     console.log('Camera cleanup completed successfully');
+    
+    // Force garbage collection and additional cleanup
+    setTimeout(() => {
+      setIsCleaningUp(false);
+    }, 100);
   };
 
   const toggleFlash = async () => {

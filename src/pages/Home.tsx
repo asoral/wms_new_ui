@@ -58,12 +58,12 @@ const Home = () => {
   };
 
   const quickActions = [
-    { icon: Package, label: 'Receive Items', action: () => navigate('/receive'), color: 'bg-blue-100 text-blue-600' },
-    { icon: Truck, label: 'Deliver Items', action: () => navigate('/deliver'), color: 'bg-green-100 text-green-600' },
-    { icon: Search, label: 'Bin Enquiry', action: () => navigate('/bin-enquiry'), color: 'bg-purple-100 text-purple-600' },
-    { icon: FileText, label: 'Stock Count', action: () => navigate('/stock-count'), color: 'bg-orange-100 text-orange-600' },
-    { icon: Plus, label: 'Material Request', action: () => navigate('/material-request'), color: 'bg-indigo-100 text-indigo-600' },
-    { icon: BarChart3, label: 'Reports', action: () => navigate('/reports'), color: 'bg-pink-100 text-pink-600' }
+    { icon: Package, label: 'Receive Items', action: () => navigate('/app/receive'), color: 'bg-blue-100 text-blue-600' },
+    { icon: Truck, label: 'Deliver Items', action: () => navigate('/app/deliver'), color: 'bg-green-100 text-green-600' },
+    { icon: Search, label: 'Bin Enquiry', action: () => navigate('/app/bin-enquiry'), color: 'bg-purple-100 text-purple-600' },
+    { icon: FileText, label: 'Stock Count', action: () => navigate('/app/stock-count'), color: 'bg-orange-100 text-orange-600' },
+    { icon: Plus, label: 'Material Request', action: () => navigate('/app/material-request'), color: 'bg-indigo-100 text-indigo-600' },
+    { icon: BarChart3, label: 'Reports', action: () => navigate('/app/reports'), color: 'bg-pink-100 text-pink-600' }
   ];
 
   const getActivityIcon = (type: string) => {
@@ -322,7 +322,7 @@ const Home = () => {
                         <Clock className="w-5 h-5 mr-2" />
                         Recent Activities
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>
+                      <Button variant="ghost" size="sm" onClick={() => navigate('/app/reports')}>
                         View All
                       </Button>
                     </CardTitle>

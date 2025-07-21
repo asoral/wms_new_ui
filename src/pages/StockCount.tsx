@@ -139,7 +139,7 @@ const StockCount = () => {
     }
 
     // Navigate to stock count session with parameters
-    navigate(`/stock-count/session?warehouse=${encodeURIComponent(selectedWarehouse)}&purpose=${encodeURIComponent(selectedPurpose)}`);
+    navigate(`/app/stock-count/session?warehouse=${encodeURIComponent(selectedWarehouse)}&purpose=${encodeURIComponent(selectedPurpose)}`);
   };
 
   const handleEditSession = async (sessionId: string) => {
@@ -150,7 +150,7 @@ const StockCount = () => {
       const sessionDetails = await erpnextAPI.getStockReconciliation(sessionId);
       if (sessionDetails?.data) {
         // Navigate to edit session with the session data
-        navigate(`/stock-count/session?sessionId=${sessionId}&mode=edit`);
+        navigate(`/app/stock-count/session?sessionId=${sessionId}&mode=edit`);
       }
     } catch (error) {
       console.error('Failed to load session details:', error);
@@ -163,7 +163,7 @@ const StockCount = () => {
   };
 
   const handleViewSession = (sessionId: string) => {
-    navigate(`/stock-count/session?sessionId=${sessionId}&mode=view`);
+    navigate(`/app/stock-count/session?sessionId=${sessionId}&mode=view`);
   };
 
   return (
