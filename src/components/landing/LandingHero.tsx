@@ -59,6 +59,64 @@ const LandingHero = () => {
             </Button>
           </motion.div>
 
+          {/* Hero Screenshot */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="flex justify-center mb-16"
+          >
+            <div className="relative">
+              {/* Main screenshot */}
+              <div className="relative w-80 h-96 mx-auto">
+                <div className="bg-slate-800 rounded-3xl p-2 shadow-2xl w-80 h-96">
+                  <div className="w-full h-full bg-white rounded-2xl overflow-hidden">
+                    <img 
+                      src="/lovable-uploads/bc19e340-dfe9-40e2-9838-a52edd4879e4.png" 
+                      alt="WMS Dashboard" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Floating mini screenshots */}
+              <motion.div
+                initial={{ opacity: 0, x: -50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="absolute -left-16 top-16 w-28 h-36 hidden lg:block"
+              >
+                <div className="bg-slate-800 rounded-2xl p-1 shadow-xl">
+                  <div className="w-full h-full bg-white rounded-xl overflow-hidden">
+                    <img 
+                      src="/lovable-uploads/9d2ccdec-ae7a-4f97-be42-fd56e3be2e03.png" 
+                      alt="Item Enquiry" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.8 }}
+                className="absolute -right-16 top-32 w-28 h-36 hidden lg:block"
+              >
+                <div className="bg-slate-800 rounded-2xl p-1 shadow-xl">
+                  <div className="w-full h-full bg-white rounded-xl overflow-hidden">
+                    <img 
+                      src="/lovable-uploads/843ae785-e73e-47a8-98dd-ea4587d27947.png" 
+                      alt="Data Sync" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+
           {/* Floating Feature Icons */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-2xl mx-auto">
             {[
