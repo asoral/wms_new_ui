@@ -120,7 +120,7 @@ const StockEntryForm = ({ type, onBack }: StockEntryFormProps) => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAddItem} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <Label htmlFor="itemCode">Item Code</Label>
                 <div className="flex space-x-2">
@@ -129,8 +129,9 @@ const StockEntryForm = ({ type, onBack }: StockEntryFormProps) => {
                     value={formData.itemCode}
                     onChange={(e) => setFormData(prev => ({ ...prev, itemCode: e.target.value }))}
                     placeholder="Scan or enter item code"
+                    className="flex-1"
                   />
-                  <Button type="button" variant="outline" onClick={() => handleScan("item")}>
+                  <Button type="button" variant="outline" size="icon" onClick={() => handleScan("item")}>
                     <Scan className="w-4 h-4" />
                   </Button>
                 </div>
@@ -153,7 +154,7 @@ const StockEntryForm = ({ type, onBack }: StockEntryFormProps) => {
                   <Label htmlFor="fromWarehouse">From Warehouse</Label>
                   <div className="flex space-x-2">
                     <Select value={formData.fromWarehouse} onValueChange={(value) => setFormData(prev => ({ ...prev, fromWarehouse: value }))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Select source warehouse" />
                       </SelectTrigger>
                       <SelectContent>
@@ -164,7 +165,7 @@ const StockEntryForm = ({ type, onBack }: StockEntryFormProps) => {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button type="button" variant="outline" onClick={() => handleScan("fromWarehouse")}>
+                    <Button type="button" variant="outline" size="icon" onClick={() => handleScan("fromWarehouse")}>
                       <Scan className="w-4 h-4" />
                     </Button>
                   </div>
@@ -176,7 +177,7 @@ const StockEntryForm = ({ type, onBack }: StockEntryFormProps) => {
                   <Label htmlFor="toWarehouse">To Warehouse</Label>
                   <div className="flex space-x-2">
                     <Select value={formData.toWarehouse} onValueChange={(value) => setFormData(prev => ({ ...prev, toWarehouse: value }))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Select target warehouse" />
                       </SelectTrigger>
                       <SelectContent>
@@ -187,7 +188,7 @@ const StockEntryForm = ({ type, onBack }: StockEntryFormProps) => {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button type="button" variant="outline" onClick={() => handleScan("toWarehouse")}>
+                    <Button type="button" variant="outline" size="icon" onClick={() => handleScan("toWarehouse")}>
                       <Scan className="w-4 h-4" />
                     </Button>
                   </div>

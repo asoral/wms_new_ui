@@ -289,26 +289,33 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
             {/* Selected Item Details */}
             {selectedItem && (
               <div className="p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-sm">
-                  <div>
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  {/* First row - Item Name (full width) */}
+                  <div className="col-span-1">
                     <p className="text-muted-foreground">Item Name</p>
-                    <p className="font-medium truncate">{selectedItem.itemName}</p>
+                    <p className="font-medium">{selectedItem.itemName}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Pending Qty</p>
-                    <p className="font-medium text-orange-600">{selectedItem.pendingQty} {selectedItem.uom}</p>
+                  
+                  {/* Second row - Key metrics in 2 columns */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-muted-foreground">Pending Qty</p>
+                      <p className="font-medium text-orange-600">{selectedItem.pendingQty} {selectedItem.uom}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Rate</p>
+                      <p className="font-medium">₹{selectedItem.rate}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Rate</p>
-                    <p className="font-medium">₹{selectedItem.rate}</p>
-                  </div>
-                  <div>
+                  
+                  {/* Third row - Warehouse (full width) */}
+                  <div className="col-span-1">
                     <p className="text-muted-foreground">Warehouse</p>
-                    <p className="font-medium truncate">{selectedItem.warehouse}</p>
+                    <p className="font-medium">{selectedItem.warehouse}</p>
                   </div>
                 </div>
                 {/* Item Tracking indicators */}
-                <div className="mt-2 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {selectedItem.has_batch_no && (
                     <Badge variant="outline">Batch Tracked</Badge>
                   )}
@@ -360,7 +367,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                     </TabsList>
                     
                     <TabsContent value="traditional" className="space-y-4 mt-4">
-                      <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-4">
                         {/* Only show batch input if item is batch tracked */}
                         {selectedItem.has_batch_no && (
                           <div className="space-y-2">
@@ -370,6 +377,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                               placeholder="Enter batch number..."
                               value={batch}
                               onChange={(e) => setBatch(e.target.value)}
+                              className="w-full"
                             />
                           </div>
                         )}
@@ -382,10 +390,11 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                               placeholder="Enter serial number..."
                               value={serial}
                               onChange={(e) => setSerial(e.target.value)}
+                              className="w-full"
                             />
                           </div>
                         )}
-                        <div className="space-y-2 md:col-span-2">
+                        <div className="space-y-2">
                           <Label htmlFor="received-qty">Actual Quantity *</Label>
                           <Input
                             id="received-qty"
@@ -395,6 +404,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                             onChange={(e) => setReceivedQty(Number(e.target.value))}
                             max={selectedItem?.pendingQty || 0}
                             min="1"
+                            className="w-full"
                           />
                         </div>
                       </div>
@@ -404,7 +414,7 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                         disabled={!selectedItem || !receivedQty || (selectedItem.has_batch_no && !batch)}
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        Add to Count
+                        Add to Receipt
                       </Button>
                     </TabsContent>
 
@@ -418,31 +428,33 @@ const ReceiveForm = ({ poItems, onAddEntry, defaultWarehouse }: ReceiveFormProps
                         </div>
                         
                         {batchEntries.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs md:text-sm font-medium text-muted-foreground pb-2 border-b">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-3 gap-2 text-xs font-medium text-muted-foreground pb-2 border-b">
                               <div>Batch Number</div>
                               <div>Quantity</div>
                               <div>Action</div>
                             </div>
                             {batchEntries.map((entry, index) => (
-                              <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+                              <div key={index} className="grid grid-cols-3 gap-2 items-center">
                                 <Input
-                                  placeholder="Enter batch number"
+                                  placeholder="Batch #"
                                   value={entry.batchNumber}
                                   onChange={(e) => updateBatchEntry(index, 'batchNumber', e.target.value)}
+                                  className="text-sm"
                                 />
                                 <Input
                                   type="number"
-                                  placeholder="Quantity"
+                                  placeholder="Qty"
                                   value={entry.quantity || ""}
                                   onChange={(e) => updateBatchEntry(index, 'quantity', Number(e.target.value))}
                                   min="1"
+                                  className="text-sm"
                                 />
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => removeBatchRow(index)}
-                                  className="text-red-600 hover:text-red-700"
+                                  className="text-red-600 hover:text-red-700 px-2"
                                 >
                                   Remove
                                 </Button>
