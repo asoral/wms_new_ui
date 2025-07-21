@@ -664,49 +664,65 @@ const Receive = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full max-w-7xl mx-auto px-4 py-4 md:py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <Truck className="w-6 h-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Receive</h1>
+      <div className="w-full max-w-7xl mx-auto px-3 md:px-4 py-3 md:py-6">
+        {/* Header - Mobile Optimized */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
+          <div className="flex items-center space-x-2 md:space-x-3">
+            <Truck className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Receive</h1>
           </div>
           {(selectedPO || currentPurchaseReceipt) && (
-            <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={resetToDashboard}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Reset
-              </Button>
-              {selectedPO && (
-                <>
-                  <Badge variant="outline">{selectedPO.poNumber}</Badge>
-                  {currentPurchaseReceipt && (
-                    <Badge variant="secondary">PR: {currentPurchaseReceipt}</Badge>
-                  )}
-                  <Button onClick={submitReceipt} disabled={!currentPurchaseReceipt || loading}>
-                    <Package className="w-4 h-4 mr-2" />
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2">
+              <div className="flex items-center gap-2 order-2 md:order-1">
+                {selectedPO && (
+                  <>
+                    <Badge variant="outline" className="text-xs">{selectedPO.poNumber}</Badge>
+                    {currentPurchaseReceipt && (
+                      <Badge variant="secondary" className="text-xs">PR: {currentPurchaseReceipt}</Badge>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="flex gap-2 order-1 md:order-2">
+                <Button 
+                  variant="outline" 
+                  onClick={resetToDashboard}
+                  className="text-muted-foreground hover:text-destructive text-sm h-8"
+                  size="sm"
+                >
+                  <RotateCcw className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                  Reset
+                </Button>
+                {selectedPO && (
+                  <Button 
+                    onClick={submitReceipt} 
+                    disabled={!currentPurchaseReceipt || loading}
+                    className="text-sm h-8"
+                    size="sm"
+                  >
+                    <Package className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
                     Submit Receipt
                   </Button>
-                </>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-3 w-full max-w-md mx-auto mb-6">
-            <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
-            <TabsTrigger value="receive" disabled={!selectedPO && !currentPurchaseReceipt} className="text-xs sm:text-sm">
-              Receive Items
+          <TabsList className="grid grid-cols-3 w-full mb-4 md:mb-6 h-auto">
+            <TabsTrigger value="dashboard" className="text-xs md:text-sm px-2 py-2">
+              Dashboard
             </TabsTrigger>
-            <TabsTrigger value="review" disabled={receiveEntries.length === 0} className="relative text-xs sm:text-sm">
-              Review & Submit
+            <TabsTrigger value="receive" disabled={!selectedPO && !currentPurchaseReceipt} className="text-xs md:text-sm px-2 py-2">
+              <span className="hidden md:inline">Receive Items</span>
+              <span className="md:hidden">Receive</span>
+            </TabsTrigger>
+            <TabsTrigger value="review" disabled={receiveEntries.length === 0} className="relative text-xs md:text-sm px-2 py-2">
+              <span className="hidden md:inline">Review & Submit</span>
+              <span className="md:hidden">Review</span>
               {receiveEntries.length > 0 && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="absolute -top-1 -right-1 w-2 h-2 md:w-3 md:h-3 bg-red-500 rounded-full"></div>
               )}
             </TabsTrigger>
           </TabsList>
