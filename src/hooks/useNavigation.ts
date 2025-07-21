@@ -5,71 +5,71 @@ export const useNavigation = () => {
   const navigate = useNavigate();
 
   const navigateToProfile = () => {
-    navigate('/profile');
+    navigate('/app/profile');
   };
 
   const navigateToHome = () => {
-    navigate('/');
+    navigate('/app/home');
   };
 
   const navigateToItemEnquiry = () => {
-    navigate('/item-enquiry');
+    navigate('/app/item-enquiry');
   };
 
   const navigateToBinEnquiry = () => {
-    navigate('/bin-enquiry');
+    navigate('/app/bin-enquiry');
   };
 
   const navigateToReceive = () => {
-    navigate('/receive');
+    navigate('/app/receive');
   };
 
   const navigateToDeliver = () => {
-    navigate('/deliver');
+    navigate('/app/deliver');
   };
 
   const navigateToPickList = () => {
-    navigate('/pick-list');
+    navigate('/app/pick-list');
   };
 
   const navigateToPacking = () => {
-    navigate('/packing');
+    navigate('/app/packing');
   };
 
   const navigateToStockEntry = () => {
-    navigate('/stock-entry');
+    navigate('/app/stock-entry');
   };
 
   const navigateToMaterialRequest = () => {
-    navigate('/material-request');
+    navigate('/app/material-request');
   };
 
   const navigateToQualityCheck = () => {
-    navigate('/quality-check');
+    navigate('/app/quality-check');
   };
 
   const navigateToStockCount = () => {
-    navigate('/stock-count');
+    navigate('/app/stock-count');
   };
 
   const navigateToPallet = () => {
-    navigate('/pallet');
+    navigate('/app/pallet');
   };
 
   const navigateToPrintLabel = () => {
-    navigate('/print-label');
+    navigate('/app/print-label');
   };
 
   const navigateToReports = () => {
-    navigate('/reports');
+    navigate('/app/reports');
   };
 
   const navigateToSync = () => {
-    navigate('/sync');
+    navigate('/app/sync');
   };
 
   const navigateToNotifications = () => {
-    navigate('/notifications');
+    navigate('/app/notifications');
   };
 
   return {

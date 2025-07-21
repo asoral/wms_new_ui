@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,12 +9,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Warehouse, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import OnboardingCarousel from '@/components/onboarding/OnboardingCarousel';
-// Add dialog
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 
 const AuthForm = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signIn, signUp } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +24,16 @@ const AuthForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
+
+  // Initialize tab from URL parameter
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'signup') {
+      setActiveTab('signup');
+    } else if (tab === 'login') {
+      setActiveTab('login');
+    }
+  }, [searchParams]);
 
   // Password reset state
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -56,7 +66,7 @@ const AuthForm = () => {
     if (error) {
       setError(error.message);
     } else {
-      navigate('/');
+      navigate('/app/home');
     }
 
     setLoading(false);
@@ -119,7 +129,6 @@ const AuthForm = () => {
     setShowOnboarding(true);
   };
 
-  // Password reset logic
   const handleOpenResetDialog = () => {
     setShowResetDialog(true);
     setResetEmail('');

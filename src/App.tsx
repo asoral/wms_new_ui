@@ -8,10 +8,13 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Layout from "@/components/Layout";
 import { Toaster } from "@/components/ui/toaster";
 
-// Pages
-import Home from "@/pages/Home";
-import Index from "@/pages/Index";
+// Public Pages
+import LandingPage from "@/components/landing/LandingPage";
 import Auth from "@/pages/Auth";
+import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
+
+// Protected Pages
+import Home from "@/pages/Home";
 import Profile from "@/pages/Profile";
 import ItemEnquiry from "@/pages/ItemEnquiry";
 import BinEnquiry from "@/pages/BinEnquiry";
@@ -33,7 +36,6 @@ import Sync from "@/pages/Sync";
 import NotFound from "@/pages/NotFound";
 import DraftReceipts from "@/pages/DraftReceipts";
 import ReceiptDetail from "@/pages/ReceiptDetail";
-import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
 import SalesOrderList from "@/pages/SalesOrderList";
 
 const queryClient = new QueryClient({
@@ -54,15 +56,19 @@ const App = () => {
             <SubscriptionProvider>
               <div className="min-h-screen bg-background">
                 <Routes>
+                  {/* Public Routes */}
+                  <Route path="/" element={<LandingPage />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+                  
+                  {/* Protected App Routes */}
                   <Route
-                    path="/*"
+                    path="/app/*"
                     element={
                       <ProtectedRoute>
                         <Layout>
                           <Routes>
-                            <Route path="/" element={<Home />} />
+                            <Route path="/" element={<Navigate to="/app/home" replace />} />
                             <Route path="/home" element={<Home />} />
                             <Route path="/profile" element={<Profile />} />
                             <Route path="/item-enquiry" element={<ItemEnquiry />} />
@@ -92,6 +98,9 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+                  
+                  {/* Catch-all redirect */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </div>
               <Toaster />
