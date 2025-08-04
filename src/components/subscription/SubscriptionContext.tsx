@@ -45,10 +45,10 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       return;
     }
 
-    // Only check subscription every 5 minutes to prevent excessive API calls
+    // Check subscription every 30 minutes for regular license validation
     const now = Date.now();
-    const fiveMinutes = 5 * 60 * 1000;
-    if (now - lastCheckTime < fiveMinutes && hasAccess) {
+    const thirtyMinutes = 30 * 60 * 1000;
+    if (now - lastCheckTime < thirtyMinutes && hasAccess) {
       setLoading(false);
       return;
     }
@@ -125,6 +125,18 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       mounted = false;
     };
   }, [user?.id]); // Only trigger on user ID change, not on every session change
+
+  // Regular license checking every 30 minutes when app is active
+  useEffect(() => {
+    if (!user || !session) return;
+
+    const licenseCheckInterval = setInterval(() => {
+      console.log('Regular license check triggered');
+      refreshSubscription();
+    }, 30 * 60 * 1000); // 30 minutes
+
+    return () => clearInterval(licenseCheckInterval);
+  }, [user?.id, session]);
 
   // Handle window focus to refresh subscription only if it's been a while
   useEffect(() => {

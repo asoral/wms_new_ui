@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -10,6 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   loading: boolean;
+  updateActivity: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +27,71 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastActivityRef = useRef<number>(Date.now());
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Session timeout: 2 hours of inactivity
+  const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+
+  // Update activity timestamp
+  const updateActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    console.log('Activity updated:', new Date().toISOString());
+  }, []);
+
+  // Check for session timeout
+  const checkSessionTimeout = useCallback(async () => {
+    if (!user || !session) return;
+    
+    const now = Date.now();
+    const timeSinceLastActivity = now - lastActivityRef.current;
+    
+    if (timeSinceLastActivity > SESSION_TIMEOUT) {
+      console.log('Session timed out due to inactivity');
+      await supabase.auth.signOut();
+      return;
+    }
+    
+    // Schedule next check
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    const nextCheckIn = SESSION_TIMEOUT - timeSinceLastActivity;
+    timeoutRef.current = setTimeout(checkSessionTimeout, Math.min(nextCheckIn, 60000)); // Check at least every minute
+  }, [user, session, SESSION_TIMEOUT]);
+
+  // Set up activity listeners
+  useEffect(() => {
+    if (!user) return;
+
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const handleActivity = () => {
+      updateActivity();
+    };
+
+    // Add event listeners for user activity
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    // Start session timeout checking
+    checkSessionTimeout();
+
+    return () => {
+      // Remove event listeners
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+      
+      // Clear timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [user, updateActivity, checkSessionTimeout]);
 
   useEffect(() => {
     let mounted = true;
@@ -110,7 +176,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signUp,
     signIn,
     signOut,
-    loading
+    loading,
+    updateActivity
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
