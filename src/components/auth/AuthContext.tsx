@@ -33,10 +33,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Session timeout: 2 hours of inactivity
   const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
-  // Update activity timestamp
+  // Update activity timestamp with throttling
   const updateActivity = useCallback(() => {
-    lastActivityRef.current = Date.now();
-    console.log('Activity updated:', new Date().toISOString());
+    const now = Date.now();
+    // Only update if at least 1 second has passed since last update
+    if (now - lastActivityRef.current > 1000) {
+      lastActivityRef.current = now;
+    }
   }, []);
 
   // Check for session timeout
