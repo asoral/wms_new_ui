@@ -122,7 +122,13 @@ const BinEnquiry = () => {
               };
             })
         );
-        setBinItems(transformedItems);
+        
+        // Sort items by item code
+        const sortedItems = transformedItems.sort((a, b) => 
+          a.item_code.localeCompare(b.item_code)
+        );
+        
+        setBinItems(sortedItems);
       } else {
         setBinItems([]);
       }
