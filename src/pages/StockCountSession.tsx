@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, RotateCcw, Save, Trash2, Edit, Check, X } from "lucide-react";
+import { BarChart3, RotateCcw, Save, Trash2, Edit, Check, X, Package } from "lucide-react";
 import ItemSelector from "@/components/stock-count/ItemSelector";
+import MultiWarehouseItemSelector from "@/components/stock-count/MultiWarehouseItemSelector";
 import { StockCountEntry } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI } from "@/services/erpnextApi";
@@ -18,6 +19,7 @@ const StockCountSession = () => {
   const purpose = searchParams.get('purpose') || 'Stock Reconciliation';
   const sessionId = searchParams.get('sessionId');
   const mode = searchParams.get('mode') || 'create'; // create, edit, view
+  const isMultiWarehouse = searchParams.get('multiWarehouse') === 'true';
   const [entries, setEntries] = useState<StockCountEntry[]>([]);
   const [activeTab, setActiveTab] = useState("entry");
   const [stockReconciliationId, setStockReconciliationId] = useState<string | null>(sessionId);
@@ -492,17 +494,25 @@ const StockCountSession = () => {
                 {sessionData?.purpose || 'Stock Reconciliation'}: {stockReconciliationId}
               </span>
             )}
-            {warehouse && !stockReconciliationId && (
+            {warehouse && !stockReconciliationId && !isMultiWarehouse && (
               <span>Warehouse: {warehouse}</span>
+            )}
+            {isMultiWarehouse && !stockReconciliationId && (
+              <span className="text-blue-600 font-medium">Multi-Warehouse Mode</span>
             )}
             {sessionData?.company && (
               <span className="ml-4 text-gray-600">
                 Company: {sessionData.company}
               </span>
             )}
-            {(sessionData?.warehouse || warehouse || (entries.length > 0 ? entries[0].warehouse : '')) && (
+            {!isMultiWarehouse && (sessionData?.warehouse || warehouse || (entries.length > 0 ? entries[0].warehouse : '')) && (
               <span className="ml-4 text-gray-600">
                 Warehouse: {sessionData?.warehouse || warehouse || (entries.length > 0 ? entries[0].warehouse : '')}
+              </span>
+            )}
+            {isMultiWarehouse && entries.length > 0 && (
+              <span className="ml-4 text-gray-600">
+                Warehouses: {[...new Set(entries.map(e => e.warehouse))].join(', ')}
               </span>
             )}
           </p>
@@ -579,32 +589,71 @@ const StockCountSession = () => {
               </CardContent>
             </Card>
           ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Scan Items</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ItemSelector 
-                warehouse={warehouse || sessionData?.warehouse || (entries.length > 0 ? entries[0].warehouse : '')}
-                onItemAdded={(item) => {
-                  const entry: StockCountEntry = {
-                    itemCode: item.itemCode,
-                    itemName: item.itemName,
-                    warehouse: item.warehouse || warehouse || sessionData?.warehouse || (entries.length > 0 ? entries[0].warehouse : ''),
-                    currentQty: item.currentQty,
-                    actualQty: item.actualQty,
-                    difference: item.actualQty - item.currentQty,
-                    status: item.actualQty === item.currentQty ? 'matched' : 'variance',
-                    uom: item.uom,
-                    batch: item.batch,
-                    serial: item.serial,
-                    serialBatchBundle: item.serialBatchBundle
-                  };
-                  handleEntryAdded(entry);
-                }}
-              />
-            </CardContent>
-            </Card>
+            <div className="space-y-4">
+              {isMultiWarehouse && (
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Package className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <h3 className="font-medium text-blue-900">Multi-Warehouse Stock Count</h3>
+                        <p className="text-sm text-blue-700">Select warehouse for each item individually</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {isMultiWarehouse ? 'Add Items with Warehouses' : 'Scan Items'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isMultiWarehouse ? (
+                    <MultiWarehouseItemSelector 
+                      onItemAdded={(item) => {
+                        const entry: StockCountEntry = {
+                          itemCode: item.itemCode,
+                          itemName: item.itemName,
+                          warehouse: item.warehouse,
+                          currentQty: item.currentQty,
+                          actualQty: item.actualQty,
+                          difference: item.actualQty - item.currentQty,
+                          status: item.actualQty === item.currentQty ? 'matched' : 'variance',
+                          uom: item.uom,
+                          batch: item.batch,
+                          serial: item.serial,
+                          serialBatchBundle: item.serialBatchBundle
+                        };
+                        handleEntryAdded(entry);
+                      }}
+                    />
+                  ) : (
+                    <ItemSelector 
+                      warehouse={warehouse || sessionData?.warehouse || (entries.length > 0 ? entries[0].warehouse : '')}
+                      onItemAdded={(item) => {
+                        const entry: StockCountEntry = {
+                          itemCode: item.itemCode,
+                          itemName: item.itemName,
+                          warehouse: item.warehouse || warehouse || sessionData?.warehouse || (entries.length > 0 ? entries[0].warehouse : ''),
+                          currentQty: item.currentQty,
+                          actualQty: item.actualQty,
+                          difference: item.actualQty - item.currentQty,
+                          status: item.actualQty === item.currentQty ? 'matched' : 'variance',
+                          uom: item.uom,
+                          batch: item.batch,
+                          serial: item.serial,
+                          serialBatchBundle: item.serialBatchBundle
+                        };
+                        handleEntryAdded(entry);
+                      }}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
         </TabsContent>
 
