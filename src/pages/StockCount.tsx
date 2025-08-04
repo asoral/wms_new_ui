@@ -5,11 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
+import WarehouseScanner from "@/components/stock-count/WarehouseScanner";
 import { StockRecoCard } from "@/components/stock-count/StockRecoCard";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, CheckCircle, AlertTriangle, Loader2, BarChart3, Building2, Search } from "lucide-react";
+import { Plus, CheckCircle, AlertTriangle, Loader2, BarChart3, Building2, Search, ScanBarcode, Package } from "lucide-react";
 import { format } from 'date-fns';
 import { StockCountSession } from "@/types";
 
@@ -21,6 +24,8 @@ const StockCount = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [selectedPurpose, setSelectedPurpose] = useState<string>("Stock Reconciliation");
+  const [isMultiWarehouse, setIsMultiWarehouse] = useState(false);
+  const [warehouseTab, setWarehouseTab] = useState<string>("select");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -128,8 +133,13 @@ const StockCount = () => {
     }
   };
 
+  const handleWarehouseFound = (warehouse: any) => {
+    setSelectedWarehouse(warehouse.name);
+    setWarehouseTab("select"); // Switch back to select tab to show selection
+  };
+
   const handleStartSession = () => {
-    if (!selectedWarehouse) {
+    if (!isMultiWarehouse && !selectedWarehouse) {
       toast({
         title: "Warehouse Required",
         description: "Please select a warehouse to start the stock count session.",
@@ -139,7 +149,8 @@ const StockCount = () => {
     }
 
     // Navigate to stock count session with parameters
-    navigate(`/app/stock-count/session?warehouse=${encodeURIComponent(selectedWarehouse)}&purpose=${encodeURIComponent(selectedPurpose)}`);
+    const warehouseParam = isMultiWarehouse ? 'multi' : encodeURIComponent(selectedWarehouse);
+    navigate(`/app/stock-count/session?warehouse=${warehouseParam}&purpose=${encodeURIComponent(selectedPurpose)}&multiWarehouse=${isMultiWarehouse}`);
   };
 
   const handleEditSession = async (sessionId: string) => {
@@ -233,13 +244,56 @@ const StockCount = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 gap-4">
-            <WarehouseSelector
-              onWarehouseSelected={setSelectedWarehouse}
-              isLoading={loading}
+          {/* Multi-warehouse option */}
+          <div className="flex items-center space-x-3 p-4 border rounded-lg bg-muted/50">
+            <Checkbox 
+              id="multi-warehouse" 
+              checked={isMultiWarehouse}
+              onCheckedChange={(checked) => {
+                setIsMultiWarehouse(checked as boolean);
+                if (checked) setSelectedWarehouse("");
+              }}
             />
-
+            <div className="flex-1">
+              <Label htmlFor="multi-warehouse" className="text-sm font-medium cursor-pointer">
+                Multi Warehouse Stock Count
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Count items across multiple warehouses. Select warehouse for each item individually.
+              </p>
+            </div>
+            <Package className="w-5 h-5 text-muted-foreground" />
           </div>
+
+          {/* Warehouse Selection - only show if not multi-warehouse */}
+          {!isMultiWarehouse && (
+            <div className="space-y-4">
+              <Label>Select Warehouse *</Label>
+              <Tabs value={warehouseTab} onValueChange={setWarehouseTab}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="select">
+                    <Building2 className="w-4 h-4 mr-2" />
+                    Select Warehouse
+                  </TabsTrigger>
+                  <TabsTrigger value="scan">
+                    <ScanBarcode className="w-4 h-4 mr-2" />
+                    Scan Barcode
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="select" className="mt-4">
+                  <WarehouseSelector
+                    onWarehouseSelected={setSelectedWarehouse}
+                    isLoading={loading}
+                  />
+                </TabsContent>
+
+                <TabsContent value="scan" className="mt-4">
+                  <WarehouseScanner onWarehouseFound={handleWarehouseFound} />
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="purpose">Select Count Purpose *</Label>
@@ -269,10 +323,10 @@ const StockCount = () => {
           <Button 
             onClick={handleStartSession}
             className="w-full py-3"
-            disabled={!selectedWarehouse}
+            disabled={(!isMultiWarehouse && !selectedWarehouse)}
           >
             <Plus className="w-4 h-4 mr-2" />
-            Start Count Session
+            {isMultiWarehouse ? 'Start Multi-Warehouse Count' : 'Start Count Session'}
           </Button>
         </CardContent>
       </Card>
