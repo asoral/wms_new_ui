@@ -61,7 +61,11 @@ const MultiWarehouseItemSelector = ({ onItemAdded }: MultiWarehouseItemSelectorP
       const response = await erpnextAPI.getWarehouses(filters);
       
       if (response?.data) {
-        setWarehouses(response.data);
+        // Sort warehouses by warehouse_name
+        const sortedWarehouses = response.data.sort((a: any, b: any) => 
+          (a.warehouse_name || a.name).localeCompare(b.warehouse_name || b.name)
+        );
+        setWarehouses(sortedWarehouses);
       }
     } catch (error) {
       console.error('Failed to load warehouses:', error);

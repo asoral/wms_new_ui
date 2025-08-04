@@ -89,6 +89,9 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
           company: (warehouse as any).company
         }));
         
+        // Sort warehouses by warehouse_name
+        warehouseData.sort((a, b) => (a.warehouse_name || a.name).localeCompare(b.warehouse_name || b.name));
+        
         setWarehouses(warehouseData);
         
         if (!search.trim()) {
@@ -131,13 +134,20 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
   };
 
   const filteredWarehouses = useMemo(() => {
-    if (!searchValue) return warehouses;
-    const lowercaseSearch = searchValue.toLowerCase();
-    const filtered = warehouses.filter(warehouse => 
-      warehouse.name.toLowerCase().includes(lowercaseSearch) ||
-      warehouse.warehouse_name.toLowerCase().includes(lowercaseSearch)
-    );
-    return filtered;
+    let result = warehouses;
+    
+    if (searchValue) {
+      const lowercaseSearch = searchValue.toLowerCase();
+      result = warehouses.filter(warehouse => 
+        warehouse.name.toLowerCase().includes(lowercaseSearch) ||
+        warehouse.warehouse_name.toLowerCase().includes(lowercaseSearch)
+      );
+    }
+    
+    // Always sort by warehouse_name
+    result.sort((a, b) => (a.warehouse_name || a.name).localeCompare(b.warehouse_name || b.name));
+    
+    return result;
   }, [warehouses, searchValue]);
 
   return (

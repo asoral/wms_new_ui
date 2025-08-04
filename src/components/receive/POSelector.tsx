@@ -311,7 +311,7 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-card border border-border shadow-lg z-[10000]" align="start">
+            <PopoverContent className="w-full p-0 bg-popover border border-border shadow-lg z-[10000]" align="start">
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Search purchase orders..." 

@@ -270,7 +270,7 @@ const EnhancedDeliveryItemScanner = ({ soItems, onAddEntry }: EnhancedDeliveryIt
                   <SelectTrigger>
                     <SelectValue placeholder={soItems.length > 0 ? "Select an item to deliver..." : "No items available"} />
                   </SelectTrigger>
-                  <SelectContent className="bg-white border border-gray-200 shadow-lg z-[10000]">
+                  <SelectContent className="bg-popover border border-border shadow-lg z-[10000]">
                     {soItems.length > 0 ? (
                       soItems.map((item) => (
                         <SelectItem key={item.itemCode} value={item.itemCode}>

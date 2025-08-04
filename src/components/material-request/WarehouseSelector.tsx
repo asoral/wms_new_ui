@@ -101,6 +101,9 @@ const WarehouseSelector = ({ value, onValueChange, placeholder = "Select warehou
           company: (warehouse as any).company
         }));
         
+        // Sort warehouses by warehouse_name
+        warehouseData.sort((a, b) => (a.warehouse_name || a.name).localeCompare(b.warehouse_name || b.name));
+        
         setWarehouses(warehouseData);
         
         if (!search.trim()) {
@@ -143,13 +146,20 @@ const WarehouseSelector = ({ value, onValueChange, placeholder = "Select warehou
   };
 
   const filteredWarehouses = useMemo(() => {
-    if (!searchValue) return warehouses;
-    const lowercaseSearch = searchValue.toLowerCase();
-    const filtered = warehouses.filter(warehouse => 
-      warehouse.name.toLowerCase().includes(lowercaseSearch) ||
-      warehouse.warehouse_name.toLowerCase().includes(lowercaseSearch)
-    );
-    return filtered;
+    let result = warehouses;
+    
+    if (searchValue) {
+      const lowercaseSearch = searchValue.toLowerCase();
+      result = warehouses.filter(warehouse => 
+        warehouse.name.toLowerCase().includes(lowercaseSearch) ||
+        warehouse.warehouse_name.toLowerCase().includes(lowercaseSearch)
+      );
+    }
+    
+    // Always sort by warehouse_name
+    result.sort((a, b) => (a.warehouse_name || a.name).localeCompare(b.warehouse_name || b.name));
+    
+    return result;
   }, [warehouses, searchValue]);
 
   return (
@@ -178,7 +188,7 @@ const WarehouseSelector = ({ value, onValueChange, placeholder = "Select warehou
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0 bg-white border border-gray-200 shadow-lg z-[10000]" align="start">
+      <PopoverContent className="w-full p-0 bg-popover border border-border shadow-lg z-[10000]" align="start">
         <Command shouldFilter={false}>
           <CommandInput 
             placeholder="Search warehouses..." 

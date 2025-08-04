@@ -96,6 +96,9 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
           item_group: item.item_group
         }));
         
+        // Sort items by item_code
+        itemData.sort((a, b) => a.item_code.localeCompare(b.item_code));
+        
         console.log('Setting items:', itemData.length);
         setItems(itemData);
         
@@ -142,14 +145,21 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
 
   const filteredItems = useMemo(() => {
     console.log('Filtering items. Total items:', items.length, 'Search value:', searchValue);
-    if (!searchValue) return items;
-    const lowercaseSearch = searchValue.toLowerCase();
-    const filtered = items.filter(item => 
-      item.item_code.toLowerCase().includes(lowercaseSearch) ||
-      item.item_name.toLowerCase().includes(lowercaseSearch)
-    );
-    console.log('Filtered items count:', filtered.length);
-    return filtered;
+    let result = items;
+    
+    if (searchValue) {
+      const lowercaseSearch = searchValue.toLowerCase();
+      result = items.filter(item => 
+        item.item_code.toLowerCase().includes(lowercaseSearch) ||
+        item.item_name.toLowerCase().includes(lowercaseSearch)
+      );
+    }
+    
+    // Always sort by item_code
+    result.sort((a, b) => a.item_code.localeCompare(b.item_code));
+    
+    console.log('Filtered items count:', result.length);
+    return result;
   }, [items, searchValue]);
 
   console.log('Rendering ItemSelector. Items count:', items.length, 'Filtered count:', filteredItems.length, 'Loading:', isLoadingItems);
