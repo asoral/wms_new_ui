@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Warehouse, Search, TrendingUp, AlertTriangle, Calendar, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, Warehouse, Search, TrendingUp, AlertTriangle, Calendar, DollarSign, FileSpreadsheet, FileText } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import BinScanner from "../components/bin-enquiry/BinScanner";
+import { exportBinEnquiryToExcel, exportBinEnquiryToPDF } from "@/utils/exportUtils";
 
 export interface BinItem {
   item_code: string;
@@ -154,6 +156,56 @@ const BinEnquiry = () => {
     }).format(amount);
   };
 
+  const handleExportExcel = () => {
+    if (binItems.length === 0 || !selectedBin) {
+      toast({
+        title: "No Data",
+        description: "No data available to export",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const success = exportBinEnquiryToExcel(binItems, selectedBin);
+    if (success) {
+      toast({
+        title: "Export Successful",
+        description: "Data exported to Excel successfully",
+      });
+    } else {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data to Excel",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (binItems.length === 0 || !selectedBin) {
+      toast({
+        title: "No Data",
+        description: "No data available to export",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const success = exportBinEnquiryToPDF(binItems, selectedBin);
+    if (success) {
+      toast({
+        title: "Export Successful",
+        description: "Data exported to PDF successfully",
+      });
+    } else {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data to PDF",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getAgeColor = (age: number) => {
     if (age <= 30) return "bg-green-100 text-green-800";
     if (age <= 60) return "bg-yellow-100 text-yellow-800";
@@ -243,10 +295,34 @@ const BinEnquiry = () => {
           {/* Items Table */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Warehouse className="w-5 h-5" />
-                <span>Items in {selectedBin}</span>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Warehouse className="w-5 h-5" />
+                  <span>Items in {selectedBin}</span>
+                </CardTitle>
+                {binItems.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={handleExportExcel}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center space-x-2"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      <span>Excel</span>
+                    </Button>
+                    <Button
+                      onClick={handleExportPDF}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center space-x-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>PDF</span>
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (

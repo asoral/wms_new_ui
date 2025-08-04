@@ -3,11 +3,12 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign } from "lucide-react";
+import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { Item } from "@/types";
 import ItemScanner from "@/components/item-enquiry/ItemScanner";
+import { exportItemEnquiryToExcel, exportItemEnquiryToPDF } from "@/utils/exportUtils";
 
 interface StockItem {
   itemCode: string;
@@ -220,6 +221,56 @@ const ItemEnquiry = () => {
     return "bg-red-100 text-red-800";
   };
 
+  const handleExportExcel = () => {
+    if (stockItems.length === 0 || !selectedItem) {
+      toast({
+        title: "No Data",
+        description: "No data available to export",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const success = exportItemEnquiryToExcel(stockItems, selectedItem.item_code);
+    if (success) {
+      toast({
+        title: "Export Successful",
+        description: "Data exported to Excel successfully",
+      });
+    } else {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data to Excel",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (stockItems.length === 0 || !selectedItem) {
+      toast({
+        title: "No Data",
+        description: "No data available to export",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const success = exportItemEnquiryToPDF(stockItems, selectedItem.item_code, selectedItem.item_name);
+    if (success) {
+      toast({
+        title: "Export Successful",
+        description: "Data exported to PDF successfully",
+      });
+    } else {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data to PDF",
+        variant: "destructive"
+      });
+    }
+  };
+
   const totalItems = stockItems.length;
   const totalQty = Math.round(stockItems.reduce((sum, item) => sum + item.qty, 0) * 100) / 100;
   const totalValuation = Math.round(stockItems.reduce((sum, item) => sum + item.valuation, 0) * 100) / 100;
@@ -313,10 +364,34 @@ const ItemEnquiry = () => {
           {/* Stock Items Table */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Warehouse className="w-5 h-5" />
-                <span>Stock of {selectedItem.item_code}</span>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Warehouse className="w-5 h-5" />
+                  <span>Stock of {selectedItem.item_code}</span>
+                </CardTitle>
+                {stockItems.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={handleExportExcel}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center space-x-2"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      <span>Excel</span>
+                    </Button>
+                    <Button
+                      onClick={handleExportPDF}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center space-x-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>PDF</span>
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
