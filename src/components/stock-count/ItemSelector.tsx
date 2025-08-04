@@ -8,7 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, ScanBarcode, Search, AlertCircle } from "lucide-react";
 import StockCountItemSelector from "@/components/common/ItemSelector";
 import SerialBatchBundleSelector from "@/components/stock-count/SerialBatchBundleSelector";
+import BarcodeScanner from "@/components/common/BarcodeScanner";
 import { useToast } from "@/hooks/use-toast";
+import { useItemSearch } from "@/hooks/useItemSearch";
 import { Item } from "@/types";
 
 interface ItemSelectorProps {
@@ -34,7 +36,9 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
   const [activeTab, setActiveTab] = useState<string>("manual");
   const [serialBatchBundle, setSerialBatchBundle] = useState<string>("");
   const [showBundleSelector, setShowBundleSelector] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const { toast } = useToast();
+  const { searchByBarcode, searching } = useItemSearch();
 
   const handleItemSelect = (item: Item) => {
     setSelectedItem(item);
@@ -57,6 +61,52 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
       title: "Bundle Created",
       description: `Serial and Batch Bundle ${bundleName} created with ${totalQty} items.`,
     });
+  };
+
+  const handleBarcodeScanned = async (barcode: string) => {
+    try {
+      setShowBarcodeScanner(false);
+      toast({
+        title: "Barcode Scanned",
+        description: `Searching for item with barcode: ${barcode}`,
+      });
+      
+      // Use ERPNext API directly to search for items by barcode
+      const { createERPNextAPI } = await import('@/services/erpnextApi');
+      const erpnextAPI = await createERPNextAPI();
+      
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not available');
+      }
+
+      const response = await erpnextAPI.searchItemsByBarcode(barcode);
+      
+      if (response?.data && Array.isArray(response.data) && response.data.length > 0) {
+        // Select the first item found
+        const foundItem = response.data[0];
+        setSelectedItem(foundItem);
+        setActualQty(1); // Default quantity
+        
+        toast({
+          title: "Item Found",
+          description: `Found: ${foundItem.item_name}`,
+        });
+      } else {
+        toast({
+          title: "No Item Found",
+          description: "No item found with the scanned barcode.",
+          variant: "destructive"
+        });
+      }
+      
+    } catch (error) {
+      console.error('Barcode search failed:', error);
+      toast({
+        title: "Search Failed",
+        description: "Could not find item with the scanned barcode.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleAddItem = () => {
@@ -247,12 +297,133 @@ const ItemSelector = ({ warehouse, onItemAdded }: ItemSelectorProps) => {
           </TabsContent>
 
           <TabsContent value="scan" className="space-y-4 mt-6">
-            <div className="text-center p-8 border-2 border-dashed border-border rounded-lg">
-              <ScanBarcode className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">Scan Barcode</h3>
-              <p className="text-muted-foreground mb-4">Use your device camera or barcode scanner</p>
-              <p className="text-sm text-muted-foreground">Feature coming soon...</p>
-            </div>
+            {!showBarcodeScanner ? (
+              <div className="text-center p-8 border-2 border-dashed border-border rounded-lg">
+                <ScanBarcode className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">Scan Barcode</h3>
+                <p className="text-muted-foreground mb-4">Use your device camera or barcode scanner</p>
+                <Button
+                  onClick={() => setShowBarcodeScanner(true)}
+                  className="w-full"
+                  disabled={searching}
+                >
+                  {searching ? 'Searching...' : 'Start Camera'}
+                </Button>
+              </div>
+            ) : (
+              <BarcodeScanner
+                onBarcodeScanned={handleBarcodeScanned}
+                onClose={() => setShowBarcodeScanner(false)}
+                title="Scan Item Barcode"
+                description="Position the barcode within the frame to scan automatically"
+                isModal={false}
+              />
+            )}
+
+            {/* Show selected item from barcode scan */}
+            {selectedItem && activeTab === "scan" && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-3">
+                    <div>
+                      <p className="font-medium text-muted-foreground">Item Code</p>
+                      <p className="text-foreground">{selectedItem.item_code}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-muted-foreground">Item Name</p>
+                      <p className="text-foreground">{selectedItem.item_name}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-muted-foreground">UOM</p>
+                      <p className="text-foreground">{selectedItem.stock_uom}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Item Tracking Info */}
+                  {isItemTracked(selectedItem) && (
+                    <div className="flex flex-wrap items-center space-x-2 mb-2">
+                      <AlertCircle className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-medium text-foreground">Item Tracking:</span>
+                      {selectedItem.has_serial_no === 1 && (
+                        <Badge variant="outline" className="text-xs">Serial Tracked</Badge>
+                      )}
+                      {selectedItem.has_batch_no === 1 && (
+                        <Badge variant="outline" className="text-xs">Batch Tracked</Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Serial/Batch Bundle for tracked items */}
+                {isItemTracked(selectedItem) && (
+                  <div className="space-y-4">
+                    {!showBundleSelector ? (
+                      <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0">
+                          <div className="flex items-center space-x-2">
+                            <AlertCircle className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-700">
+                              This item requires serial/batch tracking
+                            </span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowBundleSelector(true)}
+                            className="w-full md:w-auto"
+                          >
+                            Create Bundle
+                          </Button>
+                        </div>
+                        {serialBatchBundle && (
+                          <div className="mt-2 flex flex-wrap items-center space-x-2">
+                            <Badge variant="secondary">Bundle: {serialBatchBundle}</Badge>
+                            <span className="text-sm text-muted-foreground">Qty: {actualQty}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <SerialBatchBundleSelector
+                        itemCode={selectedItem.item_code}
+                        itemName={selectedItem.item_name}
+                        itemGroup={selectedItem.item_group || ''}
+                        hasSerial={selectedItem.has_serial_no === 1}
+                        hasBatch={selectedItem.has_batch_no === 1}
+                        warehouse={warehouse}
+                        transactionType="Inward"
+                        onBundleCreated={handleBundleCreated}
+                        initialQuantity={1}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Simple quantity input for non-tracked items */}
+                {!isItemTracked(selectedItem) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="scan-actual-qty">Actual Quantity *</Label>
+                      <Input
+                        id="scan-actual-qty"
+                        type="number"
+                        placeholder="0"
+                        value={actualQty || ""}
+                        onChange={(e) => setActualQty(Number(e.target.value))}
+                        min="1"
+                        step="0.01"
+                        className="w-full"
+                      />
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleAddItem} 
+                  className="w-full"
+                  disabled={!selectedItem || actualQty <= 0 || (isItemTracked(selectedItem) && !serialBatchBundle)}
+                >
+                  Add Item to Count
+                </Button>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </CardContent>
