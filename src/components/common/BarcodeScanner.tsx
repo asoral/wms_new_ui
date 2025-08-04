@@ -125,7 +125,7 @@ const BarcodeScanner = ({
     }
   };
 
-  const cleanup = () => {
+  const cleanup = async () => {
     if (isCleaningUp) return;
     setIsCleaningUp(true);
     
@@ -142,20 +142,7 @@ const BarcodeScanner = ({
       codeReader.current = null;
     }
 
-    // Stop all media stream tracks
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        try {
-          track.stop();
-          console.log('Camera track stopped:', track.kind, track.readyState);
-        } catch (err) {
-          console.error('Error stopping track:', err);
-        }
-      });
-      streamRef.current = null;
-    }
-
-    // Clear and stop video element
+    // Clear and stop video element first
     if (videoRef.current) {
       try {
         videoRef.current.pause();
@@ -167,15 +154,49 @@ const BarcodeScanner = ({
       }
     }
 
+    // Stop all media stream tracks with more aggressive cleanup
+    if (streamRef.current) {
+      const tracks = streamRef.current.getTracks();
+      console.log('Stopping', tracks.length, 'camera tracks...');
+      
+      // Stop each track individually and wait for it to complete
+      for (const track of tracks) {
+        try {
+          if (track.readyState !== 'ended') {
+            track.stop();
+            console.log('Camera track stopped:', track.kind, track.readyState);
+            
+            // Wait a brief moment for the track to properly stop
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        } catch (err) {
+          console.error('Error stopping track:', err);
+        }
+      }
+      
+      streamRef.current = null;
+    }
+
     setIsScanning(false);
     setFlashOn(false);
     setError(null);
     console.log('Camera cleanup completed successfully');
     
-    // Force garbage collection and additional cleanup
+    // Force additional cleanup after a delay
     setTimeout(() => {
       setIsCleaningUp(false);
-    }, 100);
+      
+      // Double-check that all tracks are stopped
+      if (streamRef.current) {
+        const remainingTracks = streamRef.current.getTracks();
+        remainingTracks.forEach(track => {
+          if (track.readyState !== 'ended') {
+            console.log('Force stopping remaining track:', track.kind);
+            track.stop();
+          }
+        });
+      }
+    }, 200);
   };
 
   const toggleFlash = async () => {
@@ -192,24 +213,24 @@ const BarcodeScanner = ({
     }
   };
 
-  const handleBarcodeFound = (code: string) => {
+  const handleBarcodeFound = async (code: string) => {
     if (isCleaningUp) return;
     
     console.log('Barcode detected:', code);
-    cleanup();
+    await cleanup(); // Ensure cleanup completes before callbacks
     onBarcodeScanned(code);
     onClose();
   };
 
-  const handleClose = () => {
-    cleanup();
+  const handleClose = async () => {
+    await cleanup();
     onClose();
   };
 
-  const handleManualInput = () => {
+  const handleManualInput = async () => {
     const barcode = prompt('Enter barcode manually:');
     if (barcode && barcode.trim()) {
-      cleanup();
+      await cleanup();
       onBarcodeScanned(barcode.trim());
       onClose();
     }
