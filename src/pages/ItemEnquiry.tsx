@@ -85,7 +85,8 @@ const ItemEnquiry = () => {
       try {
         const itemDetailResponse = await erpnextAPI.getItemDetails(code);
         itemDetails = itemDetailResponse?.data;
-        console.log('Item details:', itemDetails);
+        console.log('Item details for', code, ':', itemDetails);
+        console.log('Has variants:', itemDetails?.has_variants);
       } catch (error) {
         console.warn('Could not fetch item details:', error);
       }
@@ -122,9 +123,14 @@ const ItemEnquiry = () => {
       
       for (const itemCode of itemCodesToFetch) {
         try {
+          console.log('Fetching stock for item:', itemCode, 'in company:', company);
           const response = await erpnextAPI.stockAPI.getBinStockForCompany(itemCode, company);
+          console.log('Stock response for', itemCode, ':', response);
           if (response?.data && response.data.length > 0) {
+            console.log('Adding stock data for', itemCode, ':', response.data.length, 'entries');
             allStockData = [...allStockData, ...response.data];
+          } else {
+            console.log('No stock data found for', itemCode);
           }
         } catch (error) {
           console.warn(`Failed to fetch stock for item ${itemCode}:`, error);
