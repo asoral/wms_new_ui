@@ -102,10 +102,13 @@ const ItemEnquiry = () => {
             ['is_stock_item', '=', 1],
             ['disabled', '=', 0]
           ];
-          const variantResponse = await erpnextAPI.callAPI('Item', 'GET', undefined, variantFilters, undefined, ['item_code']);
+          const variantResponse = await erpnextAPI.callAPI('Item', 'GET', undefined, variantFilters, undefined, ['item_code', 'item_name']);
+          console.log('Variant API response:', variantResponse);
           if (variantResponse?.data && variantResponse.data.length > 0) {
             itemCodesToFetch = variantResponse.data.map((item: any) => item.item_code);
             console.log('Found variants:', itemCodesToFetch);
+          } else {
+            console.log('No variants found, using template item only');
           }
         } catch (error) {
           console.warn('Could not fetch item variants:', error);
@@ -212,7 +215,8 @@ const ItemEnquiry = () => {
               age: age,
               binLocation: item.warehouse
             };
-          });
+          })
+          .sort((a, b) => a.itemCode.localeCompare(b.itemCode)); // Sort by item code
           
         setStockItems(transformedItems);
         
