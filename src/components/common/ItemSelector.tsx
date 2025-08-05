@@ -81,7 +81,51 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
 
       console.log('API search for items:', search);
       
-      const result = await erpnextAPI.searchItems(search || "", 50);
+      // Apply filters for stock items only and search
+      const filters = [
+        ['is_stock_item', '=', 1],
+        ['disabled', '=', 0]
+      ];
+
+      // Add search filters if search term is provided
+      const orFilters = search ? [
+        ['item_code', 'like', `%${search}%`],
+        ['item_name', 'like', `%${search}%`]
+      ] : undefined;
+
+      const params = new URLSearchParams({
+        filters: JSON.stringify(filters),
+        fields: JSON.stringify([
+          'name',
+          'item_code',
+          'item_name',
+          'stock_uom',
+          'is_stock_item',
+          'has_variants',
+          'variant_of',
+          'has_serial_no',
+          'has_batch_no',
+          'item_group'
+        ]),
+        limit_page_length: String(50)
+      });
+
+      if (orFilters) {
+        params.append('or_filters', JSON.stringify(orFilters));
+      }
+
+      const response = await fetch(`${erpnextAPI.getBaseURL}/api/resource/Item?${params}`, {
+        headers: {
+          'Authorization': `token ${erpnextAPI.getApiKey}:${erpnextAPI.getApiSecret}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to search items: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       console.log('Item API result:', result);
       
       if (result && result.data) {

@@ -80,36 +80,75 @@ const ItemEnquiry = () => {
         console.error('Failed to fetch company currency:', error);
       }
 
-      // Fetch item stock details using company-filtered approach
-      console.log('Fetching stock for item:', code, 'company:', company);
-      const response = await erpnextAPI.stockAPI.getBinStockForCompany(code, company);
-      console.log('Item stock response:', response);
+      // Get item details to check if it has variants
+      let itemDetails = null;
+      try {
+        const itemDetailResponse = await erpnextAPI.getItemDetails(code);
+        itemDetails = itemDetailResponse?.data;
+        console.log('Item details:', itemDetails);
+      } catch (error) {
+        console.warn('Could not fetch item details:', error);
+      }
 
-      if (response?.data && response.data.length > 0) {
-        // Get additional item details for valuation
-        let itemDetails = null;
+      // Determine which items to fetch stock for
+      let itemCodesToFetch = [code];
+      
+      if (itemDetails?.has_variants === 1) {
+        console.log('Item has variants, fetching all variant stock');
+        // Fetch all items where variant_of equals this item code
         try {
-          const itemDetailResponse = await erpnextAPI.getItemDetails(code);
-          itemDetails = itemDetailResponse?.data;
-          console.log('Item details:', itemDetails);
+          const variantFilters = [
+            ['variant_of', '=', code],
+            ['is_stock_item', '=', 1],
+            ['disabled', '=', 0]
+          ];
+          const variantResponse = await erpnextAPI.callAPI('Item', 'GET', undefined, variantFilters, undefined, ['item_code']);
+          if (variantResponse?.data && variantResponse.data.length > 0) {
+            itemCodesToFetch = variantResponse.data.map((item: any) => item.item_code);
+            console.log('Found variants:', itemCodesToFetch);
+          }
         } catch (error) {
-          console.warn('Could not fetch item details:', error);
+          console.warn('Could not fetch item variants:', error);
+          // Continue with original item if variants fetch fails
         }
+      }
 
+      // Fetch stock for all items (original or variants)
+      console.log('Fetching stock for items:', itemCodesToFetch, 'company:', company);
+      let allStockData: any[] = [];
+      
+      for (const itemCode of itemCodesToFetch) {
+        try {
+          const response = await erpnextAPI.stockAPI.getBinStockForCompany(itemCode, company);
+          if (response?.data && response.data.length > 0) {
+            allStockData = [...allStockData, ...response.data];
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch stock for item ${itemCode}:`, error);
+        }
+      }
+      
+      console.log('Combined stock response:', allStockData);
+
+      if (allStockData && allStockData.length > 0) {
         // Get stock ledger entries for accurate valuation
-        const warehouses = response.data.map((item: any) => item.warehouse);
+        const warehouses = allStockData.map((item: any) => item.warehouse);
         console.log('Fetching stock ledger for warehouses:', warehouses);
         
         let stockLedgerData: any[] = [];
-        try {
-          const stockLedgerResponse = await erpnextAPI.stockAPI.getStockLedgerEntries(code, warehouses);
-          stockLedgerData = stockLedgerResponse?.data || [];
-          console.log('Stock ledger entries:', stockLedgerData);
-        } catch (error) {
-          console.warn('Could not fetch stock ledger entries:', error);
+        for (const itemCode of itemCodesToFetch) {
+          try {
+            const stockLedgerResponse = await erpnextAPI.stockAPI.getStockLedgerEntries(itemCode, warehouses);
+            if (stockLedgerResponse?.data) {
+              stockLedgerData = [...stockLedgerData, ...stockLedgerResponse.data];
+            }
+          } catch (error) {
+            console.warn(`Could not fetch stock ledger entries for ${itemCode}:`, error);
+          }
         }
+        console.log('Stock ledger entries:', stockLedgerData);
 
-        const transformedItems: StockItem[] = response.data
+        const transformedItems: StockItem[] = allStockData
           .filter((item: any) => (item.actual_qty || 0) > 0)
           .map((item: any) => {
             const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
@@ -118,9 +157,9 @@ const ItemEnquiry = () => {
             let valuationRate = 0;
             let totalValuation = 0;
             
-            // Find the latest stock ledger entry for this warehouse
+            // Find the latest stock ledger entry for this warehouse and item
             const warehouseLedgerEntries = stockLedgerData
-              .filter((entry: any) => entry.warehouse === item.warehouse && entry.item_code === code)
+              .filter((entry: any) => entry.warehouse === item.warehouse && entry.item_code === item.item_code)
               .sort((a: any, b: any) => {
                 const dateA = new Date(a.posting_date + ' ' + (a.posting_time || '00:00:00'));
                 const dateB = new Date(b.posting_date + ' ' + (b.posting_time || '00:00:00'));
@@ -143,7 +182,7 @@ const ItemEnquiry = () => {
               totalValuation = Math.round(actualQty * valuationRate * 100) / 100;
             }
 
-            console.log(`Item: ${code}, Warehouse: ${item.warehouse}, Qty: ${actualQty}, Rate: ${valuationRate}, Total: ${totalValuation}`);
+            console.log(`Item: ${item.item_code}, Warehouse: ${item.warehouse}, Qty: ${actualQty}, Rate: ${valuationRate}, Total: ${totalValuation}`);
 
             // Calculate age from bin creation date
             let age = 1; // Default to at least 1 day
@@ -154,12 +193,21 @@ const ItemEnquiry = () => {
               age = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
             }
 
+            // Get item name from details if we have it, or try to fetch it
+            let itemName = item.item_code;
+            if (itemDetails && item.item_code === code) {
+              itemName = itemDetails.item_name || item.item_code;
+            } else {
+              // For variants, try to get item name from API
+              itemName = item.item_name || item.item_code;
+            }
+
             return {
               itemCode: item.item_code,
-              itemName: itemDetails?.item_name || item.item_code,
+              itemName: itemName,
               warehouse: item.warehouse,
               qty: actualQty,
-              uom: itemDetails?.stock_uom || 'Nos',
+              uom: itemDetails?.stock_uom || item.stock_uom || 'Nos',
               valuation: totalValuation,
               age: age,
               binLocation: item.warehouse
@@ -175,9 +223,10 @@ const ItemEnquiry = () => {
             variant: "destructive"
           });
         } else {
+          const itemType = itemDetails?.has_variants === 1 ? 'template item and its variants' : 'item';
           toast({
             title: "Stock Loaded",
-            description: `Found stock in ${transformedItems.length} locations for company: ${company}`,
+            description: `Found stock in ${transformedItems.length} locations for ${itemType}: ${code}`,
           });
         }
       } else {

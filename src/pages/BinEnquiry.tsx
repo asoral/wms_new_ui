@@ -62,8 +62,46 @@ const BinEnquiry = () => {
         }
       }
 
-      // Fetch bin stock details from Bin doctype
-      const filters = [['warehouse', '=', binCode], ['actual_qty', '>', 0]];
+      // Check if the selected warehouse is a group warehouse
+      let warehousesToQuery = [binCode];
+      
+      try {
+        const warehouseDetails = await erpnextAPI.callAPI(`Warehouse/${binCode}`, 'GET');
+        console.log('Warehouse details:', warehouseDetails);
+        
+        if (warehouseDetails?.data?.is_group === 1) {
+          console.log('Selected warehouse is a group, fetching descendant warehouses');
+          // Get descendant warehouses using Frappe's method
+          const descendantsResponse = await fetch(`${erpnextAPI.getBaseURL}/api/method/frappe.utils.nestedset.get_descendants_of`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `token ${erpnextAPI.getApiKey}:${erpnextAPI.getApiSecret}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              doctype: 'Warehouse',
+              name: binCode,
+              include_self: false // Exclude the group warehouse itself
+            })
+          });
+          
+          if (descendantsResponse.ok) {
+            const descendantsResult = await descendantsResponse.json();
+            console.log('Descendant warehouses:', descendantsResult);
+            if (descendantsResult?.message && descendantsResult.message.length > 0) {
+              warehousesToQuery = descendantsResult.message;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not check warehouse hierarchy:', error);
+        // Continue with original warehouse if hierarchy check fails
+      }
+
+      console.log('Final warehouses to query:', warehousesToQuery);
+
+      // Fetch bin stock details from Bin doctype for all warehouses
+      const filters = [['warehouse', 'in', warehousesToQuery], ['actual_qty', '>', 0]];
       const fields = [
         'name',
         'item_code', 

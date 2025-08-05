@@ -68,7 +68,9 @@ const WarehouseSelector = ({ onWarehouseSelected, isLoading }: WarehouseSelector
         return;
       }
 
-      let filters: any[] = [];
+      let filters: any[] = [
+        ['disabled', '=', 0] // Only show enabled warehouses
+      ];
       
       if (search.trim()) {
         filters.push(['warehouse_name', 'like', `%${search}%`]);

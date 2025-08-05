@@ -336,3 +336,47 @@ export const useCustomerAPI = () => {
     getSalesOrdersForCustomer
   };
 };
+
+export const useWarehouseAPI = () => {
+  const { callAPI, loading } = useERPNextAPI();
+
+  const getWarehouses = useCallback(async (filters?: any, company?: string, limitPageLength?: number) => {
+    return callAPI(
+      async (api) => await api.getWarehouses(filters, company, limitPageLength),
+      "Failed to fetch warehouses"
+    );
+  }, [callAPI]);
+
+  const getWarehouseDescendants = useCallback(async (warehouseName: string) => {
+    return callAPI(
+      async (api) => {
+        // Call Frappe's get_descendants_of method for warehouse hierarchy
+        const response = await fetch(`${api.getBaseURL}/api/method/frappe.utils.nestedset.get_descendants_of`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${api.getApiKey}:${api.getApiSecret}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            doctype: 'Warehouse',
+            name: warehouseName,
+            include_self: true
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to get warehouse descendants: ${response.statusText}`);
+        }
+        
+        return response.json();
+      },
+      "Failed to get warehouse descendants"
+    );
+  }, [callAPI]);
+
+  return {
+    loading,
+    getWarehouses,
+    getWarehouseDescendants
+  };
+};
