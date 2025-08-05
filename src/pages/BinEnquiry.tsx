@@ -67,29 +67,76 @@ const BinEnquiry = () => {
       
       try {
         const warehouseDetails = await erpnextAPI.callAPI(`Warehouse/${binCode}`, 'GET');
-        console.log('Warehouse details:', warehouseDetails);
+        console.log('Warehouse details for', binCode, ':', warehouseDetails);
         
         if (warehouseDetails?.data?.is_group === 1) {
           console.log('Selected warehouse is a group, fetching descendant warehouses');
-          // Get descendant warehouses using Frappe's method
-          const descendantsResponse = await fetch(`${erpnextAPI.getBaseURL}/api/method/frappe.utils.nestedset.get_descendants_of`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `token ${erpnextAPI.getApiKey}:${erpnextAPI.getApiSecret}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              doctype: 'Warehouse',
-              name: binCode,
-              include_self: false // Exclude the group warehouse itself
-            })
-          });
           
-          if (descendantsResponse.ok) {
-            const descendantsResult = await descendantsResponse.json();
-            console.log('Descendant warehouses:', descendantsResult);
-            if (descendantsResult?.message && descendantsResult.message.length > 0) {
-              warehousesToQuery = descendantsResult.message;
+          // Try the direct Frappe API approach first
+          try {
+            const baseURL = erpnextAPI.baseURL;
+            const apiKey = erpnextAPI.apiKey;
+            const apiSecret = erpnextAPI.apiSecret;
+            
+            console.log('Using base URL:', baseURL);
+            
+            const descendantsResponse = await fetch(`${baseURL}/api/method/frappe.utils.nestedset.get_descendants_of`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `token ${apiKey}:${apiSecret}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                doctype: 'Warehouse',
+                name: binCode,
+                include_self: false
+              })
+            });
+            
+            console.log('Descendants API response status:', descendantsResponse.status);
+            
+            if (descendantsResponse.ok) {
+              const descendantsResult = await descendantsResponse.json();
+              console.log('Descendant warehouses API result:', descendantsResult);
+              if (descendantsResult?.message && descendantsResult.message.length > 0) {
+                warehousesToQuery = descendantsResult.message;
+                console.log('Will query these descendant warehouses:', warehousesToQuery);
+              }
+            } else {
+              console.error('Failed to fetch descendants:', await descendantsResponse.text());
+            }
+          } catch (apiError) {
+            console.error('API call failed:', apiError);
+            
+            // Fallback: Try to get all warehouses and filter by parent
+            console.log('Fallback: Fetching all warehouses to find children');
+            try {
+              const allWarehousesFilters = [['parent_warehouse', '=', binCode]];
+              const allWarehousesResponse = await erpnextAPI.callAPI('Warehouse', 'GET', undefined, allWarehousesFilters, undefined, ['name', 'warehouse_name', 'parent_warehouse']);
+              console.log('Direct children warehouses:', allWarehousesResponse);
+              
+              if (allWarehousesResponse?.data && allWarehousesResponse.data.length > 0) {
+                const directChildren = allWarehousesResponse.data.map((w: any) => w.name);
+                warehousesToQuery = directChildren;
+                console.log('Using direct children warehouses:', warehousesToQuery);
+                
+                // Recursively get grandchildren
+                for (const childWarehouse of directChildren) {
+                  try {
+                    const grandChildrenFilters = [['parent_warehouse', '=', childWarehouse]];
+                    const grandChildrenResponse = await erpnextAPI.callAPI('Warehouse', 'GET', undefined, grandChildrenFilters, undefined, ['name']);
+                    if (grandChildrenResponse?.data && grandChildrenResponse.data.length > 0) {
+                      const grandChildren = grandChildrenResponse.data.map((w: any) => w.name);
+                      warehousesToQuery.push(...grandChildren);
+                      console.log('Added grandchildren:', grandChildren);
+                    }
+                  } catch (grandChildError) {
+                    console.error('Failed to fetch grandchildren for', childWarehouse, ':', grandChildError);
+                  }
+                }
+              }
+            } catch (fallbackError) {
+              console.error('Fallback approach also failed:', fallbackError);
             }
           }
         }
