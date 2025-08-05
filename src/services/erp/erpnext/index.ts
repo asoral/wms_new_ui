@@ -11,7 +11,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   public stockAPI: ERPNextStockAPI;
   private materialAPI: ERPNextMaterialAPI;
   private purchaseAPI: ERPNextPurchaseAPI;
-  private itemsAPI: ERPNextItemsAPI;
+  public itemsAPI: ERPNextItemsAPI;
 
   constructor(baseURL: string, apiKey: string, apiSecret: string) {
     super(baseURL, apiKey, apiSecret);

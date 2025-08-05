@@ -98,12 +98,7 @@ const ItemEnquiry = () => {
         console.log('Item has variants, fetching all variant stock');
         // Fetch all items where variant_of equals this item code
         try {
-          const variantFilters = [
-            ['variant_of', '=', code],
-            ['is_stock_item', '=', 1],
-            ['disabled', '=', 0]
-          ];
-          const variantResponse = await erpnextAPI.callAPI('Item', 'GET', undefined, variantFilters, undefined, ['item_code', 'item_name']);
+          const variantResponse = await erpnextAPI.itemsAPI.getItemVariants(code);
           console.log('Variant API response:', variantResponse);
           if (variantResponse?.data && variantResponse.data.length > 0) {
             itemCodesToFetch = variantResponse.data.map((item: any) => item.item_code);

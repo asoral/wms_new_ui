@@ -9,6 +9,8 @@ export interface Item {
   description?: string;
   has_batch_no?: number;
   has_serial_no?: number;
+  has_variants?: number;
+  variant_of?: string;
   barcodes?: Array<{
     barcode: string;
     barcode_type: string;

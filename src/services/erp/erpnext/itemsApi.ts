@@ -158,7 +158,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
         'stock_uom',
         'item_group',
         'has_batch_no',
-        'has_serial_no'
+        'has_serial_no',
+        'has_variants'
       ])
     });
 
@@ -180,7 +181,8 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       stock_uom: result.data.stock_uom || 'Nos',
       has_batch_no: result.data.has_batch_no || false,
       has_serial_no: result.data.has_serial_no || false,
-      item_group: result.data.item_group || 'All Item Groups'
+      item_group: result.data.item_group || 'All Item Groups',
+      has_variants: result.data.has_variants || false
     };
     
     return { data: transformedItem };
@@ -333,6 +335,61 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
       item_group: item.item_group || 'All Item Groups'
     }));
 
+    return { data: transformedItems };
+  }
+
+  /**
+   * Get all variants of a template item
+   */
+  async getItemVariants(templateItem: string): Promise<ERPNextResponse<Item[]>> {
+    console.log('Fetching variants for template item:', templateItem);
+    
+    const conditions: string[][] = [
+      ['disabled', '=', '0'],
+      ['is_stock_item', '=', '1'],
+      ['variant_of', '=', templateItem]
+    ];
+
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(conditions));
+    params.append('fields', JSON.stringify([
+      'name',
+      'item_code',
+      'item_name',
+      'stock_uom',
+      'item_group',
+      'has_batch_no',
+      'has_serial_no',
+      'variant_of'
+    ]));
+
+    console.log('Fetching variants with URL:', `${this.baseURL}/api/resource/Item?${params.toString()}`);
+
+    const response = await fetch(
+      `${this.baseURL}/api/resource/Item?${params.toString()}`,
+      { headers: this.getHeaders() }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch item variants: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Variants API response:', result);
+    
+    // Transform the data to ensure proper structure
+    const transformedItems = (result.data || []).map((item: any) => ({
+      name: item.name,
+      item_code: item.item_code || item.name,
+      item_name: item.item_name || item.item_code || item.name,
+      stock_uom: item.stock_uom || 'Nos',
+      has_batch_no: item.has_batch_no || false,
+      has_serial_no: item.has_serial_no || false,
+      item_group: item.item_group || 'All Item Groups',
+      variant_of: item.variant_of
+    }));
+
+    console.log('Transformed variants:', transformedItems);
     return { data: transformedItems };
   }
 }
