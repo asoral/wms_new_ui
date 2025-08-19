@@ -158,21 +158,25 @@ const Home = () => {
                     title="Total Items"
                     value={safeStats.totalItems.toString()}
                     icon={PackageOpen}
+                    info="Count of all enabled items in your ERPNext system"
                   />
                   <MetricCard
                     title="Low Stock Items"
                     value={safeStats.lowStockItems.toString()}
                     icon={AlertTriangle}
+                    info="Items with negative projected quantity in warehouse bins"
                   />
                   <MetricCard
                     title="Pending Orders"
                     value={safeStats.pendingOrders.toString()}
                     icon={ShoppingCart}
+                    info="Purchase Orders with status 'To Receive' or 'To Receive and Bill'"
                   />
                   <MetricCard
                     title="Total Warehouses"
                     value={safeStats.totalWarehouses.toString()}
                     icon={Warehouse}
+                    info="Count of group warehouses under your company"
                   />
                 </>
               )}
@@ -194,21 +198,25 @@ const Home = () => {
                     title="Total Stock Value"
                     value={formatValue(safeStats.totalStockValue, 'currency')}
                     icon={CreditCard}
+                    info="Sum of stock values from all warehouse bins for your company"
                   />
                   <MetricCard
                     title="Stock Turnover Ratio"
                     value={safeFinancialMetrics.stockTurnoverRatio.toString()}
                     icon={TrendingUp}
+                    info="Calculated from stock ledger transactions over the past year"
                   />
                   <MetricCard
                     title="Dead Stock Value"
                     value={formatValue(safeFinancialMetrics.deadStockValue, 'currency')}
                     icon={AlertTriangle}
+                    info="Value of expired stock based on batch expiry dates"
                   />
                   <MetricCard
                     title="Carrying Cost"
                     value={formatValue(safeFinancialMetrics.carryingCostPercentage, 'percentage')}
                     icon={Percent}
+                    info="Estimated carrying cost as percentage of total stock value (15% standard)"
                   />
                 </>
               )}
