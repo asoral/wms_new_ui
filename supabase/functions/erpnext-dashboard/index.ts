@@ -51,7 +51,15 @@ serve(async (req) => {
     )
 
     // Get the authorization header
-    const authHeader = req.headers.get('Authorization')!
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      console.error('No authorization header')
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const token = authHeader.replace('Bearer ', '')
 
     // Set the auth token for the Supabase client
@@ -65,8 +73,23 @@ serve(async (req) => {
       )
     }
 
-    // Get ERPNext credentials
-    const { data: credentials, error: credError } = await supabaseClient
+    console.log('User authenticated:', user.id)
+
+    // Create authenticated Supabase client for RPC calls
+    const authenticatedClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
+    )
+
+    // Get ERPNext credentials using authenticated client
+    const { data: credentials, error: credError } = await authenticatedClient
       .rpc('get_user_erpnext_credentials')
       
     if (credError || !credentials || credentials.length === 0) {
