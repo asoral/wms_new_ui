@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -233,6 +232,103 @@ const Reports = () => {
     }
   };
 
+  const fetchReportData = async (reportType: string) => {
+    console.log('Fetching report data for:', reportType);
+    setLoading(true);
+    
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Get company currency
+      const company = await getUserDefaultCompany();
+      if (company) {
+        try {
+          const companiesResult = await erpnextAPI.getCompanies();
+          const companyData = companiesResult.data?.find(c => c.name === company);
+          if (companyData) {
+            setCompanyCurrency(companyData.default_currency || "INR");
+          }
+        } catch (error) {
+          console.error('Failed to fetch company currency:', error);
+        }
+      }
+
+      let reportName = '';
+      let filters: any = {};
+
+      switch (reportType) {
+        case 'stock-aging':
+          reportName = 'Stock Ageing';
+          break;
+        case 'stock-projected':
+          reportName = 'Stock Projected Qty';
+          break;
+        case 'item-shortage':
+          reportName = 'Item Shortage Report';
+          break;
+        case 'stock-ledger':
+          reportName = 'Stock Ledger';
+          break;
+        case 'warehouse-wise':
+          reportName = 'Warehouse wise Stock Balance';
+          break;
+        default:
+          throw new Error('Unknown report type');
+      }
+
+      // Add filters based on selections
+      if (selectedItem) {
+        filters.item_code = selectedItem.item_code;
+      }
+      if (selectedWarehouse) {
+        filters.warehouse = selectedWarehouse;
+      }
+      if (company) {
+        filters.company = company;
+      }
+
+      console.log('Running ERPNext report:', reportName, 'with filters:', filters);
+
+      // Use ERPNext's report runner API
+      const response = await erpnextAPI.runReport(reportName, filters);
+      console.log('Report response:', response);
+
+      if (response?.message) {
+        console.log('Report data received:', response.message);
+        
+        toast({
+          title: "Report Generated",
+          description: `${reportName} report has been generated successfully. Full implementation coming soon.`,
+        });
+        
+      } else {
+        toast({
+          title: "No Data",
+          description: `No data available for ${reportName}`,
+          variant: "destructive"
+        });
+      }
+
+    } catch (error) {
+      console.error('Report fetch error:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedReport === "stock-balance") {
       // Automatically load all stock balance data when report is selected
@@ -250,17 +346,19 @@ const Reports = () => {
   const handleFilter = () => {
     if (selectedReport === "stock-balance") {
       fetchStockBalance();
+    } else if (selectedReport) {
+      fetchReportData(selectedReport);
     }
   };
 
   const handleItemSelect = (item: Item) => {
     setSelectedItem(item);
-    console.log('Selected item for stock balance:', item);
+    console.log('Selected item for report:', item);
   };
 
   const handleWarehouseSelect = (warehouse: string) => {
     setSelectedWarehouse(warehouse);
-    console.log('Selected warehouse for stock balance:', warehouse);
+    console.log('Selected warehouse for report:', warehouse);
   };
 
   const handleClearFilters = () => {
@@ -274,6 +372,8 @@ const Reports = () => {
   const handleRefresh = () => {
     if (selectedReport === "stock-balance") {
       fetchStockBalance();
+    } else if (selectedReport) {
+      fetchReportData(selectedReport);
     }
   };
 
@@ -354,132 +454,201 @@ const Reports = () => {
     }
   };
 
+  const renderStockBalanceReport = () => {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Select Item</label>
+            <ItemSelector
+              onItemSelect={handleItemSelect}
+              selectedItem={selectedItem}
+              placeholder="Search and select item..."
+              isLoading={loading}
+            />
+          </div>
+          <div>
+            <WarehouseSelector
+              onWarehouseSelected={handleWarehouseSelect}
+              isLoading={loading}
+            />
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Button variant="outline" onClick={handleFilter} disabled={loading}>
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            Apply Filters
+          </Button>
+          {(selectedItem || selectedWarehouse) && (
+            <Button variant="outline" onClick={handleClearFilters} disabled={loading}>
+              Clear Filters
+            </Button>
+          )}
+          {selectedItem && (
+            <Badge variant="secondary">Item: {selectedItem.item_code}</Badge>
+          )}
+          {selectedWarehouse && (
+            <Badge variant="secondary">Warehouse: {selectedWarehouse}</Badge>
+          )}
+        </div>
+        
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner />
+          </div>
+        ) : stockBalanceData.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No stock balance data found</p>
+          </div>
+        ) : (
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {stockBalanceData.map((item, index) => (
+            <Card key={index}>
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-medium">{item.itemName}</h4>
+                      <p className="text-sm text-muted-foreground">{item.item}</p>
+                    </div>
+                    <Badge variant="outline">{item.warehouse}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Quantity:</span>
+                      <p className="font-medium">{item.qty} {item.uom}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Value:</span>
+                      <p className="font-medium">{new Intl.NumberFormat('en-IN', {
+                        style: 'currency',
+                        currency: companyCurrency,
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(item.value)}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 text-foreground">Item Details</th>
+                    <th className="text-left p-3 text-foreground">Warehouse</th>
+                    <th className="text-right p-3 text-foreground">Quantity</th>
+                    <th className="text-left p-3 text-foreground">UOM</th>
+                    <th className="text-right p-3 text-foreground">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockBalanceData.map((item, index) => (
+                <tr key={index} className="border-b border-border hover:bg-accent">
+                  <td className="p-3 text-foreground">
+                    <div>
+                      <div className="font-medium">{item.itemName}</div>
+                      <div className="text-sm text-muted-foreground">{item.item}</div>
+                    </div>
+                  </td>
+                  <td className="p-3 text-foreground">{item.warehouse}</td>
+                  <td className="p-3 text-right text-foreground">{item.qty}</td>
+                  <td className="p-3 text-foreground">{item.uom}</td>
+                  <td className="p-3 text-right text-foreground">{new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: companyCurrency,
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }).format(item.value)}</td>
+                </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderGenericReport = (reportType: string, reportName: string, description: string) => {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Select Item</label>
+            <ItemSelector
+              onItemSelect={handleItemSelect}
+              selectedItem={selectedItem}
+              placeholder="Search and select item..."
+              isLoading={loading}
+            />
+          </div>
+          <div>
+            <WarehouseSelector
+              onWarehouseSelected={handleWarehouseSelect}
+              isLoading={loading}
+            />
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Button variant="outline" onClick={() => fetchReportData(reportType)} disabled={loading}>
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            Load {reportName}
+          </Button>
+          {(selectedItem || selectedWarehouse) && (
+            <Button variant="outline" onClick={handleClearFilters} disabled={loading}>
+              Clear Filters
+            </Button>
+          )}
+          {selectedItem && (
+            <Badge variant="secondary">Item: {selectedItem.item_code}</Badge>
+          )}
+          {selectedWarehouse && (
+            <Badge variant="secondary">Warehouse: {selectedWarehouse}</Badge>
+          )}
+        </div>
+        
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner />
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground text-lg font-medium">{reportName}</p>
+            <p className="text-sm text-muted-foreground mt-2">{description}</p>
+            <p className="text-xs text-muted-foreground mt-4">Click "Load {reportName}" to generate the report</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderReportData = () => {
     if (!selectedReport) return null;
 
     switch (selectedReport) {
       case "stock-balance":
-        return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Select Item</label>
-                <ItemSelector
-                  onItemSelect={handleItemSelect}
-                  selectedItem={selectedItem}
-                  placeholder="Search and select item..."
-                  isLoading={loading}
-                />
-              </div>
-              <div>
-                <WarehouseSelector
-                  onWarehouseSelected={handleWarehouseSelect}
-                  isLoading={loading}
-                />
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-2 mb-4">
-              <Button variant="outline" onClick={handleFilter} disabled={loading}>
-                <RefreshCcw className="w-4 h-4 mr-2" />
-                Apply Filters
-              </Button>
-              {(selectedItem || selectedWarehouse) && (
-                <Button variant="outline" onClick={handleClearFilters} disabled={loading}>
-                  Clear Filters
-                </Button>
-              )}
-              {selectedItem && (
-                <Badge variant="secondary">Item: {selectedItem.item_code}</Badge>
-              )}
-              {selectedWarehouse && (
-                <Badge variant="secondary">Warehouse: {selectedWarehouse}</Badge>
-              )}
-            </div>
-            
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <LoadingSpinner />
-              </div>
-            ) : stockBalanceData.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No stock balance data found</p>
-              </div>
-            ) : (
-              <>
-                {/* Mobile Card View */}
-                <div className="md:hidden space-y-3">
-                  {stockBalanceData.map((item, index) => (
-                <Card key={index}>
-                  <CardContent className="p-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium">{item.itemName}</h4>
-                          <p className="text-sm text-muted-foreground">{item.item}</p>
-                        </div>
-                        <Badge variant="outline">{item.warehouse}</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Quantity:</span>
-                          <p className="font-medium">{item.qty} {item.uom}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Value:</span>
-                          <p className="font-medium">{new Intl.NumberFormat('en-IN', {
-                            style: 'currency',
-                            currency: companyCurrency,
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          }).format(item.value)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                {/* Desktop Table View */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-3 text-foreground">Item Details</th>
-                        <th className="text-left p-3 text-foreground">Warehouse</th>
-                        <th className="text-right p-3 text-foreground">Quantity</th>
-                        <th className="text-left p-3 text-foreground">UOM</th>
-                        <th className="text-right p-3 text-foreground">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stockBalanceData.map((item, index) => (
-                    <tr key={index} className="border-b border-border hover:bg-accent">
-                      <td className="p-3 text-foreground">
-                        <div>
-                          <div className="font-medium">{item.itemName}</div>
-                          <div className="text-sm text-muted-foreground">{item.item}</div>
-                        </div>
-                      </td>
-                      <td className="p-3 text-foreground">{item.warehouse}</td>
-                      <td className="p-3 text-right text-foreground">{item.qty}</td>
-                      <td className="p-3 text-foreground">{item.uom}</td>
-                      <td className="p-3 text-right text-foreground">{new Intl.NumberFormat('en-IN', {
-                        style: 'currency',
-                        currency: companyCurrency,
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }).format(item.value)}</td>
-                    </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </div>
-        );
+        return renderStockBalanceReport();
+      case "stock-aging":
+        return renderGenericReport("stock-aging", "Stock Aging Report", "Shows how long items have been in stock grouped by age ranges (0-30, 30-60, 60+ days)");
+      case "stock-projected":
+        return renderGenericReport("stock-projected", "Stock Projected Qty Report", "Shows projected stock levels including planned receipts and issues");
+      case "item-shortage":
+        return renderGenericReport("item-shortage", "Item Shortage Report", "Shows items below minimum stock level or reorder point");
+      case "stock-ledger":
+        return renderGenericReport("stock-ledger", "Stock Ledger Report", "Shows all stock movement transactions with dates and references");
+      case "warehouse-wise":
+        return renderGenericReport("warehouse-wise", "Warehouse-wise Stock Report", "Shows stock distribution across different warehouses");
       default:
         return (
           <div className="text-center py-8">
@@ -506,7 +675,7 @@ const Reports = () => {
               <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
                 <RefreshCcw className="w-4 h-4" />
               </Button>
-              {stockBalanceData.length > 0 && (
+              {selectedReport === "stock-balance" && stockBalanceData.length > 0 && (
                 <>
                   <Button variant="outline" onClick={handleExportExcel} disabled={loading}>
                     <Download className="w-4 h-4 mr-2" />
