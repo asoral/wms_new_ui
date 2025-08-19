@@ -7,13 +7,15 @@ export const getAccessToken = async (): Promise<string | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // Get ERPNext credentials from the database
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('erpnext_url, erpnext_api_key, erpnext_api_secret')
-      .eq('id', user.id)
-      .single();
+    // Get ERPNext credentials using the secure function
+    const { data: credentials, error } = await supabase.rpc('get_user_erpnext_credentials');
+    
+    if (error) {
+      console.error('Error getting ERPNext credentials:', error);
+      return null;
+    }
 
+    const profile = credentials?.[0];
     if (profile?.erpnext_url && profile?.erpnext_api_key && profile?.erpnext_api_secret) {
       // Return a token that indicates ERPNext is configured
       return `${profile.erpnext_api_key}:${profile.erpnext_api_secret}`;
@@ -31,13 +33,15 @@ export const getERPNextConfig = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('erpnext_url, erpnext_api_key, erpnext_api_secret, erpnext_default_company, erpnext_pallet_template_item')
-      .eq('id', user.id)
-      .single();
+    // Use the secure function to get decrypted credentials
+    const { data: credentials, error } = await supabase.rpc('get_user_erpnext_credentials');
+    
+    if (error) {
+      console.error('Error getting ERPNext credentials:', error);
+      return null;
+    }
 
-    return profile;
+    return credentials?.[0] || null;
   } catch (error) {
     console.error('Error getting ERPNext config:', error);
     return null;
@@ -55,23 +59,19 @@ export const saveERPNextConfig = async (config: {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        id: user.id,
-        email: user.email,
-        erpnext_url: config.erpnext_url,
-        erpnext_api_key: config.erpnext_api_key,
-        erpnext_api_secret: config.erpnext_api_secret,
-        erpnext_default_company: config.erpnext_default_company,
-        erpnext_pallet_template_item: config.erpnext_pallet_template_item,
-        updated_at: new Date().toISOString()
-      });
+    // Use the secure function to update encrypted credentials with audit logging
+    const { error } = await supabase.rpc('update_user_erpnext_credentials', {
+      p_erpnext_url: config.erpnext_url,
+      p_erpnext_api_key: config.erpnext_api_key,
+      p_erpnext_api_secret: config.erpnext_api_secret,
+      p_erpnext_default_company: config.erpnext_default_company,
+      p_erpnext_pallet_template_item: config.erpnext_pallet_template_item
+    });
 
     if (error) throw error;
 
-    // Security: Do not store sensitive credentials in localStorage
-    // All credentials are now securely stored in the database with RLS protection
+    // Security: All credentials are now encrypted and stored securely with audit logging
+    // No sensitive data is stored in localStorage or plaintext in the database
 
     return { success: true };
   } catch (error) {

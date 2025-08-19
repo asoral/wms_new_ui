@@ -12,12 +12,15 @@ export const createERPNextAPI = async (): Promise<ERPNextAPI | null> => {
       return null;
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('erpnext_url, erpnext_api_key, erpnext_api_secret')
-      .eq('id', user.id)
-      .single();
+    // Use the secure function to get decrypted credentials
+    const { data: credentials, error } = await supabase.rpc('get_user_erpnext_credentials');
+    
+    if (error) {
+      console.error('Error getting ERPNext credentials:', error);
+      return null;
+    }
 
+    const profile = credentials?.[0];
     if (!profile || !profile.erpnext_url || !profile.erpnext_api_key || !profile.erpnext_api_secret) {
       console.error('ERPNext configuration not found or incomplete');
       return null;
@@ -45,12 +48,15 @@ export const createERPNextCompanyAPI = async (): Promise<ERPNextCompanyAPI | nul
       return null;
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('erpnext_url, erpnext_api_key, erpnext_api_secret')
-      .eq('id', user.id)
-      .single();
+    // Use the secure function to get decrypted credentials
+    const { data: credentials, error } = await supabase.rpc('get_user_erpnext_credentials');
+    
+    if (error) {
+      console.error('Error getting ERPNext credentials:', error);
+      return null;
+    }
 
+    const profile = credentials?.[0];
     if (!profile || !profile.erpnext_url || !profile.erpnext_api_key || !profile.erpnext_api_secret) {
       console.error('ERPNext configuration not found or incomplete');
       return null;
@@ -78,12 +84,15 @@ export const getUserDefaultCompany = async (): Promise<string | null> => {
       return null;
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('erpnext_default_company')
-      .eq('id', user.id)
-      .single();
+    // Use the secure function to get user configuration including default company
+    const { data: credentials, error } = await supabase.rpc('get_user_erpnext_credentials');
+    
+    if (error) {
+      console.error('Error getting ERPNext credentials:', error);
+      return null;
+    }
 
+    const profile = credentials?.[0];
     const defaultCompany = profile?.erpnext_default_company;
     
     if (!defaultCompany) {
