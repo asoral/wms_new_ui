@@ -26,6 +26,8 @@ const Reports = () => {
   const { toast } = useToast();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [stockBalanceData, setStockBalanceData] = useState<any[]>([]);
+  const [reportData, setReportData] = useState<any[]>([]);
+  const [reportColumns, setReportColumns] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -235,6 +237,8 @@ const Reports = () => {
   const fetchReportData = async (reportType: string) => {
     console.log('Fetching report data for:', reportType);
     setLoading(true);
+    setReportData([]);
+    setReportColumns([]);
     
     try {
       const erpnextAPI = await createERPNextAPI();
@@ -267,65 +271,40 @@ const Reports = () => {
       switch (reportType) {
         case 'stock-aging':
           reportName = 'Stock Ageing';
-          // Stock Ageing report specific filters
-          filters = {
-            company: company || '',
-            to_date: new Date().toISOString().split('T')[0], // Today's date
-            item_group: '',
-            warehouse: selectedWarehouse || '',
-            brand: '',
-            range1: 30,
-            range2: 60,
-            range3: 90
-          };
-          if (selectedItem) {
-            filters.item_code = selectedItem.item_code;
-          }
+          filters = {};
+          if (company) filters.company = company;
+          if (selectedWarehouse) filters.warehouse = selectedWarehouse;
+          if (selectedItem) filters.item_code = selectedItem.item_code;
           break;
         case 'stock-projected':
           reportName = 'Stock Projected Qty';
-          filters = {
-            company: company || '',
-            warehouse: selectedWarehouse || '',
-            item_group: ''
-          };
-          if (selectedItem) {
-            filters.item_code = selectedItem.item_code;
-          }
+          filters = {};
+          if (company) filters.company = company;
+          if (selectedWarehouse) filters.warehouse = selectedWarehouse;
+          if (selectedItem) filters.item_code = selectedItem.item_code;
           break;
         case 'item-shortage':
           reportName = 'Item Shortage Report';
-          filters = {
-            company: company || '',
-            warehouse: selectedWarehouse || ''
-          };
-          if (selectedItem) {
-            filters.item_code = selectedItem.item_code;
-          }
+          filters = {};
+          if (company) filters.company = company;
+          if (selectedWarehouse) filters.warehouse = selectedWarehouse;
           break;
         case 'stock-ledger':
           reportName = 'Stock Ledger';
           filters = {
-            company: company || '',
             from_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
-            to_date: new Date().toISOString().split('T')[0], // Today
-            warehouse: selectedWarehouse || '',
-            item_group: ''
+            to_date: new Date().toISOString().split('T')[0] // Today
           };
-          if (selectedItem) {
-            filters.item_code = selectedItem.item_code;
-          }
+          if (company) filters.company = company;
+          if (selectedWarehouse) filters.warehouse = selectedWarehouse;
+          if (selectedItem) filters.item_code = selectedItem.item_code;
           break;
         case 'warehouse-wise':
           reportName = 'Warehouse wise Stock Balance';
-          filters = {
-            company: company || '',
-            warehouse: selectedWarehouse || '',
-            item_group: ''
-          };
-          if (selectedItem) {
-            filters.item_code = selectedItem.item_code;
-          }
+          filters = {};
+          if (company) filters.company = company;
+          if (selectedWarehouse) filters.warehouse = selectedWarehouse;
+          if (selectedItem) filters.item_code = selectedItem.item_code;
           break;
         default:
           throw new Error('Unknown report type');
@@ -337,15 +316,47 @@ const Reports = () => {
       const response = await erpnextAPI.runReport(reportName, filters);
       console.log('Report response:', response);
 
-      if (response?.message) {
-        console.log('Report data received:', response.message);
-        
-        toast({
-          title: "Report Generated",
-          description: `${reportName} report has been generated successfully. Check console for data details.`,
-        });
-        
+      const responseMessage = response?.message;
+      if (responseMessage && typeof responseMessage === 'object') {
+        const messageObj = responseMessage as any;
+        if ('result' in messageObj && Array.isArray(messageObj.result)) {
+          const reportResult = messageObj.result;
+          const reportColumns = messageObj.columns || [];
+          
+          console.log('Report data received:', reportResult.length, 'rows');
+          console.log('Report columns:', reportColumns);
+          
+          // Transform the data to a more usable format
+          const transformedData = reportResult.map((row: any, index: number) => {
+            const rowData: any = { id: index };
+            reportColumns.forEach((col: any, colIndex: number) => {
+              const fieldName = col.fieldname || col.label || `col_${colIndex}`;
+              rowData[fieldName] = row[colIndex];
+            });
+            return rowData;
+          });
+          
+          setReportData(transformedData);
+          setReportColumns(reportColumns);
+          
+          toast({
+            title: "Report Generated",
+            description: `${reportName} loaded successfully with ${transformedData.length} records`,
+          });
+        } else {
+          console.log('No data in response result:', responseMessage);
+          setReportData([]);
+          setReportColumns([]);
+          toast({
+            title: "No Data",
+            description: `No data available for ${reportName}`,
+            variant: "destructive"
+          });
+        }
       } else {
+        console.log('No data in response:', response);
+        setReportData([]);
+        setReportColumns([]);
         toast({
           title: "No Data",
           description: `No data available for ${reportName}`,
@@ -355,6 +366,8 @@ const Reports = () => {
 
     } catch (error) {
       console.error('Report fetch error:', error);
+      setReportData([]);
+      setReportColumns([]);
       toast({
         title: "Error",
         description: `Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -657,6 +670,78 @@ const Reports = () => {
           <div className="flex justify-center py-8">
             <LoadingSpinner />
           </div>
+        ) : reportData.length > 0 ? (
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {reportData.map((row, index) => (
+                <Card key={index}>
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      {reportColumns.slice(0, 4).map((col: any, colIndex: number) => {
+                        const fieldName = col.fieldname || col.label || `col_${colIndex}`;
+                        const value = row[fieldName];
+                        return (
+                          <div key={colIndex} className="flex justify-between">
+                            <span className="text-muted-foreground">{col.label || fieldName}:</span>
+                            <span className="font-medium">
+                              {col.fieldtype === 'Currency' && value !== null && value !== undefined 
+                                ? new Intl.NumberFormat('en-IN', {
+                                    style: 'currency',
+                                    currency: companyCurrency,
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  }).format(Number(value) || 0)
+                                : String(value || '')
+                              }
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    {reportColumns.map((col: any, index: number) => (
+                      <th key={index} className="text-left p-3 text-foreground">
+                        {col.label || col.fieldname || `Column ${index + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.map((row: any, rowIndex: number) => (
+                    <tr key={rowIndex} className="border-b border-border hover:bg-accent">
+                      {reportColumns.map((col: any, colIndex: number) => {
+                        const fieldName = col.fieldname || col.label || `col_${colIndex}`;
+                        const value = row[fieldName];
+                        return (
+                          <td key={colIndex} className="p-3 text-foreground">
+                            {col.fieldtype === 'Currency' && value !== null && value !== undefined 
+                              ? new Intl.NumberFormat('en-IN', {
+                                  style: 'currency',
+                                  currency: companyCurrency,
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }).format(Number(value) || 0)
+                              : String(value || '')
+                            }
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div className="text-center py-8">
             <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
