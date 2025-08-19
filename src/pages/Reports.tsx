@@ -267,32 +267,68 @@ const Reports = () => {
       switch (reportType) {
         case 'stock-aging':
           reportName = 'Stock Ageing';
+          // Stock Ageing report specific filters
+          filters = {
+            company: company || '',
+            to_date: new Date().toISOString().split('T')[0], // Today's date
+            item_group: '',
+            warehouse: selectedWarehouse || '',
+            brand: '',
+            range1: 30,
+            range2: 60,
+            range3: 90
+          };
+          if (selectedItem) {
+            filters.item_code = selectedItem.item_code;
+          }
           break;
         case 'stock-projected':
           reportName = 'Stock Projected Qty';
+          filters = {
+            company: company || '',
+            warehouse: selectedWarehouse || '',
+            item_group: ''
+          };
+          if (selectedItem) {
+            filters.item_code = selectedItem.item_code;
+          }
           break;
         case 'item-shortage':
           reportName = 'Item Shortage Report';
+          filters = {
+            company: company || '',
+            warehouse: selectedWarehouse || ''
+          };
+          if (selectedItem) {
+            filters.item_code = selectedItem.item_code;
+          }
           break;
         case 'stock-ledger':
           reportName = 'Stock Ledger';
+          filters = {
+            company: company || '',
+            from_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
+            to_date: new Date().toISOString().split('T')[0], // Today
+            warehouse: selectedWarehouse || '',
+            item_group: ''
+          };
+          if (selectedItem) {
+            filters.item_code = selectedItem.item_code;
+          }
           break;
         case 'warehouse-wise':
           reportName = 'Warehouse wise Stock Balance';
+          filters = {
+            company: company || '',
+            warehouse: selectedWarehouse || '',
+            item_group: ''
+          };
+          if (selectedItem) {
+            filters.item_code = selectedItem.item_code;
+          }
           break;
         default:
           throw new Error('Unknown report type');
-      }
-
-      // Add filters based on selections
-      if (selectedItem) {
-        filters.item_code = selectedItem.item_code;
-      }
-      if (selectedWarehouse) {
-        filters.warehouse = selectedWarehouse;
-      }
-      if (company) {
-        filters.company = company;
       }
 
       console.log('Running ERPNext report:', reportName, 'with filters:', filters);
@@ -306,7 +342,7 @@ const Reports = () => {
         
         toast({
           title: "Report Generated",
-          description: `${reportName} report has been generated successfully. Full implementation coming soon.`,
+          description: `${reportName} report has been generated successfully. Check console for data details.`,
         });
         
       } else {
