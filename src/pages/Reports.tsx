@@ -135,9 +135,31 @@ const Reports = () => {
       console.log('Direct Bin API response:', response);
       
       if (response?.data && Array.isArray(response.data)) {
+        // Get item details to fetch item names
+        const itemCodes = [...new Set(response.data.map((bin: any) => bin.item_code))];
+        console.log('Fetching item names for codes:', itemCodes);
+        
+        const itemNames: Record<string, string> = {};
+        
+        // Fetch item names in batches
+        try {
+          const itemFilters = [['item_code', 'in', itemCodes]];
+          const itemFields = ['item_code', 'item_name'];
+          const itemResponse = await erpnextAPI.callAPI('Item', 'GET', undefined, itemFilters, undefined, itemFields);
+          
+          if (itemResponse?.data) {
+            itemResponse.data.forEach((item: any) => {
+              itemNames[item.item_code] = item.item_name || item.item_code;
+            });
+          }
+        } catch (error) {
+          console.warn('Failed to fetch item names:', error);
+        }
+        
         // Transform ERPNext Bin data to our format
         const transformedData = response.data.map((bin: any) => ({
           item: bin.item_code,
+          itemName: itemNames[bin.item_code] || bin.item_code,
           warehouse: bin.warehouse,
           qty: bin.actual_qty || 0,
           uom: bin.stock_uom || "Nos",
@@ -237,6 +259,7 @@ const Reports = () => {
 
     const exportData = stockBalanceData.map(item => ({
       'Item Code': item.item,
+      'Item Name': item.itemName,
       'Warehouse': item.warehouse, 
       'Quantity': item.qty,
       'UOM': item.uom,
@@ -270,6 +293,7 @@ const Reports = () => {
 
     const exportData = stockBalanceData.map(item => ({
       item: item.item,
+      itemName: item.itemName,
       warehouse: item.warehouse,
       qty: item.qty,
       uom: item.uom,
@@ -278,6 +302,7 @@ const Reports = () => {
 
     const columns = [
       { header: 'Item Code', dataKey: 'item' },
+      { header: 'Item Name', dataKey: 'itemName' },
       { header: 'Warehouse', dataKey: 'warehouse' },
       { header: 'Quantity', dataKey: 'qty' },
       { header: 'UOM', dataKey: 'uom' },
@@ -359,7 +384,10 @@ const Reports = () => {
                   <CardContent className="p-4">
                     <div className="space-y-2">
                       <div className="flex justify-between items-start">
-                        <h4 className="font-medium">{item.item}</h4>
+                        <div>
+                          <h4 className="font-medium">{item.itemName}</h4>
+                          <p className="text-sm text-muted-foreground">{item.item}</p>
+                        </div>
                         <Badge variant="outline">{item.warehouse}</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -383,7 +411,7 @@ const Reports = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-left p-3 text-foreground">Item Code</th>
+                        <th className="text-left p-3 text-foreground">Item Details</th>
                         <th className="text-left p-3 text-foreground">Warehouse</th>
                         <th className="text-right p-3 text-foreground">Quantity</th>
                         <th className="text-left p-3 text-foreground">UOM</th>
@@ -393,7 +421,12 @@ const Reports = () => {
                     <tbody>
                       {stockBalanceData.map((item, index) => (
                     <tr key={index} className="border-b border-border hover:bg-accent">
-                      <td className="p-3 text-foreground">{item.item}</td>
+                      <td className="p-3 text-foreground">
+                        <div>
+                          <div className="font-medium">{item.itemName}</div>
+                          <div className="text-sm text-muted-foreground">{item.item}</div>
+                        </div>
+                      </td>
                       <td className="p-3 text-foreground">{item.warehouse}</td>
                       <td className="p-3 text-right text-foreground">{item.qty}</td>
                       <td className="p-3 text-foreground">{item.uom}</td>
