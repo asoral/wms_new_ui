@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { 
@@ -12,13 +11,15 @@ import {
   AlertTriangle,
   Calendar,
   Warehouse,
-  Filter,
   Download,
   RefreshCcw
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useStockAPI } from "@/hooks/useERPNextAPI";
 import { useToast } from "@/hooks/use-toast";
+import ItemSelector from "@/components/item-enquiry/ItemSelector";
+import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
+import { Item } from "@/types";
 
 const Reports = () => {
   const navigate = useNavigate();
@@ -26,10 +27,8 @@ const Reports = () => {
   const { getStockBalance, loading } = useStockAPI();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [stockBalanceData, setStockBalanceData] = useState<any[]>([]);
-  const [filters, setFilters] = useState({
-    itemCode: "",
-    warehouse: ""
-  });
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
 
   const reportCategories = [
     {
@@ -89,15 +88,15 @@ const Reports = () => {
   const fetchStockBalance = async () => {
     try {
       const apiFilters = [];
-      if (filters.itemCode) {
-        apiFilters.push(['item_code', 'like', `%${filters.itemCode}%`]);
+      if (selectedItem) {
+        apiFilters.push(['item_code', 'like', `%${selectedItem.item_code}%`]);
       }
-      if (filters.warehouse) {
-        apiFilters.push(['warehouse', 'like', `%${filters.warehouse}%`]);
+      if (selectedWarehouse) {
+        apiFilters.push(['warehouse', 'like', `%${selectedWarehouse}%`]);
       }
       
       const response = await getStockBalance(apiFilters);
-      if (response.data && Array.isArray(response.data)) {
+      if (response?.data && Array.isArray(response.data)) {
         // Transform ERPNext Bin data to our format
         const transformedData = response.data.map((bin: any) => ({
           item: bin.item_code,
@@ -108,13 +107,30 @@ const Reports = () => {
         })).filter((item: any) => item.qty > 0); // Only show items with positive stock
         
         setStockBalanceData(transformedData);
+        
+        if (transformedData.length === 0) {
+          toast({
+            title: "No Data",
+            description: "No stock balance data found with the selected filters",
+            variant: "destructive"
+          });
+        }
+      } else {
+        setStockBalanceData([]);
+        toast({
+          title: "No Data", 
+          description: "No stock balance data available",
+          variant: "destructive"
+        });
       }
     } catch (error) {
+      console.error('Stock balance fetch error:', error);
       toast({
         title: "Error",
         description: "Failed to fetch stock balance data",
         variant: "destructive"
       });
+      setStockBalanceData([]);
     }
   };
 
@@ -125,6 +141,22 @@ const Reports = () => {
   }, [selectedReport]);
 
   const handleFilter = () => {
+    if (selectedReport === "stock-balance") {
+      fetchStockBalance();
+    }
+  };
+
+  const handleItemSelect = (item: Item) => {
+    setSelectedItem(item);
+  };
+
+  const handleWarehouseSelect = (warehouse: string) => {
+    setSelectedWarehouse(warehouse);
+  };
+
+  const handleClearFilters = () => {
+    setSelectedItem(null);
+    setSelectedWarehouse("");
     if (selectedReport === "stock-balance") {
       fetchStockBalance();
     }
@@ -143,23 +175,33 @@ const Reports = () => {
       case "stock-balance":
         return (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4 mb-4">
-              <Input 
-                placeholder="Item Code/Name" 
-                className="flex-1"
-                value={filters.itemCode}
-                onChange={(e) => setFilters({...filters, itemCode: e.target.value})}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <ItemSelector
+                onItemSelected={handleItemSelect}
+                isLoading={loading}
               />
-              <Input 
-                placeholder="Warehouse" 
-                className="flex-1"
-                value={filters.warehouse}
-                onChange={(e) => setFilters({...filters, warehouse: e.target.value})}
+              <WarehouseSelector
+                onWarehouseSelected={handleWarehouseSelect}
+                isLoading={loading}
               />
+            </div>
+            
+            <div className="flex flex-wrap gap-2 mb-4">
               <Button variant="outline" onClick={handleFilter} disabled={loading}>
-                <Filter className="w-4 h-4 mr-2" />
-                Filter
+                <RefreshCcw className="w-4 h-4 mr-2" />
+                Apply Filters
               </Button>
+              {(selectedItem || selectedWarehouse) && (
+                <Button variant="outline" onClick={handleClearFilters} disabled={loading}>
+                  Clear Filters
+                </Button>
+              )}
+              {selectedItem && (
+                <Badge variant="secondary">Item: {selectedItem.item_code}</Badge>
+              )}
+              {selectedWarehouse && (
+                <Badge variant="secondary">Warehouse: {selectedWarehouse}</Badge>
+              )}
             </div>
             
             {loading ? (
