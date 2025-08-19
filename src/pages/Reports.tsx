@@ -15,7 +15,7 @@ import {
   RefreshCcw
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useStockAPI } from "@/hooks/useERPNextAPI";
+import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "@/components/common/ItemSelector";
 import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
@@ -25,11 +25,11 @@ import { exportToExcel, exportToPDF } from "@/utils/exportUtils";
 const Reports = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { getStockBalance, loading } = useStockAPI();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [stockBalanceData, setStockBalanceData] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
   const reportCategories = [
     {
@@ -92,18 +92,47 @@ const Reports = () => {
       selectedWarehouse 
     });
     
+    setLoading(true);
     try {
       const apiFilters = [];
+      
+      // Only add filters if items are actually selected
       if (selectedItem) {
-        apiFilters.push(['item_code', 'like', `%${selectedItem.item_code}%`]);
+        apiFilters.push(['item_code', '=', selectedItem.item_code]);
       }
       if (selectedWarehouse) {
-        apiFilters.push(['warehouse', 'like', `%${selectedWarehouse}%`]);
+        apiFilters.push(['warehouse', '=', selectedWarehouse]);
       }
       
+      // Always filter for positive stock only
+      apiFilters.push(['actual_qty', '>', 0]);
+      
       console.log('API filters for stock balance:', apiFilters);
-      const response = await getStockBalance(apiFilters);
-      console.log('Stock balance API response:', response);
+      
+      // Use the ERPNext API directly for better field control
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const fields = [
+        'item_code',
+        'warehouse', 
+        'actual_qty',
+        'reserved_qty',
+        'planned_qty',
+        'valuation_rate',
+        'stock_value',
+        'stock_uom'
+      ];
+
+      const response = await erpnextAPI.callAPI('Bin', 'GET', undefined, apiFilters, undefined, fields);
+      console.log('Direct Bin API response:', response);
       
       if (response?.data && Array.isArray(response.data)) {
         // Transform ERPNext Bin data to our format
@@ -112,7 +141,7 @@ const Reports = () => {
           warehouse: bin.warehouse,
           qty: bin.actual_qty || 0,
           uom: bin.stock_uom || "Nos",
-          value: (bin.actual_qty || 0) * (bin.valuation_rate || 0)
+          value: bin.stock_value || ((bin.actual_qty || 0) * (bin.valuation_rate || 0))
         })).filter((item: any) => item.qty > 0); // Only show items with positive stock
         
         console.log('Transformed stock balance data:', transformedData);
@@ -121,7 +150,7 @@ const Reports = () => {
         if (transformedData.length === 0) {
           toast({
             title: "No Data",
-            description: "No stock balance data found with the selected filters",
+            description: selectedItem || selectedWarehouse ? "No stock balance data found with the selected filters" : "No stock found in any warehouse",
             variant: "destructive"
           });
         } else {
@@ -143,10 +172,12 @@ const Reports = () => {
       console.error('Stock balance fetch error:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch stock balance data",
+        description: "Failed to fetch stock balance data. Please check your connection and try again.",
         variant: "destructive"
       });
       setStockBalanceData([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -159,7 +190,7 @@ const Reports = () => {
 
   // Auto-fetch when filters change
   useEffect(() => {
-    if (selectedReport === "stock-balance" && (selectedItem || selectedWarehouse)) {
+    if (selectedReport === "stock-balance") {
       fetchStockBalance();
     }
   }, [selectedItem, selectedWarehouse]);
