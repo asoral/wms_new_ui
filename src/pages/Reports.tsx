@@ -143,28 +143,43 @@ const Reports = () => {
         
         // Fetch item names in batches
         try {
-          const itemFilters = [['item_code', 'in', itemCodes]];
-          const itemFields = ['item_code', 'item_name'];
-          const itemResponse = await erpnextAPI.callAPI('Item', 'GET', undefined, itemFilters, undefined, itemFields);
-          
-          if (itemResponse?.data) {
-            itemResponse.data.forEach((item: any) => {
-              itemNames[item.item_code] = item.item_name || item.item_code;
-            });
+          if (itemCodes.length > 0) {
+            const itemFilters = [['item_code', 'in', itemCodes]];
+            const itemFields = ['item_code', 'item_name'];
+            console.log('Item API call with filters:', itemFilters);
+            
+            const itemResponse = await erpnextAPI.callAPI('Item', 'GET', undefined, itemFilters, undefined, itemFields);
+            console.log('Item API response:', itemResponse);
+            
+            if (itemResponse?.data && Array.isArray(itemResponse.data)) {
+              itemResponse.data.forEach((item: any) => {
+                itemNames[item.item_code] = item.item_name || item.item_code;
+                console.log(`Mapped item: ${item.item_code} -> ${item.item_name}`);
+              });
+            } else {
+              console.warn('Item API returned no data or invalid format:', itemResponse);
+            }
           }
         } catch (error) {
-          console.warn('Failed to fetch item names:', error);
+          console.error('Failed to fetch item names:', error);
         }
         
+        console.log('Final itemNames mapping:', itemNames);
+        
         // Transform ERPNext Bin data to our format
-        const transformedData = response.data.map((bin: any) => ({
-          item: bin.item_code,
-          itemName: itemNames[bin.item_code] || bin.item_code,
-          warehouse: bin.warehouse,
-          qty: bin.actual_qty || 0,
-          uom: bin.stock_uom || "Nos",
-          value: bin.stock_value || ((bin.actual_qty || 0) * (bin.valuation_rate || 0))
-        })).filter((item: any) => item.qty > 0); // Only show items with positive stock
+        const transformedData = response.data.map((bin: any) => {
+          const itemName = itemNames[bin.item_code] || bin.item_code;
+          console.log(`Transforming bin: ${bin.item_code} -> itemName: ${itemName}`);
+          
+          return {
+            item: bin.item_code,
+            itemName: itemName,
+            warehouse: bin.warehouse,
+            qty: bin.actual_qty || 0,
+            uom: bin.stock_uom || "Nos",
+            value: bin.stock_value || ((bin.actual_qty || 0) * (bin.valuation_rate || 0))
+          };
+        }).filter((item: any) => item.qty > 0); // Only show items with positive stock
         
         console.log('Transformed stock balance data:', transformedData);
         setStockBalanceData(transformedData);
