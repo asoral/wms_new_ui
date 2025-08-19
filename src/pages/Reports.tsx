@@ -319,25 +319,30 @@ const Reports = () => {
       const responseMessage = response?.message;
       if (responseMessage && typeof responseMessage === 'object') {
         const messageObj = responseMessage as any;
-        if ('result' in messageObj && Array.isArray(messageObj.result)) {
+        if ('result' in messageObj && Array.isArray(messageObj.result) && messageObj.result.length > 0) {
           const reportResult = messageObj.result;
-          const reportColumns = messageObj.columns || [];
           
           console.log('Report data received:', reportResult.length, 'rows');
-          console.log('Report columns:', reportColumns);
+          console.log('Sample row:', reportResult[0]);
           
-          // Transform the data to a more usable format
-          const transformedData = reportResult.map((row: any, index: number) => {
-            const rowData: any = { id: index };
-            reportColumns.forEach((col: any, colIndex: number) => {
-              const fieldName = col.fieldname || col.label || `col_${colIndex}`;
-              rowData[fieldName] = row[colIndex];
-            });
-            return rowData;
-          });
+          // For newer ERPNext versions, result is an array of objects
+          // Extract column information from the first row's keys
+          const firstRow = reportResult[0];
+          const dynamicColumns = Object.keys(firstRow).map((key, index) => ({
+            fieldname: key,
+            label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            fieldtype: typeof firstRow[key] === 'number' ? 'Float' : 'Data',
+            width: 120
+          }));
+          
+          // Transform the data - since it's already in object format, just add IDs
+          const transformedData = reportResult.map((row: any, index: number) => ({
+            id: index,
+            ...row
+          }));
           
           setReportData(transformedData);
-          setReportColumns(reportColumns);
+          setReportColumns(dynamicColumns);
           
           toast({
             title: "Report Generated",
