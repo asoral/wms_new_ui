@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { createERPNextAPI, getUserDefaultCompany } from '@/services/erpnextApi';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
 
 // Define proper types for dashboard metrics
@@ -133,75 +133,112 @@ export function useEnhancedDashboard() {
         setIsLoading(true);
         setError('');
         
-        const api = await createERPNextAPI();
-        if (!api) {
-          setError('ERPNext API not configured');
-          setIsLoading(false);
-          return;
-        }
-
-        const company = await getUserDefaultCompany();
-
-        // Mock data for dashboard stats - these would normally come from API calls
-        const dashboardResult = {
-          data: {
-            totalSales: 5678900,
-            totalPurchase: 4523400,
-            totalItems: 1245,
-            totalCustomers: 487,
-            revenueGrowth: 8.7,
-            inventoryValue: 3245600,
-            lowStockItems: 45,
-            pendingOrders: 12,
-            totalWarehouses: 8,
-            totalStockValue: 3245600
-          }
-        };
+        // Call the ERPNext dashboard edge function
+        const { data: erpMetrics, error: erpError } = await supabase.functions.invoke('erpnext-dashboard');
         
-        const operationalResult = {
-          data: {
-            salesThisMonth: 875400,
-            salesLastMonth: 812300,
-            ordersThisMonth: 124,
-            ordersLastMonth: 103,
-            deliveriesThisMonth: 98,
-            openDeliveries: 26,
-            purchasesThisMonth: 654200,
-            openPurchases: 14,
-            pickAccuracy: 98.5,
-            putawaySpeed: 45.2,
-            cycleCountAccuracy: 99.1,
-            orderFulfillmentRate: 96.8,
-            warehouseUtilization: 78.3,
-            averageProcessingTime: 24.5
-          }
-        };
-        
-        const financialResult = {
-          data: {
-            grossProfit: 1998600,
-            grossProfitMargin: 35.2,
-            outstandingAmount: 876500,
-            averageCollectionPeriod: 28.4,
-            stockTurnoverRatio: 4.2,
-            carryingCostPercentage: 12.5,
-            deadStockValue: 145600,
+        if (erpError) {
+          console.error('ERPNext dashboard error:', erpError);
+          setError(erpError.message || 'Failed to fetch ERPNext data');
+          
+          // Fallback to mock data on error
+          setDashboardStats({
+            totalSales: 0,
+            totalPurchase: 0,
+            totalItems: 0,
+            totalCustomers: 0,
+            revenueGrowth: 0,
+            inventoryValue: 0,
+            lowStockItems: 0,
+            pendingOrders: 0,
+            totalWarehouses: 0,
+            totalStockValue: 0,
+          });
+          setOperationalMetrics({
+            salesThisMonth: 0,
+            salesLastMonth: 0,
+            ordersThisMonth: 0,
+            ordersLastMonth: 0,
+            deliveriesThisMonth: 0,
+            openDeliveries: 0,
+            purchasesThisMonth: 0,
+            openPurchases: 0,
+            pickAccuracy: 0,
+            putawaySpeed: 0,
+            cycleCountAccuracy: 0,
+            orderFulfillmentRate: 0,
+            warehouseUtilization: 0,
+            averageProcessingTime: 0,
+          });
+          setFinancialMetrics({
+            grossProfit: 0,
+            grossProfitMargin: 0,
+            outstandingAmount: 0,
+            averageCollectionPeriod: 0,
+            stockTurnoverRatio: 0,
+            carryingCostPercentage: 0,
+            deadStockValue: 0,
             abcAnalysis: {
-              classA: 65,
-              classB: 25,
-              classC: 10
-            }
-          }
-        };
-
-        setDashboardStats(dashboardResult.data as DashboardStats);
-        setOperationalMetrics(operationalResult.data as OperationalMetrics);
-        setFinancialMetrics(financialResult.data as FinancialMetrics);
-        setStockAgingData({
-          items_count: 1245,
-          aged_30_days: 123,
-          aged_90_days: 45
-        });
+              classA: 0,
+              classB: 0,
+              classC: 0,
+            },
+          });
+          setStockAgingData({
+            items_count: 0,
+            aged_30_days: 0,
+            aged_90_days: 0,
+          });
+        } else if (erpMetrics?.data) {
+          // Use real ERPNext data
+          const metrics = erpMetrics.data;
+          
+          setDashboardStats({
+            totalSales: 0, // Not calculated in current implementation
+            totalPurchase: 0, // Not calculated in current implementation
+            totalItems: metrics.totalItems,
+            totalCustomers: 0, // Not calculated in current implementation
+            revenueGrowth: 0, // Not calculated in current implementation
+            inventoryValue: metrics.totalStockValue,
+            lowStockItems: metrics.lowStockItems,
+            pendingOrders: metrics.pendingOrders,
+            totalWarehouses: metrics.totalWarehouses,
+            totalStockValue: metrics.totalStockValue,
+          });
+          
+          setOperationalMetrics({
+            salesThisMonth: 0, // Not calculated in current implementation
+            salesLastMonth: 0, // Not calculated in current implementation
+            ordersThisMonth: 0, // Not calculated in current implementation
+            ordersLastMonth: 0, // Not calculated in current implementation
+            deliveriesThisMonth: 0, // Not calculated in current implementation
+            openDeliveries: 0, // Not calculated in current implementation
+            purchasesThisMonth: 0, // Not calculated in current implementation
+            openPurchases: metrics.pendingOrders,
+            pickAccuracy: metrics.operationalMetrics.pickAccuracy,
+            putawaySpeed: metrics.operationalMetrics.putawaySpeed,
+            cycleCountAccuracy: metrics.operationalMetrics.cycleCountAccuracy,
+            orderFulfillmentRate: metrics.operationalMetrics.orderFulfillmentRate,
+            warehouseUtilization: metrics.operationalMetrics.warehouseUtilization,
+            averageProcessingTime: metrics.operationalMetrics.averageProcessingTime,
+          });
+          
+          setFinancialMetrics({
+            grossProfit: 0, // Not calculated in current implementation
+            grossProfitMargin: 0, // Not calculated in current implementation
+            outstandingAmount: 0, // Not calculated in current implementation
+            averageCollectionPeriod: 0, // Not calculated in current implementation
+            stockTurnoverRatio: metrics.stockTurnoverRatio,
+            carryingCostPercentage: metrics.carryingCostPercentage,
+            deadStockValue: metrics.deadStockValue,
+            abcAnalysis: {
+              classA: 80, // Placeholder values
+              classB: 15,
+              classC: 5,
+            },
+          });
+          
+          setStockAgingData(metrics.stockAgingData);
+        }
 
         // Load recent activities
         await loadRecentActivities();
@@ -226,47 +263,22 @@ export function useEnhancedDashboard() {
   const loadRecentActivities = async () => {
     try {
       setIsLoadingActivities(true);
-      const api = await createERPNextAPI();
-      if (!api) return;
-
-      // Mock data for recent activities
+      
+      // For now, use mock data for recent activities
+      // In future, this could be enhanced to fetch real transaction data from ERPNext
       const activitiesResult = {
         data: [
           {
             id: 'act1',
             type: 'sales_order',
-            reference: 'SO-2023-0034',
-            description: 'New order from ABC Corp',
-            amount: 12450,
-            date: '2023-05-14',
-            status: 'To Deliver',
-            title: 'Sales Order SO-2023-0034',
-            subtitle: 'New order from ABC Corp',
-            time: '2 hours ago'
-          },
-          {
-            id: 'act2',
-            type: 'delivery',
-            reference: 'DN-2023-0067',
-            description: 'Delivery to XYZ Ltd.',
-            amount: 8760,
-            date: '2023-05-13',
-            status: 'completed',
-            title: 'Delivery Note DN-2023-0067',
-            subtitle: 'Delivery to XYZ Ltd.',
-            time: '4 hours ago'
-          },
-          {
-            id: 'act3',
-            type: 'purchase_order',
-            reference: 'PO-2023-0054',
-            description: 'Office supplies from Vendor Inc',
-            amount: 3200,
-            date: '2023-05-12',
+            reference: 'Loading...',
+            description: 'Fetching recent activities from ERPNext',
+            amount: 0,
+            date: new Date().toISOString().split('T')[0],
             status: 'pending',
-            title: 'Purchase Order PO-2023-0054',
-            subtitle: 'Office supplies from Vendor Inc',
-            time: '1 day ago'
+            title: 'Recent activities loading...',
+            subtitle: 'Please wait while we fetch your latest transactions',
+            time: 'Just now'
           }
         ]
       };
@@ -281,8 +293,71 @@ export function useEnhancedDashboard() {
   };
 
   const refreshData = async () => {
-    // Refresh all data
-    window.location.reload();
+    // Re-fetch dashboard data
+    setIsLoading(true);
+    try {
+      const { data: erpMetrics, error: erpError } = await supabase.functions.invoke('erpnext-dashboard');
+      
+      if (!erpError && erpMetrics?.data) {
+        const metrics = erpMetrics.data;
+        
+        setDashboardStats({
+          totalSales: 0,
+          totalPurchase: 0,
+          totalItems: metrics.totalItems,
+          totalCustomers: 0,
+          revenueGrowth: 0,
+          inventoryValue: metrics.totalStockValue,
+          lowStockItems: metrics.lowStockItems,
+          pendingOrders: metrics.pendingOrders,
+          totalWarehouses: metrics.totalWarehouses,
+          totalStockValue: metrics.totalStockValue,
+        });
+        
+        setOperationalMetrics({
+          salesThisMonth: 0,
+          salesLastMonth: 0,
+          ordersThisMonth: 0,
+          ordersLastMonth: 0,
+          deliveriesThisMonth: 0,
+          openDeliveries: 0,
+          purchasesThisMonth: 0,
+          openPurchases: metrics.pendingOrders,
+          pickAccuracy: metrics.operationalMetrics.pickAccuracy,
+          putawaySpeed: metrics.operationalMetrics.putawaySpeed,
+          cycleCountAccuracy: metrics.operationalMetrics.cycleCountAccuracy,
+          orderFulfillmentRate: metrics.operationalMetrics.orderFulfillmentRate,
+          warehouseUtilization: metrics.operationalMetrics.warehouseUtilization,
+          averageProcessingTime: metrics.operationalMetrics.averageProcessingTime,
+        });
+        
+        setFinancialMetrics({
+          grossProfit: 0,
+          grossProfitMargin: 0,
+          outstandingAmount: 0,
+          averageCollectionPeriod: 0,
+          stockTurnoverRatio: metrics.stockTurnoverRatio,
+          carryingCostPercentage: metrics.carryingCostPercentage,
+          deadStockValue: metrics.deadStockValue,
+          abcAnalysis: {
+            classA: 80,
+            classB: 15,
+            classC: 5,
+          },
+        });
+        
+        setStockAgingData(metrics.stockAgingData);
+      }
+    } catch (error) {
+      console.error('Error refreshing dashboard data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh dashboard data',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return {
