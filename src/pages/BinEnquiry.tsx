@@ -229,7 +229,7 @@ const BinEnquiry = () => {
       return;
     }
 
-    const success = exportBinEnquiryToExcel(binItems, selectedBin);
+    const success = exportBinEnquiryToExcel(binItems, selectedBin, companyCurrency);
     if (success) {
       toast({
         title: "Export Successful",
@@ -254,7 +254,7 @@ const BinEnquiry = () => {
       return;
     }
 
-    const success = exportBinEnquiryToPDF(binItems, selectedBin);
+    const success = exportBinEnquiryToPDF(binItems, selectedBin, companyCurrency);
     if (success) {
       toast({
         title: "Export Successful",

@@ -285,7 +285,7 @@ const ItemEnquiry = () => {
       return;
     }
 
-    const success = exportItemEnquiryToExcel(stockItems, selectedItem.item_code);
+    const success = exportItemEnquiryToExcel(stockItems, selectedItem.item_code, companyCurrency);
     if (success) {
       toast({
         title: "Export Successful",
@@ -310,7 +310,7 @@ const ItemEnquiry = () => {
       return;
     }
 
-    const success = exportItemEnquiryToPDF(stockItems, selectedItem.item_code, selectedItem.item_name);
+    const success = exportItemEnquiryToPDF(stockItems, selectedItem.item_code, selectedItem.item_name, companyCurrency);
     if (success) {
       toast({
         title: "Export Successful",

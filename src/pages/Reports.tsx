@@ -15,7 +15,7 @@ import {
   RefreshCcw
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createERPNextAPI } from "@/services/erpnextApi";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import ItemSelector from "@/components/common/ItemSelector";
 import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
@@ -30,6 +30,7 @@ const Reports = () => {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
 
   const reportCategories = [
     {
@@ -118,6 +119,20 @@ const Reports = () => {
           variant: "destructive"
         });
         return;
+      }
+
+      // Get company currency
+      const company = await getUserDefaultCompany();
+      if (company) {
+        try {
+          const companiesResult = await erpnextAPI.getCompanies();
+          const companyData = companiesResult.data?.find(c => c.name === company);
+          if (companyData) {
+            setCompanyCurrency(companyData.default_currency || "INR");
+          }
+        } catch (error) {
+          console.error('Failed to fetch company currency:', error);
+        }
       }
 
       const fields = [
@@ -281,7 +296,7 @@ const Reports = () => {
       'Value': item.value
     }));
 
-    const success = exportToExcel(exportData, 'Stock_Balance_Report', 'Stock Balance');
+    const success = exportToExcel(exportData, 'Stock_Balance_Report', 'Stock Balance', companyCurrency);
     if (success) {
       toast({
         title: "Export Successful",
@@ -324,7 +339,7 @@ const Reports = () => {
       { header: 'Value', dataKey: 'value' }
     ];
 
-    const success = exportToPDF(exportData, 'Stock_Balance_Report', 'Stock Balance Report', columns);
+    const success = exportToPDF(exportData, 'Stock_Balance_Report', 'Stock Balance Report', columns, companyCurrency);
     if (success) {
       toast({
         title: "Export Successful", 
@@ -412,7 +427,12 @@ const Reports = () => {
                         </div>
                         <div>
                           <span className="text-muted-foreground">Value:</span>
-                          <p className="font-medium">₹{item.value.toLocaleString()}</p>
+                          <p className="font-medium">{new Intl.NumberFormat('en-IN', {
+                            style: 'currency',
+                            currency: companyCurrency,
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }).format(item.value)}</p>
                         </div>
                       </div>
                     </div>
@@ -445,7 +465,12 @@ const Reports = () => {
                       <td className="p-3 text-foreground">{item.warehouse}</td>
                       <td className="p-3 text-right text-foreground">{item.qty}</td>
                       <td className="p-3 text-foreground">{item.uom}</td>
-                      <td className="p-3 text-right text-foreground">₹{item.value.toLocaleString()}</td>
+                      <td className="p-3 text-right text-foreground">{new Intl.NumberFormat('en-IN', {
+                        style: 'currency',
+                        currency: companyCurrency,
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(item.value)}</td>
                     </tr>
                       ))}
                     </tbody>

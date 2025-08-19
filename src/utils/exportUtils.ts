@@ -2,13 +2,66 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Helper function to get currency symbol
+const getCurrencySymbol = (currencyCode: string): string => {
+  const currencyMap: { [key: string]: string } = {
+    'INR': '₹',
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥',
+    'AUD': 'A$',
+    'CAD': 'C$',
+    'CHF': 'CHF',
+    'CNY': '¥',
+    'SEK': 'kr',
+    'NZD': 'NZ$'
+  };
+  
+  return currencyMap[currencyCode] || currencyCode;
+};
+
+// Helper function to format currency
+const formatCurrency = (amount: number, currencyCode: string = 'INR'): string => {
+  try {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch (error) {
+    // Fallback if currency code is not supported
+    const symbol = getCurrencySymbol(currencyCode);
+    return `${symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+  }
+};
+
 export interface ExportData {
   [key: string]: any;
 }
 
-export const exportToExcel = (data: ExportData[], filename: string, sheetName: string = 'Sheet1') => {
+export const exportToExcel = (
+  data: ExportData[], 
+  filename: string, 
+  sheetName: string = 'Sheet1', 
+  currencyCode: string = 'INR'
+) => {
   try {
-    const ws = XLSX.utils.json_to_sheet(data);
+    // Format currency values before creating worksheet
+    const formattedData = data.map(row => {
+      const newRow: any = {};
+      Object.entries(row).forEach(([key, value]) => {
+        if (typeof value === 'number' && (key.toLowerCase().includes('value') || key.toLowerCase().includes('valuation'))) {
+          newRow[key] = formatCurrency(value, currencyCode);
+        } else {
+          newRow[key] = value;
+        }
+      });
+      return newRow;
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(formattedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     XLSX.writeFile(wb, `${filename}.xlsx`);
@@ -23,7 +76,8 @@ export const exportToPDF = (
   data: ExportData[], 
   filename: string, 
   title: string,
-  columns: { header: string; dataKey: string }[]
+  columns: { header: string; dataKey: string }[],
+  currencyCode: string = 'INR'
 ) => {
   try {
     const doc = new jsPDF();
@@ -43,7 +97,7 @@ export const exportToPDF = (
         // Format numbers and currency values
         if (typeof value === 'number') {
           return col.dataKey.toLowerCase().includes('valuation') || col.dataKey.toLowerCase().includes('value')
-            ? `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+            ? formatCurrency(value, currencyCode)
             : value.toString();
         }
         return value?.toString() || '';
@@ -89,7 +143,7 @@ export const exportToPDF = (
 };
 
 // Item Enquiry specific export functions
-export const exportItemEnquiryToExcel = (stockItems: any[], itemCode: string) => {
+export const exportItemEnquiryToExcel = (stockItems: any[], itemCode: string, currencyCode: string = 'INR') => {
   const exportData = stockItems.map(item => ({
     'Item Code': item.itemCode,
     'Item Name': item.itemName,
@@ -100,10 +154,10 @@ export const exportItemEnquiryToExcel = (stockItems: any[], itemCode: string) =>
     'Valuation': item.valuation
   }));
   
-  return exportToExcel(exportData, `item-enquiry-${itemCode}-${new Date().toISOString().split('T')[0]}`, 'Item Stock');
+  return exportToExcel(exportData, `item-enquiry-${itemCode}-${new Date().toISOString().split('T')[0]}`, 'Item Stock', currencyCode);
 };
 
-export const exportItemEnquiryToPDF = (stockItems: any[], itemCode: string, itemName: string) => {
+export const exportItemEnquiryToPDF = (stockItems: any[], itemCode: string, itemName: string, currencyCode: string = 'INR') => {
   const exportData = stockItems.map(item => ({
     itemCode: item.itemCode,
     itemName: item.itemName,
@@ -128,12 +182,13 @@ export const exportItemEnquiryToPDF = (stockItems: any[], itemCode: string, item
     exportData, 
     `item-enquiry-${itemCode}-${new Date().toISOString().split('T')[0]}`,
     `Item Enquiry Report - ${itemCode} (${itemName})`,
-    columns
+    columns,
+    currencyCode
   );
 };
 
 // Bin Enquiry specific export functions
-export const exportBinEnquiryToExcel = (binItems: any[], binCode: string) => {
+export const exportBinEnquiryToExcel = (binItems: any[], binCode: string, currencyCode: string = 'INR') => {
   const exportData = binItems.map(item => ({
     'Item Code': item.item_code,
     'Item Name': item.item_name,
@@ -144,10 +199,10 @@ export const exportBinEnquiryToExcel = (binItems: any[], binCode: string) => {
     'Bin/Warehouse': item.bin || item.warehouse
   }));
   
-  return exportToExcel(exportData, `bin-enquiry-${binCode}-${new Date().toISOString().split('T')[0]}`, 'Bin Items');
+  return exportToExcel(exportData, `bin-enquiry-${binCode}-${new Date().toISOString().split('T')[0]}`, 'Bin Items', currencyCode);
 };
 
-export const exportBinEnquiryToPDF = (binItems: any[], binCode: string) => {
+export const exportBinEnquiryToPDF = (binItems: any[], binCode: string, currencyCode: string = 'INR') => {
   const exportData = binItems.map(item => ({
     itemCode: item.item_code,
     itemName: item.item_name,
@@ -172,6 +227,7 @@ export const exportBinEnquiryToPDF = (binItems: any[], binCode: string) => {
     exportData, 
     `bin-enquiry-${binCode}-${new Date().toISOString().split('T')[0]}`,
     `Bin Enquiry Report - ${binCode}`,
-    columns
+    columns,
+    currencyCode
   );
 };
