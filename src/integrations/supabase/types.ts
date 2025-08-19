@@ -175,45 +175,6 @@ export type Database = {
       }
     }
     Views: {
-      profiles_with_decrypted_credentials: {
-        Row: {
-          created_at: string | null
-          email: string | null
-          erpnext_api_key: string | null
-          erpnext_api_secret: string | null
-          erpnext_default_company: string | null
-          erpnext_pallet_template_item: string | null
-          erpnext_url: string | null
-          full_name: string | null
-          id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email?: string | null
-          erpnext_api_key?: never
-          erpnext_api_secret?: never
-          erpnext_default_company?: string | null
-          erpnext_pallet_template_item?: string | null
-          erpnext_url?: string | null
-          full_name?: string | null
-          id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string | null
-          erpnext_api_key?: never
-          erpnext_api_secret?: never
-          erpnext_default_company?: string | null
-          erpnext_pallet_template_item?: string | null
-          erpnext_url?: string | null
-          full_name?: string | null
-          id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       public_app_settings: {
         Row: {
           description: string | null
@@ -242,6 +203,16 @@ export type Database = {
         Args: { key_id?: string; secret: string }
         Returns: string
       }
+      get_user_erpnext_credentials: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          erpnext_api_key: string
+          erpnext_api_secret: string
+          erpnext_default_company: string
+          erpnext_pallet_template_item: string
+          erpnext_url: string
+        }[]
+      }
       log_sensitive_operation: {
         Args: {
           p_action: string
@@ -250,6 +221,16 @@ export type Database = {
           p_resource_id?: string
           p_resource_type: string
           p_user_id: string
+        }
+        Returns: undefined
+      }
+      update_user_erpnext_credentials: {
+        Args: {
+          p_erpnext_api_key?: string
+          p_erpnext_api_secret?: string
+          p_erpnext_default_company?: string
+          p_erpnext_pallet_template_item?: string
+          p_erpnext_url?: string
         }
         Returns: undefined
       }
