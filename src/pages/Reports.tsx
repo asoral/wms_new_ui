@@ -17,9 +17,10 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useStockAPI } from "@/hooks/useERPNextAPI";
 import { useToast } from "@/hooks/use-toast";
-import ItemSelector from "@/components/item-enquiry/ItemSelector";
+import ItemSelector from "@/components/common/ItemSelector";
 import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
 import { Item } from "@/types";
+import { exportToExcel, exportToPDF } from "@/utils/exportUtils";
 
 const Reports = () => {
   const navigate = useNavigate();
@@ -86,6 +87,11 @@ const Reports = () => {
   ];
 
   const fetchStockBalance = async () => {
+    console.log('Fetching stock balance with filters:', { 
+      selectedItem: selectedItem?.item_code, 
+      selectedWarehouse 
+    });
+    
     try {
       const apiFilters = [];
       if (selectedItem) {
@@ -95,7 +101,10 @@ const Reports = () => {
         apiFilters.push(['warehouse', 'like', `%${selectedWarehouse}%`]);
       }
       
+      console.log('API filters for stock balance:', apiFilters);
       const response = await getStockBalance(apiFilters);
+      console.log('Stock balance API response:', response);
+      
       if (response?.data && Array.isArray(response.data)) {
         // Transform ERPNext Bin data to our format
         const transformedData = response.data.map((bin: any) => ({
@@ -106,6 +115,7 @@ const Reports = () => {
           value: (bin.actual_qty || 0) * (bin.valuation_rate || 0)
         })).filter((item: any) => item.qty > 0); // Only show items with positive stock
         
+        console.log('Transformed stock balance data:', transformedData);
         setStockBalanceData(transformedData);
         
         if (transformedData.length === 0) {
@@ -114,8 +124,14 @@ const Reports = () => {
             description: "No stock balance data found with the selected filters",
             variant: "destructive"
           });
+        } else {
+          toast({
+            title: "Data Loaded",
+            description: `Found ${transformedData.length} stock records`,
+          });
         }
       } else {
+        console.log('No data in response or invalid response format');
         setStockBalanceData([]);
         toast({
           title: "No Data", 
@@ -136,9 +152,17 @@ const Reports = () => {
 
   useEffect(() => {
     if (selectedReport === "stock-balance") {
+      // Automatically load all stock balance data when report is selected
       fetchStockBalance();
     }
   }, [selectedReport]);
+
+  // Auto-fetch when filters change
+  useEffect(() => {
+    if (selectedReport === "stock-balance" && (selectedItem || selectedWarehouse)) {
+      fetchStockBalance();
+    }
+  }, [selectedItem, selectedWarehouse]);
 
   const handleFilter = () => {
     if (selectedReport === "stock-balance") {
@@ -148,10 +172,12 @@ const Reports = () => {
 
   const handleItemSelect = (item: Item) => {
     setSelectedItem(item);
+    console.log('Selected item for stock balance:', item);
   };
 
   const handleWarehouseSelect = (warehouse: string) => {
     setSelectedWarehouse(warehouse);
+    console.log('Selected warehouse for stock balance:', warehouse);
   };
 
   const handleClearFilters = () => {
@@ -168,6 +194,80 @@ const Reports = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    if (stockBalanceData.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No data available to export",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const exportData = stockBalanceData.map(item => ({
+      'Item Code': item.item,
+      'Warehouse': item.warehouse, 
+      'Quantity': item.qty,
+      'UOM': item.uom,
+      'Value': item.value
+    }));
+
+    const success = exportToExcel(exportData, 'Stock_Balance_Report', 'Stock Balance');
+    if (success) {
+      toast({
+        title: "Export Successful",
+        description: "Stock balance report exported to Excel successfully",
+      });
+    } else {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export report to Excel",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (stockBalanceData.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No data available to export", 
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const exportData = stockBalanceData.map(item => ({
+      item: item.item,
+      warehouse: item.warehouse,
+      qty: item.qty,
+      uom: item.uom,
+      value: item.value
+    }));
+
+    const columns = [
+      { header: 'Item Code', dataKey: 'item' },
+      { header: 'Warehouse', dataKey: 'warehouse' },
+      { header: 'Quantity', dataKey: 'qty' },
+      { header: 'UOM', dataKey: 'uom' },
+      { header: 'Value', dataKey: 'value' }
+    ];
+
+    const success = exportToPDF(exportData, 'Stock_Balance_Report', 'Stock Balance Report', columns);
+    if (success) {
+      toast({
+        title: "Export Successful", 
+        description: "Stock balance report exported to PDF successfully",
+      });
+    } else {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export report to PDF",
+        variant: "destructive"
+      });
+    }
+  };
+
   const renderReportData = () => {
     if (!selectedReport) return null;
 
@@ -176,14 +276,21 @@ const Reports = () => {
         return (
           <div className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              <ItemSelector
-                onItemSelected={handleItemSelect}
-                isLoading={loading}
-              />
-              <WarehouseSelector
-                onWarehouseSelected={handleWarehouseSelect}
-                isLoading={loading}
-              />
+              <div>
+                <label className="text-sm font-medium mb-2 block">Select Item</label>
+                <ItemSelector
+                  onItemSelect={handleItemSelect}
+                  selectedItem={selectedItem}
+                  placeholder="Search and select item..."
+                  isLoading={loading}
+                />
+              </div>
+              <div>
+                <WarehouseSelector
+                  onWarehouseSelected={handleWarehouseSelect}
+                  isLoading={loading}
+                />
+              </div>
             </div>
             
             <div className="flex flex-wrap gap-2 mb-4">
@@ -295,9 +402,18 @@ const Reports = () => {
               <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
                 <RefreshCcw className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="icon">
-                <Download className="w-4 h-4" />
-              </Button>
+              {stockBalanceData.length > 0 && (
+                <>
+                  <Button variant="outline" onClick={handleExportExcel} disabled={loading}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Excel
+                  </Button>
+                  <Button variant="outline" onClick={handleExportPDF} disabled={loading}>
+                    <Download className="w-4 h-4 mr-2" />
+                    PDF
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
