@@ -41,12 +41,53 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          resource_id: string | null
+          resource_type: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          resource_id?: string | null
+          resource_type: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          resource_id?: string | null
+          resource_type?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
           email: string | null
           erpnext_api_key: string | null
+          erpnext_api_key_encrypted: string | null
           erpnext_api_secret: string | null
+          erpnext_api_secret_encrypted: string | null
           erpnext_default_company: string | null
           erpnext_pallet_template_item: string | null
           erpnext_url: string | null
@@ -58,7 +99,9 @@ export type Database = {
           created_at?: string
           email?: string | null
           erpnext_api_key?: string | null
+          erpnext_api_key_encrypted?: string | null
           erpnext_api_secret?: string | null
+          erpnext_api_secret_encrypted?: string | null
           erpnext_default_company?: string | null
           erpnext_pallet_template_item?: string | null
           erpnext_url?: string | null
@@ -70,7 +113,9 @@ export type Database = {
           created_at?: string
           email?: string | null
           erpnext_api_key?: string | null
+          erpnext_api_key_encrypted?: string | null
           erpnext_api_secret?: string | null
+          erpnext_api_secret_encrypted?: string | null
           erpnext_default_company?: string | null
           erpnext_pallet_template_item?: string | null
           erpnext_url?: string | null
@@ -130,10 +175,84 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_with_decrypted_credentials: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          erpnext_api_key: string | null
+          erpnext_api_secret: string | null
+          erpnext_default_company: string | null
+          erpnext_pallet_template_item: string | null
+          erpnext_url: string | null
+          full_name: string | null
+          id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          erpnext_api_key?: never
+          erpnext_api_secret?: never
+          erpnext_default_company?: string | null
+          erpnext_pallet_template_item?: string | null
+          erpnext_url?: string | null
+          full_name?: string | null
+          id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          erpnext_api_key?: never
+          erpnext_api_secret?: never
+          erpnext_default_company?: string | null
+          erpnext_pallet_template_item?: string | null
+          erpnext_url?: string | null
+          full_name?: string | null
+          id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      public_app_settings: {
+        Row: {
+          description: string | null
+          setting_key: string | null
+          setting_value: string | null
+        }
+        Insert: {
+          description?: string | null
+          setting_key?: string | null
+          setting_value?: string | null
+        }
+        Update: {
+          description?: string | null
+          setting_key?: string | null
+          setting_value?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      decrypt_secret: {
+        Args: { encrypted_data: string; key_id?: string }
+        Returns: string
+      }
+      encrypt_secret: {
+        Args: { key_id?: string; secret: string }
+        Returns: string
+      }
+      log_sensitive_operation: {
+        Args: {
+          p_action: string
+          p_new_values?: Json
+          p_old_values?: Json
+          p_resource_id?: string
+          p_resource_type: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
