@@ -1,9 +1,10 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -16,10 +17,19 @@ import {
   RefreshCcw
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useStockAPI } from "@/hooks/useERPNextAPI";
+import { useToast } from "@/hooks/use-toast";
 
 const Reports = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { getStockBalance, loading } = useStockAPI();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [stockBalanceData, setStockBalanceData] = useState<any[]>([]);
+  const [filters, setFilters] = useState({
+    itemCode: "",
+    warehouse: ""
+  });
 
   const reportCategories = [
     {
@@ -76,12 +86,55 @@ const Reports = () => {
     }
   ];
 
-  const sampleStockBalance = [
-    { item: "RAW-MAT-001", warehouse: "Main Store", qty: 150, uom: "Nos", value: 15000 },
-    { item: "FIN-GOOD-001", warehouse: "Finished Goods", qty: 75, uom: "Pcs", value: 37500 },
-    { item: "COMP-001", warehouse: "Components", qty: 200, uom: "Nos", value: 20000 },
-    { item: "PKG-MAT-001", warehouse: "Packaging", qty: 500, uom: "Nos", value: 5000 }
-  ];
+  const fetchStockBalance = async () => {
+    try {
+      const apiFilters = [];
+      if (filters.itemCode) {
+        apiFilters.push(['item_code', 'like', `%${filters.itemCode}%`]);
+      }
+      if (filters.warehouse) {
+        apiFilters.push(['warehouse', 'like', `%${filters.warehouse}%`]);
+      }
+      
+      const response = await getStockBalance(apiFilters);
+      if (response.data && Array.isArray(response.data)) {
+        // Transform ERPNext Bin data to our format
+        const transformedData = response.data.map((bin: any) => ({
+          item: bin.item_code,
+          warehouse: bin.warehouse,
+          qty: bin.actual_qty || 0,
+          uom: bin.stock_uom || "Nos",
+          value: (bin.actual_qty || 0) * (bin.valuation_rate || 0)
+        })).filter((item: any) => item.qty > 0); // Only show items with positive stock
+        
+        setStockBalanceData(transformedData);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch stock balance data",
+        variant: "destructive"
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (selectedReport === "stock-balance") {
+      fetchStockBalance();
+    }
+  }, [selectedReport]);
+
+  const handleFilter = () => {
+    if (selectedReport === "stock-balance") {
+      fetchStockBalance();
+    }
+  };
+
+  const handleRefresh = () => {
+    if (selectedReport === "stock-balance") {
+      fetchStockBalance();
+    }
+  };
 
   const renderReportData = () => {
     if (!selectedReport) return null;
@@ -91,17 +144,37 @@ const Reports = () => {
         return (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-4 mb-4">
-              <Input placeholder="Item Code/Name" className="flex-1" />
-              <Input placeholder="Warehouse" className="flex-1" />
-              <Button variant="outline">
+              <Input 
+                placeholder="Item Code/Name" 
+                className="flex-1"
+                value={filters.itemCode}
+                onChange={(e) => setFilters({...filters, itemCode: e.target.value})}
+              />
+              <Input 
+                placeholder="Warehouse" 
+                className="flex-1"
+                value={filters.warehouse}
+                onChange={(e) => setFilters({...filters, warehouse: e.target.value})}
+              />
+              <Button variant="outline" onClick={handleFilter} disabled={loading}>
                 <Filter className="w-4 h-4 mr-2" />
                 Filter
               </Button>
             </div>
             
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-3">
-              {sampleStockBalance.map((item, index) => (
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : stockBalanceData.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No stock balance data found</p>
+              </div>
+            ) : (
+              <>
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
+                  {stockBalanceData.map((item, index) => (
                 <Card key={index}>
                   <CardContent className="p-4">
                     <div className="space-y-2">
@@ -121,24 +194,24 @@ const Reports = () => {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </Card>
+                  ))}
+                </div>
 
-            {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left p-3 text-foreground">Item Code</th>
-                    <th className="text-left p-3 text-foreground">Warehouse</th>
-                    <th className="text-right p-3 text-foreground">Quantity</th>
-                    <th className="text-left p-3 text-foreground">UOM</th>
-                    <th className="text-right p-3 text-foreground">Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sampleStockBalance.map((item, index) => (
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left p-3 text-foreground">Item Code</th>
+                        <th className="text-left p-3 text-foreground">Warehouse</th>
+                        <th className="text-right p-3 text-foreground">Quantity</th>
+                        <th className="text-left p-3 text-foreground">UOM</th>
+                        <th className="text-right p-3 text-foreground">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stockBalanceData.map((item, index) => (
                     <tr key={index} className="border-b border-border hover:bg-accent">
                       <td className="p-3 text-foreground">{item.item}</td>
                       <td className="p-3 text-foreground">{item.warehouse}</td>
@@ -146,10 +219,12 @@ const Reports = () => {
                       <td className="p-3 text-foreground">{item.uom}</td>
                       <td className="p-3 text-right text-foreground">₹{item.value.toLocaleString()}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         );
       default:
@@ -175,7 +250,7 @@ const Reports = () => {
               </h1>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
                 <RefreshCcw className="w-4 h-4" />
               </Button>
               <Button variant="outline" size="icon">
