@@ -38,9 +38,10 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
     };
   }, []);
 
-  useEffect(() => {
-    loadInitialItems();
-  }, []);
+  // Remove automatic initial loading - only load when user searches
+  // useEffect(() => {
+  //   loadInitialItems();
+  // }, []);
 
   const loadInitialItems = async () => {
     setIsLoadingItems(true);
@@ -71,10 +72,7 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         console.error('ERPNext API not configured');
-        const cached = await offlineStorage.getCachedData('items_page_1');
-        if (cached && Array.isArray(cached)) {
-          setItems(cached);
-        }
+        setItems([]);
         setIsLoadingItems(false);
         return;
       }
@@ -107,7 +105,7 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
           'has_batch_no',
           'item_group'
         ]),
-        limit_page_length: String(50)
+        limit_page_length: String(20) // Reduced from 50 to 20
       });
 
       if (orFilters) {
@@ -145,27 +143,13 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
         
         console.log('Setting items:', itemData.length);
         setItems(itemData);
-        
-        if (!search.trim()) {
-          await offlineStorage.cacheData('items_page_1', itemData, 300000);
-        }
       } else {
         console.log('No items found in API response');
         setItems([]);
       }
     } catch (error) {
       console.error('Failed to fetch items:', error);
-      
-      try {
-        const cacheKey = search.trim() ? `items_search_${search}` : 'items_page_1';
-        const cached = await offlineStorage.getCachedData(cacheKey);
-        if (cached && Array.isArray(cached)) {
-          console.log('Loading items from cache after error');
-          setItems(cached);
-        }
-      } catch (cacheError) {
-        console.error('Failed to load cached items:', cacheError);
-      }
+      setItems([]);
     } finally {
       setIsLoadingItems(false);
     }
@@ -173,8 +157,10 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (searchValue !== undefined && searchValue.trim()) {
+      if (searchValue && searchValue.trim().length >= 2) { // Only search when user types at least 2 characters
         fetchItems(searchValue);
+      } else if (searchValue && searchValue.trim().length === 0) {
+        setItems([]); // Clear items when search is cleared
       }
     }, 500);
 
@@ -253,7 +239,7 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
             />
             <CommandList>
               <CommandEmpty>
-                {isLoadingItems ? "Loading items..." : "No items found."}
+                {isLoadingItems ? "Loading items..." : searchValue && searchValue.trim().length >= 2 ? "No items found matching your search." : "Type at least 2 characters to search for items..."}
               </CommandEmpty>
               {isLoadingItems && (
                 <CommandGroup>
