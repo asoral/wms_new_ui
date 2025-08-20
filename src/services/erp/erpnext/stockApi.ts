@@ -158,10 +158,22 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       
       // If we have company warehouses, filter by them
       if (companyWarehouses.length > 0 && binResult?.data) {
-        const filteredData = binResult.data.filter((bin: any) => 
-          companyWarehouses.includes(bin.warehouse)
-        );
+        console.log('Company warehouses to match against:', companyWarehouses.slice(0, 10)); // Show first 10
+        console.log('Bin warehouses found:', binResult.data.map((bin: any) => bin.warehouse));
+        
+        const filteredData = binResult.data.filter((bin: any) => {
+          const isMatch = companyWarehouses.includes(bin.warehouse);
+          console.log(`Warehouse "${bin.warehouse}" match: ${isMatch}`);
+          return isMatch;
+        });
         console.log(`Filtered to ${filteredData.length} bins using known warehouses`);
+        
+        // If filtering removes everything, return unfiltered data with a warning
+        if (filteredData.length === 0 && binResult.data.length > 0) {
+          console.warn('Warehouse filtering removed all bins. Returning unfiltered data.');
+          return binResult;
+        }
+        
         return { ...binResult, data: filteredData };
       }
       
