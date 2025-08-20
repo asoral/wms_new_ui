@@ -152,8 +152,14 @@ const ItemEnquiry = () => {
         }
         console.log('Stock ledger entries:', stockLedgerData);
 
+        console.log('All stock data before filtering:', allStockData);
         const transformedItems: StockItem[] = allStockData
-          .filter((item: any) => (item.actual_qty || 0) > 0)
+          .filter((item: any) => {
+            const actualQty = item.actual_qty || 0;
+            const projectedQty = item.projected_qty || 0;
+            console.log(`${item.warehouse}: actual_qty=${actualQty}, projected_qty=${projectedQty}`);
+            return actualQty > 0 || projectedQty > 0;
+          })
           .map((item: any) => {
             const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
             

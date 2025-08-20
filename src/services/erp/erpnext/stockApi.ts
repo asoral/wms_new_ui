@@ -57,7 +57,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       
       // First, get warehouses for the company
       const warehouseFilters = [['company', '=', company]];
-      const warehouseParams = this.buildQueryParams(warehouseFilters, ['name']);
+      const warehouseParams = this.buildQueryParams(warehouseFilters, ['name'], 999);
       
       console.log('Fetching warehouses with URL:', `${this.baseURL}/api/resource/Warehouse?${warehouseParams}`);
       
@@ -101,7 +101,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
         'modified'
       ];
 
-      const binParams = this.buildQueryParams(binFilters, binFields);
+      const binParams = this.buildQueryParams(binFilters, binFields, 999);
       console.log('Fetching bins with URL:', `${this.baseURL}/api/resource/Bin?${binParams}`);
       
       const binResponse = await fetch(`${this.baseURL}/api/resource/Bin?${binParams}`, {
