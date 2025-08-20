@@ -200,20 +200,22 @@ serve(async (req) => {
       : []
 
     console.log('Data fetched - Items:', items.length, 'Bins:', bins.length, 'POs:', purchaseOrders.length, 'Warehouses:', warehouses.length)
+    console.log('Warehouse details:', warehouses.map(w => ({ name: w.name, is_group: w.is_group })))
+    console.log('Sample bins:', bins.slice(0, 3).map(b => ({ item_code: b.item_code, actual_qty: b.actual_qty, projected_qty: b.projected_qty, stock_value: b.stock_value })))
 
     // Calculate metrics
     const metrics: DashboardMetrics = {
       // 1. Total Items
       totalItems: items.length,
       
-      // 2. Low Stock Items (negative projected qty)
-      lowStockItems: bins.filter(bin => (bin.projected_qty || 0) < 0).length,
+      // 2. Low Stock Items (items with actual qty <= 10 or projected qty <= 0)
+      lowStockItems: bins.filter(bin => (bin.actual_qty || 0) <= 10 || (bin.projected_qty || 0) <= 0).length,
       
       // 3. Pending Purchase Orders
       pendingOrders: purchaseOrders.length,
       
-      // 4. Total Warehouses (group warehouses)
-      totalWarehouses: warehouses.filter(wh => wh.is_group === 1).length,
+      // 4. Total Warehouses (non-group warehouses)
+      totalWarehouses: warehouses.filter(wh => wh.is_group !== 1).length,
       
       // 5. Total Stock Value
       totalStockValue: bins.reduce((sum, bin) => sum + (bin.stock_value || 0), 0),
@@ -269,12 +271,15 @@ serve(async (req) => {
 function calculateStockTurnover(stockLedgerEntries: any[]): number {
   if (stockLedgerEntries.length === 0) return 0
   
-  // Simple calculation: total transactions / average stock
-  const totalTransactions = stockLedgerEntries.length
-  const averageStock = stockLedgerEntries.reduce((sum, entry) => 
-    sum + Math.abs(entry.qty_after_transaction || 0), 0) / stockLedgerEntries.length
+  // Calculate COGS (total outgoing stock value) and average inventory
+  const outgoingEntries = stockLedgerEntries.filter(entry => (entry.qty_after_transaction || 0) < 0)
+  const totalCOGS = Math.abs(outgoingEntries.reduce((sum, entry) => sum + (entry.stock_value || 0), 0))
   
-  return averageStock > 0 ? (totalTransactions / averageStock) * 12 : 0
+  // Average inventory value
+  const averageInventoryValue = stockLedgerEntries.reduce((sum, entry) => 
+    sum + Math.abs(entry.stock_value || 0), 0) / stockLedgerEntries.length
+  
+  return averageInventoryValue > 0 ? totalCOGS / averageInventoryValue : 0
 }
 
 function calculateDeadStockValue(bins: any[], batches: any[]): number {
