@@ -166,12 +166,23 @@ const ItemEnquiry = () => {
         console.log('Stock ledger entries:', stockLedgerData);
 
         console.log('All stock data before filtering:', allStockData);
+        console.log('=== FILTERING STOCK DATA ===');
+        allStockData.forEach((item, index) => {
+          console.log(`Item ${index}:`, {
+            warehouse: item.warehouse,
+            actual_qty: item.actual_qty,
+            projected_qty: item.projected_qty,
+            item_code: item.item_code
+          });
+        });
+        
         const transformedItems: StockItem[] = allStockData
           .filter((item: any) => {
             const actualQty = item.actual_qty || 0;
             const projectedQty = item.projected_qty || 0;
-            console.log(`${item.warehouse}: actual_qty=${actualQty}, projected_qty=${projectedQty}`);
-            return actualQty > 0 || projectedQty > 0;
+            const shouldInclude = actualQty > 0 || projectedQty > 0;
+            console.log(`FILTER: ${item.warehouse} - actual_qty=${actualQty}, projected_qty=${projectedQty}, include=${shouldInclude}`);
+            return shouldInclude;
           })
           .map((item: any) => {
             const actualQty = Math.round((item.actual_qty || 0) * 100) / 100;
