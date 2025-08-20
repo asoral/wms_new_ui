@@ -27,6 +27,7 @@ const StockCountSession = () => {
   const [sessionData, setSessionData] = useState<any>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingEntry, setEditingEntry] = useState<StockCountEntry | null>(null);
+  const [loadingWarehouseItems, setLoadingWarehouseItems] = useState(false);
   const { toast } = useToast();
 
   // Load existing session data if in edit/view mode
@@ -469,6 +470,126 @@ const StockCountSession = () => {
     }
   };
 
+  const handleGetAllItems = async () => {
+    if (!warehouse) {
+      toast({
+        title: "No Warehouse",
+        description: "No warehouse selected for stock count.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setLoadingWarehouseItems(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        throw new Error('ERPNext API not available');
+      }
+
+      // Get company from user profile
+      const { getUserDefaultCompany } = await import('@/services/erpnextApi');
+      const company = await getUserDefaultCompany();
+      
+      if (!company) {
+        throw new Error('No default company found. Please set your default company in Profile settings.');
+      }
+
+      console.log(`Getting all items for warehouse: ${warehouse}`);
+      
+      // Get all items for the warehouse
+      const warehouseItemsResponse = await erpnextAPI.stockAPI.getAllWarehouseItems(warehouse, company);
+      
+      if (!warehouseItemsResponse?.data || warehouseItemsResponse.data.length === 0) {
+        toast({
+          title: "No Items Found",
+          description: `No items with stock found in warehouse ${warehouse}.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log(`Found ${warehouseItemsResponse.data.length} items in warehouse`);
+
+      // Create Stock Reconciliation with all items
+      const stockReconciliationItems = warehouseItemsResponse.data.map((bin: any) => ({
+        item_code: bin.item_code,
+        warehouse: bin.warehouse,
+        qty: bin.actual_qty, // Start with current qty as actual qty
+        valuation_rate: 0, // Will be calculated by ERPNext
+        current_qty: bin.actual_qty,
+        current_valuation_rate: 0
+      }));
+
+      const stockReconciliationData = {
+        doctype: 'Stock Reconciliation',
+        company: company,
+        purpose: purpose,
+        posting_date: new Date().toISOString().split('T')[0],
+        posting_time: new Date().toTimeString().split(' ')[0],
+        set_posting_time: 1,
+        expense_account: '', // Will be auto-set by ERPNext
+        cost_center: '', // Will be auto-set by ERPNext
+        items: stockReconciliationItems
+      };
+
+      console.log('Creating Stock Reconciliation with all warehouse items:', stockReconciliationData);
+      const response = await erpnextAPI.callAPI('Stock Reconciliation', 'POST', stockReconciliationData);
+      console.log('Stock Reconciliation response:', response);
+      
+      if (response?.data?.name) {
+        setStockReconciliationId(response.data.name);
+        
+        // Transform items to StockCountEntry format
+        const transformedEntries: StockCountEntry[] = warehouseItemsResponse.data.map((bin: any) => ({
+          itemCode: bin.item_code,
+          itemName: bin.item_code, // We'll need to fetch item names separately if needed
+          warehouse: bin.warehouse,
+          currentQty: bin.actual_qty,
+          actualQty: bin.actual_qty,
+          difference: 0,
+          status: 'matched' as 'matched' | 'variance' | 'pending',
+          uom: bin.uom || '',
+          batch: '',
+          serial: '',
+          serialBatchBundle: ''
+        }));
+        
+        setEntries(transformedEntries);
+        setActiveTab("review");
+        
+        toast({
+          title: "Stock Reconciliation Created",
+          description: `Draft Stock Reconciliation ${response.data.name} created with ${warehouseItemsResponse.data.length} items from warehouse ${warehouse}.`,
+        });
+      } else {
+        throw new Error('No Stock Reconciliation ID returned from API');
+      }
+    } catch (error: any) {
+      console.error('Failed to get warehouse items:', error);
+      
+      let errorMessage = 'Failed to get warehouse items and create Stock Reconciliation.';
+      
+      if (error.message) {
+        if (error.message.includes('ValidationError')) {
+          errorMessage = 'Validation failed: Please check warehouse permissions and data.';
+        } else if (error.message.includes('PermissionError')) {
+          errorMessage = 'Permission denied: You may not have rights to access warehouse data.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast({
+        title: "Error Getting Items",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingWarehouseItems(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto py-4 md:py-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
@@ -606,8 +727,27 @@ const StockCountSession = () => {
               
               <Card>
                 <CardHeader>
-                  <CardTitle>
-                    {isMultiWarehouse ? 'Add Items with Warehouses' : 'Scan Items'}
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{isMultiWarehouse ? 'Add Items with Warehouses' : 'Scan Items'}</span>
+                    {!isMultiWarehouse && warehouse && mode !== 'view' && !stockReconciliationId && (
+                      <Button 
+                        onClick={handleGetAllItems} 
+                        disabled={loadingWarehouseItems}
+                        className="ml-4"
+                      >
+                        {loadingWarehouseItems ? (
+                          <>
+                            <Package className="w-4 h-4 mr-2 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            <Package className="w-4 h-4 mr-2" />
+                            Get Items
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

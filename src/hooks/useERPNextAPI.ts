@@ -138,6 +138,13 @@ export const useStockAPI = () => {
     );
   }, [callAPI]);
 
+  const getAllWarehouseItems = useCallback((warehouse: string, company?: string) => {
+    return callAPI(
+      (api) => api.stockAPI.getAllWarehouseItems(warehouse, company),
+      `Failed to fetch all items for warehouse ${warehouse}`
+    );
+  }, [callAPI]);
+
   const createStockEntry = useCallback((stockEntryData: any) => {
     return callAPI(
       (api) => api.createStockEntry(stockEntryData),
@@ -163,6 +170,7 @@ export const useStockAPI = () => {
     loading,
     getStockBalance,
     getCurrentStock,
+    getAllWarehouseItems,
     createStockEntry,
     getStockEntries,
     submitStockEntry

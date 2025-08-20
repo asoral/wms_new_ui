@@ -48,7 +48,46 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       throw new Error(`Failed to fetch current stock: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log('Stock response:', result);
+    return result;
+  }
+
+  async getAllWarehouseItems(warehouse: string, company?: string): Promise<ERPNextResponse<any[]>> {
+    console.log(`Getting all items for warehouse: ${warehouse}`);
+    
+    const filters = [
+      ['warehouse', '=', warehouse],
+      ['actual_qty', '>', 0]  // Only get items with stock
+    ];
+    
+    // Use basic fields
+    const fields = [
+      'name',
+      'item_code', 
+      'warehouse',
+      'actual_qty',
+      'reserved_qty',
+      'planned_qty',
+      'ordered_qty',
+      'projected_qty'
+    ];
+    
+    const params = this.buildQueryParams(filters, fields, 1000); // Increase limit for warehouse stock
+    
+    const response = await fetch(`${this.baseURL}/api/resource/Bin?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Warehouse Items API Error:', response.status, errorText);
+      throw new Error(`Failed to fetch warehouse items: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log(`Found ${result?.data?.length || 0} items in warehouse ${warehouse}:`, result);
+    return result;
   }
 
   async getBinStockForCompany(itemCode: string, company: string): Promise<ERPNextResponse<any[]>> {
