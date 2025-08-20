@@ -137,17 +137,36 @@ const BinEnquiry = () => {
         'valuation_rate',
         'stock_value'
       ];
-      const response = await erpnextAPI.callAPI('Bin', 'GET', undefined, filters, undefined, fields);
+      
+      // Add limit to prevent API timeouts
+      const limit = 999;
+      console.log('Fetching bin stock with filters:', filters, 'limit:', limit);
+      
+      const response = await erpnextAPI.callAPI('Bin', 'GET', undefined, filters, limit, fields);
       console.log('Bin stock response:', response);
+      
+      if (!response) {
+        console.error('No response received from Bin API');
+        throw new Error('Failed to fetch bin data - no response from server');
+      }
+      
+      if (!response.data) {
+        console.error('No data in response:', response);
+        throw new Error('Failed to fetch bin data - empty response');
+      }
 
       if (response?.data) {
+        console.log('Processing', response.data.length, 'bin records');
+        
         // Transform the data to match our BinItem interface with proper item names
         const transformedItems: BinItem[] = await Promise.all(
           response.data
             .filter((item: any) => {
               const actualQty = item.actual_qty || 0;
+              console.log(`Filtering item ${item.item_code}: actual_qty=${actualQty}`);
               return actualQty > 0; // Only show items with positive stock
             })
+            .slice(0, 200) // Limit items processed to avoid performance issues
             .map(async (item: any) => {
               // Get item details to fetch item name
               let itemName = item.item_name || item.item_code;
@@ -157,7 +176,8 @@ const BinEnquiry = () => {
                   itemName = itemDetails.data.item_name;
                 }
               } catch (error) {
-                console.error('Failed to fetch item name for:', item.item_code);
+                console.warn('Failed to fetch item name for:', item.item_code, error);
+                // Continue with item_code as name if details fetch fails
               }
 
               // Calculate quantities and valuation properly
@@ -200,9 +220,21 @@ const BinEnquiry = () => {
 
     } catch (error) {
       console.error('Failed to load bin items:', error);
+      
+      let errorMessage = "Failed to load bin items from ERPNext";
+      if (error instanceof Error) {
+        if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+          errorMessage = "Network error: Unable to connect to ERPNext server. Please check your internet connection and server settings.";
+        } else if (error.message.includes('timeout')) {
+          errorMessage = "Request timeout: The server took too long to respond. Please try again.";
+        } else {
+          errorMessage = `Error: ${error.message}`;
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to load bin items from ERPNext",
+        title: "Bin Enquiry Error",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
