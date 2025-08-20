@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, CheckCircle, FileText, Edit, Eye } from "lucide-react";
+import { AlertTriangle, CheckCircle, FileText, Edit, Eye, User } from "lucide-react";
 import { format } from "date-fns";
 import { StockCountSession } from "@/types";
 
@@ -76,6 +76,15 @@ export const StockRecoCard = ({ session, onEdit, onView }: StockRecoCardProps) =
               <span className="text-muted-foreground">Total Items:</span>
               <p className="font-medium text-blue-600">{session.totalItems}</p>
             </div>
+            {session.owner && (
+              <div className="col-span-2">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <User className="w-3 h-3" />
+                  Created by:
+                </span>
+                <p className="font-medium text-blue-600">{session.owner}</p>
+              </div>
+            )}
             {session.differenceAmount !== undefined && (
               <div className="col-span-2">
                 <span className="text-muted-foreground">Difference Amount:</span>

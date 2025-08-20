@@ -98,6 +98,8 @@ export interface StockCountSession {
   matchedItems: number;
   varianceItems: number;
   differenceAmount?: number;
+  createdBy?: string;
+  owner?: string;
   entries: StockCountEntry[];
 }
 

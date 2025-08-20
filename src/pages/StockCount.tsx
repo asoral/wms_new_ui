@@ -89,6 +89,8 @@ const StockCount = () => {
                 matchedItems: 0,
                 varianceItems: detailData.items?.length || 0,
                 differenceAmount: session.difference_amount || 0,
+                createdBy: detailData.creation || session.creation,
+                owner: detailData.owner,
                 entries: detailData.items || []
               };
             } catch (error) {
@@ -107,6 +109,8 @@ const StockCount = () => {
                 matchedItems: 0,
                 varianceItems: 0,
                 differenceAmount: session.difference_amount || 0,
+                createdBy: session.creation,
+                owner: session.owner,
                 entries: []
               };
             }
