@@ -53,39 +53,17 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
   async getBinStockForCompany(itemCode: string, company: string): Promise<ERPNextResponse<any[]>> {
     try {
-      console.log('Getting bin stock for company:', company);
+      console.log('=== Getting bin stock for company ===');
+      console.log('Item code:', itemCode);
+      console.log('Company:', company);
       
-      // First, get warehouses for the company
-      const warehouseFilters = [['company', '=', company]];
-      const warehouseParams = this.buildQueryParams(warehouseFilters, ['name'], 999);
-      
-      console.log('Fetching warehouses with URL:', `${this.baseURL}/api/resource/Warehouse?${warehouseParams}`);
-      
-      const warehouseResponse = await fetch(`${this.baseURL}/api/resource/Warehouse?${warehouseParams}`, {
-        headers: this.getHeaders(),
-      });
+      // Skip warehouse fetching to avoid URL length issues
+      // Query Bin table directly and filter by company pattern later
 
-      if (!warehouseResponse.ok) {
-        const errorText = await warehouseResponse.text();
-        console.error('Warehouse API Error:', warehouseResponse.status, errorText);
-        throw new Error(`Failed to fetch warehouses: ${warehouseResponse.statusText}`);
-      }
-
-      const warehouseData = await warehouseResponse.json();
-      console.log('Warehouse data received:', warehouseData);
-      
-      const warehouses = warehouseData.data?.map((w: any) => w.name) || [];
-      console.log('Company warehouses:', warehouses);
-      
-      if (warehouses.length === 0) {
-        console.log('No warehouses found for company:', company);
-        return { data: [] };
-      }
-
-      // Now get bins for this item in company warehouses
+      // Simplified approach - query Bin table directly for item only
+      // Let ERPNext filter by company warehouses on server side if needed
       const binFilters = [
-        ['item_code', '=', itemCode],
-        ['warehouse', 'in', warehouses]
+        ['item_code', '=', itemCode]
       ];
 
       const binFields = [
@@ -103,13 +81,10 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
       const binParams = this.buildQueryParams(binFilters, binFields, 999);
       const fullUrl = `${this.baseURL}/api/resource/Bin?${binParams}`;
-      console.log('=== BIN STOCK API CALL ===');
-      console.log('Base URL:', this.baseURL);
-      console.log('Bin filters:', binFilters);
-      console.log('Bin fields:', binFields);
-      console.log('Built params:', binParams.toString());
+      console.log('=== BIN STOCK API CALL (SIMPLIFIED) ===');
+      console.log('Item code:', itemCode);
       console.log('Full URL:', fullUrl);
-      console.log('Headers:', this.getHeaders());
+      console.log('URL length:', fullUrl.length);
       
       const binResponse = await fetch(fullUrl, {
         headers: this.getHeaders(),
@@ -131,6 +106,18 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
       const binResult = await binResponse.json();
       console.log('Bin data received:', binResult);
+      
+      // Filter results to only include warehouses from the specified company
+      if (binResult?.data) {
+        const filteredData = binResult.data.filter((bin: any) => {
+          // Check if warehouse belongs to the company by checking if warehouse name ends with company abbreviation
+          const companyAbbr = company.split(' ').map(word => word.charAt(0)).join(''); // Hi-Tech Marketing -> HTM
+          return bin.warehouse && bin.warehouse.includes(`- ${companyAbbr}`);
+        });
+        
+        console.log(`Filtered ${binResult.data.length} bins to ${filteredData.length} for company ${company}`);
+        return { ...binResult, data: filteredData };
+      }
       
       return binResult;
 
