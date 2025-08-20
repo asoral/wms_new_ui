@@ -102,16 +102,31 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       ];
 
       const binParams = this.buildQueryParams(binFilters, binFields, 999);
-      console.log('Fetching bins with URL:', `${this.baseURL}/api/resource/Bin?${binParams}`);
+      const fullUrl = `${this.baseURL}/api/resource/Bin?${binParams}`;
+      console.log('=== BIN STOCK API CALL ===');
+      console.log('Base URL:', this.baseURL);
+      console.log('Bin filters:', binFilters);
+      console.log('Bin fields:', binFields);
+      console.log('Built params:', binParams.toString());
+      console.log('Full URL:', fullUrl);
+      console.log('Headers:', this.getHeaders());
       
-      const binResponse = await fetch(`${this.baseURL}/api/resource/Bin?${binParams}`, {
+      const binResponse = await fetch(fullUrl, {
         headers: this.getHeaders(),
       });
 
+      console.log('Response status:', binResponse.status);
+      console.log('Response ok:', binResponse.ok);
+      
       if (!binResponse.ok) {
         const errorText = await binResponse.text();
-        console.error('Bin API Error:', binResponse.status, errorText);
-        throw new Error(`Failed to fetch bin stock: ${binResponse.status} ${binResponse.statusText}`);
+        console.error('Bin API Error Response:', {
+          status: binResponse.status,
+          statusText: binResponse.statusText,
+          url: fullUrl,
+          errorText
+        });
+        throw new Error(`Failed to fetch bin stock: ${binResponse.status} ${binResponse.statusText} - ${errorText}`);
       }
 
       const binResult = await binResponse.json();
