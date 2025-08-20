@@ -32,8 +32,11 @@ const ItemEnquiry = () => {
 
   const loadItemStock = async (item: Item) => {
     const code = item.item_code;
+    console.log('=== loadItemStock called with item:', item);
+    console.log('Item code:', code);
     
     if (!code || !code.trim()) {
+      console.error('No item code provided');
       toast({
         title: "Error",
         description: "Please enter an item code",
@@ -43,9 +46,11 @@ const ItemEnquiry = () => {
     }
 
     try {
+      console.log('Starting stock loading process...');
       setLoading(true);
       setSelectedItem(item);
       
+      console.log('Creating ERPNext API connection...');
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) {
         toast({
@@ -113,24 +118,32 @@ const ItemEnquiry = () => {
       }
 
       // Fetch stock for all items (original or variants)
-      console.log('Fetching stock for items:', itemCodesToFetch, 'company:', company);
+      console.log('=== FETCHING STOCK FOR ITEMS ===');
+      console.log('Items to fetch:', itemCodesToFetch);
+      console.log('Company:', company);
       let allStockData: any[] = [];
       
       for (const itemCode of itemCodesToFetch) {
         try {
-          console.log('Fetching stock for item:', itemCode, 'in company:', company);
+          console.log(`--- Fetching stock for item: ${itemCode} in company: ${company} ---`);
           const response = await erpnextAPI.stockAPI.getBinStockForCompany(itemCode, company);
-          console.log('Stock response for', itemCode, ':', response);
+          console.log(`Stock API response for ${itemCode}:`, response);
+          
           if (response?.data && response.data.length > 0) {
-            console.log('Adding stock data for', itemCode, ':', response.data.length, 'entries');
+            console.log(`✓ Found ${response.data.length} stock entries for ${itemCode}`);
             allStockData = [...allStockData, ...response.data];
           } else {
-            console.log('No stock data found for', itemCode);
+            console.log(`✗ No stock data found for ${itemCode}`);
+            console.log('Response structure:', response);
           }
         } catch (error) {
-          console.warn(`Failed to fetch stock for item ${itemCode}:`, error);
+          console.error(`❌ Failed to fetch stock for item ${itemCode}:`, error);
         }
       }
+      
+      console.log('=== COMBINED STOCK DATA ===');
+      console.log('Total stock entries found:', allStockData.length);
+      console.log('Combined stock data:', allStockData);
       
       console.log('Combined stock response:', allStockData);
 
