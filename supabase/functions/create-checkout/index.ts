@@ -26,15 +26,8 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
-    // Get monthly fee from settings
-    const { data: settings, error: settingsError } = await supabaseClient
-      .from("app_settings")
-      .select("setting_value")
-      .eq("setting_key", "monthly_fee_cents")
-      .single();
-
-    if (settingsError) throw new Error("Failed to get pricing settings");
-    const monthlyFee = parseInt(settings.setting_value) || 1500;
+    // Monthly fee in cents ($15.00)
+    const monthlyFee = 1500;
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
       apiVersion: "2023-10-16",
