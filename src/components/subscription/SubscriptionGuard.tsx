@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CreditCard, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 interface SubscriptionGuardProps {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ const SubscriptionGuard = ({ children }: SubscriptionGuardProps) => {
     refreshSubscription,
   } = useSubscription();
   const { toast } = useToast();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Show minimal loading only on initial load
   if (loading && !hasAccess && !paymentExempt) {
@@ -42,14 +44,24 @@ const SubscriptionGuard = ({ children }: SubscriptionGuardProps) => {
   }
 
   const handleSubscribe = async () => {
+    if (isCheckingOut) return; // Prevent double clicks
+    
+    setIsCheckingOut(true);
     try {
+      console.log('Starting checkout process...');
       await createCheckout();
+      console.log('Checkout process completed');
+      // Note: If successful, user should be redirected to Stripe
     } catch (error) {
+      console.error('Checkout error:', error);
       toast({
         title: "Error",
         description: "Failed to start checkout process. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      // Only reset loading state if still on page (not redirected)
+      setTimeout(() => setIsCheckingOut(false), 2000);
     }
   };
 
@@ -124,9 +136,17 @@ const SubscriptionGuard = ({ children }: SubscriptionGuardProps) => {
                   Update Payment Method
                 </Button>
               ) : (
-                <Button onClick={handleSubscribe} className="w-full">
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Subscribe Now - $15/month
+                <Button 
+                  onClick={handleSubscribe} 
+                  disabled={isCheckingOut}
+                  className="w-full"
+                >
+                  {isCheckingOut ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CreditCard className="w-4 h-4 mr-2" />
+                  )}
+                  {isCheckingOut ? 'Redirecting to Stripe...' : 'Subscribe Now - $15/month'}
                 </Button>
               )}
 
