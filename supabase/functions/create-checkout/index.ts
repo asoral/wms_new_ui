@@ -36,7 +36,14 @@ serve(async (req) => {
     if (settingsError) throw new Error("Failed to get pricing settings");
     const monthlyFee = parseInt(settings.setting_value) || 1500;
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
+      apiVersion: "2023-10-16",
+    });
+    
+    // Log Stripe key info (safely)
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+    console.log('Stripe key starts with:', stripeKey.substring(0, 7));
+    console.log('Stripe key mode:', stripeKey.startsWith('sk_live_') ? 'LIVE' : stripeKey.startsWith('sk_test_') ? 'TEST' : 'UNKNOWN');
     
     // Check if customer exists
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -45,6 +52,11 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
+    console.log('Creating Stripe checkout session for:', user.email);
+    console.log('Monthly fee:', monthlyFee);
+    console.log('Origin:', req.headers.get("origin"));
+    console.log('Customer ID:', customerId || 'Will create new customer');
+    
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
@@ -60,8 +72,19 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/subscription-success`,
-      cancel_url: `${req.headers.get("origin")}/`,
+      success_url: `${req.headers.get("origin")}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.get("origin")}/app/home`,
+      allow_promotion_codes: true,
+      billing_address_collection: 'auto',
+      automatic_tax: {
+        enabled: false,
+      },
+    });
+
+    console.log('Stripe session created successfully:', {
+      session_id: session.id,
+      url_exists: !!session.url,
+      customer_id: customerId || 'new customer'
     });
 
     // Update subscriber with customer ID if new
