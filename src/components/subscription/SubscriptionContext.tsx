@@ -40,7 +40,7 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
   const refreshSubscription = async () => {
     // Don't check subscription for unauthenticated users
     if (!user || !session) {
-      setHasAccess(true); // Allow access to public routes
+      setHasAccess(false); // Require authentication for protected routes
       setLoading(false);
       return;
     }
@@ -156,9 +156,9 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       }
     };
 
-    // For unauthenticated users, just set loading to false and allow access
+    // For unauthenticated users, deny access in protected routes
     if (!user) {
-      setHasAccess(true);
+      setHasAccess(false);
       setLoading(false);
       return;
     }
