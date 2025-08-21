@@ -68,8 +68,11 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       setLastCheckTime(now);
     } catch (error) {
       console.error('Error checking subscription:', error);
-      // Don't set hasAccess to false on error - maintain current state
-      // setHasAccess(false);
+      // Security: Deny access on subscription check errors for authenticated users
+      setHasAccess(false);
+      setIsTrialActive(false);
+      setSubscribed(false);
+      setPaymentExempt(false);
     } finally {
       setLoading(false);
     }

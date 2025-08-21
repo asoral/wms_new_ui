@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth/AuthContext";
 import { SubscriptionProvider } from "@/components/subscription/SubscriptionContext";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import SubscriptionGuard from "@/components/subscription/SubscriptionGuard";
 import Layout from "@/components/Layout";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -66,35 +67,37 @@ const App = () => {
                     path="/app/*"
                     element={
                       <ProtectedRoute>
-                        <Layout>
-                          <Routes>
-                            <Route path="/" element={<Navigate to="/app/home" replace />} />
-                            <Route path="/home" element={<Home />} />
-                            <Route path="/profile" element={<Profile />} />
-                            <Route path="/item-enquiry" element={<ItemEnquiry />} />
-                            <Route path="/bin-enquiry" element={<BinEnquiry />} />
-                            <Route path="/material-request" element={<MaterialRequest />} />
-                            <Route path="/mat-request" element={<MaterialRequest />} />
-                            <Route path="/stock-entry" element={<StockEntry />} />
-                            <Route path="/receive" element={<Receive />} />
-                            <Route path="/deliver" element={<Deliver />} />
-                            <Route path="/stock-count" element={<StockCount />} />
-                            <Route path="/stock-count/new" element={<StockCountNew />} />
-                            <Route path="/stock-count/session" element={<StockCountSession />} />
-                            <Route path="/packing" element={<Packing />} />
-                            <Route path="/pick-list" element={<PickList />} />
-                            <Route path="/print-label" element={<PrintLabel />} />
-                            <Route path="/quality-check" element={<QualityCheck />} />
-                            <Route path="/pallet" element={<Pallet />} />
-                            <Route path="/reports" element={<Reports />} />
-                            <Route path="/notifications" element={<Notifications />} />
-                            <Route path="/sync" element={<Sync />} />
-                            <Route path="/sales-orders" element={<SalesOrderList />} />
-                            <Route path="/draft-receipts" element={<DraftReceipts />} />
-                            <Route path="/receipt/:id" element={<ReceiptDetail />} />
-                            <Route path="*" element={<NotFound />} />
-                          </Routes>
-                        </Layout>
+                        <SubscriptionGuard>
+                          <Layout>
+                            <Routes>
+                              <Route path="/" element={<Navigate to="/app/home" replace />} />
+                              <Route path="/home" element={<Home />} />
+                              <Route path="/profile" element={<Profile />} />
+                              <Route path="/item-enquiry" element={<ItemEnquiry />} />
+                              <Route path="/bin-enquiry" element={<BinEnquiry />} />
+                              <Route path="/material-request" element={<MaterialRequest />} />
+                              <Route path="/mat-request" element={<MaterialRequest />} />
+                              <Route path="/stock-entry" element={<StockEntry />} />
+                              <Route path="/receive" element={<Receive />} />
+                              <Route path="/deliver" element={<Deliver />} />
+                              <Route path="/stock-count" element={<StockCount />} />
+                              <Route path="/stock-count/new" element={<StockCountNew />} />
+                              <Route path="/stock-count/session" element={<StockCountSession />} />
+                              <Route path="/packing" element={<Packing />} />
+                              <Route path="/pick-list" element={<PickList />} />
+                              <Route path="/print-label" element={<PrintLabel />} />
+                              <Route path="/quality-check" element={<QualityCheck />} />
+                              <Route path="/pallet" element={<Pallet />} />
+                              <Route path="/reports" element={<Reports />} />
+                              <Route path="/notifications" element={<Notifications />} />
+                              <Route path="/sync" element={<Sync />} />
+                              <Route path="/sales-orders" element={<SalesOrderList />} />
+                              <Route path="/draft-receipts" element={<DraftReceipts />} />
+                              <Route path="/receipt/:id" element={<ReceiptDetail />} />
+                              <Route path="*" element={<NotFound />} />
+                            </Routes>
+                          </Layout>
+                        </SubscriptionGuard>
                       </ProtectedRoute>
                     }
                   />
