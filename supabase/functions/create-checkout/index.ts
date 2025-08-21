@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('=== CREATE-CHECKOUT FUNCTION START ===');
+  console.log('=== CREATE-CHECKOUT FUNCTION START (v2) ===');
   
   if (req.method === "OPTIONS") {
     console.log('Handling CORS preflight request');
@@ -27,11 +27,12 @@ serve(async (req) => {
       hasSupabaseUrl: !!supabaseUrl,
       hasSupabaseKey: !!supabaseKey,
       hasStripeKey: !!stripeKey,
-      stripeKeyStart: stripeKey?.substring(0, 7) || 'MISSING'
+      stripeKeyStart: stripeKey?.substring(0, 7) || 'MISSING',
+      allEnvVars: Object.keys(Deno.env.toObject())
     });
     
     if (!stripeKey) {
-      throw new Error("STRIPE_SECRET_KEY not found in environment");
+      throw new Error(`STRIPE_SECRET_KEY not found. Available env vars: ${Object.keys(Deno.env.toObject()).join(', ')}`);
     }
     
     console.log('Step 2: Creating Supabase client');
