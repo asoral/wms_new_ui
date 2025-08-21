@@ -82,7 +82,13 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout');
       if (error) throw error;
-      window.open(data.url, '_blank');
+      
+      // Use window.location.href instead of window.open to avoid popup blockers
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
     } catch (error) {
       console.error('Error creating checkout:', error);
       throw error;
