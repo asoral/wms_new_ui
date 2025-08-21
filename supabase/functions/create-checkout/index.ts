@@ -57,6 +57,8 @@ serve(async (req) => {
     console.log('Origin:', req.headers.get("origin"));
     console.log('Customer ID:', customerId || 'Will create new customer');
     
+    const origin = req.headers.get("origin") || "https://0b254384-a178-46e7-85bb-4de1df76205a.sandbox.lovable.dev";
+    
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
@@ -72,13 +74,8 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/app/home`,
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
-      automatic_tax: {
-        enabled: false,
-      },
+      success_url: `${origin}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/app/home`,
     });
 
     console.log('Stripe session created successfully:', {
