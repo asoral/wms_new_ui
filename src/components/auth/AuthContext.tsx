@@ -30,8 +30,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const lastActivityRef = useRef<number>(Date.now());
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Session timeout: 2 hours of inactivity
-  const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+  // Session timeout: 24 hours of inactivity (much more reasonable)
+  const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
   // Update activity timestamp with throttling
   const updateActivity = useCallback(() => {
@@ -99,10 +99,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let mounted = true;
     
-    // Get initial session first
+    // Set up auth state listener FIRST to catch any auth events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (mounted) {
+          console.log('Auth state change:', event, !!session);
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (!session && event === 'SIGNED_OUT') {
+            // Clear any existing timeouts on sign out
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
+          }
+        }
+      }
+    );
+    
+    // THEN get initial session
     const getInitialSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error getting initial session:', error);
+        }
         if (mounted) {
           setSession(session);
           setUser(session?.user ?? null);
@@ -117,17 +138,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     getInitialSession();
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (mounted) {
-          console.log('Auth state change:', event, !!session);
-          setSession(session);
-          setUser(session?.user ?? null);
-        }
-      }
-    );
 
     return () => {
       mounted = false;
