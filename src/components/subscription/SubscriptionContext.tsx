@@ -81,7 +81,16 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
   const createCheckout = async () => {
     try {
       console.log('Invoking create-checkout function...');
-      const { data, error } = await supabase.functions.invoke('create-checkout');
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+      
+      const checkoutPromise = supabase.functions.invoke('create-checkout');
+      
+      const result = await Promise.race([checkoutPromise, timeoutPromise]);
+      const { data, error } = result;
       
       console.log('Checkout response:', { data, error });
       
@@ -98,8 +107,30 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
         console.error('No checkout URL received:', data);
         throw new Error('No checkout URL received');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating checkout:', error);
+      // If timeout, try direct fetch as fallback
+      if (error.message === 'Request timeout') {
+        console.log('Trying direct fetch as fallback...');
+        try {
+          const response = await fetch(`https://wqsyuqzrxntuwcohoycl.supabase.co/functions/v1/create-checkout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indxc3l1cXpyeG50dXdjb2hveWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4NDM0OTcsImV4cCI6MjA2NDQxOTQ5N30.YhIJqqe_n2aYQeed7pl1LVx7yTYGFN3y0X--2oFuer8',
+              'Content-Type': 'application/json'
+            }
+          });
+          const fallbackData = await response.json();
+          if (fallbackData?.url) {
+            console.log('Fallback redirect to:', fallbackData.url);
+            window.location.href = fallbackData.url;
+            return;
+          }
+        } catch (fallbackError) {
+          console.error('Fallback also failed:', fallbackError);
+        }
+      }
       throw error;
     }
   };
