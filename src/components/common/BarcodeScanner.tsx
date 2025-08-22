@@ -52,13 +52,28 @@ const BarcodeScanner = ({
       setError(null);
       console.log('Starting camera...');
       
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      // Try mobile-optimized constraints first
+      let constraints: MediaStreamConstraints = {
         video: {
           facingMode: 'environment',
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 }
+          width: { min: 320, ideal: 640, max: 1280 },
+          height: { min: 240, ideal: 480, max: 720 }
         }
-      });
+      };
+      
+      let mediaStream: MediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        console.log('Trying fallback constraints for mobile...');
+        // Fallback for mobile devices - minimal constraints
+        constraints = {
+          video: {
+            facingMode: 'environment'
+          }
+        };
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      }
 
       if (isCleaningUp) {
         // If cleanup started while we were getting camera access, stop immediately
@@ -70,12 +85,21 @@ const BarcodeScanner = ({
       
       if (videoRef.current && !isCleaningUp) {
         videoRef.current.srcObject = mediaStream;
+        
+        // Mobile-specific video setup
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.setAttribute('webkit-playsinline', 'true');
+        
         // Wait for video to be ready before starting barcode scanning
-        videoRef.current.onloadedmetadata = () => {
+        videoRef.current.onloadedmetadata = async () => {
           if (!isCleaningUp && videoRef.current) {
-            videoRef.current.play().catch(err => {
+            try {
+              await videoRef.current.play();
+              console.log('Video playing successfully');
+            } catch (err) {
               console.error('Error playing video:', err);
-            });
+              setError('Failed to start camera preview. Please try again.');
+            }
           }
         };
       }
@@ -276,10 +300,11 @@ const BarcodeScanner = ({
             <div className="relative">
               <video
                 ref={videoRef}
-                className="w-full h-64 bg-black rounded-lg object-contain"
+                className="w-full h-64 sm:h-80 bg-black rounded-lg object-contain"
                 autoPlay
                 playsInline
                 muted
+                webkit-playsinline="true"
               />
               
               {/* Scanning overlay */}
