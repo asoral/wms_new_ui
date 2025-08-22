@@ -53,56 +53,73 @@ export const StockRecoCard = ({ session, onEdit, onView }: StockRecoCardProps) =
     return time ? `${dateStr}, ${time}` : dateStr;
   };
 
+  const getCreatedByDisplay = (owner?: string) => {
+    if (!owner) return 'Unknown';
+    return owner.includes('@') ? owner.split('@')[0] : owner;
+  };
+
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer">
       <CardContent className="p-4">
-        <div className="space-y-3">
-          {/* Header */}
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="font-semibold text-lg text-foreground">{session.id}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{session.purpose}</p>
+        {/* Compact single row layout */}
+        <div className="flex items-center justify-between gap-4">
+          {/* Left Section - Primary Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <h3 className="font-semibold text-base text-foreground truncate">{session.id}</h3>
+              {getStatusBadge(session.status)}
             </div>
-            {getStatusBadge(session.status)}
+            <p className="text-sm text-muted-foreground truncate">{session.purpose}</p>
           </div>
 
-          {/* Details */}
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="text-muted-foreground">Started:</span>
-              <p className="font-medium">{formatDateTime(session.startedAt, session.postingTime)}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Total Items:</span>
-              <p className="font-medium text-blue-600">{session.totalItems}</p>
-            </div>
-            {session.owner && (
-              <div className="col-span-2">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <User className="w-3 h-3" />
-                  Created by:
-                </span>
-                <p className="font-medium text-blue-600">{session.owner}</p>
+          {/* Middle Section - Details in compact columns */}
+          <div className="hidden md:flex gap-6 text-sm">
+            {/* Column 1: Time & Creator */}
+            <div className="space-y-1">
+              <div>
+                <span className="text-muted-foreground text-xs">Started:</span>
+                <p className="font-medium">{formatDateTime(session.startedAt, session.postingTime)}</p>
               </div>
-            )}
-            {session.differenceAmount !== undefined && (
-              <div className="col-span-2">
-                <span className="text-muted-foreground">Difference Amount:</span>
-                <p className="font-medium text-red-600">₹ {session.differenceAmount?.toLocaleString() || 0}</p>
+              {session.owner && (
+                <div>
+                  <span className="text-muted-foreground text-xs flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    Created by:
+                  </span>
+                  <p className="font-medium text-blue-600">
+                    <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium dark:bg-blue-900/20 dark:text-blue-300">
+                      {getCreatedByDisplay(session.owner)}
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Column 2: Metrics */}
+            <div className="space-y-1">
+              <div>
+                <span className="text-muted-foreground text-xs">Total Items:</span>
+                <p className="font-medium text-blue-600 text-lg">{session.totalItems}</p>
               </div>
-            )}
+              {session.differenceAmount !== undefined && (
+                <div>
+                  <span className="text-muted-foreground text-xs">Difference:</span>
+                  <p className="font-medium text-red-600">₹ {session.differenceAmount?.toLocaleString() || 0}</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2 pt-3 border-t">
+          {/* Right Section - Actions */}
+          <div className="flex gap-2 flex-shrink-0">
             {session.status === 'Draft' && onEdit && (
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={() => onEdit(session.id)}
-                className="flex-1"
+                className="px-3"
               >
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="w-4 h-4 mr-1" />
                 Edit
               </Button>
             )}
@@ -111,11 +128,40 @@ export const StockRecoCard = ({ session, onEdit, onView }: StockRecoCardProps) =
                 variant="ghost" 
                 size="sm" 
                 onClick={() => onView(session.id)}
-                className="flex-1"
+                className="px-3"
               >
-                <Eye className="w-4 h-4 mr-2" />
+                <Eye className="w-4 h-4 mr-1" />
                 View
               </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile-only details - shown below on smaller screens */}
+        <div className="md:hidden mt-3 pt-3 border-t">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <span className="text-muted-foreground text-xs">Started:</span>
+              <p className="font-medium">{formatDateTime(session.startedAt, session.postingTime)}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground text-xs">Total Items:</span>
+              <p className="font-medium text-blue-600">{session.totalItems}</p>
+            </div>
+            {session.owner && (
+              <div>
+                <span className="text-muted-foreground text-xs flex items-center gap-1">
+                  <User className="w-3 h-3" />
+                  Created by:
+                </span>
+                <p className="font-medium text-blue-600">{getCreatedByDisplay(session.owner)}</p>
+              </div>
+            )}
+            {session.differenceAmount !== undefined && (
+              <div>
+                <span className="text-muted-foreground text-xs">Difference:</span>
+                <p className="font-medium text-red-600">₹ {session.differenceAmount?.toLocaleString() || 0}</p>
+              </div>
             )}
           </div>
         </div>
