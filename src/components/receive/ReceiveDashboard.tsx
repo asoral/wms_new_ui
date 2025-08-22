@@ -93,25 +93,40 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
     fetchDashboardData();
   }, []);
 
-  // Filter POs based on search term
+  // Update filtered lists when main lists change (but not when searching)
   useEffect(() => {
-    const filtered = purchaseOrders.filter(po =>
-      po.name.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
-      (po.supplier || '').toLowerCase().includes(poSearchTerm.toLowerCase()) ||
-      (po.supplier_name || '').toLowerCase().includes(poSearchTerm.toLowerCase())
-    );
-    setFilteredPOs(filtered);
-  }, [purchaseOrders, poSearchTerm]);
+    if (poSearchTerm.trim() === "") {
+      setFilteredPOs(purchaseOrders.slice(0, 5));
+    }
+  }, [purchaseOrders]);
 
-  // Filter draft receipts based on search term
   useEffect(() => {
-    const filtered = draftReceipts.filter(draft =>
-      draft.name.toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
-      (draft.supplier || '').toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
-      (draft.supplier_name || '').toLowerCase().includes(draftSearchTerm.toLowerCase())
-    );
-    setFilteredDrafts(filtered);
-  }, [draftReceipts, draftSearchTerm]);
+    if (draftSearchTerm.trim() === "") {
+      setFilteredDrafts(draftReceipts.slice(0, 5));
+    }
+  }, [draftReceipts]);
+
+  // Handle PO search - fetch from ERPNext when search term provided
+  useEffect(() => {
+    if (poSearchTerm.trim() === "") {
+      // Show only last 5 POs if no search term
+      setFilteredPOs(purchaseOrders.slice(0, 5));
+    } else {
+      // Search directly in ERPNext
+      fetchPurchaseOrders(poSearchTerm.trim());
+    }
+  }, [poSearchTerm]);
+
+  // Handle draft receipt search - fetch from ERPNext when search term provided
+  useEffect(() => {
+    if (draftSearchTerm.trim() === "") {
+      // Show only last 5 drafts if no search term
+      setFilteredDrafts(draftReceipts.slice(0, 5));
+    } else {
+      // Search directly in ERPNext
+      fetchDraftReceipts(draftSearchTerm.trim());
+    }
+  }, [draftSearchTerm]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -128,45 +143,11 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
 
       const company = await getUserDefaultCompany();
       
-      // Fetch purchase orders
-      const poFilters = [
-        ['docstatus', '=', 1], // Submitted orders only
-        ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']]
-      ];
-
-      const poResponse = await erpnextAPI.getPurchaseOrders(poFilters, company || undefined);
-      
-      if (poResponse?.data && Array.isArray(poResponse.data)) {
-        setPurchaseOrders(poResponse.data);
-      } else {
-        setPurchaseOrders([]);
-      }
-
-      // Fetch draft purchase receipts
-      const receiptFilters = [
-        ['docstatus', '=', 0] // Draft receipts only
-      ];
-
-      const receiptResponse = await erpnextAPI.getPurchaseReceipts(receiptFilters, company || undefined);
-      
-      if (receiptResponse?.data && Array.isArray(receiptResponse.data)) {
-        setDraftReceipts(receiptResponse.data);
-      } else {
-        setDraftReceipts([]);
-      }
-
-      // Calculate analytics
-      const totalPOs = poResponse?.data?.length || 0;
-      const pendingPOs = poResponse?.data?.filter((po: any) => po.status === 'To Receive').length || 0;
-      const completedPOs = poResponse?.data?.filter((po: any) => po.status === 'Completed').length || 0;
-      const draftReceiptsCount = receiptResponse?.data?.length || 0;
-
-      setAnalytics({
-        totalPOs,
-        pendingPOs,
-        completedPOs,
-        draftReceipts: draftReceiptsCount
-      });
+      // Fetch purchase orders and draft receipts
+      await Promise.all([
+        fetchPurchaseOrders(),
+        fetchDraftReceipts()
+      ]);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -177,6 +158,115 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPurchaseOrders = async (searchTerm?: string) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const company = await getUserDefaultCompany();
+      
+      // Fetch purchase orders
+      const poFilters: any[] = [
+        ['docstatus', '=', 1], // Submitted orders only
+        ['status', 'in', ['To Receive', 'To Receive and Bill', 'Partially Received']]
+      ];
+
+      if (company) {
+        poFilters.push(['company', '=', company]);
+      }
+
+      // Add search filter if search term provided
+      if (searchTerm) {
+        poFilters.push(['name', 'like', `%${searchTerm}%`]);
+      }
+
+      const poResponse = await erpnextAPI.getPurchaseOrders(poFilters, company || undefined);
+      
+      if (poResponse?.data && Array.isArray(poResponse.data)) {
+        const sortedData = poResponse.data.sort((a: any, b: any) => 
+          new Date(b.creation).getTime() - new Date(a.creation).getTime()
+        );
+        
+        if (searchTerm) {
+          setFilteredPOs(sortedData);
+          setPurchaseOrders(sortedData); // Update full list for analytics
+        } else {
+          setPurchaseOrders(sortedData);
+          setFilteredPOs(sortedData.slice(0, 5));
+        }
+
+        // Calculate analytics
+        const totalPOs = sortedData.length;
+        const pendingPOs = sortedData.filter((po: any) => po.status === 'To Receive').length;
+        const completedPOs = sortedData.filter((po: any) => po.status === 'Completed').length;
+        
+        setAnalytics(prev => ({
+          ...prev,
+          totalPOs,
+          pendingPOs,
+          completedPOs
+        }));
+      } else {
+        setPurchaseOrders([]);
+        setFilteredPOs([]);
+      }
+    } catch (error) {
+      console.error('Error fetching purchase orders:', error);
+    }
+  };
+
+  const fetchDraftReceipts = async (searchTerm?: string) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const company = await getUserDefaultCompany();
+
+      // Fetch draft purchase receipts
+      const receiptFilters: any[] = [
+        ['docstatus', '=', 0] // Draft receipts only
+      ];
+
+      if (company) {
+        receiptFilters.push(['company', '=', company]);
+      }
+
+      // Add search filter if search term provided
+      if (searchTerm) {
+        receiptFilters.push(['name', 'like', `%${searchTerm}%`]);
+      }
+
+      const receiptResponse = await erpnextAPI.getPurchaseReceipts(receiptFilters, company || undefined);
+      
+      if (receiptResponse?.data && Array.isArray(receiptResponse.data)) {
+        const sortedData = receiptResponse.data.sort((a: any, b: any) => 
+          new Date(b.creation).getTime() - new Date(a.creation).getTime()
+        );
+        
+        if (searchTerm) {
+          setFilteredDrafts(sortedData);
+          setDraftReceipts(sortedData); // Update full list for analytics
+        } else {
+          setDraftReceipts(sortedData);
+          setFilteredDrafts(sortedData.slice(0, 5));
+        }
+
+        // Calculate analytics
+        const draftReceiptsCount = sortedData.length;
+        
+        setAnalytics(prev => ({
+          ...prev,
+          draftReceipts: draftReceiptsCount
+        }));
+      } else {
+        setDraftReceipts([]);
+        setFilteredDrafts([]);
+      }
+    } catch (error) {
+      console.error('Error fetching draft receipts:', error);
     }
   };
 

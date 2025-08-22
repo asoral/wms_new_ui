@@ -92,25 +92,40 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
     fetchDashboardData();
   }, []);
 
-  // Filter SOs based on search term
+  // Update filtered lists when main lists change (but not when searching)
   useEffect(() => {
-    const filtered = salesOrders.filter(so =>
-      so.name.toLowerCase().includes(soSearchTerm.toLowerCase()) ||
-      (so.customer || '').toLowerCase().includes(soSearchTerm.toLowerCase()) ||
-      (so.customer_name || '').toLowerCase().includes(soSearchTerm.toLowerCase())
-    );
-    setFilteredSOs(filtered);
-  }, [salesOrders, soSearchTerm]);
+    if (soSearchTerm.trim() === "") {
+      setFilteredSOs(salesOrders.slice(0, 5));
+    }
+  }, [salesOrders]);
 
-  // Filter draft deliveries based on search term
   useEffect(() => {
-    const filtered = draftDeliveries.filter(draft =>
-      draft.name.toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
-      (draft.customer || '').toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
-      (draft.customer_name || '').toLowerCase().includes(draftSearchTerm.toLowerCase())
-    );
-    setFilteredDrafts(filtered);
-  }, [draftDeliveries, draftSearchTerm]);
+    if (draftSearchTerm.trim() === "") {
+      setFilteredDrafts(draftDeliveries.slice(0, 5));
+    }
+  }, [draftDeliveries]);
+
+  // Handle SO search - fetch from ERPNext when search term provided
+  useEffect(() => {
+    if (soSearchTerm.trim() === "") {
+      // Show only last 5 SOs if no search term
+      setFilteredSOs(salesOrders.slice(0, 5));
+    } else {
+      // Search directly in ERPNext
+      fetchSalesOrders(soSearchTerm.trim());
+    }
+  }, [soSearchTerm]);
+
+  // Handle draft delivery search - fetch from ERPNext when search term provided  
+  useEffect(() => {
+    if (draftSearchTerm.trim() === "") {
+      // Show only last 5 drafts if no search term
+      setFilteredDrafts(draftDeliveries.slice(0, 5));
+    } else {
+      // Search directly in ERPNext
+      fetchDraftDeliveries(draftSearchTerm.trim());
+    }
+  }, [draftSearchTerm]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -127,45 +142,11 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
 
       const company = await getUserDefaultCompany();
       
-      // Fetch sales orders
-      const soFilters = [
-        ['docstatus', '=', 1], // Submitted orders only
-        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
-      ];
-
-      const soResponse = await erpnextAPI.getSalesOrders(soFilters, company || undefined);
-      
-      if (soResponse?.data && Array.isArray(soResponse.data)) {
-        setSalesOrders(soResponse.data);
-      } else {
-        setSalesOrders([]);
-      }
-
-      // Fetch draft delivery notes
-      const deliveryFilters = [
-        ['docstatus', '=', 0] // Draft deliveries only
-      ];
-
-      const deliveryResponse = await erpnextAPI.getDeliveryNotes(deliveryFilters, company || undefined);
-      
-      if (deliveryResponse?.data && Array.isArray(deliveryResponse.data)) {
-        setDraftDeliveries(deliveryResponse.data);
-      } else {
-        setDraftDeliveries([]);
-      }
-
-      // Calculate analytics
-      const totalSOs = soResponse?.data?.length || 0;
-      const pendingSOs = soResponse?.data?.filter((so: any) => so.status === 'To Deliver').length || 0;
-      const completedSOs = soResponse?.data?.filter((so: any) => so.status === 'Completed').length || 0;
-      const draftDeliveriesCount = deliveryResponse?.data?.length || 0;
-
-      setAnalytics({
-        totalSOs,
-        pendingSOs,
-        completedSOs,
-        draftDeliveries: draftDeliveriesCount
-      });
+      // Fetch sales orders and draft deliveries
+      await Promise.all([
+        fetchSalesOrders(),
+        fetchDraftDeliveries()
+      ]);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -176,6 +157,115 @@ const DeliverDashboard = ({ onSelectSalesOrder, onSelectDraftDelivery, shortcuts
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSalesOrders = async (searchTerm?: string) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const company = await getUserDefaultCompany();
+      
+      // Fetch sales orders
+      const soFilters: any[] = [
+        ['docstatus', '=', 1], // Submitted orders only
+        ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']]
+      ];
+
+      if (company) {
+        soFilters.push(['company', '=', company]);
+      }
+
+      // Add search filter if search term provided
+      if (searchTerm) {
+        soFilters.push(['name', 'like', `%${searchTerm}%`]);
+      }
+
+      const soResponse = await erpnextAPI.getSalesOrders(soFilters, company || undefined);
+      
+      if (soResponse?.data && Array.isArray(soResponse.data)) {
+        const sortedData = soResponse.data.sort((a: any, b: any) => 
+          new Date(b.creation).getTime() - new Date(a.creation).getTime()
+        );
+        
+        if (searchTerm) {
+          setFilteredSOs(sortedData);
+          setSalesOrders(sortedData); // Update full list for analytics
+        } else {
+          setSalesOrders(sortedData);
+          setFilteredSOs(sortedData.slice(0, 5));
+        }
+
+        // Calculate analytics
+        const totalSOs = sortedData.length;
+        const pendingSOs = sortedData.filter((so: any) => so.status === 'To Deliver').length;
+        const completedSOs = sortedData.filter((so: any) => so.status === 'Completed').length;
+        
+        setAnalytics(prev => ({
+          ...prev,
+          totalSOs,
+          pendingSOs,
+          completedSOs
+        }));
+      } else {
+        setSalesOrders([]);
+        setFilteredSOs([]);
+      }
+    } catch (error) {
+      console.error('Error fetching sales orders:', error);
+    }
+  };
+
+  const fetchDraftDeliveries = async (searchTerm?: string) => {
+    try {
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      const company = await getUserDefaultCompany();
+
+      // Fetch draft delivery notes
+      const deliveryFilters: any[] = [
+        ['docstatus', '=', 0] // Draft deliveries only
+      ];
+
+      if (company) {
+        deliveryFilters.push(['company', '=', company]);
+      }
+
+      // Add search filter if search term provided
+      if (searchTerm) {
+        deliveryFilters.push(['name', 'like', `%${searchTerm}%`]);
+      }
+
+      const deliveryResponse = await erpnextAPI.getDeliveryNotes(deliveryFilters, company || undefined);
+      
+      if (deliveryResponse?.data && Array.isArray(deliveryResponse.data)) {
+        const sortedData = deliveryResponse.data.sort((a: any, b: any) => 
+          new Date(b.creation).getTime() - new Date(a.creation).getTime()
+        );
+        
+        if (searchTerm) {
+          setFilteredDrafts(sortedData);
+          setDraftDeliveries(sortedData); // Update full list for analytics
+        } else {
+          setDraftDeliveries(sortedData);
+          setFilteredDrafts(sortedData.slice(0, 5));
+        }
+
+        // Calculate analytics
+        const draftDeliveriesCount = sortedData.length;
+        
+        setAnalytics(prev => ({
+          ...prev,
+          draftDeliveries: draftDeliveriesCount
+        }));
+      } else {
+        setDraftDeliveries([]);
+        setFilteredDrafts([]);
+      }
+    } catch (error) {
+      console.error('Error fetching draft deliveries:', error);
     }
   };
 

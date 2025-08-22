@@ -17,6 +17,7 @@ interface MaterialRequestListProps {
 
 const MaterialRequestList = ({ onBack, onEdit, onView }: MaterialRequestListProps) => {
   const [requests, setRequests] = useState<any[]>([]);
+  const [filteredRequests, setFilteredRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -27,7 +28,34 @@ const MaterialRequestList = ({ onBack, onEdit, onView }: MaterialRequestListProp
     fetchRequests();
   }, []);
 
-  const fetchRequests = async () => {
+  // Update filtered list when requests change (but not when searching)
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      applyStatusFilter(requests);
+    }
+  }, [requests, filterStatus]);
+
+  // Handle search - fetch from ERPNext when search term provided
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      applyStatusFilter(requests);
+    } else {
+      fetchRequests(searchTerm.trim());
+    }
+  }, [searchTerm]);
+
+  const applyStatusFilter = (requestsList: any[]) => {
+    if (filterStatus === "all") {
+      setFilteredRequests(requestsList);
+    } else {
+      const filtered = requestsList.filter(request => 
+        (request.status || '').toLowerCase() === filterStatus.toLowerCase()
+      );
+      setFilteredRequests(filtered);
+    }
+  };
+
+  const fetchRequests = async (searchTerm?: string) => {
     setIsLoading(true);
     try {
       const api = await createERPNextAPI();
@@ -42,9 +70,31 @@ const MaterialRequestList = ({ onBack, onEdit, onView }: MaterialRequestListProp
         return;
       }
 
-      const result = await api.getMaterialRequests(undefined, company || undefined, 50);
+      const filters: any[] = [];
+      
+      // Add search filter if search term provided
+      if (searchTerm) {
+        filters.push(['name', 'like', `%${searchTerm}%`]);
+      }
+
+      const result = await api.getMaterialRequests(filters.length > 0 ? filters : undefined, company || undefined, 50);
       if (result && result.data) {
-        setRequests(result.data);
+        const sortedData = result.data.sort((a: any, b: any) => 
+          new Date(b.creation).getTime() - new Date(a.creation).getTime()
+        );
+        
+        if (searchTerm) {
+          // When searching, show all results and apply status filter
+          setRequests(sortedData);
+          applyStatusFilter(sortedData);
+        } else {
+          // When not searching, load full list and apply status filter
+          setRequests(sortedData);
+          applyStatusFilter(sortedData);
+        }
+      } else {
+        setRequests([]);
+        setFilteredRequests([]);
       }
     } catch (error) {
       console.error('Error fetching material requests:', error);
@@ -57,15 +107,6 @@ const MaterialRequestList = ({ onBack, onEdit, onView }: MaterialRequestListProp
       setIsLoading(false);
     }
   };
-
-  const filteredRequests = requests.filter(request => {
-    const matchesSearch = (request.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (request.material_request_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (request.title || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (filterStatus === "all") return matchesSearch;
-    return matchesSearch && (request.status || '').toLowerCase() === filterStatus.toLowerCase();
-  });
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { variant: any, color: string }> = {
@@ -125,7 +166,7 @@ const MaterialRequestList = ({ onBack, onEdit, onView }: MaterialRequestListProp
                 <option value="ordered">Ordered</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <Button onClick={fetchRequests} variant="outline" size="icon">
+              <Button onClick={() => fetchRequests()} variant="outline" size="icon">
                 <Filter className="w-4 h-4" />
               </Button>
             </div>

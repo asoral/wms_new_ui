@@ -17,6 +17,7 @@ interface StockEntryListProps {
 
 const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
   const [stockEntries, setStockEntries] = useState<any[]>([]);
+  const [filteredEntries, setFilteredEntries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -27,7 +28,40 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
     fetchStockEntries();
   }, []);
 
-  const fetchStockEntries = async () => {
+  // Update filtered list when entries change (but not when searching)
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      applyStatusFilter(stockEntries);
+    }
+  }, [stockEntries, filterStatus]);
+
+  // Handle search - fetch from ERPNext when search term provided
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      applyStatusFilter(stockEntries);
+    } else {
+      fetchStockEntries(searchTerm.trim());
+    }
+  }, [searchTerm]);
+
+  const applyStatusFilter = (entriesList: any[]) => {
+    if (filterStatus === "all") {
+      setFilteredEntries(entriesList);
+    } else {
+      const statusMap: Record<string, number> = {
+        "draft": 0,
+        "submitted": 1,
+        "cancelled": 2
+      };
+      
+      const filtered = entriesList.filter(entry => 
+        entry.docstatus === statusMap[filterStatus]
+      );
+      setFilteredEntries(filtered);
+    }
+  };
+
+  const fetchStockEntries = async (searchTerm?: string) => {
     setIsLoading(true);
     try {
       const api = await createERPNextAPI();
@@ -42,9 +76,31 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
         return;
       }
 
-      const result = await api.getStockEntries(undefined, company || undefined, 50);
+      const filters: any[] = [];
+      
+      // Add search filter if search term provided
+      if (searchTerm) {
+        filters.push(['name', 'like', `%${searchTerm}%`]);
+      }
+
+      const result = await api.getStockEntries(filters.length > 0 ? filters : undefined, company || undefined, 50);
       if (result && result.data) {
-        setStockEntries(result.data);
+        const sortedData = result.data.sort((a: any, b: any) => 
+          new Date(b.creation).getTime() - new Date(a.creation).getTime()
+        );
+        
+        if (searchTerm) {
+          // When searching, show all results and apply status filter
+          setStockEntries(sortedData);
+          applyStatusFilter(sortedData);
+        } else {
+          // When not searching, load full list and apply status filter
+          setStockEntries(sortedData);
+          applyStatusFilter(sortedData);
+        }
+      } else {
+        setStockEntries([]);
+        setFilteredEntries([]);
       }
     } catch (error) {
       console.error('Error fetching stock entries:', error);
@@ -57,21 +113,6 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
       setIsLoading(false);
     }
   };
-
-  const filteredEntries = stockEntries.filter(entry => {
-    const matchesSearch = entry.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         entry.stock_entry_type.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (filterStatus === "all") return matchesSearch;
-    
-    const statusMap: Record<string, number> = {
-      "draft": 0,
-      "submitted": 1,
-      "cancelled": 2
-    };
-    
-    return matchesSearch && entry.docstatus === statusMap[filterStatus];
-  });
 
   const getStatusBadge = (docstatus: number) => {
     switch (docstatus) {
@@ -124,7 +165,7 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
                 <option value="submitted">Submitted</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <Button onClick={fetchStockEntries} variant="outline" size="icon">
+              <Button onClick={() => fetchStockEntries()} variant="outline" size="icon">
                 <Filter className="w-4 h-4" />
               </Button>
             </div>
