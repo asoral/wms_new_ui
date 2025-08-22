@@ -61,8 +61,8 @@ export const StockRecoCard = ({ session, onEdit, onView }: StockRecoCardProps) =
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer">
       <CardContent className="p-4">
-        {/* Compact single row layout with fixed column widths */}
-        <div className="flex items-center gap-4">
+        {/* Desktop Layout - Fixed columns for alignment */}
+        <div className="hidden lg:flex items-center gap-4">
           {/* Left Section - Primary Info (Fixed width) */}
           <div className="w-64 min-w-0 flex-shrink-0">
             <div className="flex items-center gap-3 mb-1">
@@ -73,7 +73,7 @@ export const StockRecoCard = ({ session, onEdit, onView }: StockRecoCardProps) =
           </div>
 
           {/* Middle Section - Details in fixed columns */}
-          <div className="hidden md:flex flex-1 justify-between items-center">
+          <div className="flex flex-1 justify-between items-center">
             {/* Column 1: Date (Fixed width) */}
             <div className="w-32 flex-shrink-0">
               <span className="text-muted-foreground text-xs block">Started:</span>
@@ -139,31 +139,71 @@ export const StockRecoCard = ({ session, onEdit, onView }: StockRecoCardProps) =
           </div>
         </div>
 
-        {/* Mobile-only details - shown below on smaller screens */}
-        <div className="md:hidden mt-3 pt-3 border-t">
-          <div className="grid grid-cols-2 gap-3 text-sm">
+        {/* Mobile & Tablet Layout - Stack layout for better mobile experience */}
+        <div className="lg:hidden">
+          {/* Header Row */}
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-base text-foreground truncate">{session.id}</h3>
+              <p className="text-sm text-muted-foreground truncate">{session.purpose}</p>
+            </div>
+            <div className="flex items-center gap-2 ml-3">
+              {getStatusBadge(session.status)}
+            </div>
+          </div>
+
+          {/* Info Grid - Mobile optimized */}
+          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
             <div>
-              <span className="text-muted-foreground text-xs">Started:</span>
+              <span className="text-muted-foreground text-xs block">Started:</span>
               <p className="font-medium">{formatDateTime(session.startedAt)}</p>
             </div>
             <div>
-              <span className="text-muted-foreground text-xs">Total Items:</span>
-              <p className="font-medium text-blue-600">{session.totalItems}</p>
+              <span className="text-muted-foreground text-xs block">Total Items:</span>
+              <p className="font-medium text-blue-600 text-lg">{session.totalItems}</p>
             </div>
             {session.owner && (
-              <div>
-                <span className="text-muted-foreground text-xs flex items-center gap-1">
+              <div className="col-span-2">
+                <span className="text-muted-foreground text-xs flex items-center gap-1 mb-1">
                   <User className="w-3 h-3" />
                   Created by:
                 </span>
-                <p className="font-medium text-blue-600">{getCreatedByDisplay(session.owner)}</p>
+                <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium dark:bg-blue-900/20 dark:text-blue-300">
+                  {getCreatedByDisplay(session.owner)}
+                </span>
               </div>
             )}
             {session.differenceAmount !== undefined && (
-              <div>
-                <span className="text-muted-foreground text-xs">Difference:</span>
+              <div className="col-span-2">
+                <span className="text-muted-foreground text-xs block">Difference:</span>
                 <p className="font-medium text-red-600">₹ {session.differenceAmount?.toLocaleString() || 0}</p>
               </div>
+            )}
+          </div>
+
+          {/* Actions Row - Mobile optimized */}
+          <div className="flex gap-2 pt-3 border-t">
+            {session.status === 'Draft' && onEdit && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => onEdit(session.id)}
+                className="flex-1"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
+            {onView && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => onView(session.id)}
+                className="flex-1"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                View
+              </Button>
             )}
           </div>
         </div>
