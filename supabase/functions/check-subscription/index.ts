@@ -64,10 +64,22 @@ serve(async (req) => {
     let hasAccess = false;
 
     if (subscriber) {
-      // Check if payment exempt
+      // Check if payment exempt FIRST - no need for Stripe if exempt
       if (subscriber.payment_exempt) {
         hasAccess = true;
-        logStep("User is payment exempt", { email: user.email });
+        logStep("User is payment exempt - granting access", { email: user.email });
+        
+        return new Response(JSON.stringify({
+          hasAccess: true,
+          isTrialActive: false,
+          trialDaysLeft: 0,
+          subscribed: true,
+          paymentExempt: true,
+          subscriptionEnd: null,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
       } else {
         // Check trial status
         if (subscriber.trial_end) {
