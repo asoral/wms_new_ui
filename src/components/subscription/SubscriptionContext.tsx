@@ -68,6 +68,38 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       setLastCheckTime(now);
     } catch (error) {
       console.error('Error checking subscription:', error);
+      console.log('Subscription check error details:', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        userEmail: user?.email,
+        timestamp: new Date().toISOString()
+      });
+      
+      // For payment exempt users, we should still check if they exist in database
+      if (user?.email) {
+        try {
+          const { data: subscriber } = await supabase
+            .from('subscribers')
+            .select('payment_exempt, email')
+            .eq('email', user.email)
+            .single();
+            
+          if (subscriber?.payment_exempt) {
+            console.log('User found with payment exemption, granting access despite API error');
+            setHasAccess(true);
+            setPaymentExempt(true);
+            setSubscribed(true);
+            setIsTrialActive(false);
+            setTrialDaysLeft(0);
+            setSubscriptionEnd(null);
+            setLastCheckTime(now);
+            setLoading(false);
+            return;
+          }
+        } catch (dbError) {
+          console.error('Database fallback check failed:', dbError);
+        }
+      }
+      
       // Security: Deny access on subscription check errors for authenticated users
       setHasAccess(false);
       setIsTrialActive(false);
