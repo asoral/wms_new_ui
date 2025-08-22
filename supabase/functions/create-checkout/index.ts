@@ -23,17 +23,24 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     
+    // Force refresh of environment variable
+    const refreshedStripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    
     console.log('Environment check:', {
       hasSupabaseUrl: !!supabaseUrl,
       hasSupabaseKey: !!supabaseKey,
-      hasStripeKey: !!stripeKey,
-      stripeKeyStart: stripeKey?.substring(0, 7) || 'MISSING',
-      allEnvVars: Object.keys(Deno.env.toObject())
+      hasStripeKey: !!refreshedStripeKey,
+      stripeKeyStart: refreshedStripeKey?.substring(0, 7) || 'MISSING',
+      allEnvVars: Object.keys(Deno.env.toObject()),
+      stripeKeyLength: refreshedStripeKey?.length || 0
     });
     
-    if (!stripeKey) {
-      throw new Error(`STRIPE_SECRET_KEY not found. Available env vars: ${Object.keys(Deno.env.toObject()).join(', ')}`);
+    if (!refreshedStripeKey || refreshedStripeKey.trim() === '') {
+      throw new Error(`STRIPE_SECRET_KEY is empty or not set. Available env vars: ${Object.keys(Deno.env.toObject()).join(', ')}`);
     }
+    
+    // Use the refreshed key
+    const finalStripeKey = refreshedStripeKey;
     
     console.log('Step 2: Creating Supabase client');
     const supabaseClient = createClient(
@@ -66,7 +73,7 @@ serve(async (req) => {
     console.log('Step 6: User authenticated:', user.email);
 
     console.log('Step 7: Initializing Stripe');
-    const stripe = new Stripe(stripeKey, { 
+    const stripe = new Stripe(finalStripeKey, { 
       apiVersion: "2023-10-16",
     });
     
