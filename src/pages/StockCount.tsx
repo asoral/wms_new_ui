@@ -26,6 +26,7 @@ const StockCount = () => {
   const [selectedPurpose, setSelectedPurpose] = useState<string>("Stock Reconciliation");
   const [isMultiWarehouse, setIsMultiWarehouse] = useState(false);
   const [warehouseTab, setWarehouseTab] = useState<string>("select");
+  const [filterWarehouse, setFilterWarehouse] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -37,10 +38,17 @@ const StockCount = () => {
       // Perform real-time search when search term is provided
       performSearch(searchTerm.trim());
     } else {
-      // Show only last 5 sessions when not searching (newest first since data is already sorted)
-      setFilteredSessions(sessions.slice(0, 5));
+      // Filter by warehouse and show only last 5 sessions when not searching
+      let filtered = sessions;
+      if (filterWarehouse) {
+        filtered = sessions.filter(session => 
+          session.warehouse.toLowerCase().includes(filterWarehouse.toLowerCase()) ||
+          session.warehouse === filterWarehouse
+        );
+      }
+      setFilteredSessions(filtered.slice(0, 5));
     }
-  }, [sessions, searchTerm]);
+  }, [sessions, searchTerm, filterWarehouse]);
 
   const performSearch = async (searchQuery: string) => {
     try {
@@ -106,9 +114,23 @@ const StockCount = () => {
         );
 
         const searchResults = detailedSessions
-          .sort((a: any, b: any) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+          .sort((a: any, b: any) => {
+            // Sort by creation date descending (most recent first) 
+            const dateA = new Date(a.createdBy || a.startedAt);
+            const dateB = new Date(b.createdBy || b.startedAt);
+            return dateB.getTime() - dateA.getTime();
+          });
 
-        setFilteredSessions(searchResults);
+        // Apply warehouse filter if set
+        let finalResults = searchResults;
+        if (filterWarehouse) {
+          finalResults = searchResults.filter(session => 
+            session.warehouse.toLowerCase().includes(filterWarehouse.toLowerCase()) ||
+            session.warehouse === filterWarehouse
+          );
+        }
+
+        setFilteredSessions(finalResults);
       } else {
         setFilteredSessions([]);
       }
@@ -195,7 +217,12 @@ const StockCount = () => {
         );
 
         const transformedSessions: StockCountSession[] = detailedSessions
-          .sort((a: any, b: any) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()); // Sort by newest first
+          .sort((a: any, b: any) => {
+            // Sort by creation date descending (most recent first)
+            const dateA = new Date(a.createdBy || a.startedAt);
+            const dateB = new Date(b.createdBy || b.startedAt);
+            return dateB.getTime() - dateA.getTime();
+          });
 
         setSessions(transformedSessions);
       } else {
@@ -416,7 +443,7 @@ const StockCount = () => {
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
             <CardTitle>Stock Reco List</CardTitle>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -426,10 +453,18 @@ const StockCount = () => {
                   className="pl-10 w-64"
                 />
               </div>
+              <div className="w-64">
+                <WarehouseSelector
+                  onWarehouseSelected={setFilterWarehouse}
+                  isLoading={loading}
+                />
+              </div>
             </div>
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            {searchTerm ? `Showing search results for "${searchTerm}"` : "Showing last 5 stock reconciliations"}
+            {searchTerm ? `Showing search results for "${searchTerm}"` : 
+             filterWarehouse ? `Showing last 5 stock reconciliations for warehouse: ${filterWarehouse}` : 
+             "Showing last 5 stock reconciliations"}
           </p>
         </CardHeader>
         <CardContent>
