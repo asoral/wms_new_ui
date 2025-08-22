@@ -35,14 +35,18 @@ const StockCount = () => {
   useEffect(() => {
     // Filter sessions based on search term
     let filtered = sessions;
-    if (searchTerm) {
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
       filtered = sessions.filter(session => 
-        session.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.purpose.toLowerCase().includes(searchTerm.toLowerCase())
+        session.id.toLowerCase().includes(searchLower) ||
+        session.name.toLowerCase().includes(searchLower) ||
+        session.purpose.toLowerCase().includes(searchLower) ||
+        session.warehouse.toLowerCase().includes(searchLower) ||
+        session.status.toLowerCase().includes(searchLower) ||
+        (session.owner && session.owner.toLowerCase().includes(searchLower))
       );
-    }
-    // Show only last 5 sessions unless searching
-    if (!searchTerm) {
+    } else {
+      // Show only last 5 sessions when not searching (newest first since data is already sorted)
       filtered = filtered.slice(0, 5);
     }
     setFilteredSessions(filtered);
