@@ -107,9 +107,9 @@ const WMSNavigation = () => {
 
         {/* Footer */}
         <div className="p-4 border-t border-gray-200">
-          <div className="text-xs text-muted-foreground text-center">
-            Version 1.0.0
-          </div>
+        <div className="text-xs text-muted-foreground text-center">
+          Version 1.1.0
+        </div>
         </div>
       </div>
 
