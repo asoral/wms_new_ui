@@ -269,6 +269,17 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
 
       {/* Pick Lists */}
       <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">
+            {searchTerm ? `Search Results (${filteredPickLists.length})` : `Recent Pick Lists (Last 5)`}
+          </h2>
+          {!searchTerm && pickLists.length > 5 && (
+            <p className="text-sm text-muted-foreground">
+              {pickLists.length - 5} more available - use search to find them
+            </p>
+          )}
+        </div>
+        
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">Loading pick lists...</div>
         ) : filteredPickLists.length === 0 ? (
@@ -277,31 +288,43 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
           </div>
         ) : (
           <div className="grid gap-4">
-            {!searchTerm && (
-              <p className="text-sm text-muted-foreground mb-2">
-                Showing last 5 pick lists. Use search to find more.
-              </p>
-            )}
             {filteredPickLists.map((pickList) => (
               <Card key={pickList.name} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex-1">
                       <div className="flex items-center space-x-3">
                         <FileText className="w-5 h-5 text-blue-600" />
                         <h3 className="font-semibold text-lg">{pickList.name}</h3>
                         {getStatusBadge(pickList.status)}
                       </div>
                       <div className="text-sm text-muted-foreground space-y-1">
-                        <p><span className="font-medium">Purpose:</span> {pickList.purpose || 'Material Transfer'}</p>
-                        <p><span className="font-medium">Company:</span> {pickList.company}</p>
-                        {pickList.material_request && (
-                          <p><span className="font-medium">Material Request:</span> {pickList.material_request}</p>
-                        )}
-                        <p><span className="font-medium">Created:</span> {formatDate(pickList.creation)}</p>
-                        {pickList.owner && (
-                          <p><span className="font-medium">Owner:</span> {pickList.owner}</p>
-                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div>
+                            <p><span className="font-medium">Purpose:</span> {pickList.purpose || 'Material Transfer'}</p>
+                            <p><span className="font-medium">Company:</span> {pickList.company}</p>
+                            {pickList.material_request && (
+                              <p><span className="font-medium">Material Request:</span> {pickList.material_request}</p>
+                            )}
+                          </div>
+                          <div>
+                            <p><span className="font-medium">Created:</span> {formatDate(pickList.creation)}</p>
+                            {pickList.owner && (
+                              <p><span className="font-medium">Created by:</span> 
+                                <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium dark:bg-blue-900/20 dark:text-blue-300">
+                                  {pickList.owner.includes('@') ? pickList.owner.split('@')[0] : pickList.owner}
+                                </span>
+                              </p>
+                            )}
+                            {pickList.modified_by && pickList.modified_by !== pickList.owner && (
+                              <p><span className="font-medium">Last modified by:</span> 
+                                <span className="ml-1 px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium dark:bg-gray-900/20 dark:text-gray-300">
+                                  {pickList.modified_by.includes('@') ? pickList.modified_by.split('@')[0] : pickList.modified_by}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div className="flex flex-col space-y-2">
