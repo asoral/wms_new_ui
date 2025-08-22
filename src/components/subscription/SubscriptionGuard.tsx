@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CreditCard, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
+import TopBar from '@/components/TopBar';
 
 interface SubscriptionGuardProps {
   children: React.ReactNode;
@@ -78,14 +79,15 @@ const SubscriptionGuard = ({ children }: SubscriptionGuardProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <Card>
+    <div className="min-h-screen bg-gray-50">
+      <TopBar />
+      <div className="flex items-center justify-center px-4 py-12">
+        <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
             </div>
-            <CardTitle>Subscription Required</CardTitle>
+            <CardTitle className="text-xl font-semibold">Subscription Required</CardTitle>
             <CardDescription>
               {isTrialActive 
                 ? `Your trial expires in ${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''}`

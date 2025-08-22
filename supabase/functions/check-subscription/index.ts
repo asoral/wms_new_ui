@@ -27,8 +27,14 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
+    // Force refresh of environment variable
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    logStep("Retrieved Stripe key", { hasKey: !!stripeKey, keyLength: stripeKey?.length || 0 });
+    
+    if (!stripeKey || stripeKey.trim() === '') {
+      throw new Error(`STRIPE_SECRET_KEY is empty or not set. Available env vars: ${Object.keys(Deno.env.toObject()).join(', ')}`);  
+    }
+    logStep("Stripe key verified");
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
