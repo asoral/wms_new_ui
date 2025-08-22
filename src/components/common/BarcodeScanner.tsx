@@ -55,8 +55,8 @@ const BarcodeScanner = ({
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
         }
       });
 
@@ -276,7 +276,7 @@ const BarcodeScanner = ({
             <div className="relative">
               <video
                 ref={videoRef}
-                className="w-full h-64 bg-black rounded-lg object-cover"
+                className="w-full h-64 bg-black rounded-lg object-contain"
                 autoPlay
                 playsInline
                 muted
@@ -285,7 +285,7 @@ const BarcodeScanner = ({
               {/* Scanning overlay */}
               <div className="absolute inset-0 pointer-events-none">
                 <div className="relative w-full h-full">
-                  <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg"></div>
+                  {/* Removed dark overlay - only add frame borders */}
                   
                   <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                     <div className="w-48 h-32 border-2 border-green-400 rounded-lg bg-transparent">
