@@ -38,32 +38,41 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
   }, []);
 
   useEffect(() => {
-    // Filter pick lists based on search term
+    // Update filtered list when pickLists changes (but not when searching)
+    if (searchTerm.trim() === "") {
+      setFilteredPickLists(pickLists.slice(0, 5));
+    }
+  }, [pickLists]);
+
+  useEffect(() => {
+    // Handle search - fetch from ERPNext when search term provided
     if (searchTerm.trim() === "") {
       // Show only last 5 pick lists if no search term
       setFilteredPickLists(pickLists.slice(0, 5));
     } else {
-      const filtered = pickLists.filter(pl => 
-        pl.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pl.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pl.material_request?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredPickLists(filtered);
+      // Search directly in ERPNext
+      fetchPickLists(searchTerm.trim());
     }
-  }, [searchTerm, pickLists]);
+  }, [searchTerm]);
 
-  const fetchPickLists = async () => {
+  const fetchPickLists = async (searchTerm?: string) => {
     try {
       const company = await getUserDefaultCompany();
       console.log('Fetching pick lists for company:', company);
       
-      // Filter for draft pick lists (docstatus = 0) and open pick lists (docstatus = 1)
-      const filters = company ? [
-        ['company', '=', company],
+      // Filter for draft pick lists (docstatus = 0) and open pick lists (docstatus = 1)  
+      const filters: any[] = [
         ['docstatus', 'in', [0, 1]]  // Include both draft and submitted
-      ] : [
-        ['docstatus', 'in', [0, 1]]
       ];
+      
+      if (company) {
+        filters.push(['company', '=', company]);
+      }
+      
+      // Add search filter if search term provided
+      if (searchTerm) {
+        filters.push(['name', 'like', `%${searchTerm}%`]);
+      }
       
       console.log('Using filters:', filters);
       const response = await getPickLists(filters);
@@ -96,7 +105,16 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         }));
         
         console.log('Processed pick lists data:', processedPickLists);
-        setPickLists(processedPickLists);
+        
+        if (searchTerm) {
+          // When searching, show all results
+          setFilteredPickLists(processedPickLists);
+          setPickLists(processedPickLists); // Update the full list for analytics
+        } else {
+          // When not searching, load full list but show only last 5
+          setPickLists(processedPickLists);
+          setFilteredPickLists(processedPickLists.slice(0, 5));
+        }
         
         // Calculate analytics
         const pending = processedPickLists.filter((pl: any) => pl.status === 'Draft').length;
@@ -113,6 +131,7 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       } else {
         console.log('No pick lists data found in response');
         setPickLists([]);
+        setFilteredPickLists([]);
         setAnalytics({
           totalPickLists: 0,
           pendingPickLists: 0,
