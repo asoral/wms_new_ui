@@ -33,24 +33,97 @@ const StockCount = () => {
   }, []);
 
   useEffect(() => {
-    // Filter sessions based on search term
-    let filtered = sessions;
     if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase().trim();
-      filtered = sessions.filter(session => 
-        session.id.toLowerCase().includes(searchLower) ||
-        session.name.toLowerCase().includes(searchLower) ||
-        session.purpose.toLowerCase().includes(searchLower) ||
-        session.warehouse.toLowerCase().includes(searchLower) ||
-        session.status.toLowerCase().includes(searchLower) ||
-        (session.owner && session.owner.toLowerCase().includes(searchLower))
-      );
+      // Perform real-time search when search term is provided
+      performSearch(searchTerm.trim());
     } else {
       // Show only last 5 sessions when not searching (newest first since data is already sorted)
-      filtered = filtered.slice(0, 5);
+      setFilteredSessions(sessions.slice(0, 5));
     }
-    setFilteredSessions(filtered);
   }, [sessions, searchTerm]);
+
+  const performSearch = async (searchQuery: string) => {
+    try {
+      setLoading(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      // Search with broader filters to find records containing the search term
+      const filters = [
+        ['docstatus', 'in', [0, 1]], // Only Draft and Submitted
+        ['name', 'like', `%${searchQuery}%`] // Search by name/ID
+      ];
+
+      const response = await erpnextAPI.getStockReconciliations(filters, 50); // Get more records for search
+      console.log('Search response:', response);
+
+      if (response?.data) {
+        // For each found record, fetch detailed data
+        const detailedSessions = await Promise.all(
+          response.data.map(async (session: any) => {
+            try {
+              const detailResponse = await erpnextAPI.getStockReconciliation(session.name);
+              const detailData = detailResponse?.data || session;
+              
+              return {
+                id: session.name,
+                name: session.name,
+                warehouse: detailData.warehouse || 'Multiple',
+                purpose: session.purpose || 'Stock Reconciliation',
+                status: session.docstatus === 0 ? 'Draft' : session.docstatus === 1 ? 'Submitted' : 'Cancelled',
+                startedAt: session.posting_date ? new Date(session.posting_date) : new Date(),
+                postingTime: session.posting_time || '',
+                completedAt: session.docstatus === 1 ? new Date(session.posting_date) : undefined,
+                totalItems: detailData.items?.length || 0,
+                matchedItems: 0,
+                varianceItems: detailData.items?.length || 0,
+                differenceAmount: session.difference_amount || 0,
+                createdBy: detailData.creation || session.creation,
+                owner: detailData.owner,
+                entries: detailData.items || []
+              };
+            } catch (error) {
+              console.error(`Failed to fetch details for ${session.name}:`, error);
+              return {
+                id: session.name,
+                name: session.name,
+                warehouse: 'Multiple',
+                purpose: session.purpose || 'Stock Reconciliation',
+                status: session.docstatus === 0 ? 'Draft' : session.docstatus === 1 ? 'Submitted' : 'Cancelled',
+                startedAt: session.posting_date ? new Date(session.posting_date) : new Date(),
+                postingTime: session.posting_time || '',
+                completedAt: session.docstatus === 1 ? new Date(session.posting_date) : undefined,
+                totalItems: 0,
+                matchedItems: 0,
+                varianceItems: 0,
+                differenceAmount: session.difference_amount || 0,
+                createdBy: session.creation,
+                owner: session.owner,
+                entries: []
+              };
+            }
+          })
+        );
+
+        const searchResults = detailedSessions
+          .sort((a: any, b: any) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+
+        setFilteredSessions(searchResults);
+      } else {
+        setFilteredSessions([]);
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+      toast({
+        title: "Search Error",
+        description: "Failed to search stock reconciliations",
+        variant: "destructive"
+      });
+      setFilteredSessions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadStockCountSessions = async () => {
     try {
