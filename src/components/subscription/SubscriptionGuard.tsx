@@ -1,4 +1,3 @@
-
 import { useSubscription } from './SubscriptionContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -78,6 +77,24 @@ const SubscriptionGuard = ({ children }: SubscriptionGuardProps) => {
     }
   };
 
+  const handleRefreshStatus = async () => {
+    try {
+      await refreshSubscription();
+      // If access is granted after refresh, the component will automatically re-render
+      // and show children instead of the subscription screen
+      toast({
+        title: "Status Updated",
+        description: "Your subscription status has been refreshed",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh subscription status",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopBar />
@@ -152,7 +169,7 @@ const SubscriptionGuard = ({ children }: SubscriptionGuardProps) => {
                 </Button>
               )}
 
-              <Button variant="outline" onClick={refreshSubscription} className="w-full">
+              <Button variant="outline" onClick={handleRefreshStatus} className="w-full">
                 Check Payment Status
               </Button>
             </div>
