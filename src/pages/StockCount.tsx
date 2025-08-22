@@ -453,11 +453,24 @@ const StockCount = () => {
                   className="pl-10 w-64"
                 />
               </div>
-              <div className="w-64">
-                <WarehouseSelector
-                  onWarehouseSelected={setFilterWarehouse}
-                  isLoading={loading}
-                />
+              <div className="flex items-center space-x-2">
+                <div className="w-64">
+                  <WarehouseSelector
+                    onWarehouseSelected={setFilterWarehouse}
+                    isLoading={loading}
+                  />
+                </div>
+                {filterWarehouse && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFilterWarehouse("")}
+                    className="px-3 py-2 h-10"
+                    title="Clear warehouse filter"
+                  >
+                    ✕
+                  </Button>
+                )}
               </div>
             </div>
           </div>
