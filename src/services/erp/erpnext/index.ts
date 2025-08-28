@@ -265,7 +265,7 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   // Pick List methods
   async getPickLists(filters?: any, company?: string, limitPageLength?: number) {
-    return this.callAPI('Pick List', 'GET', undefined, filters, limitPageLength);
+    return this.stockAPI.getPickLists(filters, company, limitPageLength);
   }
 
   async getPickList(name: string) {
