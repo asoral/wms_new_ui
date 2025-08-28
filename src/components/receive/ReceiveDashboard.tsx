@@ -178,11 +178,54 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
         poFilters.push(['company', '=', company]);
       }
 
-      // Add search filter if search term provided
+      // Add search filter if search term provided  
       if (searchTerm) {
+        // Search by PO name OR supplier name
         poFilters.push(['name', 'like', `%${searchTerm}%`]);
+        // Also create separate query for supplier name search
+        const supplierFilters = [...poFilters.slice(0, -1)]; // Remove the name filter
+        supplierFilters.push(['supplier_name', 'like', `%${searchTerm}%`]);
+        
+        // We'll make two calls and combine results
+        const [nameResults, supplierResults] = await Promise.all([
+          erpnextAPI.getPurchaseOrders(poFilters, company || undefined),
+          erpnextAPI.getPurchaseOrders(supplierFilters, company || undefined)
+        ]);
+        
+        // Combine and deduplicate results
+        const combinedResults: any[] = [];
+        const seenNames = new Set();
+        
+        [...(nameResults?.data || []), ...(supplierResults?.data || [])].forEach((po: any) => {
+          if (!seenNames.has(po.name)) {
+            seenNames.add(po.name);
+            combinedResults.push(po);
+          }
+        });
+        
+        const sortedData = combinedResults.sort((a: any, b: any) => 
+          new Date(b.creation).getTime() - new Date(a.creation).getTime()
+        );
+        
+        setFilteredPOs(sortedData);
+        setPurchaseOrders(sortedData);
+        
+        // Calculate analytics
+        const totalPOs = sortedData.length;
+        const pendingPOs = sortedData.filter((po: any) => po.status === 'To Receive').length;
+        const completedPOs = sortedData.filter((po: any) => po.status === 'Completed').length;
+        
+        setAnalytics(prev => ({
+          ...prev,
+          totalPOs,
+          pendingPOs,
+          completedPOs
+        }));
+        
+        return; // Exit early since we handled the search above
       }
 
+      // This section only executes when there's no searchTerm (handled above)
       const poResponse = await erpnextAPI.getPurchaseOrders(poFilters, company || undefined);
       
       if (poResponse?.data && Array.isArray(poResponse.data)) {
@@ -190,13 +233,8 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
           new Date(b.creation).getTime() - new Date(a.creation).getTime()
         );
         
-        if (searchTerm) {
-          setFilteredPOs(sortedData);
-          setPurchaseOrders(sortedData); // Update full list for analytics
-        } else {
-          setPurchaseOrders(sortedData);
-          setFilteredPOs(sortedData.slice(0, 5));
-        }
+        setPurchaseOrders(sortedData);
+        setFilteredPOs(sortedData.slice(0, 5));
 
         // Calculate analytics
         const totalPOs = sortedData.length;

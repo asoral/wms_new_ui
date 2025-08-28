@@ -96,6 +96,10 @@ const BarcodeScanner = ({
             try {
               await videoRef.current.play();
               console.log('Video playing successfully');
+              // Start barcode scanning after video is playing
+              if (!isCleaningUp) {
+                setTimeout(() => startBarcodeScanning(), 500);
+              }
             } catch (err) {
               console.error('Error playing video:', err);
               setError('Failed to start camera preview. Please try again.');
@@ -112,7 +116,7 @@ const BarcodeScanner = ({
       
       if (!isCleaningUp) {
         codeReader.current = new BrowserMultiFormatReader();
-        startBarcodeScanning();
+        // Don't start barcode scanning immediately, wait for video to load
       }
 
     } catch (err) {
