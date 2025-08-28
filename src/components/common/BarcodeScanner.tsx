@@ -52,6 +52,17 @@ const BarcodeScanner = ({
       setError(null);
       console.log('Starting camera...');
       
+      // Clean up any existing stream first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
+      // Clean up video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      
       // Try mobile-optimized constraints first
       let constraints: MediaStreamConstraints = {
         video: {
@@ -84,55 +95,39 @@ const BarcodeScanner = ({
       streamRef.current = mediaStream;
       
       if (videoRef.current && !isCleaningUp) {
+        // Clear any existing source
+        videoRef.current.srcObject = null;
+        
+        // Wait a brief moment before setting new source
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (isCleaningUp) return;
+        
         videoRef.current.srcObject = mediaStream;
         
         // Mobile-specific video setup
         videoRef.current.setAttribute('playsinline', 'true');
         videoRef.current.setAttribute('webkit-playsinline', 'true');
         
-        let videoStarted = false;
-        
-        const startVideoAndScanning = async () => {
-          if (videoStarted || isCleaningUp || !videoRef.current) return;
-          videoStarted = true;
+        try {
+          await videoRef.current.play();
+          console.log('Video playing successfully');
+          setIsScanning(true);
           
-          try {
-            await videoRef.current.play();
-            console.log('Video playing successfully');
-            // Start barcode scanning after video is playing
-            if (!isCleaningUp) {
-              setTimeout(() => startBarcodeScanning(), 500);
-            }
-          } catch (err) {
-            console.error('Error playing video:', err);
-            setError('Failed to start camera preview. Please try again.');
+          // Initialize barcode reader
+          if (!isCleaningUp) {
+            codeReader.current = new BrowserMultiFormatReader();
+            setTimeout(() => startBarcodeScanning(), 500);
           }
-        };
-        
-        // Multiple event listeners to ensure video starts on different devices
-        videoRef.current.onloadedmetadata = () => startVideoAndScanning();
-        videoRef.current.oncanplay = () => startVideoAndScanning();
-        videoRef.current.onloadeddata = () => startVideoAndScanning();
-        
-        // Fallback timeout in case events don't fire
-        setTimeout(() => {
-          if (!videoStarted && !isCleaningUp) {
-            console.log('Fallback: Starting video after timeout');
-            startVideoAndScanning();
-          }
-        }, 1000);
+        } catch (err) {
+          console.error('Error playing video:', err);
+          setError('Failed to start camera preview. Please try again.');
+        }
       }
 
       const track = mediaStream.getVideoTracks()[0];
       const capabilities = track.getCapabilities();
       setFlashSupported('torch' in capabilities);
-
-      setIsScanning(true);
-      
-      if (!isCleaningUp) {
-        codeReader.current = new BrowserMultiFormatReader();
-        // Don't start barcode scanning immediately, wait for video to load
-      }
 
     } catch (err) {
       if (!isCleaningUp) {
