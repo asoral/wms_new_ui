@@ -21,10 +21,10 @@ serve(async (req) => {
     // Check environment variables
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const stripeKey = Deno.env.get("STRIPEKEY");
     
     // Force refresh of environment variable
-    const refreshedStripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const refreshedStripeKey = Deno.env.get("STRIPEKEY");
     
     console.log('Environment check:', {
       hasSupabaseUrl: !!supabaseUrl,
@@ -36,7 +36,7 @@ serve(async (req) => {
     });
     
     if (!refreshedStripeKey || refreshedStripeKey.trim() === '') {
-      throw new Error(`STRIPE_SECRET_KEY is empty or not set. Available env vars: ${Object.keys(Deno.env.toObject()).join(', ')}`);
+      throw new Error(`STRIPEKEY is empty or not set. Available env vars: ${Object.keys(Deno.env.toObject()).join(', ')}`);
     }
     
     // Use the refreshed key
@@ -86,7 +86,7 @@ serve(async (req) => {
         {
           price_data: {
             currency: "usd",
-            product_data: { name: "WMS Monthly Subscription" },
+            product_data: { name: "WMS Premium Subscription" },
             unit_amount: 1500, // $15.00
             recurring: { interval: "month" },
           },
@@ -94,6 +94,9 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
+      subscription_data: {
+        trial_period_days: 15,
+      },
       success_url: `${origin}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/app/home`,
     });

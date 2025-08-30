@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
+import SubscriptionPlans from "@/components/subscription/SubscriptionPlans";
+import { useSubscription } from "@/components/subscription/SubscriptionContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,6 +40,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState('week');
   const [refreshing, setRefreshing] = useState(false);
+  const { hasAccess } = useSubscription();
   
   const {
     dashboardStats,
@@ -117,6 +120,11 @@ const Home = () => {
     aged_30_days: stockAgingData?.aged_30_days || 0,
     aged_90_days: stockAgingData?.aged_90_days || 0,
   };
+
+  // Show subscription plans if user doesn't have access
+  if (!hasAccess) {
+    return <SubscriptionPlans />;
+  }
 
   return (
     <div className="w-full max-w-7xl mx-auto py-4 md:py-6 space-y-6 md:space-y-8">
