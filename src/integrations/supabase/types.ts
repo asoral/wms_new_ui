@@ -211,42 +211,6 @@ export type Database = {
         }
         Relationships: []
       }
-      safe_profiles: {
-        Row: {
-          created_at: string | null
-          email: string | null
-          erpnext_default_company: string | null
-          erpnext_pallet_template_item: string | null
-          erpnext_url: string | null
-          full_name: string | null
-          has_api_credentials: boolean | null
-          id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email?: string | null
-          erpnext_default_company?: string | null
-          erpnext_pallet_template_item?: string | null
-          erpnext_url?: string | null
-          full_name?: string | null
-          has_api_credentials?: never
-          id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string | null
-          erpnext_default_company?: string | null
-          erpnext_pallet_template_item?: string | null
-          erpnext_url?: string | null
-          full_name?: string | null
-          has_api_credentials?: never
-          id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
     }
     Functions: {
       can_access_subscription: {
@@ -260,6 +224,20 @@ export type Database = {
       encrypt_secret: {
         Args: { key_id?: string; secret: string }
         Returns: string
+      }
+      get_safe_profile: {
+        Args: { profile_id?: string }
+        Returns: {
+          created_at: string
+          email: string
+          erpnext_default_company: string
+          erpnext_pallet_template_item: string
+          erpnext_url: string
+          full_name: string
+          has_api_credentials: boolean
+          id: string
+          updated_at: string
+        }[]
       }
       get_user_erpnext_credentials: {
         Args: Record<PropertyKey, never>
