@@ -44,30 +44,42 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
 
       const company = await getUserDefaultCompany();
       
+      // Get recent entries (last 5) with proper sorting
       const entriesResult = await erpnextAPI.getStockEntries(
         undefined,
         company || undefined,
-        50
+        5,
+        'creation desc'
       );
 
       if (entriesResult.data) {
-        console.log('Fetched stock entries:', entriesResult.data);
+        console.log('Fetched recent stock entries:', entriesResult.data);
         setRecentEntries(entriesResult.data);
         
         const drafts = entriesResult.data.filter((entry: any) => entry.docstatus === 0);
         setDraftEntries(drafts);
         
-        const total = entriesResult.data.length;
-        const draft = drafts.length;
-        const submitted = entriesResult.data.filter((entry: any) => entry.docstatus === 1).length;
-        const cancelled = entriesResult.data.filter((entry: any) => entry.docstatus === 2).length;
+        // Get full stats by fetching more entries
+        const allEntriesResult = await erpnextAPI.getStockEntries(
+          undefined,
+          company || undefined,
+          100,
+          'creation desc'
+        );
+        
+        if (allEntriesResult.data) {
+          const total = allEntriesResult.data.length;
+          const draft = allEntriesResult.data.filter((entry: any) => entry.docstatus === 0).length;
+          const submitted = allEntriesResult.data.filter((entry: any) => entry.docstatus === 1).length;
+          const cancelled = allEntriesResult.data.filter((entry: any) => entry.docstatus === 2).length;
 
-        setStats({
-          totalEntries: total,
-          draftEntries: draft,
-          submittedEntries: submitted,
-          cancelledEntries: cancelled
-        });
+          setStats({
+            totalEntries: total,
+            draftEntries: draft,
+            submittedEntries: submitted,
+            cancelledEntries: cancelled
+          });
+        }
       }
 
     } catch (error) {
@@ -329,7 +341,8 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
                         Draft
                       </Badge>
                       <span className="text-sm text-gray-500">
-                        {new Date(entry.posting_date).toLocaleDateString()}
+                        {entry.posting_date ? new Date(entry.posting_date).toLocaleDateString() : 
+                         entry.creation ? new Date(entry.creation).toLocaleDateString() : 'Invalid Date'}
                       </span>
                     </div>
                   </div>
@@ -363,7 +376,7 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
             </div>
           ) : (
             <div className="space-y-4">
-              {recentEntries.slice(0, 8).map((entry, index) => {
+              {recentEntries.map((entry, index) => {
                 const StatusIcon = getStatusIcon(entry.docstatus);
                 const TypeIcon = getEntryTypeIcon(entry.stock_entry_type);
                 return (
@@ -384,7 +397,8 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
                         {getStatusText(entry.docstatus)}
                       </Badge>
                       <span className="text-sm text-gray-500">
-                        {new Date(entry.posting_date).toLocaleDateString()}
+                        {entry.posting_date ? new Date(entry.posting_date).toLocaleDateString() : 
+                         entry.creation ? new Date(entry.creation).toLocaleDateString() : 'Invalid Date'}
                       </span>
                     </div>
                   </div>

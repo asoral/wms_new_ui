@@ -233,11 +233,26 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       finalFilters.push(['company', '=', company]);
     }
     
-    // Default to last 5 records ordered by creation date for performance
-    const limit = limitPageLength || 5;
-    const order = orderBy || 'creation desc';
-    
-    const params = this.buildQueryParams(finalFilters, undefined, limit, order);
+      // Default to last 5 records ordered by creation date for performance
+      const limit = limitPageLength || 5;
+      const order = orderBy || 'creation desc';
+      
+      // Include important fields for stock entries
+      const fields = [
+        'name',
+        'stock_entry_type',
+        'docstatus',
+        'posting_date',
+        'creation',
+        'owner',
+        'modified_by',
+        'company',
+        'from_warehouse',
+        'to_warehouse',
+        'purpose'
+      ];
+      
+      const params = this.buildQueryParams(finalFilters, fields, limit, order);
 
     const response = await fetch(`${this.baseURL}/api/resource/Stock Entry?${params}`, {
       headers: this.getHeaders(),
