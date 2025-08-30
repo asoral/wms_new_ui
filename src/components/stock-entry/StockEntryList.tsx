@@ -78,23 +78,23 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
 
       const filters: any[] = [];
       
-      // Add search filter if search term provided
+      // Add search filter if search term provided and increase limit for search
       if (searchTerm) {
         filters.push(['name', 'like', `%${searchTerm}%`]);
       }
 
-      const result = await api.getStockEntries(filters.length > 0 ? filters : undefined, company || undefined, 50);
+      const result = await api.getStockEntries(filters.length > 0 ? filters : undefined, company || undefined, searchTerm ? 50 : 5, 'creation desc');
       if (result && result.data) {
         const sortedData = result.data.sort((a: any, b: any) => 
           new Date(b.creation).getTime() - new Date(a.creation).getTime()
         );
         
         if (searchTerm) {
-          // When searching, show all results and apply status filter
+          // When searching, show all results
           setStockEntries(sortedData);
           applyStatusFilter(sortedData);
         } else {
-          // When not searching, load full list and apply status filter
+          // When not searching, these are already limited to 5 by API
           setStockEntries(sortedData);
           applyStatusFilter(sortedData);
         }
@@ -178,12 +178,17 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Stock Entries ({filteredEntries.length})</span>
+              <span>{searchTerm ? `Search Results (${filteredEntries.length})` : `Recent Stock Entries (${filteredEntries.length})`}</span>
               <Button onClick={() => onCreateNew("Material Receipt")} size="sm">
                 <Plus className="w-4 h-4 mr-2" />
                 New Entry
               </Button>
             </CardTitle>
+            {!searchTerm && (
+              <p className="text-sm text-muted-foreground">
+                Showing last 5 records - use search to find more
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             {isMobile ? (

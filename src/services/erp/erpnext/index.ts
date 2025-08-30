@@ -97,8 +97,8 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI(`Stock Entry/${name}`, 'PUT', data);
   }
 
-  async getStockEntries(filters?: any, company?: string, limitPageLength?: number) {
-    return this.stockAPI.getStockEntries(filters, company, limitPageLength);
+  async getStockEntries(filters?: any, company?: string, limitPageLength?: number, orderBy?: string) {
+    return this.stockAPI.getStockEntries(filters, company, limitPageLength, orderBy);
   }
 
   async getStockEntry(name: string) {
@@ -270,8 +270,8 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Pick List methods
-  async getPickLists(filters?: any, company?: string, limitPageLength?: number) {
-    return this.stockAPI.getPickLists(filters, company, limitPageLength);
+  async getPickLists(filters?: any, company?: string, limitPageLength?: number, orderBy?: string) {
+    return this.stockAPI.getPickLists(filters, company, limitPageLength, orderBy);
   }
 
   async getPickList(name: string) {
@@ -447,8 +447,17 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Packing Slips
-  async getPackingSlips(filters?: any, limitPageLength?: number) {
-    return this.callAPI('Packing Slip', 'GET', undefined, filters, limitPageLength);
+  async getPackingSlips(filters?: any, company?: string, limitPageLength?: number, orderBy?: string) {
+    // Default to last 5 records ordered by creation date for performance
+    const limit = limitPageLength || 5;
+    const order = orderBy || 'creation desc';
+    
+    let finalFilters = filters || [];
+    if (company) {
+      finalFilters = [...(Array.isArray(finalFilters) ? finalFilters : []), ['company', '=', company]];
+    }
+    
+    return this.callAPI('Packing Slip', 'GET', undefined, finalFilters, limit, undefined, order);
   }
 
   // Generic API call method - updated to support fields and order parameters

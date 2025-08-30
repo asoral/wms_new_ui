@@ -40,17 +40,17 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
   useEffect(() => {
     // Update filtered list when pickLists changes (but not when searching)
     if (searchTerm.trim() === "") {
-      setFilteredPickLists(pickLists.slice(0, 5));
+      setFilteredPickLists(pickLists); // Show all since API already limits to 5
     }
   }, [pickLists]);
 
   useEffect(() => {
     // Handle search - fetch from ERPNext when search term provided
     if (searchTerm.trim() === "") {
-      // Show only last 5 pick lists if no search term
-      setFilteredPickLists(pickLists.slice(0, 5));
+      // Show all since API already limits to 5 when no search
+      setFilteredPickLists(pickLists);
     } else {
-      // Search directly in ERPNext
+      // Search directly in ERPNext with higher limit
       fetchPickLists(searchTerm.trim());
     }
   }, [searchTerm]);
@@ -69,13 +69,13 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         filters.push(['company', '=', company]);
       }
       
-      // Add search filter if search term provided
+      // Add search filter if search term provided and increase limit for search
       if (searchTerm) {
         filters.push(['name', 'like', `%${searchTerm}%`]);
       }
       
       console.log('Using filters:', filters);
-      const response = await getPickLists(filters);
+      const response = await getPickLists(filters, company, searchTerm ? 50 : 5, 'creation desc');
       console.log('Pick lists API response:', response);
       
       // Check different response structure possibilities
@@ -111,9 +111,9 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
           setFilteredPickLists(processedPickLists);
           setPickLists(processedPickLists); // Update the full list for analytics
         } else {
-          // When not searching, load full list but show only last 5
+          // When not searching, these are already limited to 5 by API
           setPickLists(processedPickLists);
-          setFilteredPickLists(processedPickLists.slice(0, 5));
+          setFilteredPickLists(processedPickLists);
         }
         
         // Calculate analytics
@@ -290,11 +290,11 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">
-            {searchTerm ? `Search Results (${filteredPickLists.length})` : `Recent Pick Lists (Last 5)`}
+            {searchTerm ? `Search Results (${filteredPickLists.length})` : `Recent Pick Lists (${filteredPickLists.length})`}
           </h2>
-          {!searchTerm && pickLists.length > 5 && (
+          {!searchTerm && (
             <p className="text-sm text-muted-foreground">
-              {pickLists.length - 5} more available - use search to find them
+              Showing last 5 records - use search to find more
             </p>
           )}
         </div>

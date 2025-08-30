@@ -227,13 +227,17 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     }
   }
 
-  async getStockEntries(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getStockEntries(filters?: any, company?: string, limitPageLength?: number, orderBy?: string): Promise<ERPNextResponse<any[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+    // Default to last 5 records ordered by creation date for performance
+    const limit = limitPageLength || 5;
+    const order = orderBy || 'creation desc';
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit, order);
 
     const response = await fetch(`${this.baseURL}/api/resource/Stock Entry?${params}`, {
       headers: this.getHeaders(),
@@ -291,7 +295,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
     }
   }
 
-  async getPickLists(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<any[]>> {
+  async getPickLists(filters?: any, company?: string, limitPageLength?: number, orderBy?: string): Promise<ERPNextResponse<any[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
@@ -310,7 +314,11 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       'work_order'
     ];
     
-    const params = this.buildQueryParams(finalFilters, fields, limitPageLength);
+    // Default to last 5 records ordered by creation date for performance
+    const limit = limitPageLength || 5;
+    const order = orderBy || 'creation desc';
+    
+    const params = this.buildQueryParams(finalFilters, fields, limit, order);
 
     const response = await fetch(`${this.baseURL}/api/resource/Pick List?${params}`, {
       headers: this.getHeaders(),

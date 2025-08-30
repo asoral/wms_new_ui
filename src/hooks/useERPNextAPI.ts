@@ -220,9 +220,9 @@ export const useMaterialRequestAPI = () => {
 export const usePickListAPI = () => {
   const { callAPI, loading } = useERPNextAPI();
 
-  const getPickLists = useCallback((filters?: any) => {
+  const getPickLists = useCallback((filters?: any, company?: string, limitPageLength?: number, orderBy?: string) => {
     return callAPI(
-      (api) => api.getPickLists(filters),
+      (api) => api.getPickLists(filters, company, limitPageLength, orderBy),
       "Failed to fetch pick lists"
     );
   }, [callAPI]);

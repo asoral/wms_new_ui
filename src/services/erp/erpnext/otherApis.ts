@@ -3,13 +3,17 @@ import { ERPNextBaseAPI } from './baseApi';
 import { ERPNextResponse, PickList, PackingSlip, QualityInspection, ProductBundle } from './types';
 
 export class ERPNextOtherAPIs extends ERPNextBaseAPI {
-  async getPickLists(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<PickList[]>> {
+  async getPickLists(filters?: any, company?: string, limitPageLength?: number, orderBy?: string): Promise<ERPNextResponse<PickList[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+    // Default to last 5 records ordered by creation date for performance
+    const limit = limitPageLength || 5;
+    const order = orderBy || 'creation desc';
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit, order);
 
     const response = await fetch(`${this.baseURL}/api/resource/Pick List?${params}`, {
       headers: this.getHeaders(),
@@ -22,13 +26,17 @@ export class ERPNextOtherAPIs extends ERPNextBaseAPI {
     return response.json();
   }
 
-  async getPackingSlips(filters?: any, company?: string, limitPageLength?: number): Promise<ERPNextResponse<PackingSlip[]>> {
+  async getPackingSlips(filters?: any, company?: string, limitPageLength?: number, orderBy?: string): Promise<ERPNextResponse<PackingSlip[]>> {
     let finalFilters = this.convertToFrappeFilters(filters);
     if (company) {
       finalFilters.push(['company', '=', company]);
     }
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+    // Default to last 5 records ordered by creation date for performance
+    const limit = limitPageLength || 5;
+    const order = orderBy || 'creation desc';
+    
+    const params = this.buildQueryParams(finalFilters, undefined, limit, order);
 
     const response = await fetch(`${this.baseURL}/api/resource/Packing Slip?${params}`, {
       headers: this.getHeaders(),
