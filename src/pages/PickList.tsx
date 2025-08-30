@@ -77,7 +77,46 @@ const PickListPage = () => {
       const pickListDetails = await erpnextAPI.getPickList(pickList.name);
       
       if (pickListDetails.data) {
-        setSelectedPickList(pickListDetails.data);
+        const plData = pickListDetails.data;
+        
+        // Convert to local format similar to createAndProcessPickList
+        const formattedItems = Array.isArray(plData.locations) ? plData.locations.map((item: any, index: number) => ({
+          id: (index + 1).toString(),
+          item_code: item.item_code,
+          code: item.item_code,
+          item_name: item.item_name || item.item_code,
+          name: item.item_name || item.item_code,
+          warehouse: item.warehouse,
+          bin: item.warehouse,
+          batch_no: item.batch_no || '',
+          batch: item.batch_no || '',
+          serial_no: item.serial_no || '',
+          serial: item.serial_no || '',
+          qty: item.qty || 0,
+          requiredQty: item.qty || 0,
+          picked_qty: item.picked_qty || 0,
+          pickedQty: item.picked_qty || 0,
+          status: (item.picked_qty || 0) === 0 ? "pending" : 
+                  (item.picked_qty || 0) < item.qty ? "partial" : "completed"
+        })) : [];
+
+        const formattedPickList: PickList = {
+          name: plData.name,
+          number: plData.name,
+          purpose: plData.purpose as PickListPurpose,
+          relatedDocument: plData.material_request || plData.work_order || 'N/A',
+          status: plData.status || "Draft",
+          company: plData.company || "Default Company",
+          docstatus: plData.docstatus || 0,
+          creation: plData.creation || new Date().toISOString(),
+          createdDate: plData.creation || new Date().toISOString(),
+          owner: plData.owner || "Administrator",
+          items: formattedItems,
+          locations: plData.locations // Keep original locations data
+        };
+        
+        console.log('Formatted pick list with items:', formattedPickList);
+        setSelectedPickList(formattedPickList);
         setIsCreatingNew(false);
         setCurrentView('details');
       }

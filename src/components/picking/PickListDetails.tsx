@@ -247,6 +247,9 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
     const mrData = (materialRequestResponse as any)?.data?.data || (materialRequestResponse as any)?.data;
     
     if (mrData && mrData.items && Array.isArray(mrData.items)) {
+      console.log('Material Request data:', mrData);
+      console.log('Material Request items:', mrData.items);
+      
       const pickListData = {
         purpose: "Material Transfer",
         material_request: relatedDocument,
@@ -254,6 +257,12 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       };
 
       await createAndProcessPickList(pickListData, mrData.items);
+    } else {
+      toast({
+        title: "No Items Found",
+        description: "The selected material request has no items to pick",
+        variant: "destructive"
+      });
     }
   };
 
@@ -314,36 +323,52 @@ const PickListDetails = ({ pickList, isCreatingNew, onStartPicking, onBack }: Pi
       throw new Error("Pick List created but no name returned");
     }
 
-    // Call get_item_locations to auto-populate items with batch/serial tracking
+    // Manually populate items based on purpose
     try {
-      if (pickListData.material_request) {
-        // For material transfer, call get_item_locations which handles batch/serial auto-selection
-        await api.getItemLocations(pickListName);
-        console.log('Called get_item_locations for material transfer pick list');
+      if (pickListData.material_request && items && items.length > 0) {
+        // For material transfer, use material request items
+        const locations = items.map((item: any) => ({
+          item_code: item.item_code,
+          item_name: item.item_name,
+          qty: item.qty || 1,
+          stock_qty: item.stock_qty || item.qty || 1,
+          uom: item.uom || item.stock_uom || 'Nos',
+          stock_uom: item.stock_uom || item.uom || 'Nos',
+          warehouse: item.from_warehouse || item.warehouse || '',
+          batch_no: item.batch_no || '',
+          serial_no: item.serial_no || '',
+          conversion_factor: item.conversion_factor || 1
+        }));
+
+        // Update the pick list with the items
+        await api.updatePickList(pickListName, {
+          locations: locations
+        });
+        console.log('Populated material transfer pick list with items');
       } else if (items && items.length > 0) {
         // For delivery and other purposes, use the provided items
         const locations = items.map((item: any) => ({
           item_code: item.item_code,
+          item_name: item.item_name,
           qty: item.qty || item.pending_qty || 1,
           stock_qty: item.stock_qty || item.qty || item.pending_qty || 1,
-          uom: item.uom || item.stock_uom,
-          stock_uom: item.stock_uom || item.uom,
+          uom: item.uom || item.stock_uom || 'Nos',
+          stock_uom: item.stock_uom || item.uom || 'Nos',
           warehouse: item.warehouse || '',
           batch_no: item.batch_no || '',
-          serial_no: item.serial_no || ''
+          serial_no: item.serial_no || '',
+          conversion_factor: item.conversion_factor || 1
         }));
 
-        // Update the pick list with the items first
+        // Update the pick list with the items
         await api.updatePickList(pickListName, {
           locations: locations
         });
-        
-        // Then call get_item_locations to populate batch/serial data
-        await api.getItemLocations(pickListName);
-        console.log('Called get_item_locations for delivery pick list');
+        console.log('Populated pick list with delivery items');
       }
     } catch (error) {
       console.warn('Failed to populate pick list items:', error);
+      // Continue anyway to show the pick list even if items couldn't be populated
     }
 
     // Fetch the updated pick list with items
