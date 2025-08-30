@@ -84,9 +84,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string | null
-          erpnext_api_key: string | null
           erpnext_api_key_encrypted: string | null
-          erpnext_api_secret: string | null
           erpnext_api_secret_encrypted: string | null
           erpnext_default_company: string | null
           erpnext_pallet_template_item: string | null
@@ -98,9 +96,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email?: string | null
-          erpnext_api_key?: string | null
           erpnext_api_key_encrypted?: string | null
-          erpnext_api_secret?: string | null
           erpnext_api_secret_encrypted?: string | null
           erpnext_default_company?: string | null
           erpnext_pallet_template_item?: string | null
@@ -112,9 +108,7 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string | null
-          erpnext_api_key?: string | null
           erpnext_api_key_encrypted?: string | null
-          erpnext_api_secret?: string | null
           erpnext_api_secret_encrypted?: string | null
           erpnext_default_company?: string | null
           erpnext_pallet_template_item?: string | null
@@ -217,8 +211,48 @@ export type Database = {
         }
         Relationships: []
       }
+      safe_profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          erpnext_default_company: string | null
+          erpnext_pallet_template_item: string | null
+          erpnext_url: string | null
+          full_name: string | null
+          has_api_credentials: boolean | null
+          id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          erpnext_default_company?: string | null
+          erpnext_pallet_template_item?: string | null
+          erpnext_url?: string | null
+          full_name?: string | null
+          has_api_credentials?: never
+          id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          erpnext_default_company?: string | null
+          erpnext_pallet_template_item?: string | null
+          erpnext_url?: string | null
+          full_name?: string | null
+          has_api_credentials?: never
+          id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      can_access_subscription: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       decrypt_secret: {
         Args: { encrypted_data: string; key_id?: string }
         Returns: string
@@ -247,6 +281,10 @@ export type Database = {
       is_admin: {
         Args: { _user_id?: string }
         Returns: boolean
+      }
+      log_security_event: {
+        Args: { details?: Json; event_type: string }
+        Returns: undefined
       }
       log_sensitive_operation: {
         Args: {
