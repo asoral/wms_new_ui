@@ -6,6 +6,8 @@ import { Camera, Search } from "lucide-react";
 import { Item, ItemSelectCallback } from "@/types";
 import ItemSelector from "../common/ItemSelector";
 import BarcodeScanner from "../common/BarcodeScanner";
+import { createERPNextAPI } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface ItemScannerProps {
   onItemScanned: ItemSelectCallback;
@@ -15,23 +17,61 @@ interface ItemScannerProps {
 const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
   const [activeTab, setActiveTab] = useState("manual");
   const [showCamera, setShowCamera] = useState(false);
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleItemSelected = (item: Item) => {
     onItemScanned(item);
   };
 
-  const handleBarcodeScanned = (code: string) => {
+  const handleBarcodeScanned = async (code: string) => {
     console.log('Barcode scanned in ItemScanner:', code);
-    // Create a minimal Item object from the scanned code
-    const scannedItem: Item = {
-      name: code,
-      item_code: code,
-      item_name: code,
-      stock_uom: 'Nos'
-    };
-    onItemScanned(scannedItem);
-    setShowCamera(false);
-    setActiveTab("manual");
+    setBarcodeLoading(true);
+    
+    try {
+      // Create ERPNext API instance
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Look up the item by barcode
+      console.log('Looking up item by barcode:', code);
+      const itemResult = await erpnextAPI.itemsAPI.getItemByBarcode(code);
+      
+      if (itemResult.data) {
+        console.log('Found item for barcode:', itemResult.data);
+        onItemScanned(itemResult.data);
+        setShowCamera(false);
+        setActiveTab("manual");
+        
+        toast({
+          title: "Item Found",
+          description: `Found item: ${itemResult.data.item_name} (${itemResult.data.item_code})`,
+        });
+      } else {
+        console.log('No item found for barcode:', code);
+        toast({
+          title: "Item Not Found",
+          description: `No item found for barcode: ${code}. Please check the barcode and try again.`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error looking up item by barcode:', error);
+      toast({
+        title: "Barcode Lookup Failed",
+        description: `Failed to lookup item by barcode: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setBarcodeLoading(false);
+    }
   };
 
   const startScanning = () => {
@@ -79,7 +119,7 @@ const ItemScanner = ({ onItemScanned, isLoading }: ItemScannerProps) => {
                 </p>
                 <Button 
                   onClick={startScanning}
-                  disabled={isLoading}
+                  disabled={isLoading || barcodeLoading}
                   className="flex items-center space-x-2"
                 >
                   <Camera className="w-4 h-4" />
