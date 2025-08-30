@@ -189,41 +189,84 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Lookup an item by barcode through Item Barcode child table
+   * Lookup an item by barcode using ERPNext search API
    */
   async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item | undefined>> {
     console.log('Fetching item by barcode:', barcode);
     try {
-      // First try to search in Item Barcode child table
-      const barcodeParams = new URLSearchParams();
-      barcodeParams.append('filters', JSON.stringify([
-        ['barcode', '=', barcode]
-      ]));
-      barcodeParams.append('fields', JSON.stringify(['parent']));
+      // Use ERPNext's search_link API to find items by barcode
+      // This searches through the barcodes child table without needing direct access
+      const searchParams = new URLSearchParams();
+      searchParams.append('doctype', 'Item');
+      searchParams.append('txt', barcode);
+      searchParams.append('query', 'erpnext.controllers.queries.item_query');
+      searchParams.append('searchfield', 'barcodes.barcode');
       
-      console.log('Searching Item Barcode table with URL:', `${this.baseURL}/api/resource/Item Barcode?${barcodeParams.toString()}`);
+      console.log('Searching items by barcode using search_link API:', `${this.baseURL}/api/method/frappe.desk.search.search_link?${searchParams.toString()}`);
       
-      const barcodeResponse = await fetch(
-        `${this.baseURL}/api/resource/Item Barcode?${barcodeParams.toString()}`,
+      const searchResponse = await fetch(
+        `${this.baseURL}/api/method/frappe.desk.search.search_link?${searchParams.toString()}`,
         { headers: this.getHeaders() }
       );
       
-      if (barcodeResponse.ok) {
-        const barcodeResult = await barcodeResponse.json();
-        console.log('Barcode table response:', barcodeResult);
+      if (searchResponse.ok) {
+        const searchResult = await searchResponse.json();
+        console.log('Search result:', searchResult);
         
-        if (barcodeResult.data && barcodeResult.data.length > 0) {
-          // Found barcode, get the parent item
-          const itemCode = barcodeResult.data[0].parent;
-          console.log('Found item code from barcode:', itemCode);
+        if (searchResult.message && searchResult.message.length > 0) {
+          // Found item(s), get the first one's details
+          const itemCode = searchResult.message[0].value;
+          console.log('Found item code from barcode search:', itemCode);
           
           return this.getItemDetails(itemCode);
         }
       }
       
-      // Fallback: try direct item lookup (in case barcode matches item code)
-      console.log('Barcode not found in child table, trying direct item lookup');
-      const params = new URLSearchParams({
+      // Alternative approach: use the item query with barcode filter
+      console.log('Search API failed, trying item query with barcode filter');
+      const params = new URLSearchParams();
+      params.append('filters', JSON.stringify([
+        ['Item', 'barcodes', 'like', `%${barcode}%`]
+      ]));
+      params.append('fields', JSON.stringify([
+        'name',
+        'item_code',
+        'item_name',
+        'stock_uom',
+        'item_group',
+        'has_batch_no',
+        'has_serial_no'
+      ]));
+      params.append('limit_page_length', '1');
+      
+      const queryResponse = await fetch(
+        `${this.baseURL}/api/resource/Item?${params.toString()}`,
+        { headers: this.getHeaders() }
+      );
+      
+      if (queryResponse.ok) {
+        const queryResult = await queryResponse.json();
+        console.log('Item query result:', queryResult);
+        
+        if (queryResult.data && queryResult.data.length > 0) {
+          const item = queryResult.data[0];
+          const transformedItem = {
+            name: item.name,
+            item_code: item.item_code || item.name,
+            item_name: item.item_name || item.item_code || item.name,
+            stock_uom: item.stock_uom || 'Nos',
+            has_batch_no: item.has_batch_no || false,
+            has_serial_no: item.has_serial_no || false,
+            item_group: item.item_group || 'All Item Groups'
+          };
+          
+          return { data: transformedItem };
+        }
+      }
+      
+      // Final fallback: try direct item lookup (in case barcode matches item code)
+      console.log('No item found with barcode filter, trying direct item lookup');
+      const directParams = new URLSearchParams({
         fields: JSON.stringify([
           'name',
           'item_code',
@@ -235,32 +278,32 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
         ]),
       });
   
-      const response = await fetch(
-        `${this.baseURL}/api/resource/Item/${encodeURIComponent(barcode)}?${params.toString()}`,
+      const directResponse = await fetch(
+        `${this.baseURL}/api/resource/Item/${encodeURIComponent(barcode)}?${directParams.toString()}`,
         { headers: this.getHeaders() }
       );
-      console.log('Direct item lookup response status:', response.status);
+      console.log('Direct item lookup response status:', directResponse.status);
   
-      if (!response.ok) {
-        if (response.status === 404) {
+      if (!directResponse.ok) {
+        if (directResponse.status === 404) {
           console.log('Item not found for barcode:', barcode);
           return { data: undefined };
         }
-        throw new Error(`Failed to fetch item by barcode: ${response.statusText}`);
+        throw new Error(`Failed to fetch item by barcode: ${directResponse.statusText}`);
       }
   
-      const result = await response.json();
-      console.log('Direct item lookup response data:', result);
+      const directResult = await directResponse.json();
+      console.log('Direct item lookup response data:', directResult);
       
       // Transform the data to ensure proper structure
       const transformedItem = {
-        name: result.data.name,
-        item_code: result.data.item_code || result.data.name,
-        item_name: result.data.item_name || result.data.item_code || result.data.name,
-        stock_uom: result.data.stock_uom || 'Nos',
-        has_batch_no: result.data.has_batch_no || false,
-        has_serial_no: result.data.has_serial_no || false,
-        item_group: result.data.item_group || 'All Item Groups'
+        name: directResult.data.name,
+        item_code: directResult.data.item_code || directResult.data.name,
+        item_name: directResult.data.item_name || directResult.data.item_code || directResult.data.name,
+        stock_uom: directResult.data.stock_uom || 'Nos',
+        has_batch_no: directResult.data.has_batch_no || false,
+        has_serial_no: directResult.data.has_serial_no || false,
+        item_group: directResult.data.item_group || 'All Item Groups'
       };
       
       return { data: transformedItem };
