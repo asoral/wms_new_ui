@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, RotateCcw, Save, Trash2, Edit, Check, X, Package } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { BarChart3, RotateCcw, Save, Trash2, Edit, Check, X, Package, Eye, EyeOff } from "lucide-react";
 import ItemSelector from "@/components/stock-count/ItemSelector";
 import MultiWarehouseItemSelector from "@/components/stock-count/MultiWarehouseItemSelector";
 import { StockCountEntry } from "@/types";
@@ -28,6 +29,10 @@ const StockCountSession = () => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingEntry, setEditingEntry] = useState<StockCountEntry | null>(null);
   const [loadingWarehouseItems, setLoadingWarehouseItems] = useState(false);
+  const [visibleQuantities, setVisibleQuantities] = useState<Set<number>>(new Set());
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [pendingVisibilityIndex, setPendingVisibilityIndex] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Load existing session data if in edit/view mode
@@ -590,6 +595,66 @@ const StockCountSession = () => {
     }
   };
 
+  const handleToggleQuantityVisibility = (index: number) => {
+    if (visibleQuantities.has(index)) {
+      // Already visible, hide it
+      const newVisible = new Set(visibleQuantities);
+      newVisible.delete(index);
+      setVisibleQuantities(newVisible);
+    } else {
+      // Not visible, show password dialog
+      setPendingVisibilityIndex(index);
+      setShowPasswordDialog(true);
+    }
+  };
+
+  const handlePasswordSubmit = () => {
+    if (passwordInput === "show123" && pendingVisibilityIndex !== null) {
+      const newVisible = new Set(visibleQuantities);
+      newVisible.add(pendingVisibilityIndex);
+      setVisibleQuantities(newVisible);
+      setPasswordInput("");
+      setShowPasswordDialog(false);
+      setPendingVisibilityIndex(null);
+    } else {
+      toast({
+        title: "Incorrect Password",
+        description: "Please enter the correct password to view quantities.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    setPasswordInput("");
+    setShowPasswordDialog(false);
+    setPendingVisibilityIndex(null);
+  };
+
+  const renderQuantityCell = (quantity: number, index: number, isEditing: boolean = false) => {
+    const isVisible = visibleQuantities.has(index);
+    
+    if (isEditing) {
+      return quantity; // Always show during editing
+    }
+    
+    return (
+      <div className="flex items-center justify-end space-x-2">
+        <span className={isVisible ? "" : "filter blur-sm select-none"}>
+          {quantity}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => handleToggleQuantityVisibility(index)}
+          className="h-6 w-6 p-0"
+        >
+          {isVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto py-4 md:py-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
@@ -830,22 +895,24 @@ const StockCountSession = () => {
                             <td className="p-3 font-medium">{entry.itemCode}</td>
                             <td className="p-3">{entry.itemName}</td>
                             <td className="p-3">{entry.warehouse}</td>
-                            <td className="p-3 text-right">{entry.currentQty}</td>
-                            <td className="p-3 text-right">
-                              {editingIndex === index ? (
-                                <Input
-                                  type="number"
-                                  value={editingEntry?.actualQty || 0}
-                                  onChange={(e) => setEditingEntry(prev => prev ? {
-                                    ...prev,
-                                    actualQty: parseFloat(e.target.value) || 0
-                                  } : null)}
-                                  className="w-20 text-right"
-                                />
-                              ) : (
-                                entry.actualQty
-                              )}
-                            </td>
+                             <td className="p-3 text-right">
+                               {renderQuantityCell(entry.currentQty, index)}
+                             </td>
+                             <td className="p-3 text-right">
+                               {editingIndex === index ? (
+                                 <Input
+                                   type="number"
+                                   value={editingEntry?.actualQty || 0}
+                                   onChange={(e) => setEditingEntry(prev => prev ? {
+                                     ...prev,
+                                     actualQty: parseFloat(e.target.value) || 0
+                                   } : null)}
+                                   className="w-20 text-right"
+                                 />
+                               ) : (
+                                 renderQuantityCell(entry.actualQty, index)
+                               )}
+                             </td>
                             <td className="p-3 text-right">
                               {editingIndex === index && editingEntry
                                 ? editingEntry.actualQty - editingEntry.currentQty
@@ -950,26 +1017,50 @@ const StockCountSession = () => {
                               <span className="text-gray-600">UOM:</span>
                               <span className="ml-1 font-medium">{entry.uom}</span>
                             </div>
-                            <div>
-                              <span className="text-gray-600">Current:</span>
-                              <span className="ml-1 font-medium">{entry.currentQty}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Actual:</span>
-                              {editingIndex === index ? (
-                                <Input
-                                  type="number"
-                                  value={editingEntry?.actualQty || 0}
-                                  onChange={(e) => setEditingEntry(prev => prev ? {
-                                    ...prev,
-                                    actualQty: parseFloat(e.target.value) || 0
-                                  } : null)}
-                                  className="w-20 ml-1 inline-block text-sm"
-                                />
-                              ) : (
-                                <span className="ml-1 font-medium">{entry.actualQty}</span>
-                              )}
-                            </div>
+                             <div className="flex items-center justify-between">
+                               <span className="text-gray-600">Current:</span>
+                               <div className="flex items-center space-x-1">
+                                 <span className={`font-medium ${visibleQuantities.has(index) ? "" : "filter blur-sm select-none"}`}>
+                                   {entry.currentQty}
+                                 </span>
+                                 <Button
+                                   size="sm"
+                                   variant="ghost"
+                                   onClick={() => handleToggleQuantityVisibility(index)}
+                                   className="h-5 w-5 p-0"
+                                 >
+                                   {visibleQuantities.has(index) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                 </Button>
+                               </div>
+                             </div>
+                             <div className="flex items-center justify-between">
+                               <span className="text-gray-600">Actual:</span>
+                               {editingIndex === index ? (
+                                 <Input
+                                   type="number"
+                                   value={editingEntry?.actualQty || 0}
+                                   onChange={(e) => setEditingEntry(prev => prev ? {
+                                     ...prev,
+                                     actualQty: parseFloat(e.target.value) || 0
+                                   } : null)}
+                                   className="w-20 ml-1 inline-block text-sm"
+                                 />
+                               ) : (
+                                 <div className="flex items-center space-x-1">
+                                   <span className={`font-medium ${visibleQuantities.has(index) ? "" : "filter blur-sm select-none"}`}>
+                                     {entry.actualQty}
+                                   </span>
+                                   <Button
+                                     size="sm"
+                                     variant="ghost"
+                                     onClick={() => handleToggleQuantityVisibility(index)}
+                                     className="h-5 w-5 p-0"
+                                   >
+                                     {visibleQuantities.has(index) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                   </Button>
+                                 </div>
+                               )}
+                             </div>
                             <div className="col-span-2">
                               <span className="text-gray-600">Difference:</span>
                               <span className={`ml-1 font-medium ${
@@ -1037,6 +1128,36 @@ const StockCountSession = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enter Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Enter the manager password to view quantity information.
+            </p>
+            <Input
+              type="password"
+              placeholder="Enter password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handlePasswordCancel}>
+              Cancel
+            </Button>
+            <Button onClick={handlePasswordSubmit}>
+              Show Quantities
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
