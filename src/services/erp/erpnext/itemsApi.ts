@@ -189,53 +189,45 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Lookup an item by barcode using multiple ERPNext approaches
+   * Lookup an item by barcode using Resource API for Item Barcode child table
    */
   async getItemByBarcode(barcode: string): Promise<ERPNextResponse<Item | undefined>> {
     console.log('=== Starting barcode search for:', barcode);
     
     try {
-      // Method 1: Try a simpler search_link approach without extra parameters
-      console.log('Method 1: Trying basic search_link API');
-      const basicSearchParams = new URLSearchParams();
-      basicSearchParams.append('doctype', 'Item');
-      basicSearchParams.append('txt', barcode);
+      // Method 1: Direct Resource API call to Item Barcode child table
+      console.log('Method 1: Accessing Item Barcode resource directly');
+      const barcodeParams = new URLSearchParams();
+      barcodeParams.append('filters', JSON.stringify([
+        ['barcode', '=', barcode]
+      ]));
+      barcodeParams.append('fields', JSON.stringify(['parent', 'barcode']));
+      barcodeParams.append('limit_page_length', '1');
       
-      const basicSearchUrl = `${this.baseURL}/api/method/frappe.desk.search.search_link?${basicSearchParams.toString()}`;
-      console.log('Basic search URL:', basicSearchUrl);
+      const barcodeUrl = `${this.baseURL}/api/resource/Item%20Barcode?${barcodeParams.toString()}`;
+      console.log('Item Barcode resource URL:', barcodeUrl);
       
-      const basicSearchResponse = await fetch(basicSearchUrl, { headers: this.getHeaders() });
-      console.log('Basic search response status:', basicSearchResponse.status);
+      const barcodeResponse = await fetch(barcodeUrl, { headers: this.getHeaders() });
+      console.log('Item Barcode resource response status:', barcodeResponse.status);
       
-      if (basicSearchResponse.ok) {
-        const basicSearchResult = await basicSearchResponse.json();
-        console.log('Basic search result:', basicSearchResult);
+      if (barcodeResponse.ok) {
+        const barcodeResult = await barcodeResponse.json();
+        console.log('Item Barcode resource result:', barcodeResult);
         
-        if (basicSearchResult.message && basicSearchResult.message.length > 0) {
-          const itemCode = basicSearchResult.message[0].value;
-          console.log('Found item code from basic search:', itemCode);
-          return this.getItemDetails(itemCode);
+        if (barcodeResult.data && barcodeResult.data.length > 0) {
+          const parentItemCode = barcodeResult.data[0].parent;
+          console.log('Found parent item code from barcode:', parentItemCode);
+          return this.getItemDetails(parentItemCode);
         }
       } else {
-        const errorText = await basicSearchResponse.text();
-        console.log('Basic search error:', basicSearchResponse.status, errorText);
+        const errorText = await barcodeResponse.text();
+        console.log('Item Barcode resource error:', barcodeResponse.status, errorText);
       }
       
-      // Method 2: Use ERPNext's run_query method specifically for barcode search
-      console.log('Method 2: Trying run_query method');
-      const queryData = {
-        query: `
-          SELECT DISTINCT item.name, item.item_code, item.item_name, item.stock_uom, item.item_group
-          FROM \`tabItem\` item
-          LEFT JOIN \`tabItem Barcode\` barcode ON barcode.parent = item.name
-          WHERE barcode.barcode = %s OR item.item_code = %s
-          LIMIT 1
-        `,
-        values: [barcode, barcode]
-      };
-      
-      const queryResponse = await fetch(
-        `${this.baseURL}/api/method/frappe.client.get_list`,
+      // Method 2: Try using the database query approach
+      console.log('Method 2: Trying database query via method call');
+      const dbQueryResponse = await fetch(
+        `${this.baseURL}/api/method/frappe.desk.query_report.run`,
         {
           method: 'POST',
           headers: {
@@ -243,46 +235,34 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            doctype: 'Item',
+            report_name: 'Stock Balance',
             filters: {
-              'barcodes.barcode': barcode
-            },
-            fields: ['name', 'item_code', 'item_name', 'stock_uom', 'item_group', 'has_batch_no', 'has_serial_no'],
-            limit_page_length: 1
+              item_code: barcode // Try treating barcode as item_code first
+            }
           })
         }
       );
       
-      console.log('Query response status:', queryResponse.status);
+      console.log('DB query response status:', dbQueryResponse.status);
       
-      if (queryResponse.ok) {
-        const queryResult = await queryResponse.json();
-        console.log('Query result:', queryResult);
+      if (dbQueryResponse.ok) {
+        const dbQueryResult = await dbQueryResponse.json();
+        console.log('DB query result:', dbQueryResult);
         
-        if (queryResult.message && queryResult.message.length > 0) {
-          const item = queryResult.message[0];
-          const transformedItem = {
-            name: item.name,
-            item_code: item.item_code || item.name,
-            item_name: item.item_name || item.item_code || item.name,
-            stock_uom: item.stock_uom || 'Nos',
-            has_batch_no: item.has_batch_no || false,
-            has_serial_no: item.has_serial_no || false,
-            item_group: item.item_group || 'All Item Groups'
-          };
-          
-          console.log('Found item via query method:', transformedItem);
-          return { data: transformedItem };
+        if (dbQueryResult.message && dbQueryResult.message.result && dbQueryResult.message.result.length > 0) {
+          const itemCode = dbQueryResult.message.result[0][0]; // First column should be item_code
+          console.log('Found item code from DB query:', itemCode);
+          return this.getItemDetails(itemCode);
         }
       } else {
-        const errorText = await queryResponse.text();
-        console.log('Query method error:', queryResponse.status, errorText);
+        const errorText = await dbQueryResponse.text();
+        console.log('DB query error:', dbQueryResponse.status, errorText);
       }
       
-      // Method 3: Custom method call to search by barcode
-      console.log('Method 3: Trying custom barcode search method');
-      const customResponse = await fetch(
-        `${this.baseURL}/api/method/erpnext.stock.get_item_details.get_item_code`,
+      // Method 3: Use frappe.client.get_value to find item by barcode
+      console.log('Method 3: Using frappe.client.get_value');
+      const getValueResponse = await fetch(
+        `${this.baseURL}/api/method/frappe.client.get_value`,
         {
           method: 'POST',
           headers: {
@@ -290,29 +270,31 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            barcode: barcode
+            doctype: 'Item Barcode',
+            filters: { barcode: barcode },
+            fieldname: 'parent'
           })
         }
       );
       
-      console.log('Custom method response status:', customResponse.status);
+      console.log('get_value response status:', getValueResponse.status);
       
-      if (customResponse.ok) {
-        const customResult = await customResponse.json();
-        console.log('Custom method result:', customResult);
+      if (getValueResponse.ok) {
+        const getValueResult = await getValueResponse.json();
+        console.log('get_value result:', getValueResult);
         
-        if (customResult.message) {
-          const itemCode = customResult.message;
-          console.log('Found item code from custom method:', itemCode);
-          return this.getItemDetails(itemCode);
+        if (getValueResult.message && getValueResult.message.parent) {
+          const parentItemCode = getValueResult.message.parent;
+          console.log('Found parent item code via get_value:', parentItemCode);
+          return this.getItemDetails(parentItemCode);
         }
       } else {
-        const errorText = await customResponse.text();
-        console.log('Custom method error:', customResponse.status, errorText);
+        const errorText = await getValueResponse.text();
+        console.log('get_value error:', getValueResponse.status, errorText);
       }
       
       // Method 4: Try direct item code match as last resort
-      console.log('Method 4: Trying direct item lookup');
+      console.log('Method 4: Trying direct item lookup (barcode as item_code)');
       try {
         const directResult = await this.getItemDetails(barcode);
         if (directResult.data) {

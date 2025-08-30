@@ -109,18 +109,24 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI(`Stock Entry/${stockEntryName}`, 'PUT', { docstatus: 1 });
   }
 
-  async getStockReconciliations(filters?: any, limitPageLength?: number) {
+  async getStockReconciliations(filters?: any, limitPageLength?: number, orderBy?: string) {
     const fields = [
       'name',
-      'purpose',
-      'docstatus', 
+      'purpose', 
+      'docstatus',
       'posting_date',
       'posting_time',
       'company',
       'difference_amount',
-      'items'
+      'creation',
+      'owner'
     ];
-    return this.callAPI('Stock Reconciliation', 'GET', undefined, filters, limitPageLength, fields);
+    
+    // Default to last 5 records ordered by creation date for performance
+    const limit = limitPageLength || 5;
+    const order = orderBy || 'creation desc';
+    
+    return this.callAPI('Stock Reconciliation', 'GET', undefined, filters, limit, fields, order);
   }
 
   async getStockReconciliation(name: string) {
@@ -445,9 +451,9 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI('Packing Slip', 'GET', undefined, filters, limitPageLength);
   }
 
-  // Generic API call method - updated to support fields parameter
-  async callAPI(endpoint: string, method: string = 'GET', data?: any, filters?: any, limitPageLength?: number, fields?: string[]) {
-    const params = this.buildQueryParams(filters, fields, limitPageLength);
+  // Generic API call method - updated to support fields and order parameters
+  async callAPI(endpoint: string, method: string = 'GET', data?: any, filters?: any, limitPageLength?: number, fields?: string[], orderBy?: string) {
+    const params = this.buildQueryParams(filters, fields, limitPageLength, orderBy);
     const url = `${this.baseURL}/api/resource/${endpoint}${params ? '?' + params : ''}`;
     
     console.log('API URL:', url);

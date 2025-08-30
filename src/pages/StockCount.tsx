@@ -160,11 +160,12 @@ const StockCount = () => {
         return;
       }
 
-      // Add filters to get recent records and order by creation date
+      // Add filters to get recent records with proper ordering from API
       const filters = [
         ['docstatus', 'in', [0, 1]] // Only Draft and Submitted
       ];
-      const response = await erpnextAPI.getStockReconciliations(filters, 20); // Get last 20 records
+      // Get only last 5 records sorted by creation date for performance
+      const response = await erpnextAPI.getStockReconciliations(filters, 5, 'creation desc');
       console.log('Stock count sessions response:', response);
 
       if (response?.data) {
@@ -217,12 +218,11 @@ const StockCount = () => {
         );
 
         const transformedSessions: StockCountSession[] = detailedSessions
-          .sort((a: any, b: any) => {
-            // Sort by creation date descending (most recent first)
-            const dateA = new Date(a.createdBy || a.startedAt);
-            const dateB = new Date(b.createdBy || b.startedAt);
-            return dateB.getTime() - dateA.getTime();
-          });
+          // No need for client-side sorting anymore since API returns sorted data
+          .map((session: any) => ({
+            ...session,
+            createdBy: session.createdBy || session.startedAt,
+          }));
 
         setSessions(transformedSessions);
       } else {

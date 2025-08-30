@@ -40,7 +40,7 @@ export class ERPNextBaseAPI {
   }
 
   // Helper method to build query parameters
-  protected buildQueryParams(filters?: any, fields?: string[], limitPageLength?: number): URLSearchParams {
+  protected buildQueryParams(filters?: any, fields?: string[], limitPageLength?: number, orderBy?: string): URLSearchParams {
     const params = new URLSearchParams();
     
     const frappeFilters = this.convertToFrappeFilters(filters);
@@ -54,6 +54,10 @@ export class ERPNextBaseAPI {
     
     if (limitPageLength) {
       params.append('limit_page_length', limitPageLength.toString());
+    }
+    
+    if (orderBy) {
+      params.append('order_by', orderBy);
     }
     
     return params;
