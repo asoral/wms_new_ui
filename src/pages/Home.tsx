@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
-import StripeSecretInput from "@/components/StripeSecretInput";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -121,8 +120,6 @@ const Home = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto py-4 md:py-6 space-y-6 md:space-y-8">
-      <StripeSecretInput />
-      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
         <div className="flex items-center space-x-3">
