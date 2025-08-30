@@ -367,14 +367,13 @@ export class ERPNextAPI extends ERPNextBaseAPI {
       filters.push(['company', '=', company]);
     }
     
-    const orFilters = [
-      ['name', 'like', `%${searchTerm}%`],
-      ['customer_name', 'like', `%${searchTerm}%`]
-    ];
+    // If there's a search term, add it to filters (simpler approach)
+    if (searchTerm && searchTerm.trim()) {
+      filters.push(['customer_name', 'like', `%${searchTerm}%`]);
+    }
 
     const params = new URLSearchParams({
       filters: JSON.stringify(filters),
-      or_filters: JSON.stringify(orFilters),
       fields: JSON.stringify([
         'name',
         'customer_name',
