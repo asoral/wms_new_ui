@@ -92,75 +92,12 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
 
   async getBinStockForCompany(itemCode: string, company: string): Promise<ERPNextResponse<any[]>> {
     try {
-      console.log('=== Getting bin stock for company ===');
+      console.log('=== Getting bin stock for company (optimized approach) ===');
       console.log('Item code:', itemCode);
       console.log('Company:', company);
       
-      // Strategy 1: Try to get warehouses for company first (more reliable)
-      let companyWarehouses: string[] = [];
-      try {
-        console.log('Trying to fetch warehouses for company...');
-        const warehouseFilters = [['company', '=', company]];
-        // Fetch all warehouses - no pagination limit
-        const warehouseParams = this.buildQueryParams(warehouseFilters, ['name'], 9999);
-        const warehouseUrl = `${this.baseURL}/api/resource/Warehouse?${warehouseParams}`;
-        
-        console.log('Warehouse URL:', warehouseUrl);
-        const warehouseResponse = await fetch(warehouseUrl, {
-          headers: this.getHeaders(),
-        });
-
-        if (warehouseResponse.ok) {
-          const warehouseData = await warehouseResponse.json();
-          companyWarehouses = warehouseData.data?.map((w: any) => w.name) || [];
-          console.log(`Found ${companyWarehouses.length} warehouses for company:`, companyWarehouses);
-        } else {
-          console.log('Warehouse API failed, will try alternative approach');
-        }
-      } catch (warehouseError) {
-        console.log('Warehouse fetch failed:', warehouseError);
-      }
-
-      // Strategy 2: Query bins with warehouse filter if we have warehouses
-      if (companyWarehouses.length > 0 && companyWarehouses.length < 50) {
-        console.log('Using warehouse-filtered approach');
-        const binFilters = [
-          ['item_code', '=', itemCode],
-          ['warehouse', 'in', companyWarehouses]
-        ];
-
-        const binFields = [
-          'name',
-          'item_code',
-          'warehouse', 
-          'actual_qty',
-          'reserved_qty',
-          'planned_qty',
-          'ordered_qty',
-          'projected_qty',
-          'creation',
-          'modified'
-        ];
-
-        const binParams = this.buildQueryParams(binFilters, binFields, 999);
-        const fullUrl = `${this.baseURL}/api/resource/Bin?${binParams}`;
-        console.log('Warehouse-filtered URL:', fullUrl);
-        
-        const binResponse = await fetch(fullUrl, {
-          headers: this.getHeaders(),
-        });
-
-        if (binResponse.ok) {
-          const binResult = await binResponse.json();
-          console.log(`Warehouse-filtered approach returned ${binResult.data?.length || 0} bins`);
-          return binResult;
-        } else {
-          console.log('Warehouse-filtered approach failed, falling back...');
-        }
-      }
-
-      // Strategy 3: Get all bins for item and filter client-side
-      console.log('Using fallback approach - get all bins and filter client-side');
+      // New approach: Get all bins for the item first, then filter by warehouse company
+      console.log('Fetching all bins for item...');
       const binFilters = [['item_code', '=', itemCode]];
       const binFields = [
         'name',
@@ -176,16 +113,16 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       ];
 
       const binParams = this.buildQueryParams(binFilters, binFields, 999);
-      const fullUrl = `${this.baseURL}/api/resource/Bin?${binParams}`;
-      console.log('Fallback URL:', fullUrl);
+      const binUrl = `${this.baseURL}/api/resource/Bin?${binParams}`;
+      console.log('Bin URL:', binUrl);
       
-      const binResponse = await fetch(fullUrl, {
+      const binResponse = await fetch(binUrl, {
         headers: this.getHeaders(),
       });
 
       if (!binResponse.ok) {
         const errorText = await binResponse.text();
-        console.error('All bin approaches failed:', {
+        console.error('Bin fetch failed:', {
           status: binResponse.status,
           statusText: binResponse.statusText,
           errorText
@@ -194,34 +131,79 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       }
 
       const binResult = await binResponse.json();
-      console.log(`All bins approach returned ${binResult.data?.length || 0} bins`);
+      console.log(`Found ${binResult.data?.length || 0} total bins for item`);
       
-      // If we have company warehouses, filter by them
-      if (companyWarehouses.length > 0 && binResult?.data) {
-        console.log('Company warehouses to match against:', companyWarehouses.length, 'total warehouses');
-        console.log('Sample warehouses:', companyWarehouses.slice(0, 10));
-        console.log('Bin warehouses found:', binResult.data.map((bin: any) => bin.warehouse));
+      if (!binResult?.data || binResult.data.length === 0) {
+        console.log('No bins found for item');
+        return { data: [] };
+      }
+
+      // Get unique warehouses from the bin results
+      const warehousesInBins = [...new Set(binResult.data.map((bin: any) => bin.warehouse))];
+      console.log(`Found ${warehousesInBins.length} unique warehouses in bins:`, warehousesInBins.slice(0, 10));
+      
+      // Now check which of these warehouses belong to the company
+      // We'll check in batches to avoid URL length issues
+      const batchSize = 50;
+      let companyWarehouses: string[] = [];
+      
+      for (let i = 0; i < warehousesInBins.length; i += batchSize) {
+        const warehouseBatch = warehousesInBins.slice(i, i + batchSize);
+        console.log(`Checking batch ${Math.floor(i/batchSize) + 1}: ${warehouseBatch.length} warehouses`);
         
-        const filteredData = binResult.data.filter((bin: any) => {
-          const isMatch = companyWarehouses.includes(bin.warehouse);
-          console.log(`Warehouse "${bin.warehouse}" match: ${isMatch}`);
-          return isMatch;
+        try {
+          const warehouseFilters = [
+            ['company', '=', company],
+            ['name', 'in', warehouseBatch]
+          ];
+          const warehouseParams = this.buildQueryParams(warehouseFilters, ['name']);
+          const warehouseUrl = `${this.baseURL}/api/resource/Warehouse?${warehouseParams}`;
+          
+          const warehouseResponse = await fetch(warehouseUrl, {
+            headers: this.getHeaders(),
+          });
+
+          if (warehouseResponse.ok) {
+            const warehouseData = await warehouseResponse.json();
+            const batchCompanyWarehouses = warehouseData.data?.map((w: any) => w.name) || [];
+            companyWarehouses = [...companyWarehouses, ...batchCompanyWarehouses];
+            console.log(`Batch ${Math.floor(i/batchSize) + 1} found ${batchCompanyWarehouses.length} company warehouses`);
+          } else {
+            console.warn(`Warehouse batch ${Math.floor(i/batchSize) + 1} check failed`);
+          }
+        } catch (batchError) {
+          console.warn(`Error checking warehouse batch ${Math.floor(i/batchSize) + 1}:`, batchError);
+        }
+      }
+      
+      console.log(`Total company warehouses found: ${companyWarehouses.length}`);
+      console.log('Company warehouses:', companyWarehouses);
+      
+      // Filter bins to only include those in company warehouses
+      if (companyWarehouses.length > 0) {
+        const filteredBins = binResult.data.filter((bin: any) => {
+          const isCompanyWarehouse = companyWarehouses.includes(bin.warehouse);
+          if (isCompanyWarehouse) {
+            console.log(`✓ Including bin in ${bin.warehouse} (company warehouse)`);
+          } else {
+            console.log(`✗ Excluding bin in ${bin.warehouse} (not company warehouse)`);
+          }
+          return isCompanyWarehouse;
         });
-        console.log(`Filtered to ${filteredData.length} bins using ${companyWarehouses.length} known warehouses`);
         
-        // If filtering removes everything, return unfiltered data with a warning
-        if (filteredData.length === 0 && binResult.data.length > 0) {
-          console.warn('Warehouse filtering removed all bins. Returning unfiltered data.');
+        console.log(`Filtered from ${binResult.data.length} to ${filteredBins.length} bins using company filter`);
+        
+        if (filteredBins.length === 0 && binResult.data.length > 0) {
+          console.warn('Company filtering removed all bins. This might indicate a configuration issue.');
+          console.warn('Returning unfiltered data to show all stock locations.');
           return binResult;
         }
         
-        return { ...binResult, data: filteredData };
+        return { ...binResult, data: filteredBins };
+      } else {
+        console.warn('No company warehouses found, returning unfiltered bins');
+        return binResult;
       }
-      
-      // If no warehouse filtering possible, return all bins 
-      // (let the frontend show all locations and let user decide)
-      console.log('No company filtering applied - returning all bins for this item');
-      return binResult;
 
     } catch (error) {
       console.error('Error in getBinStockForCompany:', error);
