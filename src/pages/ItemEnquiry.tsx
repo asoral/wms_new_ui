@@ -176,11 +176,14 @@ const ItemEnquiry = () => {
           });
         });
         
+        console.log('=== TRANSFORMING STOCK DATA ===');
+        console.log('Raw stock data before transformation:', allStockData);
+        
         const transformedItems: StockItem[] = allStockData
           .filter((item: any) => {
             const actualQty = item.actual_qty || 0;
             const shouldInclude = actualQty > 0;
-            console.log(`FILTER: ${item.warehouse} - actual_qty=${actualQty}, include=${shouldInclude}`);
+            console.log(`FILTER: ${item.warehouse} - actual_qty=${actualQty}, include=${shouldInclude}, item:`, item);
             return shouldInclude;
           })
           .map((item: any) => {
