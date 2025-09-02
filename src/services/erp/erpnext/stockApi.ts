@@ -101,7 +101,8 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       try {
         console.log('Trying to fetch warehouses for company...');
         const warehouseFilters = [['company', '=', company]];
-        const warehouseParams = this.buildQueryParams(warehouseFilters, ['name'], 999);
+        // Fetch all warehouses - no pagination limit
+        const warehouseParams = this.buildQueryParams(warehouseFilters, ['name'], 9999);
         const warehouseUrl = `${this.baseURL}/api/resource/Warehouse?${warehouseParams}`;
         
         console.log('Warehouse URL:', warehouseUrl);
@@ -121,8 +122,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       }
 
       // Strategy 2: Query bins with warehouse filter if we have warehouses
-      // Skip warehouse filtering for now to get all stock locations
-      if (false && companyWarehouses.length > 0 && companyWarehouses.length < 50) {
+      if (companyWarehouses.length > 0 && companyWarehouses.length < 50) {
         console.log('Using warehouse-filtered approach');
         const binFilters = [
           ['item_code', '=', itemCode],
@@ -196,10 +196,10 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
       const binResult = await binResponse.json();
       console.log(`All bins approach returned ${binResult.data?.length || 0} bins`);
       
-      // Temporarily disable company warehouse filtering to show all stock locations
-      // The filtering was excluding warehouses that actually have stock
-      if (false && companyWarehouses.length > 0 && binResult?.data) {
-        console.log('Company warehouses to match against:', companyWarehouses.slice(0, 10)); // Show first 10
+      // If we have company warehouses, filter by them
+      if (companyWarehouses.length > 0 && binResult?.data) {
+        console.log('Company warehouses to match against:', companyWarehouses.length, 'total warehouses');
+        console.log('Sample warehouses:', companyWarehouses.slice(0, 10));
         console.log('Bin warehouses found:', binResult.data.map((bin: any) => bin.warehouse));
         
         const filteredData = binResult.data.filter((bin: any) => {
@@ -207,7 +207,7 @@ export class ERPNextStockAPI extends ERPNextBaseAPI {
           console.log(`Warehouse "${bin.warehouse}" match: ${isMatch}`);
           return isMatch;
         });
-        console.log(`Filtered to ${filteredData.length} bins using known warehouses`);
+        console.log(`Filtered to ${filteredData.length} bins using ${companyWarehouses.length} known warehouses`);
         
         // If filtering removes everything, return unfiltered data with a warning
         if (filteredData.length === 0 && binResult.data.length > 0) {
