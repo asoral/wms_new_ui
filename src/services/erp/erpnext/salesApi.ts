@@ -218,8 +218,8 @@ export class ERPNextSalesAPI extends ERPNextBaseAPI {
       }
 
       const [todayResult, allResult] = await Promise.all([
-        this.getDeliveryNotes(todayFilters, company, 1000),
-        this.getDeliveryNotes(allFilters, company, 1000)
+        this.getDeliveryNotes(todayFilters, company, 9999),
+        this.getDeliveryNotes(allFilters, company, 9999)
       ]);
 
       return {

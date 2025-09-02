@@ -16,7 +16,7 @@ export class ERPNextWarehouseAPI extends ERPNextBaseAPI {
 
     finalFilters.push(['disabled', '=', '0']);
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength);
+    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength || 9999);
 
     const response = await fetch(`${this.baseURL}/api/resource/Warehouse?${params}`, {
       headers: this.getHeaders(),

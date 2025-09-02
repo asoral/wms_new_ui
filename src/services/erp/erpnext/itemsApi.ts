@@ -320,7 +320,7 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   async getItems(
     filters: Record<string, any> = {},
     searchText?: string,
-    limit: number = 20,
+    limit: number = 1000,
     offset: number = 0
   ): Promise<ERPNextResponse<Item[]>> {
     

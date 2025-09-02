@@ -20,7 +20,7 @@ export const useERPNextData = () => {
 
       switch (dataType) {
         case 'items':
-          response = await erpnextAPI.getItems(filters, 50);
+          response = await erpnextAPI.getItems(filters, 1000);
           break;
         case 'sales_orders':
           response = await erpnextAPI.getSalesOrders(filters, defaultCompany);
