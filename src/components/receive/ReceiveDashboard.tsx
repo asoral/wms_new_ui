@@ -96,22 +96,27 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
   // Update filtered lists when main lists change (but not when searching)
   useEffect(() => {
     if (poSearchTerm.trim() === "") {
-      setFilteredPOs(purchaseOrders.slice(0, 5));
+      // Sort by creation date descending before slicing
+      const sortedData = [...purchaseOrders].sort((a: any, b: any) => 
+        new Date(b.creation).getTime() - new Date(a.creation).getTime()
+      );
+      setFilteredPOs(sortedData.slice(0, 5));
     }
   }, [purchaseOrders]);
 
   useEffect(() => {
     if (draftSearchTerm.trim() === "") {
-      setFilteredDrafts(draftReceipts.slice(0, 5));
+      // Sort by creation date descending before slicing
+      const sortedData = [...draftReceipts].sort((a: any, b: any) => 
+        new Date(b.creation).getTime() - new Date(a.creation).getTime()
+      );
+      setFilteredDrafts(sortedData.slice(0, 5));
     }
   }, [draftReceipts]);
 
   // Handle PO search - fetch from ERPNext when search term provided
   useEffect(() => {
-    if (poSearchTerm.trim() === "") {
-      // Show only last 5 POs if no search term
-      setFilteredPOs(purchaseOrders.slice(0, 5));
-    } else {
+    if (poSearchTerm.trim() !== "") {
       // Search directly in ERPNext
       fetchPurchaseOrders(poSearchTerm.trim());
     }
@@ -119,10 +124,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
 
   // Handle draft receipt search - fetch from ERPNext when search term provided
   useEffect(() => {
-    if (draftSearchTerm.trim() === "") {
-      // Show only last 5 drafts if no search term
-      setFilteredDrafts(draftReceipts.slice(0, 5));
-    } else {
+    if (draftSearchTerm.trim() !== "") {
       // Search directly in ERPNext
       fetchDraftReceipts(draftSearchTerm.trim());
     }
@@ -234,7 +236,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
         );
         
         setPurchaseOrders(sortedData);
-        setFilteredPOs(sortedData.slice(0, 5));
+        // Let the useEffect handle setting filteredPOs to ensure consistent sorting
 
         // Calculate analytics
         const totalPOs = sortedData.length;
@@ -289,7 +291,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
           setDraftReceipts(sortedData); // Update full list for analytics
         } else {
           setDraftReceipts(sortedData);
-          setFilteredDrafts(sortedData.slice(0, 5));
+          // Let the useEffect handle setting filteredDrafts to ensure consistent sorting
         }
 
         // Calculate analytics
