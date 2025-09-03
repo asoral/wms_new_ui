@@ -2,9 +2,8 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import PickListDashboard from "@/components/picking/PickListDashboard";
-import PickListDetails from "@/components/picking/PickListDetails";
+import PickListCreation from "@/components/picking/PickListCreation";
 import PickingProcess from "@/components/picking/PickingProcess";
-import PickListReviewSubmit from "@/components/picking/PickListReviewSubmit";
 
 // Export the types that other components need
 export interface PickList {
@@ -51,20 +50,16 @@ export interface PickListItem {
 export type PickListPurpose = 'Delivery' | 'Material Transfer' | 'Material Transfer for Manufacture' | 'Manufacturing';
 export type PickListStatus = 'Draft' | 'Open' | 'Completed';
 
-type ViewState = 'dashboard' | 'details' | 'picking' | 'review';
+type ViewState = 'dashboard' | 'creation' | 'picking';
 
 const PickListPage = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [selectedPickList, setSelectedPickList] = useState<PickList | null>(null);
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pickedItems, setPickedItems] = useState<PickListItem[]>([]);
   const { toast } = useToast();
 
   const handleCreateNew = () => {
-    setIsCreatingNew(true);
-    setSelectedPickList(null);
-    setCurrentView('details');
+    setCurrentView('creation');
   };
 
   const handleSelectPickList = async (pickList: any) => {
@@ -117,8 +112,7 @@ const PickListPage = () => {
         
         console.log('Formatted pick list with items:', formattedPickList);
         setSelectedPickList(formattedPickList);
-        setIsCreatingNew(false);
-        setCurrentView('details');
+        setCurrentView('picking');
       }
     } catch (error) {
       console.error('Error loading pick list:', error);
@@ -132,41 +126,39 @@ const PickListPage = () => {
     }
   };
 
-  const handleStartPicking = (pickList: PickList) => {
-    setSelectedPickList(pickList);
+  const handlePickListCreated = (pickListData: any) => {
+    // Convert created pick list to our format and start picking
+    const formattedPickList: PickList = {
+      name: pickListData.name,
+      number: pickListData.name,
+      purpose: pickListData.purpose as PickListPurpose,
+      relatedDocument: pickListData.relatedDocument || 'N/A',
+      status: "Draft",
+      company: pickListData.company,
+      docstatus: 0,
+      creation: new Date().toISOString(),
+      createdDate: new Date().toISOString(),
+      owner: "Administrator",
+      items: pickListData.items || [],
+      locations: pickListData.locations
+    };
+    
+    setSelectedPickList(formattedPickList);
     setCurrentView('picking');
   };
 
   const handleBackToDashboard = () => {
     setCurrentView('dashboard');
     setSelectedPickList(null);
-    setIsCreatingNew(false);
   };
 
-  const handleBackToDetails = () => {
-    setCurrentView('details');
-  };
-
-  const handlePickingComplete = (items: PickListItem[]) => {
-    console.log('Picking completed with items:', items);
-    setPickedItems(items);
-    setCurrentView('review');
-  };
-
-  const handleEditItem = (index: number) => {
-    // Go back to picking at specific item
-    setCurrentView('picking');
-  };
-
-  const handleFinalSubmit = () => {
+  const handlePickingComplete = () => {
     toast({
-      title: "Pick List Submitted",
-      description: "Pick list has been successfully submitted.",
+      title: "Pick List Completed",
+      description: "Pick list has been successfully completed.",
     });
     setCurrentView('dashboard');
     setSelectedPickList(null);
-    setIsCreatingNew(false);
-    setPickedItems([]);
   };
 
   if (currentView === 'dashboard') {
@@ -178,12 +170,10 @@ const PickListPage = () => {
     );
   }
 
-  if (currentView === 'details') {
+  if (currentView === 'creation') {
     return (
-      <PickListDetails
-        pickList={selectedPickList}
-        isCreatingNew={isCreatingNew}
-        onStartPicking={handleStartPicking}
+      <PickListCreation
+        onPickListCreated={handlePickListCreated}
         onBack={handleBackToDashboard}
       />
     );
@@ -193,20 +183,8 @@ const PickListPage = () => {
     return (
       <PickingProcess
         pickList={selectedPickList}
-        onBack={handleBackToDetails}
+        onBack={handleBackToDashboard}
         onComplete={handlePickingComplete}
-      />
-    );
-  }
-
-  if (currentView === 'review' && selectedPickList) {
-    return (
-      <PickListReviewSubmit
-        pickList={selectedPickList}
-        items={pickedItems}
-        onBack={() => setCurrentView('picking')}
-        onEditItem={handleEditItem}
-        onSubmit={handleFinalSubmit}
       />
     );
   }

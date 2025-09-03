@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ChevronLeft, Package, ScanLine, CheckCircle, SkipForward, Scan, Hash } from "lucide-react";
+import { ArrowLeft, ChevronLeft, Package, ScanLine, CheckCircle, SkipForward, Scan, Hash, RefreshCw } from "lucide-react";
 import { PickList, PickListItem } from "../../pages/PickList";
 import { useToast } from "@/hooks/use-toast";
 import BarcodeScanner from "@/components/common/BarcodeScanner";
@@ -13,13 +13,13 @@ import BarcodeScanner from "@/components/common/BarcodeScanner";
 interface PickingProcessProps {
   pickList: PickList;
   onBack: () => void;
-  onComplete: (items: PickListItem[]) => void;
+  onComplete: () => void;
 }
 
 const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) => {
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [scannedCode, setScannedCode] = useState("");
-  const [scannedQty, setScannedQty] = useState<string>("");
+  const [scannedQty, setScannedQty] = useState<string>("1");
   const [items, setItems] = useState<PickListItem[]>(pickList.items || []);
   const [scanningStep, setScanningStep] = useState<'item' | 'batch_serial' | 'qty' | 'complete'>('item');
   const [isItemVerified, setIsItemVerified] = useState(false);
@@ -27,6 +27,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
   const [scannedBatch, setScannedBatch] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [scannerMode, setScannerMode] = useState<'item' | 'batch' | 'serial'>('item');
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,7 +65,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
     setScannedSerials([]);
     setScannedBatch("");
     setScannedCode("");
-    setScannedQty("");
+    setScannedQty("1");
   }, [currentItemIndex]);
 
   const handleBarcodeScanned = (code: string) => {
@@ -159,7 +160,6 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
         description: "Code does not match item code. Please scan correct item or skip.",
         variant: "destructive"
       });
-      // Don't allow progression with wrong item
       return;
     }
   };
@@ -207,7 +207,6 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
           description: `Remove invalid serials: ${invalidSerials.join(', ')}`,
           variant: "destructive"
         });
-        // Remove invalid serials
         const validSerials = scannedSerials.filter(s => expectedSerials.includes(s));
         setScannedSerials(validSerials);
         setScannedQty(validSerials.length.toString());
@@ -233,33 +232,79 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
       return;
     }
 
-    // Update the current item and send to ERPNext
-    const updatedItems = [...items];
-    const updatedItem = {
-      ...currentItem,
-      picked_qty: quantity,
-      pickedQty: quantity,
-      status: quantity === currentItem.qty ? "completed" : "partial",
-      scanned_serials: scannedSerials,
-      scanned_batch: scannedBatch
-    };
-    
-    // Update ERPNext with picked quantities
+    setLoading(true);
+
     try {
+      // Update ERPNext with picked quantities
       const { createERPNextAPI } = await import("@/services/erpnextApi");
       const erpnextAPI = await createERPNextAPI();
       
       if (erpnextAPI) {
-        // Update the pick list item with picked quantities
-        const updateData = {
-          locations: [{
-            ...updatedItem,
-            serial_and_batch_bundle: scannedSerials.length > 0 ? scannedSerials.join('\n') : null
-          }]
-        };
+        // Get current pick list data and update the specific location
+        const currentPickList = await erpnextAPI.getPickList(pickList.name);
+        const pickListData = currentPickList.data?.data || currentPickList.data;
         
-        await erpnextAPI.updatePickList(pickList.name, updateData);
+        if (pickListData && pickListData.locations) {
+          // Update the specific location item with picked quantity
+          const updatedLocations = pickListData.locations.map((loc: any) => {
+            if (loc.item_code === currentItem.item_code && 
+                loc.warehouse === currentItem.warehouse) {
+              return {
+                ...loc,
+                picked_qty: quantity,
+                batch_no: scannedBatch || loc.batch_no,
+                serial_no: scannedSerials.length > 0 ? scannedSerials.join('\n') : loc.serial_no
+              };
+            }
+            return loc;
+          });
+
+          // Update the pick list in ERPNext
+          await erpnextAPI.updatePickList(pickList.name, {
+            locations: updatedLocations
+          });
+        }
       }
+
+      // Update local state
+      const updatedItems = [...items];
+      const updatedItem = {
+        ...currentItem,
+        picked_qty: quantity,
+        pickedQty: quantity,
+        status: quantity === currentItem.qty ? "completed" : "partial",
+        scanned_serials: scannedSerials,
+        scanned_batch: scannedBatch
+      };
+      
+      updatedItems[currentItemIndex] = updatedItem;
+      setItems(updatedItems);
+
+      toast({
+        title: "Item Picked",
+        description: `Successfully picked ${quantity} units`,
+      });
+
+      // Reset scanning state
+      setScannedCode("");
+      setScannedQty("1");
+      setScannedSerials([]);
+      setScannedBatch("");
+      setScanningStep("item");
+      setIsItemVerified(false);
+
+      // Check if this is the last item or all items are processed
+      if (currentItemIndex === items.length - 1) {
+        // Auto-advance or show completion based on all items status
+        const allCompleted = updatedItems.every(item => item.status === "completed");
+        if (allCompleted) {
+          // Will trigger the completion UI automatically via isAllCompleted()
+        }
+      } else {
+        // Move to next item
+        setCurrentItemIndex(currentItemIndex + 1);
+      }
+      
     } catch (error) {
       console.error('Error updating pick list:', error);
       toast({
@@ -267,25 +312,40 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
         description: "Item picked locally but failed to sync with ERPNext",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
-    
-    updatedItems[currentItemIndex] = updatedItem;
-    setItems(updatedItems);
+  };
 
-    toast({
-      title: "Item Picked",
-      description: `Successfully picked ${quantity} units`,
-    });
-
-    // Check if this is the last item or all items are processed
-    if (currentItemIndex === items.length - 1) {
-      // Show review page
-      setTimeout(() => {
-        onComplete(updatedItems);
-      }, 1000);
-    } else {
-      // Move to next item
-      setCurrentItemIndex(currentItemIndex + 1);
+  const handleCompletePickList = async () => {
+    try {
+      setLoading(true);
+      const { createERPNextAPI } = await import("@/services/erpnextApi");
+      const erpnextAPI = await createERPNextAPI();
+      
+      if (erpnextAPI) {
+        // Submit the pick list in ERPNext (change docstatus to 1)
+        await erpnextAPI.submitPickList(pickList.name);
+        
+        toast({
+          title: "Pick List Submitted",
+          description: "Pick list has been successfully submitted in ERPNext",
+        });
+        
+        // Return to dashboard
+        onComplete();
+      } else {
+        throw new Error("Failed to connect to ERPNext");
+      }
+    } catch (error) {
+      console.error('Error submitting pick list:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit pick list to ERPNext",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -299,8 +359,11 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
     if (currentItemIndex < items.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1);
     } else {
-      // If last item, show review
-      onComplete(items);
+      // If last item, check completion
+      const allCompleted = items.every(item => item.status === "completed");
+      if (allCompleted) {
+        // Will trigger completion UI
+      }
     }
   };
 
@@ -328,9 +391,8 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
     return items.length > 0 && items.every(item => (item.picked_qty || 0) === item.qty);
   };
 
-  // Early return if no items - first check if locations exist
+  // Early return if no items
   if (!items || items.length === 0) {
-    // Check if pickList has locations instead of items
     const locations = pickList.locations || [];
     if (locations.length > 0) {
       // Convert locations to items format
@@ -349,10 +411,8 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                 (loc.picked_qty || 0) < loc.qty ? "partial" : "completed"
       }));
       
-      // Update items state with converted locations
       if (convertedItems.length > 0) {
         setItems(convertedItems);
-        // Don't return early, continue with normal flow
       }
     } else {
       return (
@@ -373,7 +433,6 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
   }
 
   const currentItem = getCurrentItem();
-  const codeMatches = currentItem && scannedCode === currentItem.item_code;
 
   if (isAllCompleted()) {
     return (
@@ -412,7 +471,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
         <div className="flex items-center justify-between">
           <Button variant="ghost" onClick={onBack} className="flex items-center space-x-2">
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Details</span>
+            <span>Back to Dashboard</span>
           </Button>
           <div className="flex items-center space-x-4">
             <span className="font-semibold">{pickList.name}</span>
@@ -435,10 +494,16 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
           <h2 className="text-2xl font-bold text-green-900 mb-2">Picking Complete!</h2>
           <p className="text-green-700 mb-6">All items have been successfully picked.</p>
           <Button 
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => onComplete(items)}
+            className="bg-green-600 hover:bg-green-700 min-w-32"
+            onClick={handleCompletePickList}
+            disabled={loading}
           >
-            Complete Pick List
+            {loading ? (
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle className="w-4 h-4 mr-2" />
+            )}
+            Submit Pick List
           </Button>
         </div>
       </div>
@@ -483,7 +548,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack} className="flex items-center space-x-2">
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Details</span>
+          <span>Back to Dashboard</span>
         </Button>
         <div className="flex items-center space-x-4">
           <span className="font-semibold">{pickList.name}</span>
@@ -564,6 +629,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                   size="sm"
                   variant="outline"
                   className="flex-1"
+                  disabled={loading}
                 >
                   <Scan className="w-4 h-4 mr-1" />
                   Scan Item
@@ -573,6 +639,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                   size="sm"
                   variant="outline"
                   className="flex-1"
+                  disabled={loading}
                 >
                   <CheckCircle className="w-4 h-4 mr-1" />
                   Manual Confirm
@@ -584,11 +651,12 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                   value={scannedCode}
                   onChange={(e) => setScannedCode(e.target.value)}
                   className="text-sm"
+                  disabled={loading}
                 />
                 <Button
                   onClick={handleItemVerification}
                   size="sm"
-                  disabled={!scannedCode}
+                  disabled={!scannedCode || loading}
                 >
                   Verify
                 </Button>
@@ -611,6 +679,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                       }}
                       size="sm"
                       variant="outline"
+                      disabled={loading}
                     >
                       <Scan className="w-4 h-4 mr-1" />
                       Scan Batch
@@ -620,6 +689,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                       value={scannedBatch}
                       onChange={(e) => setScannedBatch(e.target.value)}
                       className="text-sm"
+                      disabled={loading}
                     />
                   </div>
                 </div>
@@ -636,7 +706,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                       }}
                       size="sm"
                       variant="outline"
-                      disabled={scannedSerials.length >= getCurrentItem().qty}
+                      disabled={scannedSerials.length >= getCurrentItem().qty || loading}
                     >
                       <Hash className="w-4 h-4 mr-1" />
                       Scan Serial
@@ -665,7 +735,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                 }}
                 size="sm"
                 className="w-full"
-                disabled={getCurrentItem().batch_no && scannedBatch !== getCurrentItem().batch_no}
+                disabled={(getCurrentItem().batch_no && scannedBatch !== getCurrentItem().batch_no) || loading}
               >
                 Continue to Quantity
               </Button>
@@ -683,12 +753,13 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                 onChange={(e) => setScannedQty(e.target.value)}
                 className="text-sm"
                 max={getCurrentItem().qty}
+                disabled={loading}
               />
               <Button
                 onClick={() => setScanningStep('complete')}
                 size="sm"
                 className="w-full"
-                disabled={!scannedQty || parseInt(scannedQty) <= 0}
+                disabled={!scannedQty || parseInt(scannedQty) <= 0 || loading}
               >
                 Continue to Confirm
               </Button>
@@ -708,8 +779,13 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                 onClick={handleConfirmPick}
                 size="sm"
                 className="w-full bg-green-600 hover:bg-green-700"
+                disabled={loading}
               >
-                <CheckCircle className="w-4 h-4 mr-1" />
+                {loading ? (
+                  <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                )}
                 Confirm Pick
               </Button>
             </div>
@@ -722,7 +798,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
         <Button
           variant="outline"
           onClick={handlePrevious}
-          disabled={currentItemIndex === 0}
+          disabled={currentItemIndex === 0 || loading}
           size="sm"
         >
           <ChevronLeft className="w-4 h-4 mr-1" />
@@ -734,6 +810,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
           onClick={handleSkipItem}
           size="sm"
           className="flex-1"
+          disabled={loading}
         >
           <SkipForward className="w-4 h-4 mr-1" />
           Skip Item
