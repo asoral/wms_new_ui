@@ -369,7 +369,14 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle>Recent Purchase Orders to Receive</CardTitle>
+            <div>
+              <CardTitle>Recent Purchase Orders to Receive</CardTitle>
+              {!poSearchTerm && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing last 5 records - use search to find more
+                </p>
+              )}
+            </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -386,7 +393,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
             <div className="text-center py-4 text-muted-foreground">Loading purchase orders...</div>
           ) : (
             <div className="space-y-4">
-              {filteredPOs.slice(0, 5).map((po) => (
+              {filteredPOs.map((po) => (
                 <div key={po.name} className="border border-border rounded-lg p-4">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -439,8 +446,15 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
       {draftReceipts.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
               <CardTitle>Draft Purchase Receipts</CardTitle>
+              {!draftSearchTerm && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing last 5 records - use search to find more
+                </p>
+              )}
+            </div>
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -454,7 +468,7 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredDrafts.slice(0, 5).map((receipt) => (
+              {filteredDrafts.map((receipt) => (
                 <div key={receipt.name} className="border border-border rounded-lg p-4">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1 min-w-0">
