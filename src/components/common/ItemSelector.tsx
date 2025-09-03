@@ -112,18 +112,20 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
         params.append('or_filters', JSON.stringify(orFilters));
       }
 
-      const response = await fetch(`${erpnextAPI.getBaseURL}/api/resource/Item?${params}`, {
-        headers: {
-          'Authorization': `token ${erpnextAPI.getApiKey}:${erpnextAPI.getApiSecret}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Use centralized API instead of direct fetch
+      const result = await erpnextAPI.callAPI('/api/resource/Item', 'GET', null, filters, 20, [
+        'name',
+        'item_code', 
+        'item_name',
+        'stock_uom',
+        'is_stock_item',
+        'has_variants',
+        'variant_of',
+        'has_serial_no',
+        'has_batch_no',
+        'item_group'
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`Failed to search items: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       console.log('Item API result:', result);
       
       if (result && result.data) {

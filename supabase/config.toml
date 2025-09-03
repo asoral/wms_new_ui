@@ -15,3 +15,6 @@ verify_jwt = true
 
 [functions.make-payment-exempt]
 verify_jwt = true
+
+[functions.secure-signup]
+verify_jwt = false

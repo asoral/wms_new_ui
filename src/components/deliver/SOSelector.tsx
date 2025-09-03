@@ -155,22 +155,11 @@ const SOSelector = ({ onOrderSelected, isLoading }: SOSelectorProps) => {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      // Get full SO details
-      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Sales Order/${so.name}`, {
-        headers: {
-          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const fullSOResult = await response.json();
+      // Get full SO details using centralized API
+      const soResponse = await erpnextAPI.getSalesOrder(so.name);
       
-      if (fullSOResult.data) {
-        const fullSO = fullSOResult.data;
+      if (soResponse?.data) {
+        const fullSO = soResponse.data;
         
         const transformedSO: SalesOrder = {
           id: fullSO.name,

@@ -96,15 +96,18 @@ const AuthForm = () => {
       return;
     }
 
+    // Sanitize credentials before sending
+    const sanitizedCredentials = {
+      erpnext_url: signupForm.erpnextUrl.trim(),
+      erpnext_api_key: signupForm.erpnextApiKey.trim(),
+      erpnext_api_secret: signupForm.erpnextApiSecret.trim()
+    };
+
     const { error } = await signUp(
-      signupForm.email, 
+      signupForm.email.trim(), 
       signupForm.password, 
-      signupForm.fullName,
-      {
-        erpnext_url: signupForm.erpnextUrl,
-        erpnext_api_key: signupForm.erpnextApiKey,
-        erpnext_api_secret: signupForm.erpnextApiSecret
-      }
+      signupForm.fullName.trim(),
+      sanitizedCredentials
     );
 
     if (error) {

@@ -160,34 +160,19 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
       const erpnextAPI = await createERPNextAPI();
       if (!erpnextAPI) return;
 
-      // Get full PO details
-      const response = await fetch(`${erpnextAPI.baseURL}/api/resource/Purchase Order/${po.name}`, {
-        headers: {
-          'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const fullPOResult = await response.json();
+      // Get full PO details using centralized API
+      const poResponse = await erpnextAPI.getPurchaseOrder(po.name);
       
-      if (fullPOResult.data) {
-        const fullPO = fullPOResult.data;
+      if (poResponse?.data) {
+        const fullPO = poResponse.data;
         
         // Fetch item details to get tracking information
         const itemsWithTracking = await Promise.all(
           (fullPO.items || []).map(async (item: any) => {
             try {
-              // Fetch item details to get has_batch_no and has_serial_no
-              const itemResponse = await fetch(
-                `${erpnextAPI.baseURL}/api/resource/Item/${encodeURIComponent(item.item_code)}?fields=["has_batch_no","has_serial_no"]`,
-                {
-                  headers: {
-                    'Authorization': `token ${erpnextAPI.apiKey}:${erpnextAPI.apiSecret}`,
-                    'Content-Type': 'application/json',
+              // Use centralized API to fetch item details
+              const itemResponse = await erpnextAPI.getItemDetails(item.item_code);
+              const itemDetails = itemResponse?.data;
                   }
                 }
               );
