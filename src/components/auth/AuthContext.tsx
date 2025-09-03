@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
@@ -29,9 +30,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const lastActivityRef = useRef<number>(Date.now());
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const licenseCheckRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Session timeout: 24 hours of inactivity (much more reasonable)
+  // Session timeout: 24 hours of inactivity
   const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  // License check interval: 10 minutes (standard for paid apps)
+  const LICENSE_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes in milliseconds
 
   // Update activity timestamp with throttling
   const updateActivity = useCallback(() => {
@@ -51,6 +55,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     if (timeSinceLastActivity > SESSION_TIMEOUT) {
       console.log('Session timed out due to inactivity');
+      toast({
+        title: "Session Expired",
+        description: "Your session has expired due to inactivity. Please log in again.",
+        variant: "destructive"
+      });
       await supabase.auth.signOut();
       return;
     }
@@ -64,7 +73,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     timeoutRef.current = setTimeout(checkSessionTimeout, Math.min(nextCheckIn, 60000)); // Check at least every minute
   }, [user, session, SESSION_TIMEOUT]);
 
-  // Set up activity listeners
+  // Check license/subscription status (like other paid apps)
+  const checkLicenseStatus = useCallback(async () => {
+    if (!user || !session) return;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      
+      if (error) {
+        console.error('License check failed:', error);
+        // Don't logout on network errors, just log and retry later
+        return;
+      }
+      
+      if (!data?.hasAccess) {
+        console.log('License validation failed - unauthorized access detected');
+        toast({
+          title: "Access Revoked",
+          description: "Your subscription has expired or been cancelled. Please renew your subscription.",
+          variant: "destructive"
+        });
+        await supabase.auth.signOut();
+        return;
+      }
+      
+      // Schedule next license check
+      if (licenseCheckRef.current) {
+        clearTimeout(licenseCheckRef.current);
+      }
+      licenseCheckRef.current = setTimeout(checkLicenseStatus, LICENSE_CHECK_INTERVAL);
+      
+    } catch (error) {
+      console.error('License check error:', error);
+      // Don't logout on unexpected errors, just retry later
+    }
+  }, [user, session, LICENSE_CHECK_INTERVAL]);
+
+  // Set up activity listeners and license checking
   useEffect(() => {
     if (!user) return;
 
@@ -81,6 +126,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Start session timeout checking
     checkSessionTimeout();
+    
+    // Start periodic license checking (like other paid apps)
+    checkLicenseStatus();
 
     return () => {
       // Remove event listeners
@@ -88,13 +136,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         document.removeEventListener(event, handleActivity, true);
       });
       
-      // Clear timeout
+      // Clear timeouts
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
+      
+      if (licenseCheckRef.current) {
+        clearTimeout(licenseCheckRef.current);
+        licenseCheckRef.current = null;
+      }
     };
-  }, [user, updateActivity, checkSessionTimeout]);
+  }, [user, updateActivity, checkSessionTimeout, checkLicenseStatus]);
 
   useEffect(() => {
     let mounted = true;
@@ -111,6 +164,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;
+            }
+            if (licenseCheckRef.current) {
+              clearTimeout(licenseCheckRef.current);
+              licenseCheckRef.current = null;
             }
           }
         }
