@@ -118,8 +118,26 @@ const PickListCreation = ({ onPickListCreated, onBack }: PickListCreationProps) 
 
       console.log('Pick list created:', pickListName);
 
-      // Get item locations using ERPNext's built-in method
-      await api.callMethod('Pick List', pickListName, 'get_item_locations');
+      // Get item locations using ERPNext's correct method based on purpose
+      let methodName = '';
+      if (purpose === "Material Transfer") {
+        methodName = 'get_items_from_material_request';
+      } else if (purpose === "Delivery") {
+        methodName = 'get_items_from_sales_order';  
+      } else if (purpose === "Material Transfer for Manufacture") {
+        methodName = 'get_items_from_work_order';
+      }
+
+      if (methodName) {
+        try {
+          await api.callMethod('Pick List', pickListName, methodName);
+          console.log(`Called ${methodName} successfully`);
+        } catch (methodError) {
+          console.warn(`Method ${methodName} failed, trying alternative approach:`, methodError);
+          // Fallback: try to get items manually and populate locations
+          await populatePickListItems(api, pickListName, purpose, relatedDocument);
+        }
+      }
       
       // Fetch the updated pick list with items
       const pickListDetails = await api.getPickList(pickListName);
@@ -319,7 +337,7 @@ const PickListCreation = ({ onPickListCreated, onBack }: PickListCreationProps) 
             <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
               <li>Select the purpose for your pick list</li>
               <li>Choose the related document (Material Request, Sales Order, or Work Order)</li>
-              <li>ERPNext will automatically fetch items and their locations based on current stock</li>
+              <li>ERPNext will create the pick list and fetch items from the source document</li>
               <li>You can then proceed to pick the items using barcode scanning</li>
             </ol>
           </CardContent>
@@ -329,4 +347,47 @@ const PickListCreation = ({ onPickListCreated, onBack }: PickListCreationProps) 
   );
 };
 
+// Helper function to manually populate pick list items when ERPNext methods fail
+const populatePickListItems = async (api: any, pickListName: string, purpose: string, relatedDocument: string) => {
+  try {
+    let items: any[] = [];
+    
+    if (purpose === "Material Transfer") {
+      const mrResponse = await api.getMaterialRequest(relatedDocument);
+      const mrData = (mrResponse as any)?.data?.data || (mrResponse as any)?.data;
+      items = mrData?.items || [];
+    } else if (purpose === "Delivery") {
+      const soResponse = await api.getSalesOrder(relatedDocument);
+      const soData = (soResponse as any)?.data?.data || (soResponse as any)?.data;
+      items = soData?.items || [];
+    } else if (purpose === "Material Transfer for Manufacture") {
+      const woResponse = await api.getWorkOrder(relatedDocument);
+      const woData = woResponse?.data?.data || woResponse?.data;
+      items = woData?.required_items || [];
+    }
+
+    if (items.length > 0) {
+      const locations = items.map((item: any) => ({
+        item_code: item.item_code,
+        item_name: item.item_name,
+        qty: item.qty || item.pending_qty || item.required_qty || 1,
+        stock_qty: item.stock_qty || item.qty || item.pending_qty || item.required_qty || 1,
+        uom: item.uom || item.stock_uom || 'Nos',
+        stock_uom: item.stock_uom || item.uom || 'Nos',
+        warehouse: item.from_warehouse || item.warehouse || item.source_warehouse || '',
+        batch_no: item.batch_no || '',
+        serial_no: item.serial_no || '',
+        conversion_factor: item.conversion_factor || 1
+      }));
+
+      await api.updatePickList(pickListName, {
+        locations: locations
+      });
+      
+      console.log('Manually populated pick list items:', locations);
+    }
+  } catch (error) {
+    console.error('Failed to manually populate pick list:', error);
+  }
+};
 export default PickListCreation;
