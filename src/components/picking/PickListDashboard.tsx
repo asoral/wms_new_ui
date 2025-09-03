@@ -94,12 +94,8 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
       }
       
       if (pickListsData.length > 0) {
-        // Sort by creation date descending (newest first)
-        const sortedData = pickListsData.sort((a: any, b: any) => 
-          new Date(b.creation).getTime() - new Date(a.creation).getTime()
-        );
-        
-        const processedPickLists = sortedData.map((pl: any) => ({
+        // Data is already sorted by ERPNext with 'creation desc'
+        const processedPickLists = pickListsData.map((pl: any) => ({
           ...pl,
           status: pl.status || (pl.docstatus === 0 ? 'Draft' : pl.docstatus === 1 ? 'Open' : 'Completed')
         }));
@@ -107,11 +103,11 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         console.log('Processed pick lists data:', processedPickLists);
         
         if (searchTerm) {
-          // When searching, show all results
+          // When searching with higher limit, show all results 
           setFilteredPickLists(processedPickLists);
           setPickLists(processedPickLists); // Update the full list for analytics
         } else {
-          // When not searching, these are already limited to 5 by API
+          // When not searching, data is already limited to 5 by API
           setPickLists(processedPickLists);
           setFilteredPickLists(processedPickLists);
         }

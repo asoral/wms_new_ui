@@ -225,8 +225,8 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   // Purchase methods
-  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength);
+  async getPurchaseOrders(filters?: any, company?: string, limitPageLength?: number, orderBy?: string) {
+    return this.purchaseAPI.getPurchaseOrders(filters, company, limitPageLength, 0, orderBy);
   }
 
   async getPurchaseOrder(poNumber: string) {
@@ -261,8 +261,8 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.purchaseAPI.getPurchaseReceipt(name);
   }
 
-  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number) {
-    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength);
+  async getPurchaseReceipts(filters?: any, company?: string, limitPageLength?: number, orderBy?: string) {
+    return this.purchaseAPI.getPurchaseReceipts(filters, company, limitPageLength, 0, orderBy);
   }
 
   async submitPurchaseReceipt(name: string) {

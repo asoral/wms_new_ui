@@ -96,21 +96,15 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
   // Update filtered lists when main lists change (but not when searching)
   useEffect(() => {
     if (poSearchTerm.trim() === "") {
-      // Sort by creation date descending before slicing
-      const sortedData = [...purchaseOrders].sort((a: any, b: any) => 
-        new Date(b.creation).getTime() - new Date(a.creation).getTime()
-      );
-      setFilteredPOs(sortedData.slice(0, 5));
+      // Data is already sorted from ERPNext, just slice to 5
+      setFilteredPOs(purchaseOrders.slice(0, 5));
     }
   }, [purchaseOrders]);
 
   useEffect(() => {
     if (draftSearchTerm.trim() === "") {
-      // Sort by creation date descending before slicing
-      const sortedData = [...draftReceipts].sort((a: any, b: any) => 
-        new Date(b.creation).getTime() - new Date(a.creation).getTime()
-      );
-      setFilteredDrafts(sortedData.slice(0, 5));
+      // Data is already sorted from ERPNext, just slice to 5
+      setFilteredDrafts(draftReceipts.slice(0, 5));
     }
   }, [draftReceipts]);
 
@@ -190,8 +184,8 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
         
         // We'll make two calls and combine results
         const [nameResults, supplierResults] = await Promise.all([
-          erpnextAPI.getPurchaseOrders(poFilters, company || undefined),
-          erpnextAPI.getPurchaseOrders(supplierFilters, company || undefined)
+          erpnextAPI.getPurchaseOrders(poFilters, company || undefined, 50, 'creation desc'),
+          erpnextAPI.getPurchaseOrders(supplierFilters, company || undefined, 50, 'creation desc')
         ]);
         
         // Combine and deduplicate results
@@ -228,20 +222,17 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
       }
 
       // This section only executes when there's no searchTerm (handled above)
-      const poResponse = await erpnextAPI.getPurchaseOrders(poFilters, company || undefined);
+      const poResponse = await erpnextAPI.getPurchaseOrders(poFilters, company || undefined, 5, 'creation desc');
       
       if (poResponse?.data && Array.isArray(poResponse.data)) {
-        const sortedData = poResponse.data.sort((a: any, b: any) => 
-          new Date(b.creation).getTime() - new Date(a.creation).getTime()
-        );
-        
-        setPurchaseOrders(sortedData);
+        // Data is already sorted by ERPNext
+        setPurchaseOrders(poResponse.data);
         // Let the useEffect handle setting filteredPOs to ensure consistent sorting
 
         // Calculate analytics
-        const totalPOs = sortedData.length;
-        const pendingPOs = sortedData.filter((po: any) => po.status === 'To Receive').length;
-        const completedPOs = sortedData.filter((po: any) => po.status === 'Completed').length;
+        const totalPOs = poResponse.data.length;
+        const pendingPOs = poResponse.data.filter((po: any) => po.status === 'To Receive').length;
+        const completedPOs = poResponse.data.filter((po: any) => po.status === 'Completed').length;
         
         setAnalytics(prev => ({
           ...prev,
@@ -279,23 +270,20 @@ const ReceiveDashboard = ({ onSelectPO, onSelectDraftReceipt, shortcuts = [] }: 
         receiptFilters.push(['name', 'like', `%${searchTerm}%`]);
       }
 
-      const receiptResponse = await erpnextAPI.getPurchaseReceipts(receiptFilters, company || undefined);
+      const receiptResponse = await erpnextAPI.getPurchaseReceipts(receiptFilters, company || undefined, 5, 'creation desc');
       
       if (receiptResponse?.data && Array.isArray(receiptResponse.data)) {
-        const sortedData = receiptResponse.data.sort((a: any, b: any) => 
-          new Date(b.creation).getTime() - new Date(a.creation).getTime()
-        );
-        
+        // Data is already sorted by ERPNext
         if (searchTerm) {
-          setFilteredDrafts(sortedData);
-          setDraftReceipts(sortedData); // Update full list for analytics
+          setFilteredDrafts(receiptResponse.data);
+          setDraftReceipts(receiptResponse.data); // Update full list for analytics
         } else {
-          setDraftReceipts(sortedData);
+          setDraftReceipts(receiptResponse.data);
           // Let the useEffect handle setting filteredDrafts to ensure consistent sorting
         }
 
         // Calculate analytics
-        const draftReceiptsCount = sortedData.length;
+        const draftReceiptsCount = receiptResponse.data.length;
         
         setAnalytics(prev => ({
           ...prev,

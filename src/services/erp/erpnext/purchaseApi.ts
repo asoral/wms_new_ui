@@ -10,7 +10,8 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
     filters: Record<string, any> = {},
     company?: string,
     limit: number = 20,
-    offset: number = 0
+    offset: number = 0,
+    orderBy?: string
   ): Promise<ERPNextResponse<PurchaseOrder[]>> {
     // Build Frappe filters array
     const conditions: any[] = this.convertToFrappeFilters(filters);
@@ -24,10 +25,17 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
     // Request specific fields needed for dashboard
     params.append('fields', JSON.stringify([
       'name', 'supplier', 'supplier_name', 'schedule_date', 'transaction_date', 
-      'grand_total', 'status', 'items', 'total_qty'
+      'grand_total', 'status', 'items', 'total_qty', 'creation'
     ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String(offset));
+    
+    // Add ordering - default to creation desc for latest records first
+    if (orderBy) {
+      params.append('order_by', orderBy);
+    } else {
+      params.append('order_by', 'creation desc');
+    }
 
     const response = await fetch(
       `${this.baseURL}/api/resource/Purchase Order?${params.toString()}`,
@@ -62,7 +70,8 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
     filters: Record<string, any> = {},
     company?: string,
     limit: number = 20,
-    offset: number = 0
+    offset: number = 0,
+    orderBy?: string
   ): Promise<ERPNextResponse<PurchaseReceipt[]>> {
     const conditions: any[] = this.convertToFrappeFilters(filters);
     if (company) {
@@ -78,6 +87,13 @@ export class ERPNextPurchaseAPI extends ERPNextBaseAPI {
     ]));
     params.append('limit_page_length', String(limit));
     params.append('limit_start', String(offset));
+    
+    // Add ordering - default to creation desc for latest records first
+    if (orderBy) {
+      params.append('order_by', orderBy);
+    } else {
+      params.append('order_by', 'creation desc');
+    }
 
     const response = await fetch(
       `${this.baseURL}/api/resource/Purchase Receipt?${params.toString()}`,
