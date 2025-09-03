@@ -16,7 +16,10 @@ export class ERPNextWarehouseAPI extends ERPNextBaseAPI {
 
     finalFilters.push(['disabled', '=', '0']);
     
-    const params = this.buildQueryParams(finalFilters, undefined, limitPageLength || 9999);
+    // When company filter is applied, fetch all warehouses for that company (no limit needed)
+    // Otherwise use the provided limit or a reasonable default
+    const finalLimit = company ? undefined : (limitPageLength || 1000);
+    const params = this.buildQueryParams(finalFilters, undefined, finalLimit);
 
     const response = await fetch(`${this.baseURL}/api/resource/Warehouse?${params}`, {
       headers: this.getHeaders(),
