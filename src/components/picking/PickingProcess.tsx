@@ -391,6 +391,15 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
     return items.length > 0 && items.every(item => (item.picked_qty || 0) === item.qty);
   };
 
+  const hasAnyPickedItems = () => {
+    return items.some(item => (item.picked_qty || 0) > 0);
+  };
+
+  const canSubmitPickList = () => {
+    // Allow submission if any items have been picked (partial or complete)
+    return hasAnyPickedItems() || isAllCompleted();
+  };
+
   // Early return if no items
   if (!items || items.length === 0) {
     const locations = pickList.locations || [];
@@ -816,6 +825,25 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
           Skip Item
         </Button>
       </div>
+
+      {/* Partial Submit Button - Fixed position when items are picked */}
+      {canSubmitPickList() && !isAllCompleted() && (
+        <div className="fixed bottom-20 md:bottom-6 right-4 z-50">
+          <Button
+            onClick={handleCompletePickList}
+            className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg px-6 py-3 rounded-full"
+            disabled={loading}
+            size="lg"
+          >
+            {loading ? (
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle className="w-4 h-4 mr-2" />
+            )}
+            Submit Partial Pick List
+          </Button>
+        </div>
+      )}
 
       {/* Barcode Scanner Modal */}
       {showScanner && (

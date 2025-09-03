@@ -128,16 +128,9 @@ const PickListCreation = ({ onPickListCreated, onBack }: PickListCreationProps) 
         methodName = 'get_items_from_work_order';
       }
 
-      if (methodName) {
-        try {
-          await api.callMethod('Pick List', pickListName, methodName);
-          console.log(`Called ${methodName} successfully`);
-        } catch (methodError) {
-          console.warn(`Method ${methodName} failed, trying alternative approach:`, methodError);
-          // Fallback: try to get items manually and populate locations
-          await populatePickListItems(api, pickListName, purpose, relatedDocument);
-        }
-      }
+      // Always try to populate items manually as ERPNext methods often fail
+      console.log('Populating pick list items manually...');
+      await populatePickListItems(api, pickListName, purpose, relatedDocument);
       
       // Fetch the updated pick list with items
       const pickListDetails = await api.getPickList(pickListName);
