@@ -79,23 +79,27 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
 
       console.log('API search for items:', search);
       
-      // Apply filters for stock items only and search
-      const filters = [
-        ['is_stock_item', '=', 1],
-        ['disabled', '=', 0]
-      ];
+      // Use the searchItems method from ERPNext API which handles search better
+      if (search) {
+        const result = await erpnextAPI.searchItems(search, 20);
+        console.log('Item search API result:', result);
+        
+        if (result && result.data) {
+          const itemsData = Array.isArray(result.data) ? result.data : [result.data];
+          console.log('Items found:', itemsData.length);
+          setItems(itemsData);
+          return itemsData;
+        }
+      } else {
+        // If no search term, get general items
+        const filters = [
+          ['is_stock_item', '=', 1],
+          ['disabled', '=', 0]
+        ];
 
-      // Add search filters if search term is provided
-      const orFilters = search ? [
-        ['item_code', 'like', `%${search}%`],
-        ['item_name', 'like', `%${search}%`]
-      ] : undefined;
-
-      const params = new URLSearchParams({
-        filters: JSON.stringify(filters),
-        fields: JSON.stringify([
+        const result = await erpnextAPI.callAPI('Item', 'GET', null, filters, 20, [
           'name',
-          'item_code',
+          'item_code', 
           'item_name',
           'stock_uom',
           'is_stock_item',
@@ -104,50 +108,16 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
           'has_serial_no',
           'has_batch_no',
           'item_group'
-        ]),
-        limit_page_length: String(20) // Reduced from 50 to 20
-      });
+        ]);
 
-      if (orFilters) {
-        params.append('or_filters', JSON.stringify(orFilters));
-      }
-
-      // Use centralized API instead of direct fetch
-      const result = await erpnextAPI.callAPI('Item', 'GET', null, filters, 20, [
-        'name',
-        'item_code', 
-        'item_name',
-        'stock_uom',
-        'is_stock_item',
-        'has_variants',
-        'variant_of',
-        'has_serial_no',
-        'has_batch_no',
-        'item_group'
-      ]);
-
-      console.log('Item API result:', result);
-      
-      if (result && result.data) {
-        const itemData: Item[] = result.data.map(item => ({
-          name: item.name,
-          item_code: item.item_code,
-          item_name: item.item_name || item.item_code,
-          stock_uom: item.stock_uom || 'Nos',
-          description: item.description,
-          has_serial_no: item.has_serial_no,
-          has_batch_no: item.has_batch_no,
-          item_group: item.item_group
-        }));
+        console.log('Item API result:', result);
         
-        // Sort items by item_code
-        itemData.sort((a, b) => a.item_code.localeCompare(b.item_code));
-        
-        console.log('Setting items:', itemData.length);
-        setItems(itemData);
-      } else {
-        console.log('No items found in API response');
-        setItems([]);
+        if (result && result.data) {
+          const itemsData = Array.isArray(result.data) ? result.data : [result.data];
+          console.log('Items found:', itemsData.length);
+          setItems(itemsData);
+          return itemsData;
+        }
       }
     } catch (error) {
       console.error('Failed to fetch items:', error);
