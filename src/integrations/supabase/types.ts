@@ -167,6 +167,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          granted_at: string
+          granted_by: string | null
+          id: string
+          is_active: boolean
+          permission: Database["public"]["Enums"]["permission_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean
+          permission: Database["public"]["Enums"]["permission_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean
+          permission?: Database["public"]["Enums"]["permission_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -217,6 +250,10 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: boolean
       }
+      current_user_has_permission: {
+        Args: { p_permission: Database["public"]["Enums"]["permission_type"] }
+        Returns: boolean
+      }
       decrypt_secret: {
         Args: { encrypted_data: string; key_id?: string }
         Returns: string
@@ -249,6 +286,21 @@ export type Database = {
           erpnext_url: string
         }[]
       }
+      grant_user_permission: {
+        Args: {
+          p_expires_at?: string
+          p_permission: Database["public"]["Enums"]["permission_type"]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      has_permission: {
+        Args: {
+          p_permission: Database["public"]["Enums"]["permission_type"]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -275,6 +327,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      revoke_user_permission: {
+        Args: {
+          p_permission: Database["public"]["Enums"]["permission_type"]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       update_user_erpnext_credentials: {
         Args: {
           p_erpnext_api_key?: string
@@ -288,6 +347,10 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      permission_type:
+        | "view_valuations"
+        | "view_sensitive_data"
+        | "admin_access"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -416,6 +479,11 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      permission_type: [
+        "view_valuations",
+        "view_sensitive_data",
+        "admin_access",
+      ],
     },
   },
 } as const

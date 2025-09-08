@@ -3,11 +3,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign, Download, FileSpreadsheet, FileText, Eye, EyeOff, ShoppingCart, Truck } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign, Download, FileSpreadsheet, FileText, Eye, EyeOff, ShoppingCart, Truck, Lock } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Item } from "@/types";
 import ItemScanner from "@/components/item-enquiry/ItemScanner";
 import { exportItemEnquiryToExcel, exportItemEnquiryToPDF } from "@/utils/exportUtils";
@@ -30,20 +30,18 @@ const ItemEnquiry = () => {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
-  const [showTotalValue, setShowTotalValue] = useState(false);
-  const [showValuation, setShowValuation] = useState(false);
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [pendingAction, setPendingAction] = useState<'total' | 'valuation' | null>(null);
   const [totalPOQty, setTotalPOQty] = useState<number>(0);
   const [totalSOQty, setTotalSOQty] = useState<number>(0);
   const [loadingPOSO, setLoadingPOSO] = useState(false);
+  const [showUnauthorizedDialog, setShowUnauthorizedDialog] = useState(false);
+  
   const { toast } = useToast();
+  const { hasPermission } = usePermissions();
 
   const loadItemStock = async (item: Item) => {
     const code = item.item_code;
-    console.log('=== loadItemStock called with item:', item);
-    console.log('Item code:', code);
+      console.log('=== loadItemStock called with item:', item);
+      console.log('Item code:', code);
     
     if (!code || !code.trim()) {
       console.error('No item code provided');
@@ -307,46 +305,14 @@ const ItemEnquiry = () => {
     setTotalSOQty(0);
   };
 
-  const handleToggleValuationVisibility = (type: 'total' | 'valuation') => {
-    const isCurrentlyVisible = type === 'total' ? showTotalValue : showValuation;
-    
-    if (isCurrentlyVisible) {
-      // Already visible, hide it
-      if (type === 'total') {
-        setShowTotalValue(false);
-      } else {
-        setShowValuation(false);
-      }
-    } else {
-      // Not visible, show password dialog
-      setPendingAction(type);
-      setShowPasswordDialog(true);
-    }
-  };
+  const canViewValuations = hasPermission('view_valuations');
 
-  const handlePasswordSubmit = () => {
-    if (passwordInput === "show123" && pendingAction) {
-      if (pendingAction === 'total') {
-        setShowTotalValue(true);
-      } else {
-        setShowValuation(true);
-      }
-      setPasswordInput("");
-      setShowPasswordDialog(false);
-      setPendingAction(null);
-    } else {
-      toast({
-        title: "Incorrect Password",
-        description: "Please enter the correct password to view valuation data.",
-        variant: "destructive"
-      });
+  const handleToggleValuationVisibility = () => {
+    if (!canViewValuations) {
+      setShowUnauthorizedDialog(true);
     }
-  };
-
-  const handlePasswordCancel = () => {
-    setPasswordInput("");
-    setShowPasswordDialog(false);
-    setPendingAction(null);
+    // If user has permission, valuation data is always visible
+    // No need to toggle since it's controlled by permissions
   };
 
   const fetchPOSOQuantities = async (itemCodes: string[], company: string) => {
@@ -584,16 +550,16 @@ const ItemEnquiry = () => {
                       <div>
                         <div className="flex items-center space-x-2 mb-1">
                           <p className="text-sm text-yellow-600">Total Value</p>
-                          <button
-                            onClick={() => handleToggleValuationVisibility('total')}
-                            className="text-yellow-600 hover:text-yellow-700 transition-colors"
-                          >
-                            {showTotalValue ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                          </button>
-                        </div>
-                        <p className="text-2xl font-bold text-yellow-600">
-                          {showTotalValue ? formatCurrency(totalValuation) : "••••••"}
-                        </p>
+                           <button
+                             onClick={handleToggleValuationVisibility}
+                             className="text-yellow-600 hover:text-yellow-700 transition-colors"
+                           >
+                             <Eye className="w-4 h-4" />
+                           </button>
+                         </div>
+                         <p className="text-2xl font-bold text-yellow-600">
+                           {canViewValuations ? formatCurrency(totalValuation) : "••••••"}
+                         </p>
                       </div>
                       <DollarSign className="w-8 h-8 text-yellow-600" />
                     </div>
@@ -705,16 +671,16 @@ const ItemEnquiry = () => {
                               <div>
                                 <div className="flex items-center space-x-2">
                                   <span className="text-gray-600">Valuation:</span>
-                                <button
-                                  onClick={() => handleToggleValuationVisibility('valuation')}
-                                  className="text-gray-600 hover:text-gray-700 transition-colors"
-                                >
-                                    {showValuation ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                  </button>
-                                </div>
-                                <p className="font-semibold mt-1">
-                                  {showValuation ? formatCurrency(item.valuation) : "••••••"}
-                                </p>
+                                 <button
+                                   onClick={handleToggleValuationVisibility}
+                                   className="text-gray-600 hover:text-gray-700 transition-colors"
+                                 >
+                                     <Eye className="w-3 h-3" />
+                                   </button>
+                                 </div>
+                                 <p className="font-semibold mt-1">
+                                   {canViewValuations ? formatCurrency(item.valuation) : "••••••"}
+                                 </p>
                               </div>
                             </div>
                           </div>
@@ -738,11 +704,11 @@ const ItemEnquiry = () => {
                               <div className="flex items-center justify-end space-x-2">
                                 <span>Valuation</span>
                                   <button
-                                    onClick={() => handleToggleValuationVisibility('valuation')}
-                                    className="text-gray-600 hover:text-gray-700 transition-colors"
-                                  >
-                                  {showValuation ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                                </button>
+                                     onClick={handleToggleValuationVisibility}
+                                     className="text-gray-600 hover:text-gray-700 transition-colors"
+                                   >
+                                   <Eye className="w-4 h-4" />
+                                 </button>
                               </div>
                             </th>
                           </tr>
@@ -764,9 +730,9 @@ const ItemEnquiry = () => {
                                   {item.age} days
                                 </Badge>
                               </td>
-                              <td className="p-3 text-right font-semibold">
-                                {showValuation ? formatCurrency(item.valuation) : "••••••"}
-                              </td>
+                               <td className="p-3 text-right font-semibold">
+                                 {canViewValuations ? formatCurrency(item.valuation) : "••••••"}
+                               </td>
                             </tr>
                           ))}
                         </tbody>
@@ -794,33 +760,25 @@ const ItemEnquiry = () => {
         </Card>
       )}
       
-      {/* Password Dialog */}
-      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+      {/* Unauthorized Access Dialog */}
+      <Dialog open={showUnauthorizedDialog} onOpenChange={setShowUnauthorizedDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Enter Password</DialogTitle>
+            <DialogTitle className="flex items-center space-x-2">
+              <Lock className="w-5 h-5" />
+              <span>Access Restricted</span>
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Enter the manager password to view valuation information.
+            <p className="text-sm text-muted-foreground">
+              You don't have permission to view valuation data. Please contact your administrator to request the "view_valuations" permission.
             </p>
-            <Input
-              type="password"
-              placeholder="Enter password"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-              className="w-full"
-            />
+            <div className="flex justify-end">
+              <Button onClick={() => setShowUnauthorizedDialog(false)}>
+                OK
+              </Button>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handlePasswordCancel}>
-              Cancel
-            </Button>
-            <Button onClick={handlePasswordSubmit}>
-              Show Valuation
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
