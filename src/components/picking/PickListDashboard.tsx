@@ -145,7 +145,7 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
     }
   };
 
-  const handleGetItemLocation = async (pickList: any) => {
+  const handleRefreshPickList = async (pickList: any) => {
     try {
       const { createERPNextAPI } = await import('@/services/erpnextApi');
       const api = await createERPNextAPI();
@@ -159,20 +159,24 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
         return;
       }
       
-      // Call the get_item_locations method in ERPNext
-      await api.callMethod('Pick List', pickList.name, 'get_item_locations');
+      // Fetch fresh pick list details from ERPNext
+      const response = await api.getPickList(pickList.name);
       
-      toast({
-        title: "Item Locations Updated",
-        description: "Pick list item locations have been refreshed from current stock",
-      });
-      
-      fetchPickLists(); // Refresh the list
+      if (response?.data) {
+        toast({
+          title: "Pick List Refreshed",
+          description: "Pick list data has been updated from ERPNext",
+        });
+        
+        fetchPickLists(); // Refresh the list
+      } else {
+        throw new Error('Failed to fetch pick list details');
+      }
     } catch (error) {
-      console.error('Error updating item locations:', error);
+      console.error('Error refreshing pick list:', error);
       toast({
         title: "Error",
-        description: "Failed to update item locations",
+        description: "Failed to refresh pick list",
         variant: "destructive"
       });
     }
@@ -356,12 +360,12 @@ const PickListDashboard = ({ onCreateNew, onSelectPickList }: PickListDashboardP
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleGetItemLocation(pickList)}
+                          onClick={() => handleRefreshPickList(pickList)}
                           disabled={loading}
                           className="min-w-20"
                         >
                           <RefreshCw className="w-4 h-4 mr-2" />
-                          Get Items
+                          Refresh
                         </Button>
                       )}
                       {pickList.status === 'Draft' && (
