@@ -324,12 +324,51 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
       const erpnextAPI = await createERPNextAPI();
       
       if (erpnextAPI) {
-        // Submit the pick list in ERPNext (change docstatus to 1)
+        // First, ensure all items have correct picked quantities in ERPNext
+        console.log('Updating all item quantities before submission...');
+        const currentPickList = await erpnextAPI.getPickList(pickList.name);
+        const pickListData = currentPickList.data?.data || currentPickList.data;
+        
+        if (pickListData && pickListData.locations) {
+          // Update all locations with their actual picked quantities
+          const updatedLocations = pickListData.locations.map((loc: any) => {
+            // Find corresponding item in local state
+            const localItem = items.find(item => 
+              item.item_code === loc.item_code && 
+              item.warehouse === loc.warehouse
+            );
+            
+            if (localItem) {
+              // Use the locally tracked picked quantity (0 for skipped items)
+              return {
+                ...loc,
+                picked_qty: localItem.picked_qty || 0,
+                batch_no: localItem.scanned_batch || loc.batch_no,
+                serial_no: localItem.scanned_serials?.join('\n') || loc.serial_no
+              };
+            }
+            
+            // If not found in local state, assume not picked (qty = 0)
+            return {
+              ...loc,
+              picked_qty: 0
+            };
+          });
+          
+          console.log('Updating pick list with final quantities:', updatedLocations);
+          
+          // Update the pick list with all quantities
+          await erpnextAPI.updatePickList(pickList.name, {
+            locations: updatedLocations
+          });
+        }
+        
+        // Now submit the pick list in ERPNext (change docstatus to 1)
         await erpnextAPI.submitPickList(pickList.name);
         
         toast({
           title: "Pick List Submitted",
-          description: "Pick list has been successfully submitted in ERPNext",
+          description: "Pick list has been successfully submitted with correct quantities",
         });
         
         // Return to dashboard
@@ -340,7 +379,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
     } catch (error) {
       console.error('Error submitting pick list:', error);
       toast({
-        title: "Error",
+        title: "Error", 
         description: "Failed to submit pick list to ERPNext",
         variant: "destructive"
       });
@@ -356,11 +395,23 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
   };
 
   const handleSkipItem = () => {
+    // Mark current item as skipped with 0 picked quantity
+    const updatedItems = [...items];
+    const currentItem = getCurrentItem();
+    const updatedItem = {
+      ...currentItem,
+      picked_qty: 0,
+      pickedQty: 0,
+      status: "skipped"
+    };
+    updatedItems[currentItemIndex] = updatedItem;
+    setItems(updatedItems);
+    
     if (currentItemIndex < items.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1);
     } else {
       // If last item, check completion
-      const allCompleted = items.every(item => item.status === "completed");
+      const allCompleted = updatedItems.every(item => item.status === "completed");
       if (allCompleted) {
         // Will trigger completion UI
       }
@@ -388,7 +439,9 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
   };
 
   const isAllCompleted = () => {
-    return items.length > 0 && items.every(item => (item.picked_qty || 0) === item.qty);
+    return items.length > 0 && items.every(item => 
+      item.status === "completed" || item.status === "skipped" || (item.picked_qty || 0) >= 0
+    );
   };
 
   const hasAnyPickedItems = () => {
