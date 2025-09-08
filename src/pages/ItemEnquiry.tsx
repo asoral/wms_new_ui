@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign, Download, FileSpreadsheet, FileText, Eye, EyeOff } from "lucide-react";
+import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign, Download, FileSpreadsheet, FileText, Eye, EyeOff, ShoppingCart, Truck } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { Item } from "@/types";
@@ -35,6 +35,9 @@ const ItemEnquiry = () => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [pendingAction, setPendingAction] = useState<'total' | 'valuation' | null>(null);
+  const [totalPOQty, setTotalPOQty] = useState<number>(0);
+  const [totalSOQty, setTotalSOQty] = useState<number>(0);
+  const [loadingPOSO, setLoadingPOSO] = useState(false);
   const { toast } = useToast();
 
   const loadItemStock = async (item: Item) => {
@@ -273,6 +276,9 @@ const ItemEnquiry = () => {
             description: `Found stock in ${transformedItems.length} locations for ${itemType}: ${code}`,
           });
         }
+
+        // Fetch PO and SO quantities
+        await fetchPOSOQuantities(itemCodesToFetch, company);
       } else {
         setStockItems([]);
         toast({
@@ -297,6 +303,8 @@ const ItemEnquiry = () => {
   const handleClear = () => {
     setSelectedItem(null);
     setStockItems([]);
+    setTotalPOQty(0);
+    setTotalSOQty(0);
   };
 
   const handleToggleValuationVisibility = (type: 'total' | 'valuation') => {
@@ -339,6 +347,95 @@ const ItemEnquiry = () => {
     setPasswordInput("");
     setShowPasswordDialog(false);
     setPendingAction(null);
+  };
+
+  const fetchPOSOQuantities = async (itemCodes: string[], company: string) => {
+    try {
+      setLoadingPOSO(true);
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) return;
+
+      let totalPO = 0;
+      let totalSO = 0;
+
+      // Fetch Purchase Orders with pending status
+      for (const itemCode of itemCodes) {
+        try {
+          // Get Purchase Orders for this company with pending status
+          const poFilters = [
+            ['docstatus', '=', 1],
+            ['status', 'in', ['To Receive', 'To Receive and Bill']],
+            ['company', '=', company]
+          ];
+          
+          const poResponse = await erpnextAPI.getPurchaseOrders(poFilters, company, 50);
+          
+          if (poResponse?.data) {
+            for (const po of poResponse.data) {
+              // Get detailed PO with items
+              try {
+                const poDetailResponse = await erpnextAPI.callAPI(`Purchase Order/${po.name}`, 'GET');
+                const poDetail = poDetailResponse?.data;
+                
+                if (poDetail?.items) {
+                  poDetail.items.forEach((item: any) => {
+                    if (item.item_code === itemCode) {
+                      const pendingQty = (item.qty || 0) - (item.received_qty || 0);
+                      if (pendingQty > 0) {
+                        totalPO += pendingQty;
+                      }
+                    }
+                  });
+                }
+              } catch (error) {
+                console.warn(`Failed to fetch PO details for ${po.name}:`, error);
+              }
+            }
+          }
+
+          // Get Sales Orders for this company with pending status  
+          const soFilters = [
+            ['docstatus', '=', 1],
+            ['status', 'in', ['To Deliver', 'To Deliver and Bill', 'Partially Delivered']],
+            ['company', '=', company]
+          ];
+          
+          const soResponse = await erpnextAPI.getSalesOrders(soFilters, company, 50);
+          
+          if (soResponse?.data) {
+            for (const so of soResponse.data) {
+              // Get detailed SO with items
+              try {
+                const soDetailResponse = await erpnextAPI.callAPI(`Sales Order/${so.name}`, 'GET');
+                const soDetail = soDetailResponse?.data;
+                
+                if (soDetail?.items) {
+                  soDetail.items.forEach((item: any) => {
+                    if (item.item_code === itemCode) {
+                      const pendingQty = (item.qty || 0) - (item.delivered_qty || 0);
+                      if (pendingQty > 0) {
+                        totalSO += pendingQty;
+                      }
+                    }
+                  });
+                }
+              } catch (error) {
+                console.warn(`Failed to fetch SO details for ${so.name}:`, error);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch PO/SO data for item ${itemCode}:`, error);
+        }
+      }
+
+      setTotalPOQty(Math.round(totalPO * 100) / 100);
+      setTotalSOQty(Math.round(totalSO * 100) / 100);
+    } catch (error) {
+      console.error('Error fetching PO/SO quantities:', error);
+    } finally {
+      setLoadingPOSO(false);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -456,7 +553,7 @@ const ItemEnquiry = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <Card className="bg-blue-50 border-blue-200">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -499,6 +596,34 @@ const ItemEnquiry = () => {
                         </p>
                       </div>
                       <DollarSign className="w-8 h-8 text-yellow-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-purple-50 border-purple-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-purple-600 mb-1">Total PO Qty</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {loadingPOSO ? "..." : totalPOQty}
+                        </p>
+                      </div>
+                      <ShoppingCart className="w-8 h-8 text-purple-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-orange-50 border-orange-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-orange-600 mb-1">Total SO Qty</p>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {loadingPOSO ? "..." : totalSOQty}
+                        </p>
+                      </div>
+                      <Truck className="w-8 h-8 text-orange-600" />
                     </div>
                   </CardContent>
                 </Card>
