@@ -173,17 +173,13 @@ const POSelector = ({ onOrderSelected, isLoading }: POSelectorProps) => {
               // Use centralized API to fetch item details
               const itemResponse = await erpnextAPI.getItemDetails(item.item_code);
               const itemDetails = itemResponse?.data;
-                  }
-                }
-              );
               
               let hasBatch = false;
               let hasSerial = false;
               
-              if (itemResponse.ok) {
-                const itemData = await itemResponse.json();
-                hasBatch = itemData.data?.has_batch_no === 1;
-                hasSerial = itemData.data?.has_serial_no === 1;
+              if (itemDetails) {
+                hasBatch = itemDetails.has_batch_no === 1;
+                hasSerial = itemDetails.has_serial_no === 1;
               }
               
               return {
