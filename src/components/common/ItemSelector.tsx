@@ -113,7 +113,7 @@ const ItemSelector = ({ onItemSelect, selectedItem, placeholder = "Search and se
       }
 
       // Use centralized API instead of direct fetch
-      const result = await erpnextAPI.callAPI('/api/resource/Item', 'GET', null, filters, 20, [
+      const result = await erpnextAPI.callAPI('Item', 'GET', null, filters, 20, [
         'name',
         'item_code', 
         'item_name',
