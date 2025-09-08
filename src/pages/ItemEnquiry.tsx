@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Package, Warehouse, TrendingUp, AlertTriangle, DollarSign, Download, FileSpreadsheet, FileText, Eye, EyeOff } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { Item } from "@/types";
@@ -28,6 +28,8 @@ const ItemEnquiry = () => {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
+  const [showTotalValue, setShowTotalValue] = useState(true);
+  const [showValuation, setShowValuation] = useState(true);
   const { toast } = useToast();
 
   const loadItemStock = async (item: Item) => {
@@ -436,8 +438,18 @@ const ItemEnquiry = () => {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-yellow-600 mb-1">Total Value</p>
-                        <p className="text-2xl font-bold text-yellow-600">{formatCurrency(totalValuation)}</p>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <p className="text-sm text-yellow-600">Total Value</p>
+                          <button
+                            onClick={() => setShowTotalValue(!showTotalValue)}
+                            className="text-yellow-600 hover:text-yellow-700 transition-colors"
+                          >
+                            {showTotalValue ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <p className="text-2xl font-bold text-yellow-600">
+                          {showTotalValue ? formatCurrency(totalValuation) : "••••••"}
+                        </p>
                       </div>
                       <DollarSign className="w-8 h-8 text-yellow-600" />
                     </div>
@@ -519,8 +531,18 @@ const ItemEnquiry = () => {
                                 </div>
                               </div>
                               <div>
-                                <span className="text-gray-600">Valuation:</span>
-                                <p className="font-semibold mt-1">{formatCurrency(item.valuation)}</p>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-gray-600">Valuation:</span>
+                                  <button
+                                    onClick={() => setShowValuation(!showValuation)}
+                                    className="text-gray-600 hover:text-gray-700 transition-colors"
+                                  >
+                                    {showValuation ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                                <p className="font-semibold mt-1">
+                                  {showValuation ? formatCurrency(item.valuation) : "••••••"}
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -540,7 +562,17 @@ const ItemEnquiry = () => {
                             <th className="text-right p-3 font-medium text-gray-700">Quantity</th>
                             <th className="text-left p-3 font-medium text-gray-700">UOM</th>
                             <th className="text-right p-3 font-medium text-gray-700">Age (Days)</th>
-                            <th className="text-right p-3 font-medium text-gray-700">Valuation</th>
+                            <th className="text-right p-3 font-medium text-gray-700">
+                              <div className="flex items-center justify-end space-x-2">
+                                <span>Valuation</span>
+                                <button
+                                  onClick={() => setShowValuation(!showValuation)}
+                                  className="text-gray-600 hover:text-gray-700 transition-colors"
+                                >
+                                  {showValuation ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                </button>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -561,7 +593,7 @@ const ItemEnquiry = () => {
                                 </Badge>
                               </td>
                               <td className="p-3 text-right font-semibold">
-                                {formatCurrency(item.valuation)}
+                                {showValuation ? formatCurrency(item.valuation) : "••••••"}
                               </td>
                             </tr>
                           ))}
