@@ -175,7 +175,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
 
   const handleConfirmPick = async () => {
     const currentItem = getCurrentItem();
-    const quantity = (currentItem.serial_no || currentItem.has_serial_no) ? scannedSerials.length : parseInt(scannedQty);
+    const quantity = (currentItem.serial_no || currentItem.has_serial_no) ? scannedSerials.length : parseFloat(scannedQty);
 
     // Validate item verification
     if (!isItemVerified) {
@@ -756,7 +756,8 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
               <h4 className="text-sm font-medium">Step 3: Enter Quantity</h4>
               <Input
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
+                step="any"
                 placeholder="Enter picked quantity"
                 value={scannedQty}
                 onChange={(e) => setScannedQty(e.target.value)}
@@ -768,7 +769,7 @@ const PickingProcess = ({ pickList, onBack, onComplete }: PickingProcessProps) =
                 onClick={() => setScanningStep('complete')}
                 size="sm"
                 className="w-full"
-                disabled={!scannedQty || parseInt(scannedQty) <= 0 || loading}
+                disabled={!scannedQty || parseFloat(scannedQty) <= 0 || loading}
               >
                 Continue to Confirm
               </Button>
