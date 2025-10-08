@@ -60,6 +60,7 @@ const App = () => {
                   {/* Public Routes */}
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/recovery" element={<Auth />} />
                   <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                   
                   {/* Protected App Routes */}

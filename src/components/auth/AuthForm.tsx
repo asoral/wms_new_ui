@@ -39,12 +39,28 @@ const AuthForm = () => {
       const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
       const hashType = hashParams.get('type');
       const hashAccessToken = hashParams.get('access_token');
+      const hashRefreshToken = hashParams.get('refresh_token');
 
-      if (type === 'recovery' || hashType === 'recovery' || accessToken || hashAccessToken) {
-        // User clicked password reset link
+      const pathname = window.location.pathname;
+
+      // If tokens are present in hash, create a session manually (detectSessionInUrl is false)
+      if (hashAccessToken && hashRefreshToken) {
+        try {
+          await supabase.auth.setSession({ access_token: hashAccessToken, refresh_token: hashRefreshToken });
+        } catch (e) {
+          console.error('Failed to establish recovery session', e);
+        }
+      }
+
+      if (
+        pathname.includes('/auth/recovery') ||
+        type === 'recovery' ||
+        hashType === 'recovery' ||
+        accessToken ||
+        hashAccessToken
+      ) {
         setIsPasswordRecovery(true);
       } else if (type === 'signup' || type === 'email_change') {
-        // Email verification - Supabase handles this automatically
         setSuccess('Email verified successfully! You can now log in.');
         setActiveTab('login');
       }
@@ -194,11 +210,9 @@ const AuthForm = () => {
       return;
     }
     try {
-      const redirectBase = window.location.hostname.includes('lovable')
-        ? 'https://wms.dexciss.tech'
-        : window.location.origin;
+      const redirectBase = window.location.origin;
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${redirectBase}/auth?type=recovery`
+        redirectTo: `${redirectBase}/auth/recovery`
       });
       if (error) {
         setResetMessage({ error: error.message || 'Failed to send reset email.' });
