@@ -24,6 +24,28 @@ const AuthForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+
+  // Check for password recovery or email verification
+  useEffect(() => {
+    const checkAuthCallback = async () => {
+      const type = searchParams.get('type');
+      const accessToken = searchParams.get('access_token');
+      
+      if (type === 'recovery' && accessToken) {
+        // User clicked password reset link
+        setIsPasswordRecovery(true);
+      } else if (type === 'signup' || type === 'email_change') {
+        // Email verification - Supabase handles this automatically
+        setSuccess('Email verified successfully! You can now log in.');
+        setActiveTab('login');
+      }
+    };
+    
+    checkAuthCallback();
+  }, [searchParams]);
 
   // Initialize tab from URL parameter
   useEffect(() => {
@@ -156,7 +178,7 @@ const AuthForm = () => {
     }
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: window.location.origin + "/auth"
+        redirectTo: window.location.origin + "/auth?type=recovery"
       });
       if (error) {
         setResetMessage({ error: error.message || 'Failed to send reset email.' });
@@ -168,6 +190,113 @@ const AuthForm = () => {
     }
     setResetLoading(false);
   };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (newPassword !== confirmNewPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      
+      if (error) {
+        setError(error.message);
+      } else {
+        setSuccess('Password updated successfully! You can now log in.');
+        setIsPasswordRecovery(false);
+        setNewPassword('');
+        setConfirmNewPassword('');
+        setActiveTab('login');
+        // Clear URL parameters
+        navigate('/auth', { replace: true });
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update password');
+    }
+    
+    setLoading(false);
+  };
+
+  // Show password recovery form
+  if (isPasswordRecovery) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="flex items-center justify-center mb-8">
+            <div className="flex items-center space-x-2">
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Warehouse className="w-6 h-6 text-white" />
+              </div>
+              <span className="font-bold text-2xl text-foreground">WMS</span>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Set New Password</CardTitle>
+              <CardDescription>
+                Enter your new password below
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                  <Input
+                    id="confirm-new-password"
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Update Password
+                </Button>
+              </form>
+
+              {error && (
+                <Alert className="mt-4 border-red-200 bg-red-50">
+                  <AlertDescription className="text-red-800">{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {success && (
+                <Alert className="mt-4 border-green-200 bg-green-50">
+                  <AlertDescription className="text-green-800">{success}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   // Show onboarding when requested
   if (showOnboarding) {
