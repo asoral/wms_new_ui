@@ -53,6 +53,17 @@ const AuthForm = () => {
     checkAuthCallback();
   }, [searchParams]);
 
+  // Also handle Supabase PASSWORD_RECOVERY event (robust across environments)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('Detected PASSWORD_RECOVERY event');
+        setIsPasswordRecovery(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Initialize tab from URL parameter
   useEffect(() => {
     const tab = searchParams.get('tab');
