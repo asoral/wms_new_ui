@@ -226,24 +226,7 @@ export type Database = {
       }
     }
     Views: {
-      public_app_settings: {
-        Row: {
-          description: string | null
-          setting_key: string | null
-          setting_value: string | null
-        }
-        Insert: {
-          description?: string | null
-          setting_key?: string | null
-          setting_value?: string | null
-        }
-        Update: {
-          description?: string | null
-          setting_key?: string | null
-          setting_value?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       admin_can_view_subscription: {
