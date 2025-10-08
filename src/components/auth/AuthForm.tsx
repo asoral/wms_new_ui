@@ -33,8 +33,14 @@ const AuthForm = () => {
     const checkAuthCallback = async () => {
       const type = searchParams.get('type');
       const accessToken = searchParams.get('access_token');
-      
-      if (type === 'recovery' && accessToken) {
+
+      // Also parse hash params (Supabase often appends tokens in the URL hash)
+      const hash = window.location.hash || '';
+      const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+      const hashType = hashParams.get('type');
+      const hashAccessToken = hashParams.get('access_token');
+
+      if (type === 'recovery' || hashType === 'recovery' || accessToken || hashAccessToken) {
         // User clicked password reset link
         setIsPasswordRecovery(true);
       } else if (type === 'signup' || type === 'email_change') {
