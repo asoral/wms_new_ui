@@ -177,8 +177,11 @@ const AuthForm = () => {
       return;
     }
     try {
+      const redirectBase = window.location.hostname.includes('lovable')
+        ? 'https://wms.dexciss.tech'
+        : window.location.origin;
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: window.location.origin + "/auth?type=recovery"
+        redirectTo: `${redirectBase}/auth?type=recovery`
       });
       if (error) {
         setResetMessage({ error: error.message || 'Failed to send reset email.' });

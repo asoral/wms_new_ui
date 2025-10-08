@@ -203,7 +203,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string, erpnextConfig?: any) => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectBase = window.location.hostname.includes('lovable')
+      ? 'https://wms.dexciss.tech'
+      : window.location.origin;
+    const redirectUrl = `${redirectBase}/`;
     
     const userData: any = {
       full_name: fullName || ''
