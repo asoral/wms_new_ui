@@ -27,88 +27,78 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Force refresh of environment variable
-    const stripeKey = Deno.env.get("STRIPEKEY");
-    logStep("Retrieved Stripe key", { hasKey: !!stripeKey, keyLength: stripeKey?.length || 0 });
-    
-    if (!stripeKey || stripeKey.trim() === '') {
-      throw new Error(`STRIPEKEY is empty or not set. Available env vars: ${Object.keys(Deno.env.toObject()).join(', ')}`);  
-    }
-    logStep("Stripe key verified");
-
+    // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    
+    // Create client with user's JWT token (respects RLS)
+    const userSupabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { 
+        auth: { persistSession: false },
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        }
+      }
+    );
+
+    const { data: userData, error: userError } = await userSupabaseClient.auth.getUser(token);
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    // Check current subscriber status
-    const { data: subscriber, error: subError } = await supabaseClient
-      .from("subscribers")
-      .select("*")
-      .eq("email", user.email)
+    // Use the secure database function to get subscription status
+    const { data: statusData, error: statusError } = await userSupabaseClient
+      .rpc('get_user_subscription_status')
       .single();
 
-    if (subError && subError.code !== 'PGRST116') {
-      throw new Error(`Subscriber lookup error: ${subError.message}`);
+    if (statusError) {
+      logStep("Error fetching subscription status", { error: statusError });
+      throw new Error(`Subscription status error: ${statusError.message}`);
     }
 
-    const now = new Date();
-    let isTrialActive = false;
-    let trialDaysLeft = 0;
-    let hasAccess = false;
+    logStep("Subscription status retrieved", { 
+      hasAccess: statusData.has_access,
+      paymentExempt: statusData.payment_exempt 
+    });
 
-    if (subscriber) {
-      // Check if payment exempt FIRST - no need for Stripe if exempt
-      if (subscriber.payment_exempt) {
-        hasAccess = true;
-        logStep("User is payment exempt - granting access", { email: user.email });
-        
-        return new Response(JSON.stringify({
-          hasAccess: true,
-          isTrialActive: false,
-          trialDaysLeft: 0,
-          subscribed: true,
-          paymentExempt: true,
-          subscriptionEnd: null,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
+    // If user doesn't have access and isn't payment exempt, check Stripe
+    if (!statusData.has_access && !statusData.payment_exempt) {
+      // Need service role to update subscriber record with Stripe data
+      const stripeKey = Deno.env.get("STRIPEKEY");
+      if (!stripeKey || stripeKey.trim() === '') {
+        logStep("Stripe key not configured, skipping Stripe check");
       } else {
-        // Check trial status
-        if (subscriber.trial_end) {
-          const trialEnd = new Date(subscriber.trial_end);
-          isTrialActive = now < trialEnd;
-          trialDaysLeft = isTrialActive ? Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-        }
-
-        // Initialize Stripe
         const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
         
-        // Check Stripe subscription if trial has ended
-        if (!isTrialActive && subscriber.stripe_customer_id) {
+        // Get subscriber record to check for stripe_customer_id
+        const { data: subscriber } = await supabaseClient
+          .from("subscribers")
+          .select("stripe_customer_id, email")
+          .eq("user_id", user.id)
+          .single();
+
+        if (subscriber?.stripe_customer_id) {
           const subscriptions = await stripe.subscriptions.list({
             customer: subscriber.stripe_customer_id,
             status: "active",
             limit: 1,
           });
           
-          const hasActiveSubscription = subscriptions.data.length > 0;
-          let subscriptionEnd = null;
-
-          if (hasActiveSubscription) {
+          if (subscriptions.data.length > 0) {
             const subscription = subscriptions.data[0];
-            subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-            hasAccess = true;
-            logStep("Active subscription found", { subscriptionId: subscription.id });
+            const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
+            
+            logStep("Active Stripe subscription found", { subscriptionId: subscription.id });
 
-            // Update subscriber record
+            // Update subscriber record with service role
             await supabaseClient
               .from("subscribers")
               .update({
@@ -117,40 +107,33 @@ serve(async (req) => {
                 is_trial_active: false,
                 updated_at: new Date().toISOString(),
               })
-              .eq("email", user.email);
-          } else {
-            hasAccess = false;
-            logStep("No active subscription found");
-          }
-        } else if (isTrialActive) {
-          hasAccess = true;
-          logStep("Trial is active", { daysLeft: trialDaysLeft });
-        }
+              .eq("user_id", user.id);
 
-        // Update trial status if needed
-        if (subscriber.is_trial_active && !isTrialActive) {
-          await supabaseClient
-            .from("subscribers")
-            .update({
-              is_trial_active: false,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("email", user.email);
+            // Return updated status
+            return new Response(JSON.stringify({
+              hasAccess: true,
+              isTrialActive: false,
+              trialDaysLeft: 0,
+              subscribed: true,
+              paymentExempt: false,
+              subscriptionEnd: subscriptionEnd,
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            });
+          }
         }
       }
-    } else {
-      // No subscriber record found - this shouldn't happen with the trigger
-      hasAccess = false;
-      logStep("No subscriber record found");
     }
 
+    // Return the status from the database function
     return new Response(JSON.stringify({
-      hasAccess,
-      isTrialActive,
-      trialDaysLeft,
-      subscribed: subscriber?.subscribed || false,
-      paymentExempt: subscriber?.payment_exempt || false,
-      subscriptionEnd: subscriber?.subscription_end,
+      hasAccess: statusData.has_access,
+      isTrialActive: statusData.is_trial_active,
+      trialDaysLeft: statusData.trial_days_left,
+      subscribed: statusData.subscribed,
+      paymentExempt: statusData.payment_exempt,
+      subscriptionEnd: statusData.subscription_end,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

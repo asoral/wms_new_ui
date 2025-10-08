@@ -246,6 +246,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_can_view_subscription: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       can_access_subscription: {
         Args: { target_user_id: string }
         Returns: boolean
@@ -284,6 +288,17 @@ export type Database = {
           erpnext_default_company: string
           erpnext_pallet_template_item: string
           erpnext_url: string
+        }[]
+      }
+      get_user_subscription_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          has_access: boolean
+          is_trial_active: boolean
+          payment_exempt: boolean
+          subscribed: boolean
+          subscription_end: string
+          trial_days_left: number
         }[]
       }
       grant_user_permission: {
