@@ -46,7 +46,7 @@ export type Database = {
           action: string
           created_at: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           new_values: Json | null
           old_values: Json | null
           resource_id: string | null
@@ -58,7 +58,7 @@ export type Database = {
           action: string
           created_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           new_values?: Json | null
           old_values?: Json | null
           resource_id?: string | null
@@ -70,7 +70,7 @@ export type Database = {
           action?: string
           created_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           new_values?: Json | null
           old_values?: Json | null
           resource_id?: string | null
@@ -264,7 +264,7 @@ export type Database = {
         }[]
       }
       get_user_erpnext_credentials: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           erpnext_api_key: string
           erpnext_api_secret: string
@@ -274,7 +274,7 @@ export type Database = {
         }[]
       }
       get_user_subscription_status: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           has_access: boolean
           is_trial_active: boolean
@@ -306,10 +306,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin: {
-        Args: { _user_id?: string }
-        Returns: boolean
-      }
+      is_admin: { Args: { _user_id?: string }; Returns: boolean }
       log_security_event: {
         Args: { details?: Json; event_type: string }
         Returns: undefined
