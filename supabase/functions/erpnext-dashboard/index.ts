@@ -23,12 +23,14 @@ interface DashboardMetrics {
   deadStockValue: number
   carryingCostPercentage: number
   operationalMetrics: {
-    pickAccuracy: number
-    putawaySpeed: number
-    cycleCountAccuracy: number
-    orderFulfillmentRate: number
+    completedPickLists: number
+    totalPickLists: number
+    completedDeliveries: number
+    totalDeliveryNotes: number
+    fullyDeliveredOrders: number
+    totalSalesOrders: number
     warehouseUtilization: number
-    averageProcessingTime: number
+    avgDeliveryTime: number
   }
   stockAgingData: {
     items_count: number
@@ -123,7 +125,10 @@ serve(async (req) => {
       purchaseOrdersResponse,
       warehousesResponse,
       stockLedgerResponse,
-      batchResponse
+      batchResponse,
+      pickListsResponse,
+      deliveryNotesResponse,
+      salesOrdersResponse
     ] = await Promise.allSettled([
       // 1. Total Items - count of enabled items
       fetch(`${config.erpnext_url}/api/resource/Item?fields=["name"]&filters=[["disabled","=",0]]&limit_page_length=999999`, {
@@ -171,6 +176,30 @@ serve(async (req) => {
           'Authorization': erpAuthHeader,
           'Content-Type': 'application/json'
         }
+      }),
+      
+      // 7. Pick Lists for pick accuracy
+      fetch(`${config.erpnext_url}/api/resource/Pick List?fields=["name","status","creation","modified","company"]&filters=[["company","=","${company || ''}"],["creation",">=","${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}"]]&limit_page_length=999999`, {
+        headers: {
+          'Authorization': erpAuthHeader,
+          'Content-Type': 'application/json'
+        }
+      }),
+      
+      // 8. Delivery Notes for fulfillment metrics
+      fetch(`${config.erpnext_url}/api/resource/Delivery Note?fields=["name","status","posting_date","docstatus","company"]&filters=[["company","=","${company || ''}"],["posting_date",">=","${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}"]]&limit_page_length=999999`, {
+        headers: {
+          'Authorization': erpAuthHeader,
+          'Content-Type': 'application/json'
+        }
+      }),
+      
+      // 9. Sales Orders for fulfillment rate
+      fetch(`${config.erpnext_url}/api/resource/Sales Order?fields=["name","status","transaction_date","delivery_status","docstatus","company"]&filters=[["company","=","${company || ''}"],["transaction_date",">=","${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}"]]&limit_page_length=999999`, {
+        headers: {
+          'Authorization': erpAuthHeader,
+          'Content-Type': 'application/json'
+        }
       })
     ])
 
@@ -198,8 +227,20 @@ serve(async (req) => {
     const batches = batchResponse.status === 'fulfilled'
       ? (await batchResponse.value.json()).data || []
       : []
+      
+    const pickLists = pickListsResponse.status === 'fulfilled'
+      ? (await pickListsResponse.value.json()).data || []
+      : []
+      
+    const deliveryNotes = deliveryNotesResponse.status === 'fulfilled'
+      ? (await deliveryNotesResponse.value.json()).data || []
+      : []
+      
+    const salesOrders = salesOrdersResponse.status === 'fulfilled'
+      ? (await salesOrdersResponse.value.json()).data || []
+      : []
 
-    console.log('Data fetched - Items:', items.length, 'Bins:', bins.length, 'POs:', purchaseOrders.length, 'Warehouses:', warehouses.length)
+    console.log('Data fetched - Items:', items.length, 'Bins:', bins.length, 'POs:', purchaseOrders.length, 'Warehouses:', warehouses.length, 'Pick Lists:', pickLists.length, 'DNs:', deliveryNotes.length, 'SOs:', salesOrders.length)
     console.log('Warehouse details:', warehouses.map(w => ({ name: w.name, is_group: w.is_group })))
     console.log('Sample bins:', bins.slice(0, 3).map(b => ({ item_code: b.item_code, actual_qty: b.actual_qty, projected_qty: b.projected_qty, stock_value: b.stock_value })))
 
@@ -229,14 +270,16 @@ serve(async (req) => {
       // 8. Carrying Cost (percentage of stock value - estimated)
       carryingCostPercentage: 15.0, // Standard estimate, could be made configurable
       
-      // Operational metrics (these would need more complex calculations with actual transaction data)
+      // Operational metrics calculated from real ERPNext data
       operationalMetrics: {
-        pickAccuracy: 95.5,
-        putawaySpeed: 42.3,
-        cycleCountAccuracy: 98.2,
-        orderFulfillmentRate: 94.8,
+        completedPickLists: pickLists.filter(pl => pl.status === 'Completed').length,
+        totalPickLists: pickLists.length,
+        completedDeliveries: deliveryNotes.filter(dn => dn.docstatus === 1).length,
+        totalDeliveryNotes: deliveryNotes.length,
+        fullyDeliveredOrders: salesOrders.filter(so => so.delivery_status === 'Fully Delivered').length,
+        totalSalesOrders: salesOrders.filter(so => so.docstatus === 1).length,
         warehouseUtilization: calculateWarehouseUtilization(bins),
-        averageProcessingTime: 18.5
+        avgDeliveryTime: calculateAverageDeliveryTime(salesOrders, deliveryNotes)
       },
       
       // Stock aging data
@@ -339,4 +382,28 @@ function calculateStockAging(stockLedgerEntries: any[]): { items_count: number; 
     aged_30_days: aged30Days,
     aged_90_days: aged90Days
   }
+}
+
+function calculateAverageDeliveryTime(salesOrders: any[], deliveryNotes: any[]): number {
+  // Calculate average time from Sales Order to Delivery Note (in days)
+  let totalDays = 0
+  let count = 0
+  
+  deliveryNotes.forEach(dn => {
+    // In ERPNext, DN would link to SO via items table, but for simplicity
+    // we'll calculate average time from SO transaction_date to DN posting_date
+    const dnDate = new Date(dn.posting_date)
+    
+    salesOrders.forEach(so => {
+      const soDate = new Date(so.transaction_date)
+      if (soDate <= dnDate) {
+        const diffTime = Math.abs(dnDate.getTime() - soDate.getTime())
+        const diffDays = diffTime / (1000 * 60 * 60 * 24)
+        totalDays += diffDays
+        count++
+      }
+    })
+  })
+  
+  return count > 0 ? totalDays / count : 0
 }

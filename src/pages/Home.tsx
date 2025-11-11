@@ -100,12 +100,15 @@ const Home = () => {
   };
 
   const safeOperationalMetrics = {
-    pickAccuracy: operationalMetrics?.pickAccuracy || 0,
-    putawaySpeed: operationalMetrics?.putawaySpeed || 0,
-    cycleCountAccuracy: operationalMetrics?.cycleCountAccuracy || 0,
-    orderFulfillmentRate: operationalMetrics?.orderFulfillmentRate || 0,
+    completedPickLists: operationalMetrics?.completedPickLists || 0,
+    totalPickLists: operationalMetrics?.totalPickLists || 0,
+    completedDeliveries: operationalMetrics?.completedDeliveries || 0,
+    totalDeliveryNotes: operationalMetrics?.totalDeliveryNotes || 0,
+    fullyDeliveredOrders: operationalMetrics?.fullyDeliveredOrders || 0,
+    totalSalesOrders: operationalMetrics?.totalSalesOrders || 0,
     warehouseUtilization: operationalMetrics?.warehouseUtilization || 0,
-    averageProcessingTime: operationalMetrics?.averageProcessingTime || 0,
+    avgDeliveryTime: operationalMetrics?.avgDeliveryTime || 0,
+    openPurchases: operationalMetrics?.openPurchases || 0,
   };
 
   const safeFinancialMetrics = {
@@ -250,50 +253,50 @@ const Home = () => {
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Target className="w-4 h-4 text-green-600" />
-                        <h4 className="font-medium text-green-600">Pick Accuracy</h4>
+                        <h4 className="font-medium text-green-600">Pick Lists Completed</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.pickAccuracy, 'percentage')}</p>
-                      <p className="text-sm text-gray-600">Target: 95%</p>
+                      <p className="text-2xl font-bold">{safeOperationalMetrics.completedPickLists} / {safeOperationalMetrics.totalPickLists}</p>
+                      <p className="text-sm text-gray-600">Last 90 days</p>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Timer className="w-4 h-4 text-blue-600" />
-                        <h4 className="font-medium text-blue-600">Putaway Speed</h4>
+                        <h4 className="font-medium text-blue-600">Delivery Notes</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.putawaySpeed, 'percentage')}</p>
-                      <p className="text-sm text-gray-600">Items per hour efficiency</p>
+                      <p className="text-2xl font-bold">{safeOperationalMetrics.completedDeliveries} / {safeOperationalMetrics.totalDeliveryNotes}</p>
+                      <p className="text-sm text-gray-600">Submitted deliveries</p>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Package className="w-4 h-4 text-purple-600" />
-                        <h4 className="font-medium text-purple-600">Cycle Count Accuracy</h4>
+                        <h4 className="font-medium text-purple-600">Order Fulfillment</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.cycleCountAccuracy, 'percentage')}</p>
-                      <p className="text-sm text-gray-600">Inventory accuracy</p>
+                      <p className="text-2xl font-bold">{safeOperationalMetrics.fullyDeliveredOrders} / {safeOperationalMetrics.totalSalesOrders}</p>
+                      <p className="text-sm text-gray-600">Fully delivered SOs</p>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <ShoppingCart className="w-4 h-4 text-orange-600" />
-                        <h4 className="font-medium text-orange-600">Order Fulfillment</h4>
+                        <h4 className="font-medium text-orange-600">Warehouse Utilization</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.orderFulfillmentRate, 'percentage')}</p>
-                      <p className="text-sm text-gray-600">On-time delivery</p>
+                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.warehouseUtilization, 'percentage')}</p>
+                      <p className="text-sm text-gray-600">Bins with stock</p>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Warehouse className="w-4 h-4 text-indigo-600" />
-                        <h4 className="font-medium text-indigo-600">Warehouse Utilization</h4>
+                        <h4 className="font-medium text-indigo-600">Avg Delivery Time</h4>
                       </div>
-                      <p className="text-2xl font-bold">{formatValue(safeOperationalMetrics.warehouseUtilization, 'percentage')}</p>
-                      <p className="text-sm text-gray-600">Space efficiency</p>
+                      <p className="text-2xl font-bold">{safeOperationalMetrics.avgDeliveryTime.toFixed(1)} days</p>
+                      <p className="text-sm text-gray-600">SO to DN time</p>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Clock className="w-4 h-4 text-red-600" />
-                        <h4 className="font-medium text-red-600">Avg Processing Time</h4>
+                        <h4 className="font-medium text-red-600">Pending POs</h4>
                       </div>
-                      <p className="text-2xl font-bold">{safeOperationalMetrics.averageProcessingTime}h</p>
-                      <p className="text-sm text-gray-600">Per order processing</p>
+                      <p className="text-2xl font-bold">{safeOperationalMetrics.openPurchases}</p>
+                      <p className="text-sm text-gray-600">To receive</p>
                     </div>
                   </div>
                 )}

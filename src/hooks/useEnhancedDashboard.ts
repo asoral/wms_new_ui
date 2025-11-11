@@ -26,12 +26,14 @@ export interface OperationalMetrics {
   openDeliveries: number;
   purchasesThisMonth: number;
   openPurchases: number;
-  pickAccuracy: number;
-  putawaySpeed: number;
-  cycleCountAccuracy: number;
-  orderFulfillmentRate: number;
+  completedPickLists: number;
+  totalPickLists: number;
+  completedDeliveries: number;
+  totalDeliveryNotes: number;
+  fullyDeliveredOrders: number;
+  totalSalesOrders: number;
   warehouseUtilization: number;
-  averageProcessingTime: number;
+  avgDeliveryTime: number;
 }
 
 export interface FinancialMetrics {
@@ -91,12 +93,14 @@ export function useEnhancedDashboard() {
     openDeliveries: 0,
     purchasesThisMonth: 0,
     openPurchases: 0,
-    pickAccuracy: 0,
-    putawaySpeed: 0,
-    cycleCountAccuracy: 0,
-    orderFulfillmentRate: 0,
+    completedPickLists: 0,
+    totalPickLists: 0,
+    completedDeliveries: 0,
+    totalDeliveryNotes: 0,
+    fullyDeliveredOrders: 0,
+    totalSalesOrders: 0,
     warehouseUtilization: 0,
-    averageProcessingTime: 0,
+    avgDeliveryTime: 0,
   });
 
   const [financialMetrics, setFinancialMetrics] = useState<FinancialMetrics>({
@@ -162,12 +166,14 @@ export function useEnhancedDashboard() {
             openDeliveries: 0,
             purchasesThisMonth: 0,
             openPurchases: 0,
-            pickAccuracy: 0,
-            putawaySpeed: 0,
-            cycleCountAccuracy: 0,
-            orderFulfillmentRate: 0,
+            completedPickLists: 0,
+            totalPickLists: 0,
+            completedDeliveries: 0,
+            totalDeliveryNotes: 0,
+            fullyDeliveredOrders: 0,
+            totalSalesOrders: 0,
             warehouseUtilization: 0,
-            averageProcessingTime: 0,
+            avgDeliveryTime: 0,
           });
           setFinancialMetrics({
             grossProfit: 0,
@@ -206,20 +212,22 @@ export function useEnhancedDashboard() {
           });
           
           setOperationalMetrics({
-            salesThisMonth: 0, // Not calculated in current implementation
-            salesLastMonth: 0, // Not calculated in current implementation
-            ordersThisMonth: 0, // Not calculated in current implementation
-            ordersLastMonth: 0, // Not calculated in current implementation
-            deliveriesThisMonth: 0, // Not calculated in current implementation
-            openDeliveries: 0, // Not calculated in current implementation
-            purchasesThisMonth: 0, // Not calculated in current implementation
+            salesThisMonth: 0,
+            salesLastMonth: 0,
+            ordersThisMonth: 0,
+            ordersLastMonth: 0,
+            deliveriesThisMonth: 0,
+            openDeliveries: 0,
+            purchasesThisMonth: 0,
             openPurchases: metrics.pendingOrders,
-            pickAccuracy: metrics.operationalMetrics.pickAccuracy,
-            putawaySpeed: metrics.operationalMetrics.putawaySpeed,
-            cycleCountAccuracy: metrics.operationalMetrics.cycleCountAccuracy,
-            orderFulfillmentRate: metrics.operationalMetrics.orderFulfillmentRate,
+            completedPickLists: metrics.operationalMetrics.completedPickLists,
+            totalPickLists: metrics.operationalMetrics.totalPickLists,
+            completedDeliveries: metrics.operationalMetrics.completedDeliveries,
+            totalDeliveryNotes: metrics.operationalMetrics.totalDeliveryNotes,
+            fullyDeliveredOrders: metrics.operationalMetrics.fullyDeliveredOrders,
+            totalSalesOrders: metrics.operationalMetrics.totalSalesOrders,
             warehouseUtilization: metrics.operationalMetrics.warehouseUtilization,
-            averageProcessingTime: metrics.operationalMetrics.averageProcessingTime,
+            avgDeliveryTime: metrics.operationalMetrics.avgDeliveryTime,
           });
           
           setFinancialMetrics({
@@ -323,12 +331,14 @@ export function useEnhancedDashboard() {
           openDeliveries: 0,
           purchasesThisMonth: 0,
           openPurchases: metrics.pendingOrders,
-          pickAccuracy: metrics.operationalMetrics.pickAccuracy,
-          putawaySpeed: metrics.operationalMetrics.putawaySpeed,
-          cycleCountAccuracy: metrics.operationalMetrics.cycleCountAccuracy,
-          orderFulfillmentRate: metrics.operationalMetrics.orderFulfillmentRate,
+          completedPickLists: metrics.operationalMetrics.completedPickLists,
+          totalPickLists: metrics.operationalMetrics.totalPickLists,
+          completedDeliveries: metrics.operationalMetrics.completedDeliveries,
+          totalDeliveryNotes: metrics.operationalMetrics.totalDeliveryNotes,
+          fullyDeliveredOrders: metrics.operationalMetrics.fullyDeliveredOrders,
+          totalSalesOrders: metrics.operationalMetrics.totalSalesOrders,
           warehouseUtilization: metrics.operationalMetrics.warehouseUtilization,
-          averageProcessingTime: metrics.operationalMetrics.averageProcessingTime,
+          avgDeliveryTime: metrics.operationalMetrics.avgDeliveryTime,
         });
         
         setFinancialMetrics({
