@@ -30,6 +30,8 @@ const AdminPermissions = () => {
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedPermission, setSelectedPermission] = useState<'view_valuations' | 'view_sensitive_data' | 'admin_access' | ''>('');
   const [expiryDate, setExpiryDate] = useState<string>('');
@@ -45,8 +47,39 @@ const AdminPermissions = () => {
   ];
 
   useEffect(() => {
-    loadData();
-  }, []);
+    checkAdminStatus();
+  }, [user]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadData();
+    }
+  }, [isAdmin]);
+
+  const checkAdminStatus = async () => {
+    if (!user) {
+      setCheckingAdmin(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('is_admin', { 
+        _user_id: user.id 
+      });
+
+      if (error) {
+        console.error('Error checking admin status:', error);
+        setIsAdmin(false);
+      } else {
+        setIsAdmin(data || false);
+      }
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdmin(false);
+    } finally {
+      setCheckingAdmin(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -163,13 +196,36 @@ const AdminPermissions = () => {
     return perm?.label || permission;
   };
 
-  if (loading) {
+  if (checkingAdmin || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Shield className="w-8 h-8 animate-spin mx-auto mb-2" />
-          <p className="text-muted-foreground">Loading permissions...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <UserX className="w-12 h-12 text-destructive mx-auto" />
+              <div>
+                <h2 className="text-xl font-semibold">Access Denied</h2>
+                <p className="text-muted-foreground mt-2">
+                  You don't have permission to access this page. Only administrators can manage user permissions.
+                </p>
+              </div>
+              <Button onClick={() => window.history.back()} variant="outline">
+                Go Back
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { createERPNextAPI } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
+import { sanitizeHtml } from "@/utils/security";
 
 interface Notification {
   name: string;
@@ -225,7 +226,7 @@ const Notifications = () => {
                       {notification.email_content && (
                         <div 
                           className="text-muted-foreground mb-2 text-sm"
-                          dangerouslySetInnerHTML={{ __html: notification.email_content }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(notification.email_content) }}
                         />
                       )}
                       <p className="text-sm text-muted-foreground">

@@ -109,13 +109,14 @@ serve(async (req) => {
     });
     
   } catch (error) {
+    // Log detailed error information server-side only
     console.error('=== ERROR IN CREATE-CHECKOUT ===');
     console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
     
+    // Return generic error to client without exposing internal details
     return new Response(JSON.stringify({ 
-      error: error.message,
-      stack: error.stack
+      error: 'Failed to create checkout session. Please try again.'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
