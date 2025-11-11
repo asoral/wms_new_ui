@@ -477,7 +477,24 @@ export class ERPNextAPI extends ERPNextBaseAPI {
   }
 
   async markNotificationAsRead(name: string) {
-    return this.callAPI(`Notification Log/${name}`, 'PUT', { read: 1 });
+    // Use ERPNext's specific method to mark notification as read
+    // This doesn't require write permissions on Notification Log doctype
+    const response = await fetch(`${this.baseURL}/api/method/frappe.desk.doctype.notification_log.notification_log.mark_as_read`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${this.apiKey}:${this.apiSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        docname: name
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to mark notification as read: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
   // Generic API call method - updated to support fields and order parameters
