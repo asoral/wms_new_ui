@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { User, Settings, Warehouse, LogOut, Building2, Server, Key, Globe, MessageCircle, Mail, ExternalLink } from "lucide-react";
+import { User, Settings, Warehouse, LogOut, Building2, Server, Key, Globe, MessageCircle, Mail, ExternalLink, AlertCircle, FileText } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { getERPNextConfig, saveERPNextConfig } from "@/services/authService";
@@ -339,75 +339,62 @@ const Profile = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Need help? Contact our support team
+              Need help? Visit our helpdesk portal to create tickets and get support
             </p>
-            <Dialog open={supportDialogOpen} onOpenChange={setSupportDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="w-full dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
-                  Contact Support
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Contact Support</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Choose how you'd like to get in touch with our support team:
+            <Button 
+              variant="outline" 
+              className="w-full dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+              onClick={() => window.open('https://www.dexciss.tech/helpdesk', '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Contact Support
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* FAQ - How to Create a Support Ticket */}
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 dark:text-gray-100">
+              <FileText className="w-5 h-5" />
+              <span>How to Create a Support Ticket</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-2 text-sm">
+                  <p className="font-medium text-blue-900 dark:text-blue-300">
+                    Before creating a ticket on our helpdesk portal:
                   </p>
-                  
-                  <div className="space-y-2">
-                    {/* WhatsApp Option */}
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start h-auto p-4"
-                      onClick={() => {
-                        window.open(`https://wa.me/917028581588`, '_blank');
-                        setSupportDialogOpen(false);
-                      }}
-                    >
-                      <MessageCircle className="h-5 w-5 mr-3 text-green-600" />
-                      <div className="text-left">
-                        <div className="font-medium">WhatsApp</div>
-                        <div className="text-sm text-muted-foreground">+91 7028581588</div>
-                      </div>
-                    </Button>
-                    
-                    {/* Email Option */}
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start h-auto p-4"
-                      onClick={() => {
-                        window.open(`mailto:asoral@dexciss.io`, '_blank');
-                        setSupportDialogOpen(false);
-                      }}
-                    >
-                      <Mail className="h-5 w-5 mr-3 text-blue-600" />
-                      <div className="text-left">
-                        <div className="font-medium">Email</div>
-                        <div className="text-sm text-muted-foreground">asoral@dexciss.io</div>
-                      </div>
-                    </Button>
-                    
-                    {/* Support Portal Option */}
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start h-auto p-4"
-                      onClick={() => {
-                        window.open(`https://support.dexciss.io`, '_blank');
-                        setSupportDialogOpen(false);
-                      }}
-                    >
-                      <ExternalLink className="h-5 w-5 mr-3 text-purple-600" />
-                      <div className="text-left">
-                        <div className="font-medium">Support Portal</div>
-                        <div className="text-sm text-muted-foreground">Visit our help center</div>
-                      </div>
-                    </Button>
-                  </div>
+                  <ul className="space-y-2 text-blue-800 dark:text-blue-300 list-disc list-inside">
+                    <li>Create an account at <span className="font-mono text-xs bg-blue-100 dark:bg-blue-900 px-1 py-0.5 rounded">dexciss.tech/helpdesk</span> if you haven't already</li>
+                    <li><strong>Use a clear, descriptive subject line</strong> that summarizes the issue</li>
+                    <li><strong>Include screenshots</strong> showing the problem whenever possible</li>
+                    <li><strong>Provide step-by-step instructions</strong> to reproduce the issue</li>
+                    <li><strong>Mention your WMS ERPNext URL</strong> for better troubleshooting</li>
+                  </ul>
                 </div>
-              </DialogContent>
-            </Dialog>
+              </div>
+            </div>
+            
+            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+              <p className="font-medium">Example of a good ticket subject:</p>
+              <p className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                "Unable to create Delivery Note - Error 500 on Save"
+              </p>
+            </div>
+            
+            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+              <p className="font-medium">Example of steps to reproduce:</p>
+              <ol className="list-decimal list-inside space-y-1 font-mono text-xs bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded">
+                <li>Go to Deliver module</li>
+                <li>Select Sales Order SO-2024-001</li>
+                <li>Click 'Create Delivery Note'</li>
+                <li>Error appears when clicking Save</li>
+              </ol>
+            </div>
           </CardContent>
         </Card>
 

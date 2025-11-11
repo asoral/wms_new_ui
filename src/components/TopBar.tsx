@@ -200,7 +200,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
               
               <DropdownMenuSeparator />
               
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open('https://www.dexciss.tech/helpdesk', '_blank')}>
                 <HelpCircle className="w-4 h-4 mr-2" />
                 Support
               </DropdownMenuItem>
