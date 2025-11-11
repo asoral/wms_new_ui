@@ -17,6 +17,24 @@ export interface DashboardStats {
   totalStockValue: number;
 }
 
+export interface ABCAnalysis {
+  classA: {
+    count: number;
+    percentage: number;
+    grossMargin: number;
+  };
+  classB: {
+    count: number;
+    percentage: number;
+    grossMargin: number;
+  };
+  classC: {
+    count: number;
+    percentage: number;
+    grossMargin: number;
+  };
+}
+
 export interface OperationalMetrics {
   salesThisMonth: number;
   salesLastMonth: number;
@@ -44,10 +62,6 @@ export interface FinancialMetrics {
   stockTurnoverRatio: number;
   carryingCostPercentage: number;
   deadStockValue: number;
-}
-
-export interface DashboardData {
-  abcAnalysis: ABCAnalysis;
 }
 
 export interface RecentActivity {
@@ -110,11 +124,6 @@ export function useEnhancedDashboard() {
     stockTurnoverRatio: 0,
     carryingCostPercentage: 0,
     deadStockValue: 0,
-    abcAnalysis: {
-      classA: 0,
-      classB: 0,
-      classC: 0,
-    },
   });
 
   const [activities, setActivities] = useState<RecentActivity[]>([]);
@@ -188,11 +197,6 @@ export function useEnhancedDashboard() {
             stockTurnoverRatio: 0,
             carryingCostPercentage: 0,
             deadStockValue: 0,
-            abcAnalysis: {
-              classA: 0,
-              classB: 0,
-              classC: 0,
-            },
           });
           setStockAgingData({
             items_count: 0,

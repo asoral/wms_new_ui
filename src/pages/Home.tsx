@@ -31,7 +31,8 @@ import {
   Activity,
   PieChart,
   RefreshCw,
-  Filter
+  Filter,
+  TrendingDown
 } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useEnhancedDashboard } from '@/hooks/useEnhancedDashboard';
@@ -309,6 +310,93 @@ const Home = () => {
               </CardContent>
             </Card>
 
+            {/* ABC Analysis */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">Class A Items</h3>
+                  <TrendingUp className="h-5 w-5 text-green-500" />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold">{safeAbcAnalysis.classA.count}</div>
+                  <p className="text-xs text-muted-foreground">Fast moving (&gt;50% volume)</p>
+                  <div className="w-full bg-secondary rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-500" 
+                      style={{ width: `${safeAbcAnalysis.classA.percentage}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {safeAbcAnalysis.classA.percentage.toFixed(1)}% of total items
+                  </p>
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground">Gross Margin</span>
+                      <span className="text-sm font-semibold text-green-600">
+                        ${safeAbcAnalysis.classA.grossMargin.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">Class B Items</h3>
+                  <Activity className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold">{safeAbcAnalysis.classB.count}</div>
+                  <p className="text-xs text-muted-foreground">Moderate moving (20-30% volume)</p>
+                  <div className="w-full bg-secondary rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-500" 
+                      style={{ width: `${safeAbcAnalysis.classB.percentage}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {safeAbcAnalysis.classB.percentage.toFixed(1)}% of total items
+                  </p>
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground">Gross Margin</span>
+                      <span className="text-sm font-semibold text-blue-600">
+                        ${safeAbcAnalysis.classB.grossMargin.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">Class C Items</h3>
+                  <TrendingDown className="h-5 w-5 text-orange-500" />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold">{safeAbcAnalysis.classC.count}</div>
+                  <p className="text-xs text-muted-foreground">Slow moving (&lt;20% volume)</p>
+                  <div className="w-full bg-secondary rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-orange-500 h-2 rounded-full transition-all duration-500" 
+                      style={{ width: `${safeAbcAnalysis.classC.percentage}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {safeAbcAnalysis.classC.percentage.toFixed(1)}% of total items
+                  </p>
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground">Gross Margin</span>
+                      <span className="text-sm font-semibold text-orange-600">
+                        ${safeAbcAnalysis.classC.grossMargin.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
               {/* Quick Actions */}
               <div className="lg:col-span-1">
@@ -436,43 +524,6 @@ const Home = () => {
                         <h4 className="font-medium text-red-600">Old Stock (90+ days)</h4>
                         <p className="text-2xl font-bold">{safeStockAgingData.aged_90_days}</p>
                         <p className="text-sm text-gray-600">Requires immediate attention</p>
-                      </div>
-                    </div>
-
-                    {/* ABC Analysis */}
-                    <div className="border-t pt-6">
-                      <h4 className="font-medium mb-4 flex items-center">
-                        <PieChart className="w-4 h-4 mr-2" />
-                        ABC Analysis Distribution
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Class A Items</span>
-                            <span className="text-sm text-gray-600">{safeFinancialMetrics.abcAnalysis.classA}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div className="bg-green-600 h-2 rounded-full" style={{ width: `${safeFinancialMetrics.abcAnalysis.classA}%` }}></div>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Class B Items</span>
-                            <span className="text-sm text-gray-600">{safeFinancialMetrics.abcAnalysis.classB}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div className="bg-yellow-600 h-2 rounded-full" style={{ width: `${safeFinancialMetrics.abcAnalysis.classB}%` }}></div>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Class C Items</span>
-                            <span className="text-sm text-gray-600">{safeFinancialMetrics.abcAnalysis.classC}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div className="bg-red-600 h-2 rounded-full" style={{ width: `${safeFinancialMetrics.abcAnalysis.classC}%` }}></div>
-                          </div>
-                        </div>
                       </div>
                     </div>
 
