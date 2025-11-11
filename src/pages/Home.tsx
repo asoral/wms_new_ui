@@ -48,6 +48,7 @@ const Home = () => {
     operationalMetrics,
     financialMetrics,
     stockAgingData,
+    abcAnalysis,
     isLoading,
     isLoadingActivities,
     error,
@@ -115,7 +116,12 @@ const Home = () => {
     stockTurnoverRatio: financialMetrics?.stockTurnoverRatio || 0,
     deadStockValue: financialMetrics?.deadStockValue || 0,
     carryingCostPercentage: financialMetrics?.carryingCostPercentage || 0,
-    abcAnalysis: financialMetrics?.abcAnalysis || { classA: 0, classB: 0, classC: 0 },
+  };
+  
+  const safeAbcAnalysis = {
+    classA: abcAnalysis?.classA || { count: 0, percentage: 0, grossMargin: 0 },
+    classB: abcAnalysis?.classB || { count: 0, percentage: 0, grossMargin: 0 },
+    classC: abcAnalysis?.classC || { count: 0, percentage: 0, grossMargin: 0 },
   };
 
   const safeStockAgingData = {

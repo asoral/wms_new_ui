@@ -37,6 +37,23 @@ interface DashboardMetrics {
     aged_30_days: number
     aged_90_days: number
   }
+  abcAnalysis: {
+    classA: {
+      count: number
+      percentage: number
+      grossMargin: number
+    }
+    classB: {
+      count: number
+      percentage: number
+      grossMargin: number
+    }
+    classC: {
+      count: number
+      percentage: number
+      grossMargin: number
+    }
+  }
 }
 
 serve(async (req) => {
@@ -128,7 +145,8 @@ serve(async (req) => {
       batchResponse,
       pickListsResponse,
       deliveryNotesResponse,
-      salesOrdersResponse
+      salesOrdersResponse,
+      deliveryNoteItemsResponse
     ] = await Promise.allSettled([
       // 1. Total Items - count of enabled items
       fetch(`${config.erpnext_url}/api/resource/Item?fields=["name"]&filters=[["disabled","=",0]]&limit_page_length=999999`, {
@@ -200,6 +218,14 @@ serve(async (req) => {
           'Authorization': erpAuthHeader,
           'Content-Type': 'application/json'
         }
+      }),
+      
+      // 10. Delivery Note Items for ABC analysis
+      fetch(`${config.erpnext_url}/api/resource/Delivery Note Item?fields=["item_code","qty","amount","base_net_amount","parent"]&filters=[["company","=","${company || ''}"],["docstatus","=",1]]&limit_page_length=999999`, {
+        headers: {
+          'Authorization': erpAuthHeader,
+          'Content-Type': 'application/json'
+        }
       })
     ])
 
@@ -239,8 +265,12 @@ serve(async (req) => {
     const salesOrders = salesOrdersResponse.status === 'fulfilled'
       ? (await salesOrdersResponse.value.json()).data || []
       : []
+      
+    const deliveryNoteItems = deliveryNoteItemsResponse.status === 'fulfilled'
+      ? (await deliveryNoteItemsResponse.value.json()).data || []
+      : []
 
-    console.log('Data fetched - Items:', items.length, 'Bins:', bins.length, 'POs:', purchaseOrders.length, 'Warehouses:', warehouses.length, 'Pick Lists:', pickLists.length, 'DNs:', deliveryNotes.length, 'SOs:', salesOrders.length)
+    console.log('Data fetched - Items:', items.length, 'Bins:', bins.length, 'POs:', purchaseOrders.length, 'Warehouses:', warehouses.length, 'Pick Lists:', pickLists.length, 'DNs:', deliveryNotes.length, 'SOs:', salesOrders.length, 'DN Items:', deliveryNoteItems.length)
     console.log('Warehouse details:', warehouses.map(w => ({ name: w.name, is_group: w.is_group })))
     console.log('Sample bins:', bins.slice(0, 3).map(b => ({ item_code: b.item_code, actual_qty: b.actual_qty, projected_qty: b.projected_qty, stock_value: b.stock_value })))
 
@@ -283,7 +313,10 @@ serve(async (req) => {
       },
       
       // Stock aging data
-      stockAgingData: calculateStockAging(stockLedgerEntries)
+      stockAgingData: calculateStockAging(stockLedgerEntries),
+      
+      // ABC Analysis
+      abcAnalysis: calculateABCAnalysis(deliveryNoteItems, items.length)
     }
 
     console.log('Calculated metrics:', metrics)
@@ -406,4 +439,80 @@ function calculateAverageDeliveryTime(salesOrders: any[], deliveryNotes: any[]):
   })
   
   return count > 0 ? totalDays / count : 0
+}
+
+function calculateABCAnalysis(deliveryNoteItems: any[], totalItemsCount: number): {
+  classA: { count: number; percentage: number; grossMargin: number }
+  classB: { count: number; percentage: number; grossMargin: number }
+  classC: { count: number; percentage: number; grossMargin: number }
+} {
+  if (deliveryNoteItems.length === 0) {
+    return {
+      classA: { count: 0, percentage: 0, grossMargin: 0 },
+      classB: { count: 0, percentage: 0, grossMargin: 0 },
+      classC: { count: 0, percentage: 0, grossMargin: 0 }
+    }
+  }
+  
+  // Aggregate delivery quantities and amounts by item
+  const itemStats = new Map<string, { qty: number; amount: number }>()
+  
+  deliveryNoteItems.forEach(item => {
+    const existing = itemStats.get(item.item_code) || { qty: 0, amount: 0 }
+    itemStats.set(item.item_code, {
+      qty: existing.qty + (item.qty || 0),
+      amount: existing.amount + (item.base_net_amount || item.amount || 0)
+    })
+  })
+  
+  // Sort items by quantity delivered (descending)
+  const sortedItems = Array.from(itemStats.entries())
+    .map(([item_code, stats]) => ({ item_code, ...stats }))
+    .sort((a, b) => b.qty - a.qty)
+  
+  const totalQty = sortedItems.reduce((sum, item) => sum + item.qty, 0)
+  
+  // Calculate cumulative percentages and classify items
+  let cumulativeQty = 0
+  const classA: any[] = []
+  const classB: any[] = []
+  const classC: any[] = []
+  
+  sortedItems.forEach(item => {
+    cumulativeQty += item.qty
+    const cumulativePercentage = (cumulativeQty / totalQty) * 100
+    
+    if (cumulativePercentage <= 50) {
+      classA.push(item)
+    } else if (cumulativePercentage <= 80) {
+      classB.push(item)
+    } else {
+      classC.push(item)
+    }
+  })
+  
+  // Calculate gross margins (simplified as percentage of amount to qty)
+  const calculateMargin = (items: any[]) => {
+    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
+    const totalQty = items.reduce((sum, item) => sum + item.qty, 0)
+    return totalQty > 0 ? (totalAmount / totalQty) * 0.25 : 0 // Estimate 25% margin
+  }
+  
+  return {
+    classA: {
+      count: classA.length,
+      percentage: totalItemsCount > 0 ? (classA.length / totalItemsCount) * 100 : 0,
+      grossMargin: calculateMargin(classA)
+    },
+    classB: {
+      count: classB.length,
+      percentage: totalItemsCount > 0 ? (classB.length / totalItemsCount) * 100 : 0,
+      grossMargin: calculateMargin(classB)
+    },
+    classC: {
+      count: classC.length,
+      percentage: totalItemsCount > 0 ? (classC.length / totalItemsCount) * 100 : 0,
+      grossMargin: calculateMargin(classC)
+    }
+  }
 }

@@ -44,11 +44,10 @@ export interface FinancialMetrics {
   stockTurnoverRatio: number;
   carryingCostPercentage: number;
   deadStockValue: number;
-  abcAnalysis: {
-    classA: number;
-    classB: number;
-    classC: number;
-  };
+}
+
+export interface DashboardData {
+  abcAnalysis: ABCAnalysis;
 }
 
 export interface RecentActivity {
@@ -123,6 +122,12 @@ export function useEnhancedDashboard() {
     items_count: 0,
     aged_30_days: 0,
     aged_90_days: 0,
+  });
+  
+  const [abcAnalysis, setAbcAnalysis] = useState<ABCAnalysis>({
+    classA: { count: 0, percentage: 0, grossMargin: 0 },
+    classB: { count: 0, percentage: 0, grossMargin: 0 },
+    classC: { count: 0, percentage: 0, grossMargin: 0 },
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -238,14 +243,10 @@ export function useEnhancedDashboard() {
             stockTurnoverRatio: metrics.stockTurnoverRatio,
             carryingCostPercentage: metrics.carryingCostPercentage,
             deadStockValue: metrics.deadStockValue,
-            abcAnalysis: {
-              classA: 80, // Placeholder values
-              classB: 15,
-              classC: 5,
-            },
           });
           
           setStockAgingData(metrics.stockAgingData);
+          setAbcAnalysis(metrics.abcAnalysis || abcAnalysis);
         }
 
         // Load recent activities
@@ -349,14 +350,10 @@ export function useEnhancedDashboard() {
           stockTurnoverRatio: metrics.stockTurnoverRatio,
           carryingCostPercentage: metrics.carryingCostPercentage,
           deadStockValue: metrics.deadStockValue,
-          abcAnalysis: {
-            classA: 80,
-            classB: 15,
-            classC: 5,
-          },
         });
         
         setStockAgingData(metrics.stockAgingData);
+        setAbcAnalysis(metrics.abcAnalysis || abcAnalysis);
       }
     } catch (error) {
       console.error('Error refreshing dashboard data:', error);
@@ -376,6 +373,7 @@ export function useEnhancedDashboard() {
     financialMetrics,
     activities,
     stockAgingData,
+    abcAnalysis,
     isLoading,
     isLoadingActivities,
     error,
