@@ -457,6 +457,32 @@ export class ERPNextAPI extends ERPNextBaseAPI {
     return this.callAPI('Packing Slip', 'GET', undefined, finalFilters, limit, undefined, order);
   }
 
+  // Notification Logs
+  async getNotificationLogs(limitPageLength?: number) {
+    const limit = limitPageLength || 50;
+    const fields = [
+      'name',
+      'subject',
+      'email_content',
+      'document_type',
+      'document_name',
+      'type',
+      'read',
+      'creation',
+      'modified'
+    ];
+    
+    return this.callAPI('Notification Log', 'GET', undefined, undefined, limit, fields, 'creation desc');
+  }
+
+  async markNotificationAsRead(name: string) {
+    return this.callAPI(`Notification Log/${name}`, 'PUT', { read: 1 });
+  }
+
+  async deleteNotificationLog(name: string) {
+    return this.callAPI(`Notification Log/${name}`, 'DELETE');
+  }
+
   // Generic API call method - updated to support fields and order parameters
   async callAPI(endpoint: string, method: string = 'GET', data?: any, filters?: any, limitPageLength?: number, fields?: string[], orderBy?: string) {
     const params = this.buildQueryParams(filters, fields, limitPageLength, orderBy);
