@@ -9,7 +9,6 @@ import {
   AlertTriangle, 
   Info, 
   XCircle,
-  Trash2,
   Check,
   Loader2
 } from "lucide-react";
@@ -117,26 +116,6 @@ const Notifications = () => {
     }
   };
 
-  const deleteNotification = async (name: string) => {
-    try {
-      const api = await createERPNextAPI();
-      if (!api) return;
-
-      await api.deleteNotificationLog(name);
-      setNotifications(prev => prev.filter(notif => notif.name !== name));
-      toast({
-        title: "Deleted",
-        description: "Notification deleted successfully",
-      });
-    } catch (error) {
-      console.error("Error deleting notification:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete notification",
-        variant: "destructive",
-      });
-    }
-  };
 
   const markAllAsRead = async () => {
     try {
@@ -232,24 +211,16 @@ const Notifications = () => {
                             </span>
                           )}
                         </h3>
-                        <div className="flex space-x-2 ml-4">
-                          {notification.read === 0 && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => markAsRead(notification.name)}
-                            >
-                              <Check className="w-4 h-4" />
-                            </Button>
-                          )}
+                        {notification.read === 0 && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => deleteNotification(notification.name)}
+                            onClick={() => markAsRead(notification.name)}
+                            className="ml-4"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Check className="w-4 h-4" />
                           </Button>
-                        </div>
+                        )}
                       </div>
                       {notification.email_content && (
                         <div 

@@ -469,7 +469,8 @@ export class ERPNextAPI extends ERPNextBaseAPI {
       'type',
       'read',
       'creation',
-      'modified'
+      'modified',
+      'for_user'
     ];
     
     return this.callAPI('Notification Log', 'GET', undefined, undefined, limit, fields, 'creation desc');
@@ -477,10 +478,6 @@ export class ERPNextAPI extends ERPNextBaseAPI {
 
   async markNotificationAsRead(name: string) {
     return this.callAPI(`Notification Log/${name}`, 'PUT', { read: 1 });
-  }
-
-  async deleteNotificationLog(name: string) {
-    return this.callAPI(`Notification Log/${name}`, 'DELETE');
   }
 
   // Generic API call method - updated to support fields and order parameters
