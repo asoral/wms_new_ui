@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/components/auth/AuthContext";
+import { useNotificationCount } from "@/hooks/useNotificationCount";
 
 interface TopBarProps {
   onSync?: () => void;
@@ -42,9 +43,7 @@ const TopBar = ({ onSync, isOnline = true }: TopBarProps) => {
   const { signOut, user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Mock notification count
-  const unreadNotifications = 3;
+  const { unreadCount: unreadNotifications } = useNotificationCount();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

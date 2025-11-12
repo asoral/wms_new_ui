@@ -204,14 +204,16 @@ const Notifications = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className={`font-medium text-foreground ${notification.read === 0 ? 'font-semibold' : ''}`}>
-                          {notification.subject}
+                        <div className={`font-medium text-foreground ${notification.read === 0 ? 'font-semibold' : ''}`}>
+                          <span 
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(notification.subject) }}
+                          />
                           {notification.document_type && notification.document_name && (
                             <span className="text-sm text-muted-foreground ml-2">
                               ({notification.document_type}: {notification.document_name})
                             </span>
                           )}
-                        </h3>
+                        </div>
                         {notification.read === 0 && (
                           <Button
                             size="sm"
