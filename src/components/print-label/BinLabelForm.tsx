@@ -1,171 +1,143 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Scan, Package } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import { BinLabelData } from "../../pages/PrintLabel";
+import BinScanner from "../bin-enquiry/BinScanner";
+import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface BinLabelFormProps {
   onGenerateLabel: (data: BinLabelData) => void;
 }
 
 const BinLabelForm = ({ onGenerateLabel }: BinLabelFormProps) => {
-  const [warehouseId, setWarehouseId] = useState("");
-  const [isScanning, setIsScanning] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
+  const { toast } = useToast();
 
-  // Mock warehouses (group = 0 means bin-level warehouses)
-  const warehouses = [
-    { id: "WH-001", name: "Main Store - Bin A1", group: 0 },
-    { id: "WH-002", name: "Main Store - Bin A2", group: 0 },
-    { id: "WH-003", name: "Main Store - Bin B1", group: 0 },
-    { id: "WH-004", name: "Raw Material - Bin C1", group: 0 },
-    { id: "WH-005", name: "Finished Goods - Bin D1", group: 0 }
-  ];
+  const handleWarehouseScanned = async (warehouseCode: string) => {
+    try {
+      setLoading(true);
+      setSelectedWarehouse(warehouseCode);
+      
+      const erpnextAPI = await createERPNextAPI();
+      if (!erpnextAPI) {
+        toast({
+          title: "ERPNext Not Configured",
+          description: "Please configure your ERPNext settings in the Profile page.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-  // Mock items in bin
-  const mockBinItems = [
-    {
-      itemCode: "ITM-001",
-      itemName: "Laptop Dell Inspiron",
-      qty: 5,
-      uom: "Nos",
-      batch: "BATCH-001",
-      serial: ""
-    },
-    {
-      itemCode: "ITM-002", 
-      itemName: "Mouse Wireless",
-      qty: 25,
-      uom: "Nos",
-      batch: "",
-      serial: "SRL-001,SRL-002,SRL-003"
-    },
-    {
-      itemCode: "ITM-003",
-      itemName: "Keyboard Mechanical",
-      qty: 10,
-      uom: "Nos",
-      batch: "BATCH-002",
-      serial: ""
+      // Get company
+      const company = await getUserDefaultCompany();
+      
+      // Check if warehouse is a group and get descendants
+      let warehousesToQuery = [warehouseCode];
+      let warehouseNames: string[] = [];
+      
+      try {
+        const warehouseDetails = await erpnextAPI.callAPI(`Warehouse/${warehouseCode}`, 'GET');
+        
+        if (warehouseDetails?.data?.is_group === 1) {
+          // Get all descendant warehouses recursively
+          const getAllWarehouses = async (parentWarehouse: string): Promise<string[]> => {
+            try {
+              const childrenFilters = [['parent_warehouse', '=', parentWarehouse]];
+              const childrenResponse = await erpnextAPI.callAPI('Warehouse', 'GET', undefined, childrenFilters, undefined, ['name', 'warehouse_name', 'is_group']);
+              
+              if (childrenResponse?.data && childrenResponse.data.length > 0) {
+                const childWarehouses: string[] = [];
+                
+                for (const warehouse of childrenResponse.data) {
+                  childWarehouses.push(warehouse.name);
+                  
+                  if (warehouse.is_group === 1) {
+                    const grandChildren = await getAllWarehouses(warehouse.name);
+                    childWarehouses.push(...grandChildren);
+                  }
+                }
+                
+                return childWarehouses;
+              }
+              return [];
+            } catch (error) {
+              console.error(`Failed to get children for ${parentWarehouse}:`, error);
+              return [];
+            }
+          };
+          
+          warehousesToQuery = await getAllWarehouses(warehouseCode);
+          
+          if (warehousesToQuery.length === 0) {
+            warehousesToQuery = [warehouseCode];
+          }
+        }
+        
+        warehouseNames = warehousesToQuery;
+      } catch (error) {
+        console.warn('Could not check warehouse hierarchy:', error);
+      }
+
+      // Fetch bin stock details
+      const filters = [['warehouse', 'in', warehousesToQuery], ['actual_qty', '>', 0]];
+      const fields = ['item_code', 'warehouse', 'actual_qty', 'stock_uom'];
+      
+      const response = await erpnextAPI.callAPI('Bin', 'GET', undefined, filters, 200, fields);
+      
+      const items = response?.data?.map((item: any) => ({
+        itemCode: item.item_code,
+        itemName: item.item_code,
+        qty: Math.round((item.actual_qty || 0) * 100) / 100,
+        uom: item.stock_uom || 'Nos',
+      })) || [];
+
+      const labelData: BinLabelData = {
+        warehouseId: warehouseCode,
+        warehouseName: warehouseCode,
+        barcode: warehouseCode,
+        items: items,
+        warehouses: warehouseNames,
+      };
+      
+      onGenerateLabel(labelData);
+      
+      toast({
+        title: "Label Generated",
+        description: `Generated label for ${warehouseNames.length} warehouse(s)`,
+      });
+      
+    } catch (error) {
+      console.error('Failed to generate bin label:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate label: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  const handleScan = () => {
-    setIsScanning(true);
-    // Simulate barcode scan
-    setTimeout(() => {
-      setWarehouseId("WH-001");
-      setIsScanning(false);
-    }, 2000);
-  };
-
-  const handleGenerateLabel = () => {
-    const selectedWarehouse = warehouses.find(w => w.id === warehouseId);
-    if (!selectedWarehouse) return;
-
-    const labelData: BinLabelData = {
-      warehouseId: selectedWarehouse.id,
-      warehouseName: selectedWarehouse.name,
-      barcode: `BIN-${selectedWarehouse.id}-${Date.now()}`,
-      items: mockBinItems.map(item => ({
-        itemCode: item.itemCode,
-        itemName: item.itemName,
-        qty: item.qty,
-        uom: item.uom,
-        batch: item.batch || undefined,
-        serial: item.serial || undefined
-      }))
-    };
-
-    onGenerateLabel(labelData);
   };
 
   return (
     <div className="space-y-6">
-      {/* Warehouse Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Select Warehouse/Bin</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={handleScan}
-              disabled={isScanning}
-              className="flex items-center space-x-2"
-            >
-              <Scan className="w-4 h-4" />
-              <span>{isScanning ? "Scanning..." : "Scan Bin"}</span>
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="warehouse">Or Select Warehouse</Label>
-            <Select value={warehouseId} onValueChange={setWarehouseId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select warehouse/bin..." />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses.map((warehouse) => (
-                  <SelectItem key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name} ({warehouse.id})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Bin Items Preview */}
-      {warehouseId && (
+      {loading && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center space-x-2">
-              <Package className="w-5 h-5" />
-              <span>Items in Bin</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {mockBinItems.map((item, index) => (
-                <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-medium">{item.itemCode}</h4>
-                      <p className="text-sm text-gray-600">{item.itemName}</p>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className="font-medium">{item.qty} {item.uom}</span>
-                        {item.batch && (
-                          <Badge variant="outline">Batch: {item.batch}</Badge>
-                        )}
-                        {item.serial && (
-                          <Badge variant="outline">Serial: {item.serial}</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="p-6 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
+            <p>Loading warehouse data...</p>
           </CardContent>
         </Card>
       )}
-
-      {/* Generate Button */}
-      <Button 
-        onClick={handleGenerateLabel}
-        disabled={!warehouseId}
-        className="w-full"
-        size="lg"
-      >
-        Generate Bin Label
-      </Button>
+      
+      {!loading && (
+        <BinScanner 
+          onBinScanned={handleWarehouseScanned}
+          isLoading={loading}
+        />
+      )}
     </div>
   );
 };
