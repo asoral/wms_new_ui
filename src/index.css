@@ -136,3 +136,36 @@
     transform: translateY(-4px);
   }
 }
+
+/* Print Styles for Labels */
+@media print {
+  @page {
+    size: auto;
+    margin: 0.5cm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-label,
+  .print-label * {
+    visibility: visible;
+  }
+
+  .print-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    page-break-after: always;
+    margin: 0;
+    padding: 1cm;
+  }
+
+  /* Hide everything except label preview */
+  button, 
+  input,
+  .no-print {
+    display: none !important;
+  }
+}

@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Printer, RefreshCcw } from "lucide-react";
 import BinLabelForm from "../components/print-label/BinLabelForm";
 import ItemLabelForm from "../components/print-label/ItemLabelForm";
@@ -22,6 +24,7 @@ export interface BinLabelData {
     batch?: string;
     serial?: string;
   }>;
+  warehouses?: string[];
 }
 
 export interface ItemLabelData {
@@ -38,6 +41,7 @@ export interface ItemLabelData {
 const PrintLabelPage = () => {
   const [activeTab, setActiveTab] = useState<LabelType>("bin");
   const [labelData, setLabelData] = useState<BinLabelData | ItemLabelData | null>(null);
+  const [copies, setCopies] = useState(1);
 
   const handleGenerateLabel = (data: BinLabelData | ItemLabelData) => {
     setLabelData(data);
@@ -45,6 +49,11 @@ const PrintLabelPage = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleClear = () => {
+    setLabelData(null);
+    setCopies(1);
   };
 
   return (
@@ -57,14 +66,16 @@ const PrintLabelPage = () => {
             <h1 className="text-2xl font-bold text-gray-900">Print Label</h1>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon">
-              <RefreshCcw className="w-4 h-4" />
-            </Button>
             {labelData && (
-              <Button onClick={handlePrint}>
-                <Printer className="w-4 h-4 mr-2" />
-                Print Label
-              </Button>
+              <>
+                <Button variant="outline" size="icon" onClick={handleClear}>
+                  <RefreshCcw className="w-4 h-4" />
+                </Button>
+                <Button onClick={handlePrint}>
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print Label
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -101,10 +112,37 @@ const PrintLabelPage = () => {
             </CardHeader>
             <CardContent>
               {labelData ? (
-                <LabelPreview 
-                  labelData={labelData} 
-                  labelType={activeTab} 
-                />
+                <div className="space-y-4">
+                  <LabelPreview 
+                    labelData={labelData} 
+                    labelType={activeTab}
+                    copies={copies}
+                  />
+                  
+                  {/* Print Options */}
+                  <div className="border-t pt-4 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="copies">Number of Copies</Label>
+                      <Input
+                        id="copies"
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={copies}
+                        onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
+                        className="w-32"
+                      />
+                    </div>
+                    
+                    <Button 
+                      onClick={handlePrint}
+                      className="w-full"
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Print {copies} {copies > 1 ? 'Labels' : 'Label'}
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="text-center text-gray-500 py-12">
                   <Printer className="w-12 h-12 mx-auto mb-4 opacity-50" />
