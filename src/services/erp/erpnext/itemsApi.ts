@@ -22,23 +22,42 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
   }
 
   /**
-   * Search items using Frappe's search_link API - SIMPLIFIED VERSION
+   * Search items using direct Resource API to avoid pos_next app conflicts
    */
   async searchItems(query: string, limit: number = 20): Promise<ERPNextResponse<Item[]>> {
-    const params = new URLSearchParams();
-    params.append('doctype', 'Item');
-    params.append('txt', query);
-    params.append('page_length', String(limit));
-    // Only use basic filters that definitely exist
-    params.append('filters', JSON.stringify([
+    // Use direct resource API with OR filters for item_code and item_name
+    const conditions: any[] = [
       ['disabled', '=', 0],
-      ['is_stock_item', '=', 1] // Only show stock items
+      ['is_stock_item', '=', 1]
+    ];
+
+    // Add search conditions for item_code or item_name
+    if (query && query.trim()) {
+      conditions.push(['item_code', 'like', `%${query}%`]);
+      conditions.push(['item_name', 'like', `%${query}%`]);
+    }
+
+    const params = new URLSearchParams();
+    params.append('filters', JSON.stringify(conditions));
+    params.append('fields', JSON.stringify([
+      'name',
+      'item_code',
+      'item_name',
+      'stock_uom',
+      'item_group',
+      'has_batch_no',
+      'has_serial_no'
     ]));
-  
-    console.log('Search API URL:', `${this.baseURL}/api/method/frappe.desk.search.search_link?${params.toString()}`);
+    params.append('limit_page_length', String(limit));
+    params.append('or_filters', JSON.stringify([
+      ['item_code', 'like', `%${query}%`],
+      ['item_name', 'like', `%${query}%`]
+    ]));
+
+    console.log('Search API URL:', `${this.baseURL}/api/resource/Item?${params.toString()}`);
 
     const response = await fetch(
-      `${this.baseURL}/api/method/frappe.desk.search.search_link?${params.toString()}`,
+      `${this.baseURL}/api/resource/Item?${params.toString()}`,
       { headers: this.getHeaders() }
     );
   
@@ -49,21 +68,18 @@ export class ERPNextItemsAPI extends ERPNextBaseAPI {
     const result = await response.json();
     console.log('Search API response:', result);
   
-    if (!Array.isArray(result.message)) {
-      throw new Error("Unexpected API response format");
-    }
+    // Transform the data to ensure proper structure
+    const transformedItems = (result.data || []).map((item: any) => ({
+      name: item.name,
+      item_code: item.item_code || item.name,
+      item_name: item.item_name || item.item_code || item.name,
+      stock_uom: item.stock_uom || 'Nos',
+      has_batch_no: item.has_batch_no || false,
+      has_serial_no: item.has_serial_no || false,
+      item_group: item.item_group || 'All Item Groups'
+    }));
   
-    const items: Item[] = await Promise.all(
-      result.message.slice(0, limit).map(async (item) => {
-        if (!item.value) {
-          throw new Error("Invalid item data: Missing 'value'");
-        }
-        const details = await this.getItemDetails(item.value as string);
-        return details.data;
-      })
-    );
-  
-    return { data: items };
+    return { data: transformedItems };
   }
 
   /**
