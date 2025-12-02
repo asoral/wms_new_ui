@@ -3,11 +3,12 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Database, RefreshCw, FileText, Clock, CheckCircle, XCircle, Plus, Search, TrendingUp, TrendingDown, ArrowRightLeft } from "lucide-react";
+import { Database, RefreshCw, FileText, Clock, CheckCircle, XCircle, Plus, Search, TrendingUp, TrendingDown, ArrowRightLeft, Eye } from "lucide-react";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { useToast } from "@/hooks/use-toast";
 import { StockEntryType } from "@/pages/StockEntry";
 import { Input } from "@/components/ui/input";
+import StockEntryDetailDialog from "./StockEntryDetailDialog";
 
 interface StockEntryDashboardProps {
   onCreateNew: (type: StockEntryType) => void;
@@ -27,7 +28,27 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState<any>(null);
+  const [recentSearchTerm, setRecentSearchTerm] = useState("");
+  const [filteredRecentEntries, setFilteredRecentEntries] = useState<any[]>([]);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedEntryName, setSelectedEntryName] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Filter recent entries based on search
+  useEffect(() => {
+    if (!recentSearchTerm.trim()) {
+      setFilteredRecentEntries(recentEntries);
+    } else {
+      const term = recentSearchTerm.toLowerCase();
+      const filtered = recentEntries.filter(
+        (entry) =>
+          entry.name?.toLowerCase().includes(term) ||
+          entry.stock_entry_type?.toLowerCase().includes(term) ||
+          entry.owner?.toLowerCase().includes(term)
+      );
+      setFilteredRecentEntries(filtered);
+    }
+  }, [recentSearchTerm, recentEntries]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -362,6 +383,16 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
               View All
             </Button>
           </div>
+          {/* Search within recent entries */}
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Filter recent entries..."
+              value={recentSearchTerm}
+              onChange={(e) => setRecentSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -369,14 +400,14 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
               <RefreshCw className="w-8 h-8 animate-spin mx-auto text-gray-400" />
               <p className="text-gray-600 mt-2">Loading recent entries...</p>
             </div>
-          ) : recentEntries.length === 0 ? (
+          ) : filteredRecentEntries.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Database className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p>No stock entries found</p>
+              <p>{recentSearchTerm ? "No matching entries found" : "No stock entries found"}</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {recentEntries.map((entry, index) => {
+              {filteredRecentEntries.map((entry, index) => {
                 const StatusIcon = getStatusIcon(entry.docstatus);
                 const TypeIcon = getEntryTypeIcon(entry.stock_entry_type);
                 return (
@@ -400,6 +431,16 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
                         {entry.posting_date ? new Date(entry.posting_date).toLocaleDateString() : 
                          entry.creation ? new Date(entry.creation).toLocaleDateString() : 'Invalid Date'}
                       </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEntryName(entry.name);
+                          setViewDialogOpen(true);
+                        }}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 );
@@ -408,6 +449,13 @@ const StockEntryDashboard = ({ onCreateNew, onViewList, onEditDraft }: StockEntr
           )}
         </CardContent>
       </Card>
+
+      {/* View Dialog */}
+      <StockEntryDetailDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        stockEntryName={selectedEntryName}
+      />
     </div>
   );
 };
