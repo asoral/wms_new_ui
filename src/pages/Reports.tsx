@@ -11,7 +11,9 @@ import {
   Calendar,
   Warehouse,
   Download,
-  RefreshCcw
+  RefreshCcw,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
@@ -20,6 +22,8 @@ import ItemSelector from "@/components/common/ItemSelector";
 import WarehouseSelector from "@/components/bin-enquiry/WarehouseSelector";
 import { Item } from "@/types";
 import { exportToExcel, exportToPDF } from "@/utils/exportUtils";
+
+const ITEMS_PER_PAGE = 20;
 
 const Reports = () => {
   const navigate = useNavigate();
@@ -32,6 +36,7 @@ const Reports = () => {
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [companyCurrency, setCompanyCurrency] = useState<string>("INR");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const reportCategories = [
     {
@@ -386,6 +391,7 @@ const Reports = () => {
   useEffect(() => {
     if (selectedReport === "stock-balance") {
       // Automatically load all stock balance data when report is selected
+      setCurrentPage(1);
       fetchStockBalance();
     }
   }, [selectedReport]);
@@ -393,9 +399,60 @@ const Reports = () => {
   // Auto-fetch when filters change
   useEffect(() => {
     if (selectedReport === "stock-balance") {
+      setCurrentPage(1);
       fetchStockBalance();
     }
   }, [selectedItem, selectedWarehouse]);
+
+  // Reset page when report data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [stockBalanceData.length, reportData.length]);
+
+  // Pagination helpers
+  const getPaginatedData = (data: any[]) => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = (data: any[]) => Math.ceil(data.length / ITEMS_PER_PAGE);
+
+  const renderPagination = (totalItems: number) => {
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+        <p className="text-sm text-muted-foreground">
+          Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} records
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground px-2">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   const handleFilter = () => {
     if (selectedReport === "stock-balance") {
@@ -559,34 +616,34 @@ const Reports = () => {
           <>
             {/* Mobile Card View */}
             <div className="md:hidden space-y-3">
-              {stockBalanceData.map((item, index) => (
-            <Card key={index}>
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-medium">{item.itemName}</h4>
-                      <p className="text-sm text-muted-foreground">{item.item}</p>
+              {getPaginatedData(stockBalanceData).map((item, index) => (
+                <Card key={index}>
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">{item.itemName}</h4>
+                          <p className="text-sm text-muted-foreground">{item.item}</p>
+                        </div>
+                        <Badge variant="outline">{item.warehouse}</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Quantity:</span>
+                          <p className="font-medium">{item.qty} {item.uom}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Value:</span>
+                          <p className="font-medium">{new Intl.NumberFormat('en-IN', {
+                            style: 'currency',
+                            currency: companyCurrency,
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }).format(item.value)}</p>
+                        </div>
+                      </div>
                     </div>
-                    <Badge variant="outline">{item.warehouse}</Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Quantity:</span>
-                      <p className="font-medium">{item.qty} {item.uom}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Value:</span>
-                      <p className="font-medium">{new Intl.NumberFormat('en-IN', {
-                        style: 'currency',
-                        currency: companyCurrency,
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }).format(item.value)}</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
+                  </CardContent>
                 </Card>
               ))}
             </div>
@@ -604,28 +661,31 @@ const Reports = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {stockBalanceData.map((item, index) => (
-                <tr key={index} className="border-b border-border hover:bg-accent">
-                  <td className="p-3 text-foreground">
-                    <div>
-                      <div className="font-medium">{item.itemName}</div>
-                      <div className="text-sm text-muted-foreground">{item.item}</div>
-                    </div>
-                  </td>
-                  <td className="p-3 text-foreground">{item.warehouse}</td>
-                  <td className="p-3 text-right text-foreground">{item.qty}</td>
-                  <td className="p-3 text-foreground">{item.uom}</td>
-                  <td className="p-3 text-right text-foreground">{new Intl.NumberFormat('en-IN', {
-                    style: 'currency',
-                    currency: companyCurrency,
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }).format(item.value)}</td>
-                </tr>
+                  {getPaginatedData(stockBalanceData).map((item, index) => (
+                    <tr key={index} className="border-b border-border hover:bg-accent">
+                      <td className="p-3 text-foreground">
+                        <div>
+                          <div className="font-medium">{item.itemName}</div>
+                          <div className="text-sm text-muted-foreground">{item.item}</div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-foreground">{item.warehouse}</td>
+                      <td className="p-3 text-right text-foreground">{item.qty}</td>
+                      <td className="p-3 text-foreground">{item.uom}</td>
+                      <td className="p-3 text-right text-foreground">{new Intl.NumberFormat('en-IN', {
+                        style: 'currency',
+                        currency: companyCurrency,
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(item.value)}</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {renderPagination(stockBalanceData.length)}
           </>
         )}
       </div>
@@ -654,7 +714,7 @@ const Reports = () => {
         </div>
         
         <div className="flex flex-wrap gap-2 mb-4">
-          <Button variant="outline" onClick={() => fetchReportData(reportType)} disabled={loading}>
+          <Button variant="outline" onClick={() => { setCurrentPage(1); fetchReportData(reportType); }} disabled={loading}>
             <RefreshCcw className="w-4 h-4 mr-2" />
             Load {reportName}
           </Button>
@@ -679,7 +739,7 @@ const Reports = () => {
           <>
             {/* Mobile Card View */}
             <div className="md:hidden space-y-3">
-              {reportData.map((row, index) => (
+              {getPaginatedData(reportData).map((row, index) => (
                 <Card key={index}>
                   <CardContent className="p-4">
                     <div className="space-y-2">
@@ -722,7 +782,7 @@ const Reports = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {reportData.map((row: any, rowIndex: number) => (
+                  {getPaginatedData(reportData).map((row: any, rowIndex: number) => (
                     <tr key={rowIndex} className="border-b border-border hover:bg-accent">
                       {reportColumns.map((col: any, colIndex: number) => {
                         const fieldName = col.fieldname || col.label || `col_${colIndex}`;
@@ -746,6 +806,9 @@ const Reports = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {renderPagination(reportData.length)}
           </>
         ) : (
           <div className="text-center py-8">
