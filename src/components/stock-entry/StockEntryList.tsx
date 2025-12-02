@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Plus, Loader2 } from "lucide-react";
+import { Search, Filter, Plus, Loader2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createERPNextAPI, getUserDefaultCompany } from "@/services/erpnextApi";
 import { StockEntryType } from "../../pages/StockEntry";
 import { useIsMobile } from "@/hooks/use-mobile";
 import MobileStockEntryCard from "./MobileStockEntryCard";
+import StockEntryDetailDialog from "./StockEntryDetailDialog";
 
 interface StockEntryListProps {
   onCreateNew: (type: StockEntryType) => void;
@@ -21,8 +22,15 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedEntryName, setSelectedEntryName] = useState<string | null>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
+
+  const handleViewEntry = (entryName: string) => {
+    setSelectedEntryName(entryName);
+    setViewDialogOpen(true);
+  };
 
   useEffect(() => {
     fetchStockEntries();
@@ -197,7 +205,7 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
                   <MobileStockEntryCard
                     key={index}
                     entry={entry}
-                    onView={(entry) => console.log('View entry:', entry)}
+                    onView={(entry) => handleViewEntry(entry.name)}
                     onEdit={(entry) => console.log('Edit entry:', entry)}
                   />
                 ))}
@@ -229,7 +237,12 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
                         <td className="p-3 border">{entry.owner}</td>
                         <td className="p-3 border">
                           <div className="flex space-x-2">
-                            <Button size="sm" variant="outline">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleViewEntry(entry.name)}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
                               View
                             </Button>
                             {entry.docstatus === 0 && (
@@ -258,6 +271,13 @@ const StockEntryList = ({ onCreateNew }: StockEntryListProps) => {
           </CardContent>
         </Card>
       )}
+
+      {/* View Dialog */}
+      <StockEntryDetailDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        stockEntryName={selectedEntryName}
+      />
     </div>
   );
 };
